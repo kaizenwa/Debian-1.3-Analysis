@@ -383,7 +383,7 @@ sys_read
                 wait_on_buffer
                 brelse <-- Here
 
-647-638: Calls __brelse.
+647-648: Calls __brelse.
 ```
 
 #### \_\_brelse (linux/fs/buffer.c:790)
