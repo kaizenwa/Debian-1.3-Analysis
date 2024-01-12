@@ -478,10 +478,10 @@ sys_open
                         dcache_add
                         brelse <-- Here
 
-643-644: Calls __bforget.
+647-648: Calls __brelse.
 ```
 
-#### \_\_bforget (linux/fs/buffer.c:810)
+#### \_\_brelse (linux/fs/buffer.c:790)
 
 ```txt
 Control Flow:
@@ -499,7 +499,7 @@ sys_open
                         ext2_find_entry
                         dcache_add
                         brelse
-                            __bforget <-- Here
+                            __brelse <-- Here
 ```
 
 #### follow\_link (linux/fs/namei.c:194)
