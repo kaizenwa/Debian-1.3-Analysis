@@ -8,12 +8,98 @@
 Control Flow:
 sys_open <-- Here
 
-429: Copies the pathname from user space into the kernel
-     space buffer tmp.
+579: Calls get_unused_fd.
 
-432: Calls do_open to complete the open operation.
+582: Calls getname.
 
-433: Frees the kernel space buffer tmp.
+584: Calls do_open.
+
+585: Calls putname.
+
+586-587: Returns local variable fd.
+```
+
+#### get\_unused\_fd (linux/fs/open.c:555)
+
+```txt
+Control Flow:
+sys_open
+    get_unused_fd <-- Here
+
+560: Calls find_first_zero_bit.
+
+562: Calls FD_SET to set to the file descriptor's bit
+     in the open_fds bitmap.
+
+563: Calls FD_CLR to clear the file descritpor's bit
+     in the close_on_exec bitmap.
+
+564: Returns local variable fd.
+```
+
+#### find\_first\_zero\_bit (linux/include/asm-i386/bitops.h:75)
+
+```txt
+Control Flow:
+sys_open
+    get_unused_fd
+        find_first_zero_bit <-- Here
+```
+
+#### FD\_SET (linux/include/linux/time.h:30)
+
+```txt
+Control Flow:
+sys_open
+    get_unused_fd
+        find_first_zero_bit
+            FD_SET <-- Here
+
+30: #define FD_SET(fd,fdsetp)	__FD_SET(fd,fdsetp)
+```
+
+#### \_\_FD\_SET (linux/include/asm-i386/posix\_types.h:39)
+
+```txt
+Control Flow:
+sys_open
+    get_unused_fd
+        find_first_zero_bit
+            FD_SET
+                __FD_SET <-- Here
+
+39-41: #define __FD_SET(fd,fdsetp) \
+               __asm__ __volatile__("btsl %1,%0": \
+                   "=m" (*(__kernel_fd_set *) (fdsetp)):"r" ((int) (fd)))
+```
+
+#### FD\_CLR (linux/include/linux/time.h:31)
+
+```txt
+Control Flow:
+sys_open
+    get_unused_fd
+        find_first_zero_bit
+            FD_SET
+            FD_CLR <-- Here
+
+31: #define FD_CLR(fd,fdsetp)	__FD_CLR(fd,fdsetp)
+```
+
+#### \_\_FD\_CLR (linux/include/asm-i386/posix\_types.h:44)
+
+```txt
+Control Flow:
+sys_open
+    get_unused_fd
+        find_first_zero_bit
+            FD_SET
+            FD_CLR
+                __FD_CLR <-- Here
+
+44-46: #define __FD_CLR(fd,fdsetp) \
+               __asm__ __volatile__("btrl %1,%0": \
+                   "=m" (*(__kernel_fd_set *) (fdsetp)):"r" ((int) (fd)))
 ```
 
 #### getname (linux/fs/namei.c:29)
@@ -21,60 +107,75 @@ sys_open <-- Here
 ```txt
 Control Flow:
 sys_open
+    get_unused_fd
     getname <-- Here
 
-35-37: Checks if the address of the filename exists and is
-       within userspace (< 3GB).
+60: Calls get_max_filename.
 
-38-43: Sets variable i to PAGE_SIZE and preemptively assigns
-       -ENAMETOOLONG to the error variable if the remaining
-       amount of memory in the task exceeds PAGE_SIZE.
+68: Calls get_user.
 
-44-46: Calls get_fs_byte to obtain the first character of the
-       filename and returns -ENOENT if the character is '\0'.
+71: Calls __get_free_page.
 
-47-49: Obtains a free page of memory and assigns it to the
-       tmp variable to create a 4096 character array.
+74-81: Copies the filename from user space into the
+       kernel buffer.
 
-50-57: Copies the filename to tmp, null terminates it, and
-       returns 0.
-
-58-59: Frees the character array if the filename exceeds
-       PAGE_SIZE in length and returns -ENAMETOOLONG
-       (recall that this was preemptively set on line 42).
+77-79: Null terminates the string and returns zero.
 ```
 
-#### do\_open (linux/fs/open.c:376)
+#### get\_max\_filename (linux/fs/namei.c:29)
 
 ```txt
 Control Flow:
 sys_open
+    get_unused_fd
+    getname
+        get_max_filename <-- Here
+```
+
+#### get\_user (linux/include/asm-i386/segment.h:18)
+
+```txt
+Control Flow:
+sys_open
+    get_unused_fd
+    getname
+        get_max_filename
+            get_user <-- Here
+
+18: #define get_user(ptr) ((__typeof__(*(ptr)))__get_user((ptr),sizeof(*(ptr))))
+```
+
+#### \_\_get\_user (linux/include/asm-i386/segment.h:58)
+
+```txt
+Control Flow:
+sys_open
+    get_unused_fd
+    getname
+        get_max_filename
+            get_user
+                __get_user <-- Here
+```
+
+#### do\_open (linux/fs/open.c:502)
+
+```txt
+Control Flow:
+sys_open
+    get_unused_fd
     getname
     do_open <-- Here
 
-382-384: Assigns the first unused file descriptor index
-         to fd.
+508: Calls get_empty_filp.
 
-387: Clears the close_on_exec bit for the file descriptor.
+517: Calls open_namei.
 
-388: Obtains a pointer to an empty file structure.
+532-533: Calls the file's open method if it exists.
 
-391: Inserts the empty file structure into the current
-     task's open file table.
+539: Inserts file structure into the current process's
+     file descriptor table.
 
-392-397: Builds the flag argument to pass to open_namei.
-
-405: Assigns the inode obtained from open_namei to the
-     new file structure's inode field.
-
-409-410: Assigns default_file_ops structure to the new
-         file's f_op field.
-
-412: Invokes inode's open file method. Note that there is
-     no open method for ext2 files.
-
-420: Clears the open flags from the file structure's flag
-     field.
+540: Returns zero.
 ```
 
 #### get\_empty\_filp (linux/fs/file\_table.c:68)
@@ -82,381 +183,359 @@ sys_open
 ```txt
 Control Flow:
 sys_open
+    get_unused_fd
     getname
     do_open
-        get_empty_filp
+        get_empty_filp <-- Here
 
-73-74: Calls grow_files for the system's first request
-       for a new file structure.
+130-139: Searches the file list for a free file structure.
 
-76-83: Finds the first file structure with a zero refcount,
-       removes it from the file table, bzeroes it, puts it
-       at the end of the file table, increments its refcount,
-       and returns it.
+132: Calls remove_file_free.
 
-84-87: Calls grow_files if there are no free file structures
-       in the file table and there are less than 1024 files
-       in total.
+133: Calls memset to bzero the file structure.
 
-88: Returns NULL if there are no free file structures and
-    we cannot grow the file table any further.
+134: Calls put_last_free.
+
+135: Assigns one to the file structure's f_count field.
+
+137: Returns the file structure.
 ```
 
-#### grow\_files (linux/fs/file\_table.c:43)
+#### remove\_file\_free (linux/fs/file\_table.c:41)
 
 ```txt
 Control Flow:
 sys_open
+    get_unused_fd
     getname
     do_open
         get_empty_filp
-            grow_files <-- Here
-
-48: Obtains a free page of memory with get_free_page.
-
-53: Increments nr_files by the amount of file structures
-    in a single page of memory.
-
-55-56: If this is the system's first call to grow_files
-       it sets first_file as the first file structure in
-       the file table and decrements i.
-
-58-59: Adds all the newly allocated file structures to the
-       file table.
-```
-
-#### insert\_file\_free (linux/fs/file\_table.c:14)
-
-```txt
-Control Flow:
-sys_open
-    getname
-    do_open
-        get_empty_filp
-            grow_files
-                insert_file_free <-- Here
-
-16-20: Inserts the new file structure to the beginning of
-       the file table using standard linked list methods.
-```
-
-#### remove\_file\_free (linux/fs/file\_table.c:23)
-
-```txt
-Control Flow:
-sys_open
-    getname
-    do_open
-        get_empty_filp
-            grow_files
             remove_file_free <-- Here
-
-25-31: Removes the file structure from the file table
-       using standard linked list methods and assigns
-       its f_next and f_prev fields to NULL.
 ```
 
-#### put\_last\_free (linux/fs/file\_table.c:35)
+#### put\_last\_free (linux/fs/file\_table.c:57)
 
 ```txt
 Control Flow:
 sys_open
+    get_unused_fd
     getname
     do_open
         get_empty_filp
-            grow_files
             remove_file_free
             put_last_free <-- Here
-
-36: Calls remove_file_free to remove the file structure
-    from the file table, which is a redundant procedure
-    if the put_last_free call follows the memset call
-    on line 79.
-
-37-40: Inserts the file structure at the end of the file table.
 ```
 
-#### open\_namei (linux/fs/namei.c:274)
+#### open\_namei (linux/fs/namei.c:335)
 
 ```txt
 Control Flow:
 sys_open
+    get_unused_fd
     getname
     do_open
         get_empty_filp
         open_namei <-- Here
 
-284: Calls dir_namei to obtain the name, name length, and base
-     directory of the pathname's leaf node.
+344: Calls dir_namei.
 
-287-299: Handles the "/usr/" special case.
+386: Calls lookup.
 
-300: Increments the base directory's refcount.
+391: Calls follow_link.
 
-301-322: Handles the O_CREAT case.
+398: Calls permission
 
-304-307: If the file we wanted to create already exists for the
-         O_EXCL case, we decrement the refcount of the inode
-         and return -EEXIST at line 327.
+458: Assigns inode to res_inode argument.
 
-309-314: Handles the case where lookup returned any error other
-         than -ENOENT.
-
-315-321: Calls the base directory's create method to create the
-         file. 
-
-324: Calls lookup for the !O_CREAT case.
-
-329: Calls follow_link in case the leaf node was a symbolic link.
-
-332-335: Returns -EISDIR if the leaf node is a directory and the
-         current process does not have write permission.
-
-336-339: Returns -EACCESS if the current process does not have
-         permissions >= rw--w-r--.
-
-340-344: Returns -EACCES if the inode represents a device file
-         with the MS_NODEV flag set. This flag is defined in
-         /include/linux/fs.h on line 68 as:
-
-         #define MS_NODEV  4 /* disallow access to device special files */ 
-
-346-350: Returns -EROFS if the inode has the MS_RDONLY flag set,
-         which corresponds to a read-only file system.
-
-         #define MS_RDONLY 1 /* mount read-only */
-
-351-369: If the current process wants to open the file for writing
-         and other processes have it open, it searches the process
-         list for any processes using the file as an executable
-         or as an inode. Returns -ETXTBSY if any such process is found.
-
-370-379: Handles the O_TRUNC case.
-
-380-381: Assigns the file's inode to *res_inode and returns 0.
+459: Returns zero.
 ```
 
-#### dir\_namei (linux/fs/namei.c:156)
+#### dir\_namei (linux/fs/namei.c:217)
 
 ```txt
 Control Flow:
 sys_open
+    get_unused_fd
     getname
     do_open
-    get_empty_filp
-    open_namei
-        dir_namei <-- Here
+        get_empty_filp
+        open_namei
+            dir_namei <-- Here
 
-165: Sets base to the current working directory if a
-     base directory is not specified.
+240: Breaks out of loop if we reached the end of
+     the pathname.
 
-169-174: Decrements the previous base directory's refcount,
-         sets base to the current process's root directory,
-         and increments its refcount.
+243: Calls lookup.
 
-177: Assigns the length of the next pathname node to len.
+248: Calls follow_link.
 
-179-180: Breaks out of the while loop if we reached the
-         leaf node of the pathname.
+256: Assigns thisname to the name argument.
 
-182: Calls lookup to obtain the inode of the directory entry
-     thisname.
+257: Assigns len to namelen argument.
 
-187: Calls follow_link to handle symbolic links if applicable.
-     If the directory entry is not a symbolic link, the follow_link
-     routine simply returns early.
+258: Assigns bse to res_inode argument.
 
-191-194: Returns -ENOTDIR is the base directory does not have a
-         lookup method. We check this condition here because we
-         break out of the loop upon reaching the leaf node, hence
-         we do not call lookup and check this condition at lines
-         118-121.
-
-195-198: Assign the leaf node's name and length, along with the
-         base directory's inode to the pass-through return values
-         and return 0.
+259: Returns zero.
 ```
 
-#### lookup (linux/fs/namei.c:94)
+#### lookup (linux/fs/namei.c:156)
 
 ```txt
 Control Flow:
 sys_open
+    get_unused_fd
     getname
     do_open
-    get_empty_filp
-    open_namei
-        dir_namei
-            lookup <-- Here
+        get_empty_filp
+        open_namei
+            dir_namei
+                lookup <-- Here
 
-100: Initializes result variable to NULL.
+166: Calls permission.
 
-104: Checks if the caller's acl has execute permission to
-     traverse the directory.
-
-105-108: Handles the ".." case for the process's root directory
-         by returning the root directory.         
-
-109-116: Handles the ".." case for when the dir variable is the
-         root of a mounted filesystem by decrementing dir's
-         refcount, assigning the mount point directory to dir,
-         and incrementing the mount point's directory.
-
-126-129: Handles the empty name case by returning dir variable
-         as the result.
-
-130: Calls the inode's lookup method.
+191: return dir->i_op->lookup(dir, name, len, result);
 ```
 
-#### permission (linux/fs/namei.c:74)
+#### permission (linux/fs/namei.c:99)
 
 ```txt
 Control Flow:
 sys_open
+    get_unused_fd
     getname
     do_open
-    get_empty_filp
-    open_namei
-        dir_namei
-            lookup
-                permission <-- Here
-
-78-79: Calls the inode's permission method if it exists.
+        get_empty_filp
+        open_namei
+            dir_namei
+                lookup
+                    permission <-- Here
 ```
 
-#### ext2\_permission (linux/fs/ext2/acl.c:25)
+#### ext2\_lookup (linux/fs/ext2/namei.c:154)
 
 ```txt
 Control Flow:
 sys_open
-    ...
-    open_namei
-        dir_namei
-            lookup
-                permission
-                    ext2_permission <-- Here
+    get_unused_fd
+    getname
+    do_open
+        get_empty_filp
+        open_namei
+            dir_namei
+                lookup
+                    permission
+                    ext2_lookup <-- Here
 
-27: Initializes mode variable to the inode's access rights.
+172: Calls dcache_lookup.
 
-32-33: Returns 1 for the super user. For thsoe interested
-       in the suser routine, it is defined as follows:
+177: Calls iget.
 
-       #define suser() (current->euid == 0)
+181: Calls iput.
 
-37-38: Right-shifts mode by 6 if the current process's
-       effective user ID is the owner of the file.
+182: Returns zero.
 
-       mode = XXXXXXX 000      000     000
-                       ^        ^       ^
-                      owner   group   other
+185: Calls ext2_find_entry.
 
-       By right-shifted by 6, we shift the owner's bits
-       to the three least-significant bits for the
-       bitmask.
+192: Calls dcache_add.
 
-39-40: Right-shifts mode by 3 if the current process
-       is within the inode's group. This shifts the
-       group's bits to the three least-significant
-       bits for the bitmask.
+193: Calls brelse.
 
-41-44: Returns 1 if the S_IRWXO flag is set in mode and
-       returns 0 otherwise.
+194: Calls iget.
+
+198: Calls iput.
+
+199: Returns zero.
 ```
 
-#### ext2\_lookup (linux/fs/ext2/namei.c:170)
+#### dcache\_lookup (linux/fs/dcache.c:183)
 
 ```txt
 Control Flow:
 sys_open
-    ...
-    open_namei
-        dir_namei
-            lookup
-                permission
-                ext2_lookup <-- Here
-
-177: Initializes result to NULL.
-
-185: Searches the ext2 directory cache for the directory.
-
-187: Calls ext2_find_entry if the directory was not cached.
-
-191-198: Adds the directory entry's inode number to the ext2
-         dcache and releases the buffer head.
-
-200: Assigns the directory entry's inode pointer to *result.
-
-204-205: Decrements the directory's refcount and return 0.
+    get_unused_fd
+    getname
+    do_open
+        get_empty_filp
+        open_namei
+            dir_namei
+                lookup
+                    permission
+                    ext2_lookup
+                        dcache_lookup <-- Here
 ```
 
-#### ext2\_find\_entry (linux/fs/ext2/namei.c:75)
+#### iget (linux/include/linux/fs.h:684)
 
 ```txt
 Control Flow:
 sys_open
-    ...
-    open_namei
-        dir_namei
-            lookup
-                permission
-                ext2_lookup
-                    ext2_find_entry <-- Here
+    get_unused_fd
+    getname
+    do_open
+        get_empty_filp
+        open_namei
+            dir_namei
+                lookup
+                    permission
+                    ext2_lookup
+                        dcache_lookup
+                        iget <-- Here
 
-Ill do this later
+686: return __iget(sb, nr, 1);
 ```
 
-#### follow\_link (linux/fs/namei.c:133)
+#### \_\_iget (linux/fs/inode.c:569)
 
 ```txt
 Control Flow:
 sys_open
-    ...
-    open_namei
-        dir_namei
-            lookup
-            follow_link <-- Here
-
-147: Calls the inode's follow_link method.
+    get_unused_fd
+    getname
+    do_open
+        get_empty_filp
+        open_namei
+            dir_namei
+                lookup
+                    permission
+                    ext2_lookup
+                        dcache_lookup
+                        iget
+                            __iget <-- Here
 ```
 
-#### ext2\_follow\_link (linux/fs/ext2/symlink.c:50)
+#### iput (linux/fs/inode.c:418)
 
 ```txt
 Control Flow:
 sys_open
-    ...
-    open_namei
-        dir_namei
-            lookup
-            follow_link
-                ext2_follow_link <-- Here
+    get_unused_fd
+    getname
+    do_open
+        get_empty_filp
+        open_namei
+            dir_namei
+                lookup
+                    permission
+                    ext2_lookup
+                        dcache_lookup
+                        iget
+                        iput <-- Here
+```
 
-66-70: If the inode's file is not a symbolic link, we
-       decrement the directory's refcount and return 0.
+#### ext2\_find\_entry (linux/fs/ext2/namei.c:62)
 
-71-75: Returns -ELOOP if we have traversed five symbolic
-       links in the overall namei procedure. Or in other
-       words, if we have made five recursive calls to
-       open_namei we return -ELOOP.
+```txt
+Control Flow:
+sys_open
+    get_unused_fd
+    getname
+    do_open
+        get_empty_filp
+        open_namei
+            dir_namei
+                lookup
+                    permission
+                    ext2_lookup
+                        dcache_lookup
+                        ext2_find_entry <-- Here
+```
 
-76-82: If the inode has buffer heads, we use one of them
-       to read in the contents of the file if necessary and
-       point the link variable to it.
+#### dcache\_add (linux/fs/dcache.c:183)
 
-83-84: If the inode does not have buffer heads, we cast its
-       u.ext2_i.i_data field to a character pointer and assign
-       it to the link variable.
+```txt
+Control Flow:
+sys_open
+    get_unused_fd
+    getname
+    do_open
+        get_empty_filp
+        open_namei
+            dir_namei
+                lookup
+                    permission
+                    ext2_lookup
+                        dcache_lookup
+                        ext2_find_entry
+                        dcache_add <-- Here
+```
 
-85: Increment the current process's link_count field.
+#### brelse (linux/include/linux/fs.h:635)
 
-86: Makes a recursive call to open_namei, passing link as its
-    pathname argument.
+```txt
+Control Flow:
+sys_open
+    get_unused_fd
+    getname
+    do_open
+        get_empty_filp
+        open_namei
+            dir_namei
+                lookup
+                    permission
+                    ext2_lookup
+                        dcache_lookup
+                        ext2_find_entry
+                        dcache_add
+                        brelse <-- Here
 
-87: Decrement the current process's link_count field upon
-    completing the recursive call.
+643-644: Calls __bforget.
+```
 
-89-91: Releases the buffer head if we used one and returns
-       error variable.
+#### \_\_bforget (linux/fs/buffer.c:810)
+
+```txt
+Control Flow:
+sys_open
+    get_unused_fd
+    getname
+    do_open
+        get_empty_filp
+        open_namei
+            dir_namei
+                lookup
+                    permission
+                    ext2_lookup
+                        dcache_lookup
+                        ext2_find_entry
+                        dcache_add
+                        brelse
+                            __bforget <-- Here
+```
+
+#### follow\_link (linux/fs/namei.c:194)
+
+```txt
+Control Flow:
+sys_open
+    get_unused_fd
+    getname
+    do_open
+        get_empty_filp
+        open_namei
+            dir_namei
+                lookup
+                follow_link <-- Here
+
+208: return inode->i_op->follow_link(dir,inode,flag,mode,res_inode);
+```
+
+#### ext2\_follow\_link (linux/fs/ext2/symlink.c:54)
+
+```txt
+Control Flow:
+sys_open
+    get_unused_fd
+    getname
+    do_open
+        get_empty_filp
+        open_namei
+            dir_namei
+                lookup
+                follow_link <-- Here
+
+81: Calls ext2_bread.
+
+94: Calls open_namei.
 ```
 
 #### ext2\_bread (linux/fs/ext2/inode.c:392)
@@ -464,38 +543,13 @@ sys_open
 ```txt
 Control Flow:
 sys_open
-    ...
-    open_namei
-        dir_namei
-            lookup
-            follow_link
-                ext2_follow_link
-                    ext2_bread <-- Here
-
-397: Calls ext2_getblk to obtain a buffer head for the
-     contents of the symbolic link's file data.
-
-398-399: Returns bh if the buffer head is NULL or the
-         buffer head already contains up to date file
-         information.
-
-400-401: Calls ll_rw_block to read the symbolic link's
-         updated file contents into the buffer head.
-
-402-403: Returns the buffer head if the read was successful.
-
-404-406: Frees the buffer head, sets err to -EIO, and returns
-         NULL if the updated file contents could not be read.
-```
-
-#### putname (linux/fs/namei.c:62)
-
-```txt
-Control Flow:
-sys_open
+    get_unused_fd
     getname
     do_open
-    putname <-- Here
-
-64: Frees the filename from kernel space.
+        get_empty_filp
+        open_namei
+            dir_namei
+                lookup
+                follow_link
+                    ext2_bread <-- Here
 ```
