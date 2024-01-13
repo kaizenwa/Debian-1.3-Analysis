@@ -12,19 +12,21 @@
 
 ### Source Code Commentary
 
-#### main (mount-2.6d/swapon.c:55)
+#### main (mount-2.6d/swapon.c:119)
 
 ```txt
 Control Flow:
 main <-- Here
 
-64-65: Assigns "swapon" to the global static variable program_name.
+128-129: Assigns "swapon" to the global static variable program_name.
 
-70-72: Iterates the local variable all.
+134-135: Iterates the local variable all.
 
-95: Calls getfsent.
+165: Calls getfsent.
 
-96-97: Calls swap.
+180: Calls swap.
+
+192: Returns local variable status.
 ```
 
 #### getfsent (mount-2.6d/fstab.c:36)
@@ -57,7 +59,7 @@ main
 23: return (F_fstab != NULL);
 ```
 
-#### \_IO\_fopen (libc-4.6.27/libio-4.6.26/iofopen.c:31)
+#### \_IO\_fopen (libc4-4.6.27/libio/iofopen.c:31)
 
 ```txt
 Control Flow:
@@ -73,8 +75,8 @@ main
 
 40: Assigns &_IO_file_jumps to the fp->file._jumps field.
 
-    Note: _IO_file_jumps is defined on line 738 of
-          libc-4.6.27/libio-4.6.26/fileops.c.
+    Note: _IO_file_jumps is defined on lines 758-776 of
+          libc4-4.6.27/libio/fileops.c.
 
 41: Calls _IO_file_init.
 
@@ -149,7 +151,7 @@ main
 ...
 ```
 
-#### swap (mount-2.6d/swapon.c:36)
+#### swap (mount-2.6d/swapon.c:69)
 
 ```txt
 Control Flow:
@@ -157,7 +159,9 @@ main
     getfsent
     swap <-- Here
 
-43-44: Calls swapon.
+88: Calls swapon -> sys_swapon.
+
+98: Returns local variable status.
 ```
 
 #### sys\_swapon (linux/mm/swapfile.c:405)
