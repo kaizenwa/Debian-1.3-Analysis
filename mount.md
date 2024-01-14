@@ -18,62 +18,117 @@
 Control Flow:
 main <-- Here
 
-643-684: Calls getopt_long to handle options.
+956-996: Calls getopt_long to handle options.
 
-727: Calls canonicalize.
+1014: Calls stat -> sys_stat.
 
-728: Calls getmntfile.
+1016: Calls lock_mtab.
 
-729: Calls getfsspec and getfsfile.
+1018: Calls create_mtab.
 
-742: Calls mount_one.
+1019: Calls open_mtab.
 
-767: Calls exit(result).
+1037: Calls canonicalize.
+
+1038: Calls getmntfile.
+
+1039: Calls getfsspec and getfsfile.
+
+1052: Calls mount_one.
+
+1077: Calls exit(result).
 ```
 
-#### canonicalize (mount-2.4/sundries.c:273)
+#### sys\_stat (linux/fs/stat.c:110)
 
 ```txt
 Control Flow:
 main
+    sys_stat <-- Here
+```
+
+#### lock\_mtab (mount-2.6d/sundries.c:197)
+
+```txt
+Control Flow:
+main
+    sys_stat
+    lock_mtab <-- Here
+```
+
+#### create\_mtab (mount-2.6d/mount.c:887)
+
+```txt
+Control Flow:
+main
+    sys_stat
+    lock_mtab
+    create_mtab <-- Here
+```
+
+#### open\_mtab (mount-2.6d/sundries.c:209)
+
+```txt
+Control Flow:
+main
+    sys_stat
+    lock_mtab
+    create_mtab
+    open_mtab <-- Here
+```
+
+#### canonicalize (mount-2.6d/sundries.c:399)
+
+```txt
+Control Flow:
+main
+    sys_stat
+    lock_mtab
+    create_mtab
+    open_mtab
     canonicalize <-- Here
 
-275: Calls xmalloc to create a buffer of size PATH_MAX + 1.
+409: Calls xmalloc to create a buffer of size PATH_MAX + 1.
 
-280-281: Calls realpath and returns the local variable canonical
+411-412: Calls realpath and returns the local variable canonical
          if it was successful.
 
-283: Calls strcpy to copy the path argument to canonical if
-     realpath was not successful.
+414: Calls free on canonical if realpath was not successful.
 
-284: Returns canonical.
+284: return xstrdup(path).
 ```
 
-#### realpath (mount-2.4/realpath.c:67)
+#### realpath (mount-2.6d/realpath.c:70)
 
 ```txt
 Control Flow:
 main
+    sys_stat
+    lock_mtab
+    create_mtab
+    open_mtab
     canonicalize
         realpath <-- Here
 
-76: Assigns the resolved_path argument to the local variable
+79: Assigns the resolved_path argument to the local variable
     new_path.
 
-82: Calls strcpy to copy the pathname into the local variable
+89: Calls strcpy to copy the pathname into the local variable
     copy_path.
 
-83: Assigns copy_path to the path argument.
+90: Assigns copy_path to the path argument.
 
-96-99: Writes '/' in new_path and increments path/new_path.
+96: Calls getcwd.
 
-103-105: Skips extra slashes.
+104-107: Writes '/' in new_path and increments path/new_path.
 
-109-111: Skips "." and "./".
+111-114: Skips extra slashes.
 
-113-124: Handles ".." and "../".
+117-120: Skips "." and "./".
 
-120-123: Decrements new_path until it points to the first
+121-132: Handles ".." and "../".
+
+128-130: Decrements new_path until it points to the first
          character of the previous component.
 
          Initial State:
@@ -94,88 +149,122 @@ main
             |
             ---- (--new_path)[-1]
 
-127-132: Copies the next pathname component into new_path.
+135-141: Copies the next pathname component into new_path.
 
-136-139: Assigns ELOOP to errno and returns NULL if we called
+144-147: Assigns ELOOP to errno and returns NULL if we called
          readlink 32 times.
 
-142: Calls sys_readlink.
+150: Calls readlink -> sys_readlink.
 
-150: Null terminates the local variable link_path.
+158: Null terminates the local variable link_path.
 
-151-153: Assigns resolved_path to new_path for an absolute
+159-161: Assigns resolved_path to new_path for an absolute
          symbolic link.
 
-156-157: Decrements new_path until we reach the previous '/'.
+164-165: Decrements new_path until we reach the previous '/'.
 
 159-162: Assigns ENAMETOOLONG to errno and returns NULL if the
          pathname after evaluating the symbolic link is longer
          than PATH_MAX.
 
-164: Calls strcat to append path to link_path.
+172: Calls strcat to append path to link_path.
 
-165: Calls strcpy to copy link_path to the local variable
+173: Calls strcpy to copy link_path to the local variable
      copy_path.
 
-166: Assigns copy_path to path.
+174: Assigns copy_path to path.
 
-169: Writes '/' in the new_path buffer and increments it.
+177: Writes '/' in the new_path buffer and increments it.
 
-172-173: Handles trailing slash.
+180-181: Handles trailing slash.
 
-175: Null-terminates new_path.
+183: Null-terminates new_path.
 
-176: Returns resolved_path.
+184: Returns resolved_path.
 ```
 
-#### sys\_readlink (linux-1.2.13/fs/stat.c:191)
+#### sys\_readlink (linux-1.2.13/fs/stat.c:221)
 
 ```txt
 Control Flow:
 main
+    sys_stat
+    lock_mtab
+    create_mtab
+    open_mtab
     canonicalize
         realpath
             sys_readlink <-- Here
 ```
 
-#### getmntfile (mount-2.4/sundries.c:194)
+#### getmntfile (mount-2.6d/sundries.c:311)
 
 ```txt
 Control Flow:
 main
+    sys_stat
+    lock_mtab
+    create_mtab
+    open_mtab
     canonicalize
     getmntfile <-- Here
 
-201: Calls rewind if F_mtab is already open.
-
-203: Calls getmntent.
-
-211: Returns local variable mnt.
+312: return getmntfromfile (name, F_mtab);
 ```
 
-#### rewind (libc-4.6.27/libio/stdio/rewind.c:5)
+#### getmntfromfile (mount-2.6d/sundries.c:291)
 
 ```txt
 Control Flow:
 main
+    sys_stat
+    lock_mtab
+    create_mtab
+    open_mtab
     canonicalize
     getmntfile
-        rewind <-- Here (F_mtab != NULL)
+        getmntfromfile <-- Here
+
+297: Calls rewind if F_mtab is already open.
+
+299: Calls getmntent.
+
+306: Returns local variable mnt.
+```
+
+#### rewind (libc4-4.6.27/libio/stdio/rewind.c:5)
+
+```txt
+Control Flow:
+main
+    sys_stat
+    lock_mtab
+    create_mtab
+    open_mtab
+    canonicalize
+    getmntfile
+        getmntfromfile
+            rewind <-- Here (F_mtab != NULL)
 
 8: Calls CHECK_FILE.
 
 9: Calls _IO_rewind -> _IO_seekoff.
 ```
 
-#### CHECK\_FILE (libc-4.6.27/libio-4.6.26/ldouble/libioP.h:325)
+#### CHECK\_FILE (libc4-4.6.27/libio-4.6.26/ldouble/libioP.h:325)
 
 ```txt
 Control Flow:
 main
+    sys_stat
+    lock_mtab
+    create_mtab
+    open_mtab
     canonicalize
     getmntfile
-        rewind
-            CHECK_FILE <-- Here
+        getmntfromfile
+            rewind
+                CHECK_FILE <-- Here
 ```
 
 #### \_IO\_seekoff (libc-4.6.27/libio-4.6.26/ioseekoffc:28)
@@ -183,29 +272,42 @@ main
 ```txt
 Control Flow:
 main
+    sys_stat
+    lock_mtab
+    create_mtab
+    open_mtab
     canonicalize
     getmntfile
-        rewind
-            CHECK_FILE
-            _IO_seekoff <-- Here
+        getmntfromfile
+            rewind
+                CHECK_FILE
+                _IO_seekoff <-- Here
 ```
 
-#### getmntent (libc-4.6.27/mntent/mntent.c:6)
+#### getmntent (libc4-4.6.27/mntent/mntent.c:6)
 
 ```txt
 Control Flow:
 main
+    sys_stat
+    lock_mtab
+    create_mtab
+    open_mtab
     canonicalize
     getmntfile
         rewind
         getmntent <-- Here
 ```
 
-#### getfsspec (mount-2.4/fstab.c:79)
+#### getfsspec (mount-2.6d/fstab.c:79)
 
 ```txt
 Control Flow:
 main
+    sys_stat
+    lock_mtab
+    create_mtab
+    open_mtab
     canonicalize
     getmntfile
     getfsspec <-- Here
@@ -214,6 +316,8 @@ main
 
 87-89: Calls getfsent in a loop until we find the SPEC device
        in fstab.
+
+91: Returns fstab.
 ```
 
 #### setfsent (mount-2.4/fstab.c:17)
@@ -221,6 +325,10 @@ main
 ```txt
 Control Flow:
 main
+    sys_stat
+    lock_mtab
+    create_mtab
+    open_mtab
     canonicalize
     getmntfile
     getfsspec
@@ -236,6 +344,10 @@ main
 ```txt
 Control Flow:
 main
+    sys_stat
+    lock_mtab
+    create_mtab
+    open_mtab
     canonicalize
     getmntfile
     getfsspec
@@ -252,11 +364,15 @@ main
 57: Returns the fstab entry.
 ```
 
-#### getfsfile (mount-2.4/fstab.c:62)
+#### getfsfile (mount-2.6d/fstab.c:62)
 
 ```txt
 Control Flow:
 main
+    sys_stat
+    lock_mtab
+    create_mtab
+    open_mtab
     canonicalize
     getmntfile
     getfsspec
@@ -270,25 +386,33 @@ main
 74: Returns the fstab entry.
 ```
 
-#### mount\_one (mount-2.4/mount.c:337)
+#### mount\_one (mount-2.6d/mount.c:537)
 
 ```txt
 Control Flow:
 main
+    sys_stat
+    lock_mtab
+    create_mtab
+    open_mtab
     canonicalize
     getmntfile
     getfsspec
     getfsfile
     mount_one <-- Here
 
-353: Calls parse_opts.
+573: Calls parse_opts.
 ```
 
-#### parse\_opts (mount-2.4/mount.c:180)
+#### parse\_opts (mount-2.6d/mount.c:232)
 
 ```txt
 Control Flow:
 main
+    sys_stat
+    lock_mtab
+    create_mtab
+    open_mtab
     canonicalize
     getmntfile
     getfsspec
