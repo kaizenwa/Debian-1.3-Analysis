@@ -18,32 +18,44 @@
 Control Flow:
 main <-- Here
 
-697: Calls PRS.
+757: Calls PRS.
 
-704: Calls strcpy to copy "/sbin:/sbin/fs.d:/sbinfs:/etc/fs:/etc:"
+765: Calls malloc to allocate a string.
+
+767: Calls strcpy to copy "/sbin:/sbin/fs.d:/sbin/fs:/etc/fs:/etc"
      to the global static variable fsck_path.
+
+768: Calls strcat to append ":" to fsck_path.
+
+769: Calls strcat to append oldpath to fsck_path.
 
 705-706: Calls strcat to append the oldpath environment variable
          to fsck_path.
 
-713: Calls fsck_device.
+779: Calls fsck_device.
 
-725: Calls wait_all.
+790: Calls wait_all.
+
+791: Calls free on fsck_path.
 
 726: Returns local variable status.
 ```
 
-#### PRS (e2fsprogs-1.10/misc/fsck.c:590)
+#### PRS (e2fsprogs-1.10/misc/fsck.c:647)
 
 ```txt
 Control Flow:
 main
     PRS <-- Here
 
-604: Calls load_fs_info.
+659: Assigns "fsck" to the global variable progname.
+
+661: Calls load_fs_info.
+
+663-748: Processes program arguments.
 ```
 
-#### load\_fs\_info (e2fsprogs-1.10/misc/fsck.c:133)
+#### load\_fs\_info (e2fsprogs-1.10/misc/fsck.c:168)
 
 ```txt
 Control Flow:
@@ -51,14 +63,16 @@ main
     PRS
         load_fs_info <-- Here
 
-143: Calls setmntent -> _IO_fopen.
+180: Calls setmntent -> _IO_fopen.
 
-148: Calls getmntent.
+185: Calls getmntent.
 
-163: Calls endmntent.
+186-201: Allocates a fs_info structure and initializes it.
+
+204: Calls endmntent.
 ```
 
-#### \_IO\_fopen (libc-4.6.27/libio-4.6.26/iofopen.c:31)
+#### \_IO\_fopen (libc4-4.6.27/libio/iofopen.c:31)
 
 ```txt
 Control Flow:
@@ -68,7 +82,7 @@ main
             _IO_fopen <-- Here
 ```
 
-#### getmntent (libc-4.6.27/mntent/mntent.c:6)
+#### getmntent (libc4-4.6.27/mntent/mntent.c:6)
 
 ```txt
 Control Flow:
@@ -79,7 +93,7 @@ main
             getmntent <-- Here
 ```
 
-#### endmntent (libc-4.6.27/mntent/mntent.c:70)
+#### endmntent (libc4-4.6.27/mntent/mntent.c:70)
 
 ```txt
 Control Flow:
@@ -91,7 +105,7 @@ main
             endmntent <-- Here
 ```
 
-#### fsck\_device (e2fsprogs-1.10/misc/fsck.c:360)
+#### fsck\_device (e2fsprogs-1.10/misc/fsck.c:411)
 
 ```txt
 Control Flow:
@@ -99,15 +113,15 @@ main
     PRS
     fsck_device <-- Here
 
-370: Calls lookup.
+421: Calls lookup.
 
-377: Calls sprintf to write the program name into the
+429: Calls sprintf to write the program name into the
      local variable prog.
 
-378: Calls execute.
+430: Calls execute.
 ```
 
-#### lookup (e2fsprogs-1.10/misc/fsck.c:180)
+#### lookup (e2fsprogs-1.10/misc/fsck.c:224)
 
 ```txt
 Control Flow:
@@ -117,7 +131,7 @@ main
         lookup <-- Here
 ```
 
-#### execute (e2fsprogs-1.10/misc/fsck.c:221)
+#### execute (e2fsprogs-1.10/misc/fsck.c:265)
 
 ```txt
 Control Flow:
@@ -127,18 +141,30 @@ main
         lookup
         execute <-- Here
 
-237: Calls find_fsck.
+281: Calls find_fsck.
 
-253: Calls fork.
+297: Calls fork.
 
-257: Child calls execv.
+301: Child calls execv.
 
-261: Parent calls malloc to allocate a fsck_instance structure.
+305: Parent calls malloc to allocate a fsck_instance structure.
 
-264-269: Parent initializes the fsck_instance structure and
+308-313: Parent initializes the fsck_instance structure and
          inserts it at the head of the instance_list.
 
 271: Returns zero.
+```
+
+#### main (util-linux-2.5/disk-utils/fsck.minix.c:748)
+
+```txt
+Control Flow:
+main
+    PRS
+    fsck_device
+        lookup
+        execute
+            main <-- Here (child)
 ```
 
 #### wait\_all (e2fsprogs-1.10/misc/fsck.c:342)
@@ -160,7 +186,7 @@ main
 354: Returns global_status.
 ```
 
-#### wait\_one (e2fsprogs-1.10/misc/fsck.c:278)
+#### wait\_one (e2fsprogs-1.10/misc/fsck.c:322)
 
 ```txt
 Control Flow:
@@ -171,7 +197,7 @@ main
         wait_one <-- Here
 ```
 
-#### free\_instance (e2fsprogs-1.10/misc/fsck.c:120)
+#### free\_instance (e2fsprogs-1.10/misc/fsck.c:155)
 
 ```txt
 Control Flow:

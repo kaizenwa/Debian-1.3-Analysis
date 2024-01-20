@@ -137,7 +137,7 @@ main
                 _IO_file_open <-- Here
 ```
 
-#### getmntent (libc-4.6.27/mntent/mntent.c:6)
+#### getmntent (libc4-4.6.27/mntent/mntent.c:6)
 
 ```txt
 Control Flow:
