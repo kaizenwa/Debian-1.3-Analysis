@@ -1,0 +1,226 @@
+.\" Copyright (c) 1994, 1995 Bjorn Ekwall <bj0rn@blox.se>
+.\" This program is distributed according to the Gnu General Public License.
+.\" See the file COPYING in the kernel source directory /linux
+.\"
+.\"
+.Dd January 25, 1995
+.Dt MODULES 2
+.Os Linux
+.Sh NAME
+.Nm get_kernel_syms, create_module, init_module, delete_module
+.Nd loadable module support
+.Sh SYNOPSIS
+.Ar #include <linux/module.h>
+.Pp
+.Ar int get_kernel_syms(struct kernel_sym *table);
+.Pp
+.Ar int create_module(char *module_name, unsigned long size);
+.Pp
+.Ar int init_module(char *module_name, char *code, unsigned codesize,
+.br
+.Ar \ \ \ \ struct mod_routines *routines, struct symbol_table *symtab);
+.Pp
+.Ar int delete_module(char *module_name);
+.Pp
+.nf
+struct kernel_sym {
+	unsigned long value;
+	char name[SYM_MAX_NAME];
+};
+
+struct mod_routines {
+	int (*init)(void);
+	void (*cleanup)(void);
+};
+
+struct module_ref {
+	struct module *module;
+	struct module_ref *next;
+};
+
+struct internal_symbol {
+	void *addr;
+	char *name;
+};
+
+struct symbol_table {
+	int size; /* total, including string table!!! */
+	int n_symbols;
+	int n_refs;
+	struct internal_symbol symbol[0];
+	struct module_ref ref[0];
+};
+.fi
+.Sh DESCRIPTION
+These system calls have not yet been included in any library,
+which means that they have to be called by the
+.Nm syscall(__NR_function)
+mechanism.
+.Pp
+.Bl -tag -width flag
+.It Nm get_kernel_syms(table);
+has two uses: first, if
+.Nm table
+is NULL, this call will only return the number of symbols,
+including module names, that are available.
+This number should be used to reserve memory for that many items
+of
+.Nm struct kernel_sym.
+.br
+If
+.Nm table
+is not NULL, this call will copy all kernel symbols and module names
+(and version info) from the kernel to the space pointed to by
+.Nm table.
+The entries are ordered in module LIFO order.
+For each module an entry that decribes the module will be followed by entries
+describing the symbols exported by this module.
+.Pp
+Note that for symbols that describe a module, the
+.Nm value
+part of the structure will contain the
+.Nm kernel
+adress of the structure that describes the module.
+.br
+The
+.Nm name
+part of the structure is the module name prepended with
+.Nm #,
+as in
+.Nm #my_module.
+The symbol that describes a module will appear before the symbols
+defined by this module.
+.br
+Ahead of the kernel resident symbols,
+a module name symbol with the "dummy" name
+.Nm #
+will appear.
+This information can be used to build a table of module references
+when modules are stacked (or layered).
+.It Nm create_module(module_name, size);
+will allocate
+.Nm size
+bytes of kernel space for a module,
+and also create the necessary kernel structures for the new module called
+.Nm name.
+The module will now exist in kernel space,
+with the status
+.Nm MOD_UNINITIALIZED.
+.It Nm init_module(module_name, code, codesize, routines, symtab);
+This is the actual "module loader", that will load the module named
+.Nm name
+into the kernel.
+The parameters
+.Nm code
+and
+.Nm codesize
+refer to the relocated binary object module that is
+.Nm codesize
+bytes long.
+Note that the first 4 bytes will be used as a reference counter
+in kernel space, updated by the MOD_INC_USE_COUNT and MOD_DEC_USE_COUNT macros.
+.br
+The functions described in
+.Nm routines
+will be used to start and stop the module.
+These pointers should therefore contain the adresses of the
+.Nm init_module()
+and
+.Nm cleanup_module()
+functions that have to be defined for all loadable modules.
+.br
+If a module wants to export symbols for use by other modules,
+or if the module makes references to symbols defined by other modules,
+the parameter
+.Nm symtab
+has to point to a structure that describes these.
+A NULL value for
+.Nm symtab
+means that no symbols are exported and no references to other modules
+are made.
+.br
+The
+.Nm symtab
+that will be copied into the kernel consist of a
+.Nm symbol_table
+structure immediately followed by a string table,
+containing the names of the symbols defined by the module.
+The
+.Nm size
+element has to include the size of this string table as well.
+.Pp
+Special considerations:
+.br
+The
+.Nm n_symbols
+and
+.Nm n_refs
+elements tells how many symbols and how many module references
+are included in the
+.Nm symbol_table
+structure.
+Immediately after these integers, the array of symbol definitions follow.
+The
+.Nm name
+element in each
+.Nm struct internal_symbol
+should actually not be an ordinary pointer,
+but instead the
+.Nm offset
+of the corresponding string table entry relative to the start of
+the symbol_table structure.
+.Pp
+When all defined symbols have been listed,
+the symbol_table structure continues with the array of module references,
+as described by the
+.Nm struct module_ref
+elements.
+Only the
+.Nm module
+field of these structures have to be initialized.
+The module adresses that were obtained from a previous
+.Nm get_kernel_syms
+call, for elements with names starting with
+.Nm #
+should be copied to this field.
+.Pp
+If the module could be successfully loaded, and if the call to
+the module function
+.Nm init_module()
+also succeeds,
+the status of the module will be changed to MOD_RUNNING.
+Otherwise, the kernel memory occupied by module will be freed.
+.It Nm delete_module(module_name);
+should be used to unload a module.
+If the module reference count shows that the module is not active,
+and if there are no references to this module from other modules,
+the module function
+.Nm cleanup_module()
+will be called.
+If all these steps succeed, the kernel memory occupied by the
+module and its structures will be freed.
+.El
+.Sh DIAGNOSTICS
+If there are any errors, these functions will return the value -1,
+and the global variable
+.Nm errno
+will contain the error number.
+A descriptive text will also be written on the console device.
+.Sh "CONFORMING TO"
+These calls are unique to Linux and should not be used in programs
+intended to be portable.
+.Pp
+The module support was first conceived by Anonymous (as far as I know...).
+.br
+Linux version by Bas Laarhoven <bas@vimec.nl>,
+.br
+0.99.14 version by Jon Tombs <jon@gtex02.us.es>,
+.br
+extended by Bjorn Ekwall <bj0rn@blox.se>.
+.Sh SEE ALSO
+.Xr insmod 1 ,
+.Xr rmmod 1 ,
+.Xr lsmod 1 ,
+.Xr ksyms 1
+.Sh BUGS
+Naah...

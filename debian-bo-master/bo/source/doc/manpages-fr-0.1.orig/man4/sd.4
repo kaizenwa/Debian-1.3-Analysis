@@ -1,0 +1,123 @@
+.\" sd.4
+.\" Copyright 1992 Rickard E. Faith (faith@cs.unc.edu)
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\"
+.\" Traduction 18/10/1996 par Christophe Blaess (ccb@club-internet.fr)
+.\"
+.TH SD 4 "18 Octobre 1996" Linux "Manuel du programmeur Linux"
+.SH NOM
+sd \- Controleur de disques SCSI.
+.SH SYNOPSIS
+#include <linux/hdreg.h>
+.SH CONFIGURATION
+Les noms de ces peripheriques blocs suivent la convention suivante :
+.BI sd lp,
+ou
+.I l
+est une lettre indiquant le lecteur physique, et
+.I p
+est un nombre caracterisant la partition sur ce disque physique. Souvent
+le numero de partition
+.IR p ,
+sera absent si le peripherique correspond a l'ensemble du disque.
+
+Les disques SCSI ont un numero majeur valant 8, et un numero mineur de
+la forme (16 *
+.IR numero_disque ") + " numero_partition ,
+ou
+.I numero_disque
+est le numero du disque physique dans l'ordre de detection, et
+.I numero_partion
+est le suivant :
+.sp
+partition 0  = disque entier
+.br
+partitions 1-4 = partitions primaires DOS.
+.br
+partitions 5-8 = partitions etendues (logiques) DOS.
+
+Par exemple,
+.B /dev/sda
+aura un majeur 8, mineur 0, et se referera a l'ensemble du premier disque SCSI.
+.B /dev/sdb3
+aura un majeur 8 mineur 19, et indiquera la troisieme partition primaire DOS
+sur le second disque SCSI du systeme.
+
+Actuellement, seuls les peripheriques blocs sont disponibles, les interfaces
+"raw" ne sont pas encore implementees.
+.SH DESCRIPTION
+Les ioctls suivant sont disponibles :
+.TP
+HDIO_REQ
+.RS
+Renvoie les parametres disques du BIOS dans la structure suivante :
+.RS
+.nf
+.ft B
+struct hd_geometry {
+      unsigned char heads;
+      unsigned char sectors;
+      unsigned short cylinders;
+      unsigned long start;
+};
+.ft R
+.fi
+.RE
+
+Un pointeur sur cette structure est passe en parametre de
+.BR ioctl (2).
+
+En retour on obtient les informations sur la geometrie du disque
+.I "telle qu'elle est comprise par le DOS!"
+Cette geometrie n'est
+.I pas
+la geometrie physique du disque.
+Elle est utilisee lors de la construction de la table des partitions du
+disque, neanmoins elle est quand meme necessaire pour
+.BR fdisk (1) ", " efdisk "(1), et " lilo (1).
+Si les informations de geometrie ne sont pas valables, zero sera renvoye
+pour tous les parametres.
+.RE
+.TP
+BLKGETSIZE
+Renvoie la taille du peripherique en secteurs. Le parametre
+.BR ioctl (2)
+doit etre un pointeur sur un
+.BR long .
+.TP
+BLKRRPART
+Force la relecture de la table des partitions du disque SCSI. Aucun parametre
+n'est necessaire.
+
+Les ioctls
+.BR scsi (4)
+sont egalement supportes. Si le parametre
+.BR ioctl (2)
+est necessaire, et est NULL, alors
+.BR ioctl (2)
+retournera -EINVAL.
+.SH FICHIERS
+/dev/sd[a-h]: Les disques entiers.
+.br
+/dev/sd[a-h][0-8]: Les partitions individuelles.
+.SH "VOIR AUSSI"
+.BR scsi (4)

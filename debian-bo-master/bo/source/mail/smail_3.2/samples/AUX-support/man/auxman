@@ -1,0 +1,57 @@
+#!/bin/sh
+# @(#) auxman 1.1 - format, pack and install manpages on A/UX
+# @(#) auxman,v 1.1 1994/10/18 08:52:29 nm4 Exp
+#
+# Bob Denny - Sun Sep 15 15:13:12 1991
+# 
+# If man-page ends in ".z" then pack(1) is used to compress the
+# man page text prior to moving it to the final location. If pack
+# fails, the page is installed without the ".z" suffix. Any pre-existing
+# man page is explicitly removed (with or without the ".z") in case it
+# was linked to another page, or had another page linked to it. 
+#
+# NOTE: The "lp" terminal type is used, and sed(1) is used to remove
+# the backspace-bolding stuff from nroff's output (it causes premature
+# word-wrapping).
+#
+if [ $# -ne 2 ] ; then
+	echo "Incorrect argument count."
+	echo "Usage: auxman nroff-src man-page"
+	echo "       man-page must be full pathname to location at which to"
+	echo "       install the man page."
+	exit 1
+fi
+
+dest=$2
+destnoz=`echo $2 | sed 's/\(.*\)\.z$/\1/`
+
+if [ -f $dest ] ; then
+	rm -f $dest
+fi
+
+if [ -f $destnoz ] ; then
+	rm -f $destnoz
+fi
+
+nroff -Tlp -man $1 |  sed -e 's/\([A-Za-z]\).\1.\1.\1/\1/g' > %TMP%$$
+
+if [ `echo $dest | grep '\.z$'` ] ; then
+	pack %TMP%$$ 1>/dev/null 2>&1
+	if [ $? -eq 0 ] ; then
+		mv %TMP%$$.z $dest || cp %TMP%$$.z $dest
+	else
+		dest=$destnoz	# <==== NOTE!
+		cp %TMP%$$ $dest
+	fi
+else
+	mv %TMP%$$ $dest || cp %TMP%$$  $dest
+fi
+
+rm -f %TMP%*
+chgrp bin $dest
+chown bin $dest
+chmod 0644 $dest
+exit 0
+
+
+

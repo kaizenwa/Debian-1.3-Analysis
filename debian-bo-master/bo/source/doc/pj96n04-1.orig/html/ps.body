@@ -1,0 +1,173 @@
+<!--
+	ps.html
+	Last modification: Sun, 3 Nov 1996 10:09:46 +0200
+	ps.	Stampare in Postscript	PJ 4: Stampare in Postscript	Articoli
+  -->
+
+<p align=center>
+
+<H1>Postscript, cui prodest?</H1> 
+<H3>Come stampare in Postscript in un sistema Linux <BR> 
+(anche senza una stampante Postscript)</H3> 
+<B> di Giacomo Cabri </B> <BR> 
+<A HREF="mailto:cabri@didasun1.cineca.it">cabri@didasun1.cineca.it</A>
+
+</p>
+
+<BR>
+<H3>Cosa è il Postscript</H3> 
+Il Postscript è un linguaggio di descrizione di pagina.<BR>
+È forse il più versatile e amato linguaggio per stampanti,
+essendo diffuso in tutto il mondo. Tuttavia non gestisce
+solo stampanti, infatti esso dà la possibilità
+di &quot;disegnare&quot; sullo schermo del computer e su ogni tipo di dispositivo
+per la gestione di immagini. Il Postscript è un linguaggio
+interpretato e ricorda un po' il linguaggio FORTH.
+Diversi programmatori scrivono direttamente programmi in Postscript
+per molte applicazioni di disegno. Il sistema operativo NeXTSTEP
+utilizza il linguaggio Postscript II per gestire il video.<BR>
+Tuttavia, i programmi Postscript sono solitamente dei documenti
+fatti per essere stampati, generati da un programma scritto in un
+linguaggio compilato.
+
+<BR>
+<H3>Configurare una stampante Postscript virtuale</H3> 
+Poiché esistono molti documenti scritti in Postscript, può
+essere utile sapere come stamparli, dato che nel formato
+nativo sono difficilmente comprensibili.
+Grazie ad un apposito software è possibile
+stampare questi documenti anche su stampanti non Postscript. Con Linux
+è inoltre possibile creare una stampante Postscript virtuale,
+e lasciare che sia il sistema a gestire la traduzione.<P>
+
+Per prima cosa è necessario capire cosa andremo a fare. L'idea di base
+è che vi sia un filtro che trasforma il file scritto in
+linguaggio Postscript in un formato riconosciuto dalla stampante.
+Nel nostro caso il programma che fa da filtro si chiama <EM>ghostscript</EM>.
+Guardiamo insieme come possiamo utilizzarlo. <BR>
+
+In un sistema Linux, il file che contiene la 
+configurazione delle stampanti è <TT>/etc/printcap</TT>.
+Nonostante non abbia una interfaccia molto umana, non è impossibile
+capire come modificarlo. Partiamo da un esempio per vedere come installare
+una stampante Postscript virtuale. Questo è un pezzo del file
+<TT>printcap</TT> del mio sistema, 
+a cui ho aggiunto la numerazione delle righe (non copiate i numeri!):
+
+<PRE>
+ 1 # --------------------------------------
+ 2 #
+ 3 # PostScript printer; filter: ghostscript
+ 4 #
+ 5 ps|PS|PostScript printer: \
+ 6        :lp=/dev/lp0: \
+ 7        :sd=/usr/spool/lpd/jp350: \
+ 8        :lf=/usr/spool/lpd/jp350/errs: \
+ 9        :sh: \
+10        :sf: \
+11        :if=/usr/spool/lpd/jp350/ps-lpf:
+</PRE>
+
+Le prime quattro righe contengono commenti. Nella quinta vi è
+il nome della stampante (<TT>ps</TT>) con possibilità di
+definire alias (<TT>PS</TT>). Nella sesta riga
+viene definito il device a cui la stampante è collegata (in questo
+caso lp0 = LPT1 nel mio sistema). È poi necessario definire una directory
+di spool (dove vengono registrati i file in corso di stampa) e un file 
+dove dirigere gli errori; nel mio caso ho creato la directory
+<TT>/usr/spool/lpd/jp350</TT>, come si può vedere dalle linee
+7 e 8. Con i comandi <TT>sh</TT> e <TT>sf</TT> si 
+disabilitano il banner iniziale e l'avanzamento di una pagina bianca
+alla fine della stampa; questi comandi non sono essenziali
+per stampare in Postscript, servono a me per evitare di
+sprecare due fogli in più per ogni stampa.
+Per ulteriori informazioni su <TT>sh</TT> e <TT>sf</TT> si
+veda il paragrafo 3.1.17 del file <TT>Printing-HOWTO</TT>.
+Arriviamo al bello. Con il comando <TT>if</TT> di linea 12 si 
+può definire un file (eseguibile) che faccia da filtro. Esso prende da
+<EM>stdin</EM> il file da stampare, lo elabora,
+e restituisce su <EM>stdout</EM> i dati da mandare alla stampante.
+Il gioco sta nello scrivere uno script adeguato.<P>
+
+Qui entra in scena il ghostscript. Una verifica da fare è 
+stabilire se la propria stampante è supportata dal programma.
+Con il comando &quot;<TT>gs -h</TT>&quot; è possibile sapere
+quali dispositivi vengono gestiti da ghostscript.
+Io ho una stampante a getto di inchiostro che lavora in emulazione
+HP deskjet, per cui posso utilizzare il dispositivo <TT>deskjet</TT>.
+Anche in questo caso diamo una occhiata al (mio) file-filtro
+per capire come costruirlo.
+Come avrete già capito l'ho chiamato <TT>ps-lpf</TT> e l'ho
+posto nella directory di spool della stampante.
+Il file si presenta così:
+<PRE>
+#!/bin/bash
+gs -q -dNOPAUSE -sPAPERSIZE=a4 -sDEVICE=deskjet -sOutputFile=- -
+</PRE>
+La prima riga è essenziale per eseguire lo script. La seconda invoca
+l'interprete ghostscript con i seguenti parametri:<BR>
+
+<B>-q</B> dice a ghostscript di non scrivere messaggi;<BR>
+<B>-dNOPAUSE</B> definisce la variabile NOPAUSE,
+per evitare che ghostscript faccia una pausa tra una pagina e l'altra;<BR>
+<B>-sPAPERSIZE=a4</B> definisce la misura del foglio;<BR>
+<B>-sDEVICE=deskjet</B> dice a ghostscript quale dispositivo utilizzare
+per la traduzione;<BR>
+<B>-sOutputFile=-</B> definisce il file di output, nel nostro caso <EM>stdout</EM>;<BR>
+<B>-</B> è il file di input, nel nostro caso  <EM>stdin</EM>.<P>
+
+È possibile riutilizzare questo file cambiando solo il dispositivo (DEVICE).<BR>
+Dopo aver salvato il file, è <STRONG>necessario</STRONG>
+settare il permesso di esecuzione del file, con il comando
+
+<PRE>
+chmod 755 ps-lpf
+</PRE>
+ed inoltre il proprietario del file deve essere root,
+cosa ottenibile eseguendo il comando
+
+<PRE>
+chown root.root ps-lpf
+</PRE>
+
+A questo punto avete nel sistema una stampante Postscript virtuale,
+che si chiama <TT>ps</TT>; notate che <B>non è</B> la stampante
+di default, per cui è necessario specificare la stampante
+ <TT>ps</TT> al momento della stampa.<BR>
+Se ad esempio usate <TT>lpr</TT>, la sintassi è:
+
+<PRE>
+lpr -Pps file.da.stampare.ps
+</PRE>
+
+e il vostro <TT>file.da.stampare.ps</TT> viene stampato in Postscript.
+
+<BR>
+<H3>Errori più comuni</H3>
+
+<UL>
+<LI>Non si è creata la directory di spool.
+<LI>Non è stato aggiunto il permesso di eseguire il file di filtro.
+<LI>Il file di filtro non inizia con la riga
+    &quot;<TT>#!/bin/bash</TT>&quot; o &quot;<TT>#!/bin/sh</TT>&quot;.
+<LI>Scegliere il dispositivo sbagliato per il ghostscript
+(se non funziona il primo, provatene altri, ma attenzione, la vostra
+stampante potrebbe non essere supportata!).
+</UL>
+ 
+
+<BR>
+<H3>Documentazione</H3> 
+
+Questi sono i file in cui è possibile trovare ulteriori informazioni,
+(tra parentesi la loro locazione nella distribuzione Slackware):
+ 
+<UL>
+<LI><TT>Printing-HOWTO (/usr/doc/faq/howto/)</TT>
+<LI>FAQ sul linguaggio Postscript <TT>(/usr/doc/faq/postscript/)</TT>
+<LI>Pagine di <TT>man</TT> su <TT>printcap</TT> e <TT>gs</TT> 
+</UL>
+
+<BR> 
+Spero di essere stato utile e rimango a disposizione per
+chiarimenti o informazioni.

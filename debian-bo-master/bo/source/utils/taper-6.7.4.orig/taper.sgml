@@ -1,0 +1,1759 @@
+<!doctype linuxdoc system>
+
+
+<article>
+
+<title> Taper
+<author> Yusuf Nagree
+<date> Version 6.7.4. 5AUG96.
+
+<toc>
+
+<sect> Disclaimer
+
+<p>
+Copyright &copy 1996 by Yusuf Nagree (yusuf@nagree.u-net.com)
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; 
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+
+<sect>Warning
+
+<p>
+Please note that this is BETA software. This means that it is still
+under development. This program works fine on my setup (DX2-66,
+Jumbo 250, Floppy controller, 32Mb RAM, 3 IDE hard drives (120mb,
+120mb, 540mb), Suprafax modem, Mitsumi Quad Speed IDE CD-ROM, serial mouse).
+
+However, there are hundreds (if not thousands) of different configurations out
+there. I cannot test them all (which why this software is beta). Before
+using this program for 'production' backups, PLEASE ensure that both
+the backup and restore programs work correctly on YOUR system. Until you
+have confirmed this (several times, I suggest), then only should you
+use this as your only means of backup. Until then, please also backup using
+a method you KNOW works for you.
+
+Having said this, from the comments I have received so far, it does
+seem to work on a fair few systems so I hope it does work on yours.
+If it doesn't, I'd like to know.
+
+
+<sect> Introduction
+
+<p>
+Taper is a user friendly archive program especially designed
+for backing up to tape drives. It also supports backing up
+to files on a hard disk
+
+It, I hope, overcomes the lack of programs available currently for Linux
+for user friendly archiving. 
+
+Tar/cpio, apart from having an unfriendly user interface, lack one
+essential feature that I needed - there was no information stored in the
+beginning of the archive about what files were on the archive. The only
+way to get such a list was to traverse the whole archive, getting cpio/tar
+to print out a list of files that it found. With a 250mB archive, this
+could easily take 5 min. It was a real hassle to maintain lists of files
+on all my tapes and it could take 20 min to locate a file if I didn't 
+know which tape it was on - printing out file lists of each tape.
+
+I solved this by maintaining an archive information file on the hard disk.
+This file contains all the information about files stored on the archive.
+When files are added to the archive, the archive information file is
+updated. This archive information file can be reconstructed from the
+archive should the file get deleted/corrupted/lost - it just takes 
+time. Should you wish to restore an archive on a different machine than
+one to where the backup was made, you have two options: 1) make a copy 
+of the information file on a floppy and take this floppy with you as
+well as the tape, 2) reconstruct the archive information file on the
+restoring machine. Since reconstructing the archive information file
+can take a while, method 1 is recommended. Archive information files are
+not long - they occupy 56 bytes + length of the filename for each file - 
+thus 10,000 files of average filename length of 20 chars is less than
+800K (or about 300K with compression) - easily fits on most floppies. 
+
+Note, that as a security measure, archives created by one user cannot
+be read by another user, unless the archive information file is
+copied from the backup user's directory to the restore user's directory.
+Thus, if you want to make a backup and don't want others to be able to
+restore it, set your permissions on the archive information file as rw-------
+(which <em/taper/ does by default). Note that this is not
+completely foolproof, since a restorer can run <em/mkinfo/ and
+create the information file and then access the archive. It is more
+a deterrent rather than secure system.
+
+The second problem with both tar and cpio was that using the floppy
+interface tape drive, you could not append files. The only way to
+append files was using a combination of tar and mt - a very clumsy 
+and time consuming method of backing up.
+
+Note that the archive device doesn't have to be a tape drive - it can be
+an ordinary file on a filesystem, or a floppy, or in fact, any file that
+the Linux can write to.
+
+Each archive is given a unique archive ID (which is actually the 
+system time that the archive was created). This is used to identify it.
+
+Development of this system has been done using gcc and based on a Colorado
+Jumbo 250 drive using the Ftape driver (v2.03). As I do not have access to any
+other tape drives, I don't know if it will work on other setups. If you
+have any problems, contact me an I'll see if I can help.
+
+The main program is called <em/taper/.
+
+Note that currently <em/taper/ is not really designed for backing up more than
+about 30,000 files (unless you have a large amount of physical memory).
+
+
+
+
+<sect>Requirements
+
+<p>
+<itemize>
+<item>
+ncurses library &gt&equals v1.9.6 with the forms library
+<item>
+kernel &gt&equals v1.2.5 (I think it will work for lesser versions but I have not 
+tested it) - Your kernel must have SYS_V_IPC support enabled if you wish to
+take advantage of the triple buffering system.
+<item>
+gcc &gt&equals 2.6.1
+</itemize>
+
+
+<sect>Unpacking and Compiling
+
+<p>
+Unpack the source file distribution by issuing the following command:
+
+<tscreen>
+tar xzf taper-6.7.4.tar.gz
+</tscreen>
+
+Modify Makefile as required and then
+
+<tscreen><verb>
+make clean
+make all
+</verb></tscreen>
+
+<descrip>
+<tag/TRIPLE_BUFFER/
+        Enable this option if you
+        wish to take advantage of <em/taper/'s new triple
+	buffering system. You must compile your kernel with SYSV_IPC
+	support. If you haven't, can't or don't want to, then you
+	can't use triple buffering. If you don't enable TRIPLE_BUFFER,
+        then your error counts in restore will be invalid.
+
+        On slow drives, triple buffering can really improve performance
+	however, on faster drives, can slow down performance. The best
+	thing to do is to compile with triple buffering and look at 
+	your performance. If it is slow, then recompile with triple
+	buffering off.
+
+        I consider a fast drive to be one that delivers a throughput of
+	more than 8mB/minute.
+	
+<tag/TAPER_BIG_ENDIAN/
+        <em/Taper/ stores all data to the tape in little endian format.
+        To use <em/taper/ on a big endian machine, define TAPER_BIG_ENDIAN. 
+</descrip>	
+
+
+<sect1>File locations
+
+<p>
+To place the binaries and the man page in the appropriate locations,
+
+<tscreen>
+make install
+</tscreen>
+
+The binaries are placed in /sbin and the man page is /usr/man/cat1
+which is in accordance with the Linux FSSTND.
+
+To remove the files
+
+<tscreen>
+make uninstall
+</tscreen>
+
+<sect1>Modifying defaults.h
+
+<p>
+For the hackers, there are a few options at the beginning of <em>
+defaults.h</em> that you can alter if you wish. They include things
+such as the environment variable names, internal defaults, and
+compression program. Don't play around unless you know what you
+are doing.
+
+
+<sect>Terminology
+
+<p>
+An archive refers to all the files on a tape. A volume is the files
+that are written to in one backup session. Thus, if you make one backup
+to a tape, then it will have one volume. If you then append files to
+this tape, it will have two volumes. If you append again, it will have
+three volumes. 
+
+For all intents &amp purposes, volumes are transparent to the user. When
+selecting files to restore, all the files on all the volumes are presented
+in alphabetical order (not volume order).
+
+
+<sect>Tape Devices 
+
+<p>
+This program requires a device driver for the tape drive. For users of
+the floppy controller type (eg. Jumbo), there are now two drivers
+available. The original one is <em/ftape/ and is written by Bas
+Laarhoven and, at the time of writing this, is currently at version 2.03b.
+It is is available at sunsite in /pub/Linux/kernel/tapes and all the usual
+Linux sites. A new driver, <em/zftape/, written by 
+Claus-Justus Heine, has recently become available and is found at sunsite 
+in the same directory. The latest version at time of writing was 1.05.
+You must use version 1.02 or later.
+
+Two devices are needed - a rewinding device - when using this device,
+the tape drive is automatically rewound when closed, and a non-rewinding
+device - when using this device, the tape drive is not rewound when 
+closed but left where is. The names of these devices depend on
+whether you are using a SCSI drive, <em/ftape/ or <em/zftape/.
+Alternatively, you can change
+the names in the global preferences menu, via the preference file,
+from the environment, or via the command line.
+
+It is important that both a rewinding and a non-rewinding device is
+given. 
+
+When making an archive as a file on a hard disk, the filename should
+be given for both the rewinding and non-rewinding device. To make things
+easier, you can use the -b command line option or the BOTH preference.
+
+
+<sect>Tape drives
+
+<p>
+<sect1> ftape
+
+<p>
+<em/ftape/ is the original floppy tape driver for Linux and now
+supports a wide variety of floppy tape drives and a few enhanced
+controllers. In the later development kernels, <em/ftape/ is part
+of the kernel source tree. It is still available separately for
+those running older kernels.
+
+Start <em/taper/ with the <bf/-T ftape/ option.
+
+The device names are /dev/ftape (which should point to /dev/rft0) for the
+rewinding device, and /dev/nftape (which should point to /dev/nrft0)
+for the non-rewinding device. These are the values that <em/taper/ uses
+as defaults; if your devices are different, modify the values using
+the environment variables, preferences file, or command line (see below).
+
+If you are still using <em/ftape/, I would strongly suggest that
+you update to <em/zftape/ which is basically <em/ftape/ with
+quite a few enhancements which should drastically improve <em/taper/
+performance. If you have multiple volume backups made under
+<em/ftape/, however, you
+should not upgrade because you will not be able to access 
+volumes other than 1 using <em/zftape/.
+
+
+<sect1> zftape
+
+<p>
+Recently a new floppy tape driver has become available. This is
+<em>ztape-1.05</em>, written by Claus-Justus Heine and is based 
+on <em/ftape/ with plenty of new features added. 
+
+Start <em/taper/ with the <bf/-T zftape/ option.
+
+This driver supports several modes - one is the generic <em/ftape/
+mode. The second is a QIC compliant mode (zftape) and the third
+is a compressed QIC compliant mode (czftape). It is possible to
+access archives made with <em/ftape/ using the generic mode
+(see below), however, if you make a backup using the QIC compliant
+mode (zftape), then you cannot use this if you decide to go
+back to <em/ftape/. As this is rarely done, and because the
+QIC compliant mode is so superior to the generic mode, I would recommend
+that you use it.
+
+Backups made under <em/ftape/ will work with <em/zftape/ if
+you:
+<enum>
+<item>Make sure that you use the device names <em>/dev/ftape</em> and
+    <em>/dev/nftape</em>. You will have to change this manually under
+    Global preferences
+<item>You only restore files from the first volume. It is not possible
+    to restore files from other volumes. This is because <em/zftape/
+    does not support the fsf ioctl for <em/ftape/ drives. I
+    am currently corresponding with Claus to see if we can resolve this
+    problem. 
+<item>Do not try and append data to an archive created with <em/ftape/
+    using <em/zftape/
+<item>You change the <em/set-blksize/ &amp <em/get-blksize/ preferences
+   to yes and change the <em/block-size/ to 10K.
+    
+    If you have multiple volume backups, then you had best use <em/ftape/
+    until you fully migrate all your backups to <em/zftape/.
+</enum>    
+
+Do not try and make backups with the generic driver of <em/zftape/
+and then go back to <em/ftape/ and hope that it will work - it
+won't!
+
+Under <em/taper/, the biggest advantage of <em>ztape</em> is 
+the ability to quickly fast forward through archives. You should
+notice quite a difference, especially when doing a <em/mkinfo/
+and when restoring from multiple volumes. Although <em/zftape/ has
+support for compression, you are better off letting <em/taper/ 
+compress since <em/taper/ buffers a bit better and has the
+option of using <em>gzip</em> which is more efficient than the algorithm
+used by <em/zftape/.
+
+The devices for this driver should be created using 
+
+<tscreen>
+make mknod
+</tscreen>
+
+in the Makefile that comes with the driver. Note that the permissions
+will be set up so that only root has write access to the tape
+drive. You will have to change this manually if you want to allow
+other users access.
+
+The device names are /dev/qft0 for the rewinding device
+and /dev/nqf0 for the non-rewinding device. 
+
+
+<sect1>SCSI Drives
+
+<p>
+Start <em/taper/ with the <bf/-T scsi/ option.
+
+Unfortunately, I do not have a SCSI drive and therefore am unable to 
+test <em/taper/ code with SCSIs. I rely on SCSI users sending me information
+about how <em/taper/ works for them and then I try and use that information to
+help other SCSI users who are having problems. The following information
+was sent to me by AP Harris (apharris@onShore.com) and I've included it to
+help SCSI users.
+
+The SCSI rewinding device is /dev/st0 (or /dev/st1 on the 2nd
+tape drive) and the non-rewinding device is /dev/nst0.
+You'll probably have to prepare all your tapes using <em/mktape/
+from the <em/utilies/ menu.
+
+If you are using a SCSI tape device, make sure you've complied the kernel
+with SCSI (CONFIG_SCSI) support, SCSI tape support (CONFIG_CHR_DEV_ST)
+and, of course, support for your SCSI host adapter.  If all is well,
+when you boot, you should see a message like this (your details
+may vary):
+
+<tscreen><verb>
+Detected scsi tape st0 at scsi0, id 4, lun 0
+scsi : detected 1 SCSI tape 1 SCSI disk total.
+</verb></tscreen>
+
+No additional drivers are needed (although the st-aware mt is 
+nice).
+
+The block size (-x option below) should be set below the tape device 
+driver buffer size (which can be changed at kernel compile time in the 
+kernel and defaults at 32K).
+
+SCSI tapes generally do not need formatting - see below for full details.
+
+
+<sect1>IDE tape drives
+
+<p>
+Start <em/taper/ with the <bf/-T ide/ option.
+
+The default device names are /dev/ht0 and /dev/nht0. Support for
+IDE drives is in alpha stage and I would encourage users to 
+give me feedback on how <em/taper/ is working with their IDE
+drives
+
+<sect1>Floppies and other removable media
+
+<p>
+Start <em/taper/ with the <bf/-T removable / option.
+
+When the floppy (or whatever) is full, <em>taper</em> will prompt
+you for the next floppy/tape. This works in exactly the same
+way as multiple tape backups. The default device names are
+set to /dev/fd0 - ie. the first floppy drive.
+
+If you are using a ZIP drive, then make sure that the whole disk
+has been partitioned as a Linux native partition then start 
+<bf/taper/:
+
+<tscreen>
+taper -T removable -b /dev/sda1
+</tscreen>
+
+Substitute /dev/sda1 with the device name of your ZIP drive.
+
+
+<sect>Quick fast forwards
+
+<p>
+Some tape drives are capable of doing quick fast forwards. A
+quick fast forward means that the tape drive is able to find
+the start of the next volume even when in the middle of the
+previous volume. Drives based on <em/ftape/ are <em>NOT</em> 
+capable of doing this, however, <em/zftape/, is able
+to do quick fast forwards, as are most SCSI drives.
+
+With <em/ftape/, therefore, the only way to find the next
+volume is to rewind the tape to the beginning, and then
+forward to the desired volume. As you can imagine, this constant
+rewinding and forwarding can take quite a while.
+
+By default, <em/taper/ assumes that zftape, SCSIs and IDE
+tape drives can do a quick fast forward, while removable
+and ftape tape drives cannot.
+
+To test whether your drive can do quick fast forwards, go
+into the <em/utilies/ menu and run the <em/Test fast fsf/
+program which will tell you if your drive supports 
+quick fast forwards or not. Note that <em/taper/ will 
+overwrite all the data on the tape used for the test.
+
+If you find that your tape drive doesn't support quick
+fast forwards, you will have to change the appropriate
+preference.
+
+
+<sect>Can seek
+
+<p>
+Some tape drives support a seek ioctl which allows positioning
+of the tape drive at a particular block. This makes restore
+a lot quicker, since <em/taper/ can calculate which block
+a file(s) lies on an advance straight to that block. 
+
+By default, <em/taper/ assumes that zftape, and SCSI
+drives support this ioctl while removable,ftape and
+IDE don't. 
+
+You can test if your tape drive supports seek by running the
+<em/Test can seek/ utility and changing the appropriate preference.
+
+
+<sect>Formatting and Erasing Tapes
+
+<p>
+Like floppy disks, there are two steps in the preparation of new
+tapes:
+<enum>
+<item>low level format
+<item>preparing for use with Linux/<em/taper/
+</enum>
+
+People with floppy tape drives need to do both. At present, there is
+no program available to low level format a tape, and thus, you will
+have to rely on DOS/WIN/OS-2 programs to do so. If you are planning
+on using <em/taper/, then you do not need to worry about step 2, since
+<em/taper/ will take care of that for you. If you are not going to be
+using <em/taper/ on that particular tape, then you will need to do a 
+<em>mt erase</em>. Note that if you buy pre-formatted tapes (which I'd
+STRONGLY recommend since formatting can take 2-3 hours), then you
+by-pass step 1 ONLY - you still have to prepare the tape for Linux.
+
+People with SCSI drives (esp DAT) may not need to format tapes for
+use under Linux. See your tape drive documentation for details.
+Similarly, you may not need to do step 2. Those drives that do not
+require step 2 may still require some information to be written on the
+tape before they will work correctly under <em/taper/, therefore, run
+<em>mktape</em> from the <em/utilties/ menu
+before running tape. You can use the <em/test make tape/ option from
+the <em/utilities/ menu to see if your tape drive needs to 
+have <em/mktape/ run on new tapes. It is important that you
+put a brand new tape in the tape drive when testing.
+
+Use the command line option
+<em/--erase-tape-off/ to tell <em/taper/ that your tape doesn't
+need erasing. This is the default behaviour
+if you have started <em/taper/ with <em/--tape-type scsi/.
+ 
+
+<sect>/proc Filesystem
+
+<p>
+Under Linux, it is possible to have a /proc filesystem. This directory doesn't
+contain files, but rather contains information about all the running processes
+and environment information. Its purpose is to allow programmers to obtain
+information about the current state of the machine (eg. the ps program).
+Because it contains run-time information, we obviously don't want to back
+it up. 
+
+<em/taper/ has an option of trying to detect the /proc system and ignoring it when
+doing the backup. Normally, the /proc system is on device number 1. If 
+your /proc system is on another device, then you can tell <em/taper/ this with the
+-j (--proc-device) option, or preference.
+
+If you are not sure what device your /proc is mounted on, then run the program
+<em>which_device</em> which is in the <em/utilities/ menu. Give the
+name /proc (or whatever name your /proc is) and <em/taper/ will tell
+you the device your /proc is mounted on.
+
+Before using <em/taper/, it is a good idea to confirm that your /proc is on device
+1 and if it isn't change the appropriate preference.
+
+
+<sect>Memory Usage and performance
+
+<p>
+<em/Taper/ can be configured to use memory two ways.
+
+One is a very fast version but uses quite a bit of memory and 
+system load. The other uses less memory but is slower and requires
+less system load. If you use the <em/--memory-tight-on/,
+option, then the slower, memory conservative version is used.
+If you use the <em/--memory-tight-off/ option, then the
+faster, but more memory hungry version is used.
+
+There is not really a lot of performance difference until
+you hit about 2,000 - 3,000 files, so if your backups are
+generally below this, so you can use
+the memory conservative version. Above that, you will find
+that the memory conservative version is a bit slow. My own
+opinion is that if you are backing up more than 2,000 files,
+you are probably a system administrator and you can send a
+message to your users saying that system performance will
+be diminished for the next half hour (or whatever) while you
+backup the system and <em/taper/ hogs a lot of
+memory. Most users will accept that.
+
+The memory requirements of the fast version are really not
+that great - it is about 600 bytes of RAM for each file -
+thus, if you are backing up 3,000 files, you will need
+about 2 meg of RAM, not really excessive (compared
+to X!!). The memory conservative version would probably
+use (depending on the length of the filenames), about 500K.
+
+There are several compression methods available. 
+
+<descrip>
+<tag/External compression - type 1/
+This method calls an external compression program to do the compression.
+The default is set to <em/gzip/ but can be changed in the <em/defaults.h/
+file at compile time. The compression program is expected to read 
+the file from standard input and write the compressed output to
+standard output. If your compression program doesn't do this, you
+will have to modify the <em/taper/ sources.
+
+<tag/Internal compression - type 2/
+This is a very good compression method - it is very fast and reasonably
+good at compression. Because of this, it is the default compression
+method. The only problem is that is uses an extra 2MB of memory
+which can degrade system performance on heavily loaded machines.
+
+<tag/Internal gzip - type 3/
+This method is basically the gzip compression method, however,
+the source has been hacked around to accommodate <em/taper/. The
+advantage of using this over the <bf/external compression/ method
+is that it is a bit quicker because it is internal, however,
+it is still a very slow compression method. The other disadvantage
+is that although the compression method is that of <em/gzip/, it
+doesn't produce compressed files that can be read by <em/gzip/. You
+need <em/taper/ to read the archives.
+
+</descrip>
+
+
+In summary then:
+
+<itemize>
+<item>Memory use, type 2 &gt type 3 &gt type 1.
+<item>Speed, type 2 &gt type 3 &gt type 1.
+<item>Compression ratio, type 3 &gt type 1 &gt type 2.
+</itemize>
+
+You should use compression 2 unless you have a very heavily loaded
+system or less than 4MB of RAM.
+
+If the memory tight version is still too memory hungry for
+you, try the following:
+
+<itemize>
+<item>Turn off triple buffering
+<item>In <bf/defaults.h/, reduce the size of DEFAULT_TR_SIZE
+<item>Don't use use <bf/compress-type/ set at 2 because this
+is a very memory hungry compression (but also the quickest of
+the lot). <bf/Compress-type/ set at 3 is a good alternative.
+<item>In <bf/defaults.h/, change the line &num;define COMPRESS2_BUFFER_SIZE
+1000000 to:
+
+<tscreen>
+&num;define COMPRESS2_BUFFER_SIZE 1
+</tscreen>
+You will not be able to use <bf/compress-type 2/, but if memory is a problem,
+you shouldn't be using this anyway.
+<item>In <bf/defaults.h/, add the following line:
+
+<tscreen>
+&num;define MAXNAMLEN 125
+</tscreen>
+This assumes that the maximum filename length you have is 125 characters.
+If this is not the case, change it to match your system.
+
+</itemize>
+
+<sect>Running Taper
+
+<p>
+To start <em/taper/, type <em/taper/ at the command line. You will be presented with
+a menu from which you select the appropriate option. To move between options,
+press the up or down arrow (or left &amp right). To select and option, press
+the ENTER key.
+
+<em/taper/ accepts the following command line options. Note that there are two
+formats for options - short (one letter) and long (GNU style). Either one
+(or a mixture of both) can be used. Alternatively, options can be stored in 
+a preference file (see below for details).
+
+<sect1>Command line options
+
+<p>
+<descrip>
+<tag/--tape-type (-T)/
+which tape drive you are using. There are three valid options
+<descrip>
+<tag/(s)csi/
+scsi drive
+<tag/(f)tape/
+ftape based tape drive
+<tag/(z)ftape/
+zftape based tape drive
+<tag/(i)de/
+ide based tape drive
+<tag/fi(l)e/
+a regular file on the hard disk
+<tag/(r)emovable/
+a device that needs mounting, eg. floppy disk
+</descrip>
+This option <bf/must/ be specified.
+NB: Only the bracketed letter of the option is required.
+
+<tag/--help (-?)/
+prints help on command line options
+	
+<tag/--append-on (+a)/
+                Append files to archive if it exists. <bf>Default</bf>.
+
+<tag/--append-off (-a)/
+                Overwrites existing archive if found. 
+		
+   NOTE: The append options are only for unattended backups. If you
+   use the main <em/taper/ program, you will be prompted for whether
+   you wish to append or overwrite an existing archive.
+
+<tag/--archive-diff (-A) archive_id/
+                Prints differences between the archive and filesystem.
+		If archive_id equals 0, then the tape that is in
+		the tape drive is used, otherwise, uses archive_id.
+
+<tag/--tape-name file (-f) file/
+                use file as the rewinding archive file. If not 
+		specified, will use the file specified in the 
+		environment variable TAPE.
+
+<tag/--ntape-name file (-n) file/ 
+                use file as the non-rewinding archive file. If not 
+		specified, will use the file specified in the 
+		environment variable NTAPE.
+
+<tag/--both-devices file (-b) file/
+                equivalent to -n file -f file  
+		useful when not using tape drives, but archive files
+
+<tag/--exclude-files file (-F) file/
+                a list of files not to include in the backup. Consists
+	        of a series of suffixes to exclude separated by spaces.
+		It is not case sensitive (ie. .o is the same as .O)
+		For example, the <bf>default</bf> setting of ".o &tilde" 
+		excludes all files that end in .o and all files that
+		end in &tilde .
+
+<tag/--bad-checksum-on (+C)/
+    When doing a mkinfo or complete restore, if a file with a bad checksum
+    is encountered, you will have the option of trying to continue, or
+    assuming the rest of the backup is bad and fudging the info file to
+    reflect this.  <bf/Default/.
+<tag/--bad-checksum-off (-C)/
+    When doing a mkinfo or complete restore, if a file with a bad checksum
+    is encountered, will try to continue without prompting.
+    
+<tag/--compress-type (-c) num/
+<descrip>
+<tag/0/
+    No compression
+<tag/1/
+    Use an external compression program. The program to use is
+    hard compiled and can be changed by editing <em>defaults.h</em>.
+    The <bf/default/ is set to use <em>gzip</em>.
+<tag/2/
+    Use the internal compression program which is similar to 
+    <em>compress</em>. It doesn't provide as good a compression as
+    <em>gzip</em> but it is much quicker. Note that this 
+    compression uses about 2MB of RAM extra so on heavily
+    loaded machines, it can degrade performance. <em/Default/.
+<tag/3/
+    Use the internal compression program which is similar to
+    <em>gzip</em>. It provides the same level of compression
+    as <em/gzip/ and is much quicker than the external version.
+    It is not as quick as option 2, but much faster than 1.
+    In addition, it doesn't use anywhere near the memory or
+    system load that <em/2/ requires.
+</descrip>
+
+<tag/--exclude-compress (-X) file/
+                Specifies which group of files to exclude from
+	        compressing. Comprises a string of suffixes
+		separated by a space - eg. ``.gz .gif'' would
+		exclude files ending in .gz and .gif. 
+		It is not case sensitive (ie. JPG = jPg etc..)
+		<bf>Default</bf> is ``.gz .gif .Z .zip .jpg .bmp''
+
+	        <em>gzip</em> is used for compression. It assumes that gzip is
+		on your path. If you use another compress
+		program, change the entry in <em>defaults.h</em> and
+		recompile.
+		
+<tag/--print-dir (-d) archive_id/ 
+                Prints the directory of the archive whose id is
+archive_id and exits. If archive_id equals 0, then the directory
+of the archive of the tape currently in the drive is printed.
+
+<tag/--auto-descend-on (+D)/
+                 If this option is on, in restore, if there are
+		 any empty directories, they will automatically
+		 be skipped. For example, your files may be
+		 in /usr/local/src/xzy with nothing in /usr,
+		 /usr/local or /usr/local/src. When you select
+		 /usr from the top restore directory, you will
+		 automatically be placed in to /usr/local/src/xyz
+		 where the files are, and the empty directories
+		 will be skipped. <bf>Default</bf>.
+		 
+<tag/--auto-descend-off (-D)/
+                 Turn the above off.
+
+<tag/--prompt-archive-on (+e)/
+When selecting restore, prints a list of all known
+			archives and the user can select which one of these
+			to restore from. <bf>Default</bf>.
+
+<tag/--prompt-archive-off (-e)/
+When selecting restore, automatically selects the
+			archive in the tape drive (or regular file). User
+			not given the option of which archive s/he would
+			like to restore from
+
+<tag/--can-seek-on (+E)/
+Tells <em/taper/ that your tape drive supports a seek ioctl for positioning
+to a particular block. Default depends on tape drive type.
+
+<tag/--can-seek-off (-E)/
+You tape drive doesn't support an ioctl for positioning to a particular
+block. <em/Taper/ will use reads to position. Default depends on tape drive
+type.
+
+<tag/--volume-title (-g) title/
+                Title of volume. <bf>Default</bf> is NULL.
+		Only applicable in backup.
+			
+<tag/--get-blocksize-on (+G)/
+        If this option is defined, then after <em/taper/
+	opens a tape, it tries to get the block size using
+	an ioctl call. This is only for the new
+	<em/zftape/ driver.
+	<bf/Default/ is on for <em/zftape/ and off for
+	others.
+<tag/--get-blocksize-off (-G)/
+        Do not try and get the block size.
+<tag/--hard-links-off (-h)/
+Store link details only and not linked file. <bf>Default</bf>.
+
+<tag/--hard-links-on (+h)/
+Store linked file
+
+<tag/--comp-head-start (+H) minutes/
+It is useful for <em/taper/ to always have a full buffer of
+data available to send to the tape drive so that the tape drive
+never has to sit and wait. This can be a problem if compression
+is taking a long time. By giving the compression program a head
+start, you can try and ensure that <em/taper/ always has 
+data available to write. A good starting number for large backups
+is 10 minutes. <em>Default is 0</em>.
+
+<tag/--info-files path (-i) path/
+directory where archive information files are saved. Also
+where file sets are saved. <bf>Default</bf> &tilde/taper_info). 
+
+<tag/--compress-info-on (+I)/
+turns on compression of info files. Automatically will compress &amp
+after creation and will decompress when required. <bf/Default/.
+
+<tag/--compress-info-off (-I)/
+Don't compress info files.
+
+<tag/--proc-device (-j) num/
+This specifies the device number of the /proc system.
+			This is avoid backing up of the /proc filesystem which
+			is a runtime filesystem used to store the current state
+			of the operating system. If this value is set to 0,
+			then no checking is performed. The <bf>default</bf> value is
+			1 (which is the device number of the /proc filesystem
+			under Linux).
+
+<tag/--min-before-seek (-J) num/
+When restoring, if the tape needs to be advanced by less than
+<em/min-before-seek/ blocks, then a seek will not be issued, rather
+the tape will continue streaming. This is because if you have a lot
+of files close together, it's more efficient to just let the drive
+continue streaming. <bf/Default 10/.
+
+<tag/--erase-tape-on (+k)/
+           When using a new tape, overwriting a tape with unrecognized
+	   data, or when overwriting existing <em/taper/ files, if
+	   this option is set, <em/taper/ will try and erase the tape
+	   using a standard ioctl call. Floppy tape drives (those based
+	   on <em/ftape/ and <em/zftape/ require this option to
+	   be set.
+<tag/--erase-tape-off (-k)/
+           Will not try to erase a tape before writing new data to it.
+	   Most SCSI drives do not require erasing, so you can use this option
+	   for them.
+	   
+<tag/--log-file (-l) file/
+name of log file. <bf>Default</bf> &tilde/taper_log.
+
+<tag/--log-level (-m) number/
+logging level (0 = no logging..4 = all). <bf>Default</bf> = 2.
+
+<tag/--limit-log-file (-L) number/
+specifies how many megabytes the log file should be at a maximum.
+If, after a <em/taper/ operation, the log file is found to exceed
+this size, enough bytes are removed from the BEGINNING of the file
+to ensure the log file becomes <em/number/ megabytes long. If this
+is 0, then no checking is done and the log file will continue to
+grow indefinitely.
+<bf/Default is 2/.
+	
+<tag/--memory-tight-on (+M)/
+Make <em/taper/ not to use much memory. This results in a 
+slower performance but much less memory usage.
+
+<tag/--memory-tight-off (-M)/
+Normal memory usage. Much better performance but more memory
+usage. <bf/Default/.
+
+<tag/--overwrite (-o) num/
+level of overwrite
+<descrip>
+<tag/0 - no overwrite./ If the file exists on the hard disk, then
+			      it is not overwritten
+<tag/1 - more recent overwrite. <bf>Default</bf>./ If the file exists on 
+                              the hard disk, it is
+			      only overwritten if the file on the backup
+			      device is more recent
+<tag/2 - unconditional overwrite./ The file on the hard disk is 
+                              always overwritten
+</descrip>			      
+
+<tag/--tape-overwrite-on (+O)/
+       When doing unattended backups, if a tape contains unrecognized
+       data, then if this option is set, then the tape is automatically
+       overwritten.
+       
+<tag/--tape-overwrite-off (-O)/
+       When doing unattended backups, if a tape contains unrecognized
+       data, then the tape is not overwritten - the backup is aborted
+       and a message is mailed to the user. <bf/Default</bf>.
+	
+<tag/--preference-file (-p) file/
+Name of preference file
+
+<tag/--tmp-dir (-P) dir/
+       Specifies the directory where temporary files are to be placed.
+       <bf/Default/ is /usr/tmp.
+
+<tag/--only-volume (-q) num/
+Tells restore/backup to only show only volume 'num'
+			in its window. <bf>Default</bf> is 0 which means show all 
+			volumes.
+
+<tag/--fast-fsf-on (+Q)/
+        Quick fast forwards are enabled.
+	See the section of Quick fast forwards for more details.
+	<bf/Default is on for <em/zftape/ and <em/SCSI/ and
+	off for <em/ftape//.
+<tag/--fast-fsf-off (-Q)/
+        Disable quick fast forwards.
+<tag/--relative-path (-r) path/
+directory to restore to. Note that the directory
+			structure of the backup is preserved
+
+<tag/--exclude-dirs (-R) path/
+which directories to automatically exclude from the backup process.
+The string consists of a list of space separated directories. Note that
+the selection is recursive. For example, if you exclude list was "/tmp",
+the contents of /tmp will not be backed up. Also, none of
+the directories in /tmp (eg. /tmp/junk) will be backed up.
+Users of netscape may also want to put their cache directory on the
+exclude list (~/.netscape/cache) since this is where netscape stores 
+its list of recently visited locations and is a waste to backup.
+<bf/Default is "/tmp /usr/tmp /var/tmp"/.
+
+
+<tag/--strip-number (-s) number/
+remove number leading pathnames. When backing up,
+			the full pathname is stored in the information file
+			(and on the tape). You have the option of removing
+			number leading paths when restoring. For example,
+			if the file backed up was /home/yusuf/taper/README,
+			by specifying -s 2, the file will appear in the 
+			restore menu as taper/README. If -s1 was specified,
+			the file will appear as yusuf/taper/README. 
+
+			If there are more strips than paths (eg. specifying 
+			-s 6 in the above example), then the filename only is
+			used (eg. README).
+
+			The value -s 99 is a special value and tells
+			restore to work out the optimum number of
+			strips based on common leading paths
+
+			The <bf>default</bf> is -s 99 (ie. auto strip).
+
+<tag/--set-blocksize-on (+S)/
+        If this option is defined, then before <em/taper/
+	erase a tape, it tries to set the block size using
+	an ioctl call. This is mainly for the new
+	<em/zftape/ driver, but some SCSI drives need it.
+	<bf/Default/ is on for <em/zftape/ and off for
+	others.
+<tag/--set-blocksize-off (-S)/
+        Do not try and set the block size before erasing a tape.
+	
+	any tape manipulation, it tries to set the block size using an
+	ioctl call first. Also, before erasing a tape, it sets the
+	block size. 
+<tag/--archive-title (-t) title/
+                Title of archive. <bf>Default</bf> is NULL.
+		Only applicable when archive is being created for
+		the first time. If supplied when doing an archive
+		append, then it is ignored.
+			
+<tag/--incremental-on (+u)/
+When doing a backup, only backup those files selected 
+			which are more recent than the files that are on the 
+			backup archive. <bf>Default</bf>.
+
+<tag/--incremental-off (-u)/
+When doing a backup, backup all files selected.
+	   This option can be overriden when selecting files for backup.
+	   
+<tag/--unattended-file (-U) file/
+           Gives the name of a file/directory to be backed up in 
+	   unattended mode. If the filename begins with a <em>&commat</em>, 
+	   then it is taken to be the name of a file set, otherwise,
+	   it is a file. You can use as many -U as you like on 
+	   the command line.
+
+<tag/--recent-restore-on (+w)/
+When doing a restore, restore the most recent file
+			with the given filename. For example, if /etc/hosts has
+			been backed up twice in different volumes, restore
+			the file which is newer. <bf>Default</bf>.
+
+<tag/--recent-restore-off (-w)/
+When doing a restore, restore the file that was 
+			selected - for example, if you selected /etc/hosts 
+			in volume 1, this if the file that will be restored, 
+			even if there is an /etc/hosts in volume 2 which is 
+			more recent.
+	   This option can be overriden when selected files for restoration.
+
+<tag/--old-archive-off (-W)/
+Using an archive created by taper version 5.6 or later. <bf/Default/.
+
+<tag/--old-archive-on (+W)/
+Using an archive created by a version less than 5.6.
+
+<tag/--version (-v)/
+prints version being used. Also prints the options <em/taper/ was
+compiled with
+
+<tag/--block-size (-x) num/
+The size of a block. Apart from the tape header,
+			data is transferred to the tape device in blocks
+			of 'num' size. The <bf>default</bf> is 28K. If you use
+			a SCSI, see then note above. Num is in bytes. Note that
+			this value MUST NOT exceed the size of DOUBLE_BUFFER
+			in <bf/defaults.h/.
+
+<tag/--sort-dirs-on (+y)/
+Alphabetically sorts the filenames displayed 
+			in the right hand window. <bf>Default</bf>.
+<tag/--sort-dirs-off (-y)/
+Files are left in the order that they were backed up in.
+
+<tag/--min-free (-Y) num/
+Specifies the minimum amount of free disk space that must exist
+before a file is compressed. num is in kilobytes. <bf/Default is 4096K/.
+
+<tag/--prompt-dirs-on (+z)/
+Turns on confirmation when selecting directories 
+for backing up. <bf>Default</bf>.
+
+<tag/--prompt-dirs-off (-z)/
+Turns off confirmation when selecting directories
+			for backing up
+			
+<tag/--tape-size (-Z) size/
+Tells <em/taper/ the size of your tapes in megabytes. This must be the
+<em/uncompressed/ size. Note that you must specify the same number every
+time you start <em/taper/. See notes on multiple tape backups for more
+details. If this value is 0, then <em/taper/ auto-detects the end of
+tape. <bf/Default is 0 (auto-detect)/.
+
+</descrip>	
+
+
+<sect1>Backup Module
+
+<p>
+Select the backup option from the <em/taper/ menu.
+
+Three windows are displayed:
+
+The top left represents the file system (hard disk) and you can move 
+it using the arrow keys. To enter a directory, press ENTER when the
+highlight is on that directory. To select a file/directory for
+backup, press 's'. Selecting a directory will select all the
+files in the directory recursively. To unselect a file/directory,
+press 'u'. If the file is only selected because it's directory is
+selected (eg. if you select /usr/john, then /usr/john/prefs is
+indirectly selected), then an appropriate error message will be printed.
+
+The top right window shows what is currently on the archive. You can
+use the arrow keys to move the display up/down. If there is previous
+archive, you can move the arrow keys down to a file/directory and
+press 's' to select this entry.
+
+The bottom window shows the files that you have selected for backup.
+To unselect a file that you have selected for backing up, move the
+highlight to the file you wish to remove from the backup set and then
+press 'u'.
+
+Pressing TAB moves between the windows.
+Pressing 'h' will display a help screen.
+Pressing 'f' will finish selection and commence backup
+Pressing 'q' will abort backup
+
+You can abort a backup by pressing q or Q while the backup is
+being made. This will cleanly stop backing up. 
+
+
+<sect2>Backup modes
+
+<p>
+There are two modes for backup - full and incremental. The default
+incremental mode (which can be changed by changing the options, the
+preference file or command line). In incremental mode, when you
+select a file for backing up, <em/taper/ looks at what is on the archive
+already. If the file you have selected for backup is more recent (or
+doesn't exist on the archive) than the one on the archive, it is backed up:
+if the file you have selected for backup is the same or older than the 
+one on the archive, it is not backed up. For directories, <em/taper/ checks
+each file in the directory recursively. To see if a file will be backed
+up, look at it's size in the selection (bottom) window - 
+if it is zero, it means that <em/taper/ will not back up that file.
+
+In full mode, <em/taper/ backups the file regardless of what's on the
+archive.
+
+The backup mode can be changed for each file selection. Move the
+highlight in the selection window to the file you wish to change and
+then press 's'. To the left of the filename is an 'I' if the file
+is to be saved as incremental, or 'F' if it is full.
+
+
+<sect1>Restore
+
+<p>
+Select the restore option from the <em/taper/ menu. If you have selected
+the 'prompt archives' option (default), then <em/taper/ prints a list
+of all the archives it knows about and lets you select which one
+you would like to work with. The highlight will be automatically
+position on the archive that is in the tape drive (or which the
+regular file pertains to). Press ENTER to accept the archive or
+use the arrow keys to move around to select another archive. If
+the prompt archive option is not set, you will not be presented
+with this screen. Note that you are not allowed to change directories -
+ie. allowed to access other people's archives.
+
+Three windows are displayed:
+
+The top left window shows what is currently on the archive. You can
+move around using the arrow keys. To enter a directory, press ENTER 
+when the highlight is on that directory. To select a file/directory for
+restoration, press 's'. Selecting a directory will select all the
+files in the directory recursively.
+
+The top right window shows what is currently on the archive. You can
+use the arrow keys to move the display up/down. You can press 's' when
+you are on a file or directory to select that particular file/directory.
+
+The bottom window shows the files that you have selected for restoration.
+To unselect a file that you have selected for restoration up, move the
+highlight to the file you wish to remove from the restore set and then
+press 'u'.
+
+Pressing TAB moves between the windows.
+Pressing 'h' will display a help screen.
+Pressing 'f' will finish selection and commence backup
+Pressing 'q' will abort backup
+
+While the restore is in progress, you can stop it by pressing
+q or Q.
+
+
+<sect2>Restore modes
+
+<p>
+<sect3>Full restore
+
+<p>
+If <em/taper/ cannot find an info file for the tape in the drive, then
+it offers you the option of doing a full restore. In full restore mode,
+all files on the archive are restored in all volumes. There is no
+pathname processing, so the full path is used relative to either the
+current directory, or the --restore-path option.
+
+<sect3>Most recent volume restore
+
+<p>
+This comes in useful when you have backed up the
+same file several times (eg. as it has changed) and is the default
+mode. When you select a file for restoration, <em/taper/
+automatically selects the file which is on the latest volume (eg. you may
+have three volumes and /etc/passwd is on each. Even if you select the
+/etc/passwd in volume 1, <em/taper/ will automatically select the 
+volume 3 file, not the volume 1 file). This is indicated by an 'M' in
+the volume column of the selection window.  Note that even if you are
+in a restricted volume view (using --only-vol), most recent restore will still 
+automatically find the latest volume of your file on the archive.
+
+<sect3>Fixed volume restore
+
+<p>
+In fixed volume mode, whichever file you select is the one that
+is restored (eg. in the example above, the /etc/passwd on volume 1
+would be restored, despite the fact that the /etc/passwd on 
+volume 3 is more recent).
+
+
+<p>
+To toggle between fixed volume &amp most recent mode for a particular
+file selection, press 's' when on the selected file in the selection
+window.
+
+
+<sect1>Recreate info file
+
+<p>
+Select the recreate info file option from the <em/taper/ menu.
+
+This recreates archive information files given an archive. It also
+checks that the checksums of all the files are valid. Any errors
+are printed to the log file.
+
+Basically, it looks for an archive on the devices given. It prints the archive
+ID and archive title on the screen, then prints each file as it passes it
+while recreating the archive information file in the directory specified.
+Because it has to traverse the whole archive, it does take some time
+to recreate the information file.
+
+As it is traversing, <em/mkinfo/ checks the checksums of the files
+on the archives and writes any errors to the log file. Thus, you can
+check the integrity of your archives with <em/mkinfo/.
+
+If <em/taper/ encounters a bad checksum, you have the option of trying
+to continue the <em/mkinfo/ or you can tell <em/taper/ to assume that
+this is the end of the backup. This is useful if a backup got killed
+by a power failure or something.
+
+During the traverse, you can press q or Q to stop it. If you do
+that, you will corrupt your info file and you will have to re-run
+<em/mkinfo/ to restore your info file.
+
+<em/Mkinfo/ may return errors when trying to advance to volumes that
+do not exist. Do not worry about this - just select abort and 
+the info file will be correctly constructed.
+
+
+<sect1>Verify archive
+
+<p>
+This option goes through an archive and checks that what's on the archive
+matches what is on the hard disk, byte by byte. If a file is on the archive
+but not on the disk, it is ignored. Any discrepancies are printed to the 
+log file. It also checks the checksums and if a bad checksum is encountered,
+like <em/mkinfo/, you have the option of trying to continue or to assume 
+that the rest of the backup is bad.
+
+
+<sect1>Utilities
+
+<p>
+<sect2>Make tape
+
+<p>
+This prepares a tape for use by <em/taper/. This is not needed
+by <em/zftape/ or <em/ftape/ tape drives. Some SCSI drives
+need this. 
+
+<sect2>Test make tape
+
+<p>
+This tests whether your tape drive needs to have <em/make tape/
+run on new tapes. It is important that a BRAND NEW tape is used
+when running this test - ie. one that has never seen the inside
+of your (or anyone else's) tape drive before.
+
+
+<sect2>Which proc
+
+<p>
+Tells you on which device your /proc filesystem is mounted. Type
+in the name of your /proc directory (usually /proc) and then
+<em/taper/ will give you a device number. This is then fed to
+<em/taper/ using the --proc-device (or -J) option. The default
+is 1.
+
+<sect2>Test fast fsf
+
+<p>
+Some tape drives can quickly advance between volumes on the tape. This
+also quicker restoration of files from multiple volumes. Use this
+utility to see if your tape drive can use fast fsf.
+
+
+<sect2>Test can seek
+
+<p>
+<em/Taper/ can use the seek ioctl to make seeking for files in
+restore a lot quicker. Basically, the block on which the file
+should lie is calculated and then a seek is issued to quickly
+advance the tape drive to this block. However, your tape
+drive must support the seek ioctl for this to happen.
+
+You can use this utility to check if your tape drive supports
+the seek ioctl.
+
+Before using <em/test can seek/ you must ensure that you have the
+correct setting for <em/test fast fsf/.
+
+
+<p>
+<sect2>Erase volumes
+
+<p>
+Lets you erase that last `n' volumes on an archive. Tell <em/taper/
+the number of volumes you wish to delete. <em/Taper/ then
+deletes these volumes. Note that once a volume is deleted, it
+cannot be restored.
+
+
+<sect2>Look for recursive links
+
+<p>
+It is possible on some systems that you have recursive links. For
+example, you may have a soft link that points to "./". This leads
+to a recursive situation which does not matter if you do not follow
+links. 
+
+If you follow links (via the hard-links option), then <em/taper/ will
+crash as it encounters this link. Running this utility identifies
+any recursive links you may have so that you can either tell <em/taper/
+not to use hard links, or so you can remove the offending link.
+
+Just enter the starting directory you wish to test - <em/taper/ will
+look for recursive links and tell you if you have any. In some
+situations, <em/taper/ will seg fault at the link. This is not a problem
+since you will know where the offending link is by when it seg faults.
+
+
+<sect> Unattended Backup
+
+<p>
+It is possible to get <em/taper/ to do unattended backups. This
+can be used to run <em/taper/ regularly through, say, <em>cron</em>.
+Two additional preferences become important:
+
+<descrip>
+<tag/--append/
+If a <em/taper/ archive exists on the tape, then if --append-on,
+the files will be appended to the archive. If --append-off, then
+the existing archive will be overwritten.
+     
+<tag/--tape-erase/     
+If unrecognized data exists on the tape, then if --tape-erase-on, the
+unrecognized data will be overwritten. If --tape-erase-off, the
+data will not be overwritten and the backup session will be aborted.
+</descrip>
+
+It is important that these preferences are correctly set, since
+<em/taper/ is running in unattended mode, you will not be
+prompted for any confirmation, rather the action will just happen.
+
+To specify the files/directories for backup, use the <em>-U</em>
+(or <em>--unattended-file</em>) command line options. If the filename
+begins with a &commat, then <em/taper/ interprets this to mean
+that a filename is a fileset and reads in the appropriate fileset.
+
+The files/directories are backed up either as full backups or as
+incremental backups - it depends on what you have set via 
+command line options, or preference files. If you haven't specified
+anything, then by default, incremental backups are used.
+
+With unattended backups, it is not possible to have multi-tape
+backups because <em/taper/ can't prompt you to insert the
+next tape. If the end of the tape is encountered, <em/taper/
+will stop the backup and send you a message.
+
+Mail is sent to the root (can be changed in <em>defaults.h</em>) via
+the <em>mail</em> (can be changed in <em>defaults.h</em>) program
+about what happened during the backup.
+
+You can use <em>cron</em> to automate your backup process. A line
+like this:
+
+<verb>
+10 20 * * * taper -U @set
+</verb>
+
+will cause <em/taper/ to run at 20:10 (8.10pm) every day, using
+the fileset named <em>set</em>.
+
+
+<sect>File Sets
+
+<p>
+You may have a particular set of files or directories  that you always wish to 
+backup - eg. /etc/passwd, /usr/local/bin, and /usr/local/etc. Rather than
+selecting these files &amp directories every time you want to make a backup, you
+can select them once and then save the particular selection to a file
+set. Next time you wish to backup this particular set of files, you
+need only load in the file set and <em/taper/ will automatically select the
+files for you.
+
+To save a file set, press B in either backup or restore. You will then
+be prompted for a name to give to your file set.
+
+To restore a file set, press L in either backup or restore. You will be
+presented with a list of known file sets. Select which one you want
+using the arrow keys and ENTER and <em/taper/ will load in the file
+set.
+
+<sect1>File Set format
+
+<p>
+A file set file simply is an ASCII file that contains the selected
+file terminated by a return. There is null line between each
+file.
+
+<sect> Environment variables
+
+<p>
+Several <em/taper/ options can be set using environment variables
+which can be set from your profile file.
+
+<descrip>
+<tag/TAPE_TYPE/
+specifies which type of tape drive you have. Valid values are
+<itemize>
+<item/scsi/
+<item/zftape/
+<item/ftape/
+<item/reg-file/
+<item/ide/
+</itemize>
+<tag/TAPER_PREFS/
+the name of your preference file
+<tag/TAPER_LOG_FILE/
+the name of your log file
+<tag/TAPER_LOG_LEVEL/
+the level of logging <em/taper/ should do
+<tag/TAPER_INFO_FILES/
+the directory in which your info files and set files are found
+<tag/TAPE/
+the name of the rewinding tape device
+<tag/NTAPE/
+the name of the non-rewinding tape device
+</descrip>
+
+<sect> Preferences
+
+<p>
+Rather than having to issue a whole lot of command line options every
+time you wish to run backup/restore, it is possible to store commonly
+used options in a preference file. Individual users can have their
+own preference file in their &tilde directory, or there can be a global
+preference file in /usr/local/etc. Both backup &amp restore look for a 
+preference file in the following sequence:
+
+<enum>
+<item>
+	Check if a filename is given via -p (or --preference-file)
+		command line option
+<item>		
+	Check if a filename is given via environment variable TAPER_PREFS
+<item>	
+	Check if &tilde/taper_prefs exists. If it does, use this
+<item>	
+	Default of /usr/local/etc/taper_prefs
+</enum>	
+If no file is given, then internal defaults (as specified above) are used.
+
+Note that command line options over-ride preference file and internal
+default settings.
+
+
+<sect1>Changing preferences
+
+<p>
+It is possible to change and save preferences within <em/taper/. Select the 
+appropriate option from the <em/taper/ menu (ie. either global options, 
+backup options or restore options). To move between options, press 
+the up or down arrows (or left and right). To change an option, use the 
+left and right arrow keys. When you have finished, press F10 (to change
+this from F10, change the entry in <em>defaults.h</em>).
+
+<sect1>Saving preferences
+
+<p>
+There are two methods of saving your preferences. One is to a preference
+file  or, the second is to a command line file. To save to a
+preference file, select the appropriate option. Give the filename of the
+preference file (default is &tilde/taper_prefs) and then press F. Next time
+you start <em/taper/, the preferences that you have selected will be
+automatically loaded.
+
+The second method of saving is to a command line file. The saves the
+preferences you have selected to a shell script. Select the name of the
+shell script (default is start_taper). To invoke <em/taper/ using the selected
+preferences, issue a `sh start_taper'. This is useful if you have temporary
+(or multiple) configurations and you don't want to overwrite your existing
+preference file.
+
+
+<sect1>Preference file format
+
+<p>
+The format of a preference file is a text file with one preference per line.
+A preference is given:
+
+<tscreen>
+PREFERENCE=VALUE       
+</tscreen>
+  
+See the file 'pref_example' for an example of a preference file.
+
+Spaces are ignored - use quotes if spaces are needed
+
+The name of the preferences are the same as the long command line
+option name. For example, to change the log file to 
+<em/my_log_file/, place the following line in your preference
+file:
+
+<tscreen>
+log-file = my_log_file
+</tscreen>
+
+<sect1>Special preferences
+
+<p>
+The following preferences can be prefixed by a letter to indicate which
+tape drive they belong to.
+
+<itemize>
+<item>set-blksize
+<item>get-blksize
+<item>erase-tape
+<item>fast-fsf
+<item>block-size
+<item>tape-name
+<item>ntape-name
+<item>can-seek
+</itemize>
+
+For example, if you have the following line in your preference file,
+
+<tscreen>
+block-size = 12300
+z-block-size = 43122
+z-tape-name = /dev/qft0
+z-ntape-name = /dev/nqft0
+s-tape-name = /dev/scsi
+s-ntape-name = /dev/nscsi
+-z
+</tscreen>
+
+then the block-size is set to 43122 only if the zftape driver is selected,
+otherwise, it is set to 12300. Also, the device names are set to /dev/qft0
+&amp /dev/nqft0 if the zftape driver is selected, or to /dev/scsi &amp
+/dev/nscsi if the scsi driver is selected.
+If the preference given is <em/block-size=43122/, then the block-size will
+be set to 43122 regardless of the tape driver selected.
+
+
+<sect>Screen Colours
+
+<p>
+It is possible to change the colours displayed. This can be done
+from the command line or from within a preference file.
+
+The valid colours are BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE.
+
+For example, to change the normal screen colour to yellow text on a blue 
+background:
+
+<tscreen>
+taper --color-normal yellow, blue
+</tscreen>
+
+from the command line, or
+
+<tscreen>
+color-normal = yellow,blue
+</tscreen>
+in a preference file.
+
+Below is a list of the possible colors to change
+
+<descrip>
+<tag/color-title/
+title bar (blue on white)
+<tag/color-main/
+main screen   (white on blue)
+<tag/color-dialog/
+dialog boxes    (white on red)                     
+<tag/color-status/
+status boxes    (white on red)                     
+<tag/color-directory/
+screen used to select files  (black on green)      
+<tag/color-selected/
+screen used to show selected files (white on blue)  
+<tag/color-bottom/
+status bar at bottom of the screen (blue on white) 
+<tag/color-help/
+screen used to show help screen (black on cyan)    
+<tag/color-on-vol/
+screen used to show current volume contents (white on purple) 
+<tag/color-form/
+screen used to get data (eg. change preferences, enter volume title)
+(white on black).
+</descrip>
+
+
+<sect>Multiple Tape Backups
+
+<p>
+For the use of multiple tape backups, these are the following assumptions
+made.
+
+<sect1>Writing
+
+<p>
+End of tape is indicated by one of:
+<itemize>
+<item>error code == -1 &amp&amp errno == ENOSPC
+<item>zero bytes written
+<item>less bytes written than we asked for
+</itemize>
+
+<sect1>Reading
+
+<p>
+End of tape is indicated by one of:
+<itemize>
+<item>error code == -1 &amp&amp errno == ENOSPC
+<item>error code == -1 &amp&amp errno == ENODATA
+<item>returned less bytes than we asked for
+</itemize>
+
+End of volume is indicated by
+<itemize>
+<item>zero bytes read
+<item>error code == -1 &amp&amp errno == ENODATA
+</itemize>
+
+
+This is what ftape does for floppy controller tape drives. If are using
+another sort of tape drive, then the multiple tape backup feature will only
+work if the above is true. If it is not true and you are able to work
+out what your particular tape drive does, if you send me details, I will
+try and incorporate it into future releases. I'm especially interested in
+users of SCSI drives since I have no access to them.
+
+If your tape drive doesn't support the above, you can use the <bf/--tape-size/
+option to tell <em/taper/ the size of your tape drive. Tape size is 
+specified in megabytes, eg. --tape-size 120 means that your tape is
+120MB, --tape-size 250 means that your tape is 250MB. Note that these
+must be <em/uncompressed/ sizes. You must specify the same number every
+time you start <em/taper/ - you can put it in your preference file if
+necessary. If you don't specify the same number, you will get very spurious,
+unpredictable results.
+
+
+<sect>Cross platform support
+
+<p>
+<em/Taper/ was primarily designed for linux running on an intel 
+processor. With linux now becoming very multi-platform, changes have been
+made to <em/taper/ to enable cross platform support. Some of the changes are:
+
+<itemize>
+<item>All data is written to the tape in little endian format. If you define
+the TAPER_BIG_ENDIAN makefile option, <em/taper/ will convert everything 
+read from the tape to big endian so that your machine can use it. Even
+if you make a backup from a big endian machine, the data on the tape will
+be in little endian format.
+
+<item>The info files are also stored in little endian format so that they
+should be portable accross different architectures.
+
+<item>Data types are defined in <em/ttypes.h/.  Taper uses 32 bit signed
+&amp unsigned data, unsigned 16 bit, and 8 bit signed &amp unsigned data.
+Change the appropriate types for your machine. Attributes such as
+gid_t, uid_t, dev_t, umode_t, and time_t are hard-coded to the intel
+defaults of unsigned short (unsigned 16 bit) and long (32 bits)
+respectively. If your machine uses
+different types for these, then you should look at the code in 
+<em/tapeio.c/, specifically, the functions tape_read_fi and tape_write_fi
+and modify it to convert the intel types to a type applicable for your
+machine. If your machine uses longer data types than an unsigned 16 bit
+used by intel linux, then, for the time being, you are in strife. 
+In a future <em/taper/ version, I intend to move away from the 16 bit
+format and use my own representation. However this will mean that existing
+archives are incompatible with the new format, so I won't be doing this
+for a while.
+
+<item>Since version 6.3, <em/taper/ aligns all structures on addresses
+that are divisable by 4. It does this by padding out the strings so that
+they have a length divisable by 4. Then an offset is added (which is the
+number of bytes that the structure needs to make it a length of a multiple
+of 4). Versions less than 6.3 do not support this, so it is unlikely that
+these archives will work on machines that require aligned addresses.
+However, for machines that do not require aligned access, there is no problem.
+</itemize>
+
+<sect>Limitations
+
+<p>
+Maximum length of total pathname is set by MAXNAMLEN. It is usually set
+to 255 bytes long. If you have a very long pathname, then you may cause
+<em/taper/ to segfault.
+
+<p>
+If a file grows while <em/taper/ is trying to back it up, only
+the beginning part of the file is backed up (specifically, the number of
+bytes the file was when <em/taper/ started to back up this file) and the
+rest is lost. This is because of inadequate mandatory file locking. I
+know that this is being worked in the kernel and hopefully, when the kernel
+code pertaining to this is stable, I can implement it in <em/taper/.
+
+
+<sect>Bugs
+
+<p>
+Please report bugs to me at the address below. If the bug causes a segment
+violation or causes the program to crash in any other way, if you know how 
+to use gdb, could you re-compile your source using the Makefile.debug 
+makefile, and tell me what source line the program crashed. Also, please
+tell me what kernel version, gcc version, C library version, ncurses
+version you are using. 
+
+As this is a sideline, I may not be able to respond to e-mail immediately. 
+However, if you do not receive a reply within one week, then repost as
+I may have forgotten about it!
+
+
+<sect>Major bugs in early versions
+
+<p>
+There was a bug in taper-5.1.1 when creating archives. If you made an
+archive with 5.1.1, unfortunately, you will have to re-backup if you find
+that restore doesn't work since it was a pretty major bug. However, since
+taper-5.1.1 was only released a day before 5.1.2 (which fixed the bug)
+was released, hopefully, not too many people are affected.
+
+From taper-5.0 to taper-5.1.3, there was another not so serious bug. This
+caused the file counts on the archives to be incorrect in certain, obscure
+situations. You will know if you have this bug because you will find that
+you have funny files on your restore screen, and some files and directories
+will be missing altogether. There is no way to correct the errors on the
+archive other than re-backing up, however 5.1.4 (and later) have a `fudge
+factor' which will allow to your to use your archives normally. Just run
+<em/mkinfo/ on your archive and taper will recognize the buggy archive and fudge
+your info file automatically for you.
+
+I don't believe it - the bug crept back into 5.1.5 - it's like a virus
+that won't go away! Anyway, 5.2 corrects it.
+
+In versions 5.6 to 6.1 (inclusive), there was an obscure backup bug which
+causes a problem if there were two buffers queued for output when the
+tape drive was closed. Unfortunately, there is no fix for this, however,
+it is a relatively rare bug, and at most, you will lose the last two
+blocks of the backup. This bug only occurred if you used triple buffering.
+
+In versions up to 6.1.3, there was a problem with internal compression
+of files > 32K. It was a spurious bug.
+
+
+<sect>Finally
+
+<p>
+Wow!  You made it through all the 'documentation'! I'm impressed.
+
+I would appreciate a short message if you find the program useful and 
+are using it. This will allow me to work out whether people are using it and
+whether to continue development. If you could also state what machine
+you are using, hard drive/floppy controllers, tape drive type, SCSI
+card etc.., then this will help me to maintain a compatibility list.
+
+
+
+Happy backing up,
+
+Yusuf Nagree
+<newline>
+yusuf@nagree.u-net.com
+<newline>
+5AUG96
+
+</article>
+
+
+

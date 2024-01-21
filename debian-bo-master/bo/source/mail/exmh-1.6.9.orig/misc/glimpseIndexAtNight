@@ -1,0 +1,155 @@
+#!/bin/sh
+# The next line is executed by /bin/sh, but not Tcl \
+exec tclsh $0 ${1+"$@"}
+# glimpseIndexAtNight
+#**********************************************************************
+# Original: Daniel Zepeda
+# Modified: Fergal Mc Carthy 22/05/95
+#	changed the index destinations to match the exmh1.6 conventions
+#	only index folders that have been updated since last index
+#	added optionality to indexing the users home directory
+#	improved the self scheduling using $argv0 and $argv
+#	looks up Path component in the users .mh_profile
+#	existing .glimpse_exclude files will be used and new template ones
+#		created
+#	account index excludes the MH directory properly
+#	default $HOME .glimpse_exclude excludes .netscape-cache also
+
+#               **********  Description  **********
+
+# This script runs glimpseindex first on the users MH folders, and then
+# optionally on the users home directory, excluding the MH folders.
+# 
+# The indices are generated according to the exmh1.6 conventions (i.e.
+# in the .glimpse directory under the MH directory), only indexing the
+# folders which have been modified since the last run.
+# 
+# The program determines the correct MH path from the users .mh_profile.
+# 
+# The program itself is self scheduling, running itself by default at
+# 3am every morning.
+
+#                  **********  Usage  **********
+# to start the program off just run it from the command line
+# with the option argument of "-home" to indicate if the users
+# home directory is also to be indexed, i.e.
+#	glimpseIndexAtNight [-home]
+
+#                  **********  Notes  **********
+# uses the unix find and at commands and assumes tclsh
+# exists in the path
+
+# Globals
+
+set TIME 	0300
+
+# Functions
+
+proc mkdirhier {path} {
+	set full_path $path
+
+	if {![string match /* $full_path]} {
+		set cur_path "."
+	} else {
+		set cur_path ""
+	}
+
+	foreach comp [split $path /] {
+		if {![llength $comp]} {
+			continue
+		}
+
+		set cur_path "$cur_path/$comp"
+
+		if {[file isdir $cur_path]} {
+			continue
+		}
+
+		if {[catch {exec mkdir $cur_path} catch_out]} {
+			puts stderr "glimpseIndexAtNight-mkdirhier: error creating directory $cur_path:\n\t$catch_out"
+			exit 1
+		}
+	}
+}
+
+# Main line
+
+# Reschedule for tomorrow at the selected time
+exec at $TIME tomorrow $argv0 2> /dev/null &
+
+# check if -home option used
+if {($argc != "0") && ([lindex $argv 0] == "-home")} {
+	open $env(HOME)/.glimpse_at_night_home "w"
+} else {
+	catch {exec rm -rf $env(HOME)/.glimpse_at_night_home}
+}
+
+#**********************************************************************
+# Index all of the Mail folders that have mail in them.
+#**********************************************************************
+
+# get the MH dir from the path component in the $HOME/.mh_profile
+set mhdir [lindex [exec grep -i path: $env(HOME)/.mh_profile] 1]
+
+# qualify the MH dir
+if {![string match /* $mhdir]} {
+	set mhdir $env(HOME)/$mhdir
+}
+
+# get the length of "$mhdir/"
+set mhdir_off [expr 1 + [string length $mhdir]]
+
+# the exmh1.6 glimpse indices directory - mirrors folder structure
+set gldir $mhdir/.glimpse
+
+foreach path [exec find $mhdir -type d -print ] {
+	set glpath $gldir/[string range $path $mhdir_off end]
+
+	if {(![file exists $glpath] \
+		 || ([file mtime $path] > [file mtime $glpath])) \
+		&& ![catch {set files [glob $path/\[0-9\]*]}]} {
+
+		# create the directory hierarcy if required
+		if {![file exists $glpath]} {
+			mkdirhier $glpath
+		}
+
+		# if there is already an exclude file use it,
+		#    otherwise create a new template one
+		if {![file exists $glpath/.glimpse_exclude]} {
+			set glx [open $glpath/.glimpse_exclude w]
+			puts $glx [format "%s\n%s" */.* *]
+			close $glx
+		}
+
+		# put the selected files in the include file
+        set gli [open $glpath/.glimpse_include w]
+		puts $gli [join $files \n]
+        close $gli
+
+		# index the folder, storing the index in the correct place,
+		#	and clean up
+        catch {exec glimpseindex -i -b -w 5000 -H $glpath $path > $glpath/.glimpse_out}
+        catch {exec rm -f $glpath/.glimpse_include}
+    }
+}
+
+#**********************************************************************
+# Index the home directory.
+#**********************************************************************
+
+# if not selected the just finish up now
+if {![file exists $env(HOME)/.glimpse_at_night_home]} {
+	exit
+}
+
+# the user can specify their own exclude file, or edit the generated
+# one as they please.
+if {![file exists $env(HOME)/.glimpse_exclude]} {
+	set ex [open $env(HOME)/.glimpse_exclude w]
+	puts $ex [format "%s\n%s" $mhdir $env(HOME)/.netscape-cache]
+	close $ex
+}
+
+# glimpse the users home directory
+catch {exec glimpseindex -b -w 2000 -H $env(HOME) $env(HOME) > $env(HOME)/.glimpse_out}

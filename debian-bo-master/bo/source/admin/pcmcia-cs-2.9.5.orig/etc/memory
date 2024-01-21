@@ -1,0 +1,62 @@
+#!/bin/sh
+#
+# memory 1.19 1997/03/18 06:47:42 (David Hinds)
+#
+# Initialize or shutdown a PCMCIA memory device using the "new" driver
+#
+# The first argument should be either 'start' or 'stop'.  The second
+# argument is the base name for the device.
+#
+# This script creates a character device and a block device for
+# accessing a single memory region:
+#
+#	/dev/{name}c	- character device
+#	/dev/{name}b	- block device
+#
+# The script passes an extended device address to 'memory.opts' in the 
+# ADDRESS variable, to retrieve device-specific configuration options.
+# The address format is "scheme,socket,instance" where "scheme" is the
+# current PCMCIA device configuration scheme, "socket" is the socket
+# number, and "instance" is used to number multiple partitions on a
+# single card.
+#
+
+. ./shared
+
+# Get device attributes
+get_info $DEVICE
+
+# Load site-specific settings
+ADDRESS="$SCHEME,$SOCKET,$INSTANCE"
+. ./memory.opts
+
+case "$ACTION" in
+
+'start')
+    rm -f /dev/${DEVICE}[bc]
+    mknod /dev/${DEVICE}c c $MAJOR $MINOR
+    mknod /dev/${DEVICE}b b $MAJOR $MINOR
+    add_blkdev /dev/${DEVICE}b || exit 1
+    ;;
+
+'check')
+    fuser -s /dev/${DEVICE}c && exit 1
+    fuser -s -m /dev/${DEVICE}b && exit 1
+    ;;
+
+'stop')
+    fuser -s -k /dev/${DEVICE}c
+    rm_blkdev /dev/${DEVICE}b || exit 1
+    rm -f /dev/${DEVICE}[bc]
+    ;;
+
+'suspend'|'resume')
+    ;;
+
+*)
+    usage
+    ;;
+
+esac
+
+exit 0

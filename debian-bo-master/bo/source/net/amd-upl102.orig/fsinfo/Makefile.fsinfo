@@ -1,0 +1,104 @@
+#
+# Copyright (c) 1990 Jan-Simon Pendry
+# Copyright (c) 1990 Imperial College of Science, Technology & Medicine
+# Copyright (c) 1990 The Regents of the University of California.
+# All rights reserved.
+#
+# This code is derived from software contributed to Berkeley by
+# Jan-Simon Pendry at Imperial College, London.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+# 3. All advertising materials mentioning features or use of this software
+#    must display the following acknowledgement:
+#      This product includes software developed by the University of
+#      California, Berkeley and its contributors.
+# 4. Neither the name of the University nor the names of its contributors
+#    may be used to endorse or promote products derived from this software
+#    without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+#
+#	%W% (Berkeley) %G%
+#
+# $Id: Makefile.fsinfo,v 5.2.2.1 1992/02/09 15:11:28 jsp beta $
+#
+
+#LEX = flex
+PROG = fsinfo
+SRCS = ${FSINFOSRC}
+OBJS = \
+	fsinfo.o \
+	fsi_gram.o fsi_lex.o \
+	fsi_util.o fsi_analyze.o fsi_dict.o \
+	wr_atab.o wr_bparam.o \
+	wr_dumpset.o \
+	wr_exportfs.o wr_fstab.o
+
+fsinfo: ${OBJS}
+	${CC} -o $@ ${CFLAGS} ${OBJS} ${SYSLIB}
+
+fsi_gram.c fsi_gram.h: ../fsinfo/fsi_gram.y
+	@echo "# expect two shift/reduce conflicts"
+	${YACC} -d ../fsinfo/fsi_gram.y
+	mv y.tab.c fsi_gram.c
+	mv y.tab.h fsi_gram.h
+
+fsi_lex.c: ../fsinfo/fsi_lex.l
+	${LEX} ../fsinfo/fsi_lex.l
+	mv lex.yy.c fsi_lex.c
+
+fsi_lex.o fsinfo.o: fsi_gram.h
+
+${OBJS}: ../fsinfo/fsinfo.h ../fsinfo/fsi_data.h ../include/am.h \
+	../config/${OS_HDR} ../config/os-defaults.h ../include/fstype.h
+
+clean::
+	-rm -f fsinfo fsi_lex.c fsi_gram.c fsi_gram.h core
+
+mkinfo:
+	@echo MAKE SURE THE SUBDIRS EXIST
+	./fsinfo -h `hostname`.doc.ic.ac.uk \
+		-e exportfs/ \
+		-f fstab/ \
+		-m automap/ \
+		-d generic/ \
+		-b generic/ \
+		conf/hosts/* conf/automounts
+
+install.man::
+	@if [ -f ../$(PROG)/$(PROG).$(MANEXT) ] ; then \
+		set -x ; \
+		$(INSTALL) -c -m 444 ../$(PROG)/$(PROG).$(MANEXT) \
+		$(MANDIR)/man$(MANEXT)/$(PROG).$(MANEXT) ; \
+	else \
+		echo No man page in ../$(PROG)/$(PROG).$(MANEXT) ; \
+		true ; \
+	fi
+
+fsinfo.o: ../fsinfo/fsinfo.c; ${CC_COMPILE} ../fsinfo/fsinfo.c
+fsi_gram.o: fsi_gram.c; ${CC_COMPILE} fsi_gram.c
+fsi_lex.o: fsi_lex.c; ${CC_COMPILE} fsi_lex.c
+fsi_util.o: ../fsinfo/fsi_util.c; ${CC_COMPILE} ../fsinfo/fsi_util.c
+fsi_analyze.o: ../fsinfo/fsi_analyze.c; ${CC_COMPILE} ../fsinfo/fsi_analyze.c
+fsi_dict.o: ../fsinfo/fsi_dict.c; ${CC_COMPILE} ../fsinfo/fsi_dict.c
+wr_atab.o: ../fsinfo/wr_atab.c; ${CC_COMPILE} ../fsinfo/wr_atab.c
+wr_bparam.o: ../fsinfo/wr_bparam.c; ${CC_COMPILE} ../fsinfo/wr_bparam.c
+wr_dumpset.o: ../fsinfo/wr_dumpset.c; ${CC_COMPILE} ../fsinfo/wr_dumpset.c
+wr_exportfs.o: ../fsinfo/wr_exportfs.c; ${CC_COMPILE} ../fsinfo/wr_exportfs.c
+wr_fstab.o: ../fsinfo/wr_fstab.c; ${CC_COMPILE} ../fsinfo/wr_fstab.c

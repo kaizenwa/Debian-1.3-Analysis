@@ -1,0 +1,48 @@
+#! /bin/sh
+# checkfile [-i] uid gid permpattern filename
+
+ign=n
+case "$1" in
+-i)	ign=y ; shift	;;
+esac
+case "$#" in
+1|2|3)	echo "Usage: $0 [-i] uid gid permpattern filename ..." >&2 ; exit 2	;;
+esac
+
+uid="$1"
+gid="$2"
+permp="$3"
+shift ; shift ; shift
+
+for f
+do
+	# the ls output with both uid and gid has 9 fields
+	# perms links uid gid size date date date name
+	( ls -ld $f ; ls -lgd $f ) |
+		awk 'BEGIN {
+			uid = "'"$uid"'"
+			gid = "'"$gid"'"
+			f = "'"$f"'"
+		}
+		NF == 9 {
+			if ($3 != uid)
+				print f, "belongs to user", $3, "not", uid
+			if ($4 != gid)
+				print f, "belongs to group", $4, "not", gid
+			if ($1 !~ /'"$permp"'/)
+				print f, "has incorrect permissions", $1
+			exit	# sometimes ls -l and ls -lg are synonymous
+		}'
+done >/tmp/cf$$
+if test -s /tmp/cf$$
+then
+	cat /tmp/cf$$
+	if test " $ign" = " n"
+	then
+		status=1
+	fi
+else
+	status=0
+fi
+rm -f /tmp/cf$$
+exit $status

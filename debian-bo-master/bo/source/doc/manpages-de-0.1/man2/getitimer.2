@@ -1,0 +1,152 @@
+.\" Hey Emacs! This file is -*- nroff -*- source.
+.\"
+.\" Copyright 7/93 by Darren Senn (sinster@scintilla.santa-clara.ca.us)
+.\" Based on a similar page Copyright 1992 by Rick Faith
+.\" May be freely distributed
+.\"
+.\" German translation by René Tschirley (gremlin@cs.tu-berlin.de)
+.\" Modified Mon Jun 10 12:23:31 1996 by Martin Schulze (joey@linux.de)
+.\"
+.TH GETITIMER 2 "5 August 1993" "Linux 0.99.11" "Systemaufrufe"
+.SH BEZEICHNUNG
+getitimer, setitimer \- holt/setzt Zeit eines Intervall-Timers
+.SH ÜBERSICHT
+.PD 0
+.HP
+.B #include <sys/time.h>
+.sp
+.HP
+.B int getitimer(int
+.IB which ,
+.B struct itimerval
+.BI * value );
+.HP
+.B int setitimer(int
+.IB which ,
+.B const struct itimerval
+.BI * value ,
+.B struct itimerval
+.BI * ovalue );
+.PD
+.SH BESCHREIBUNG
+Das System stellt jedem Prozeß drei Intervall-Timer zur Verfügung, die
+in unterschiedlichen Prozeßzuständen bis Null herabzählen.  Wenn der
+Timer Null erreicht, wird ein Signal an den Prozeß geliefert und der
+Timer startet (möglicherweise) von vorne.
+.TP 1.5i
+.B ITIMER_REAL
+zählt die tatsächlich laufende Zeit und liefert
+.B SIGALRM
+wenn die Null erreicht wurde.
+.TP
+.B ITIMER_VIRTUAL
+zählt nur, wenn der Prozeß ausgeführt wird und liefert
+.B SIGVTALRM
+wenn die Null erreicht wurde.
+.TP
+.B ITIMER_PROF
+zählt sowohl, wenn der Prozeß Rechnerzeit beansprucht, als auch, wenn
+das System für den Prozeß tätig ist.  Zusammen mit
+.BR ITIMER_VIRTUAL ,
+kann man so ermitteln, wie lange eine Applikation sich im User- und im
+Kernelprogrammraum aufhält.  Wenn der Zähler abgelaufen ist, wird
+.B SIGPROF
+geliefert.
+.LP
+Die Timerwerte sind durch folgende Strukturen definiert:
+.PD 0
+.RS .5i
+.nf
+struct itimerval
+{
+    struct timeval it_interval; /* nächster Timerwert */
+    struct timeval it_value;    /* dieser Timerwert */
+};
+struct timeval
+{
+    long tv_sec;                /* Sekunden */
+    long tv_usec;               /* Mikrosekunden */
+};
+.fi
+.RE
+.PD
+.LP
+.BR Getitimer (2)
+füllt die Struktur
+.I value
+mit den aktuellen Werten des Timers, den 
+.I which
+angibt, was
+.BR ITIMER_REAL ,
+.BR ITIMER_VIRTUAL ,
+oder
+.BR ITIMER_PROF )
+sein kann.
+The element
+.B it_value
+wird auf die Zeit gesetzt, die noch verbleibt oder auf Null, wenn der
+Timer nicht aktiv ist.  Analog wird
+.B it_interval
+auf den Resetwert gesetzt.
+.P
+.BR Setitimer (2)
+setzt den angegebenen Timer auf den Wert, der in 
+.I value
+referenziert wird.  Falls 
+.I ovalue
+nicht Null ist, wird der alte Wert dort abgelegt.
+.LP
+Timer werden von
+.I it_value
+dekrementiert bis Null erreicht wird, es wird ein Signal ausgelöst und
+der Timer wird auf den Beginn des Intervalls
+.IR it_interval
+zurückgesetzt.  Ein Timer, der auf Null gesetzt wird
+.RI ( it_value
+ist Null oder der Timer läuft ab und
+.I it_interval
+wird auf Null gesetzt) terminiert.
+.LP
+Timer laufen nie vor der angeforderten Zeit ab, sondern eher eine
+konstant kurze Zeitspanne später.  Die Größe der Zeitspanne hängt von
+der Auflösung des Timer ab (aktuell 10ms).  Bei Ablauf wird ein Signal
+erzeugt und der Timer beginnt von neuem.  Wenn das Signal ausgelöst
+wird, wenn der Prozeß aktiv ist (das ist bei
+.BR ITIMER_VIRT
+stets der Fall), wird das Signal augenblicklich
+ausgeliefert.  Andernfalls wird das Signal etwas später ausgeliefert,
+was von der Belastung der Maschine abhängen kann.
+.LP
+.SH "RÜCKGABEWERT"
+Bei Erfolg wird Null geliefert, bei aufgetretenem Fehler wird -1
+geliefert und 
+.I errno
+wird entsprechend gesetzt.
+.SH FEHLER
+.TP 1.5i
+.B EFAULT
+.I value
+oder
+.I ovalue
+sind keine gültigen Pointer.
+.TP
+.B EINVAL
+.I which
+ist weder
+.BR ITIMER_REAL
+noch
+.BR ITIMER_VIRT
+noch
+.BR ITIMER_PROF .
+.SH BUGS
+Unter Linux ist der Zeitpunkt der Auslösung des Signals vom Zeitpunkt
+der Auslieferung verschieden und es existiert keine Warteschlange.  Das
+bedeutet, daß unter unbeschreiblich starker Belastung es denkbar ist,
+daß 
+.B ITIMER_REAL
+abläuft, bevor das Signal des vorigen Ablaufs des Timers ausgeliefert
+wurde.  Das zweite Signal wird verloren.
+.SH "SIEHE AUCH"
+.BR gettimeofday (2),
+.BR sigaction (2),
+.BR signal (2).

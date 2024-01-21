@@ -1,0 +1,102 @@
+*** gas/ecoff.c.old	Tue Oct 31 18:30:30 1995
+--- gas/ecoff.c	Wed Dec 27 08:39:21 1995
+***************
+*** 2845,2855 ****
+  
+    coff_type.extra_sizes = coff_tag != (char *) NULL;
+    if (coff_type.num_dims > 0)
+      {
+!       int diff = coff_type.num_dims - coff_type.num_sizes;
+!       int i = coff_type.num_dims - 1;
+        int j;
+  
+!       if (coff_type.num_sizes != 1 || diff < 0)
+  	{
+  	  as_warn ("Bad COFF debugging info");
+--- 2845,2867 ----
+  
+    coff_type.extra_sizes = coff_tag != (char *) NULL;
++ 
++   /* We must allow for the case of an array whose base type is
++      a bitfield, because this is possible in Ada.  */
++ 
++   if (coff_symbol_typ == st_Member
++       && (coff_type.num_sizes - coff_type.extra_sizes
++ 	  - (coff_type.num_dims > 0) == 1))
++     {
++       /* Is this a bitfield?  This is indicated by a structure member
++ 	 having a size field that isn't an array size field.  */
++       coff_type.bitfield = 1;
++     }
++ 
+    if (coff_type.num_dims > 0)
+      {
+!       int diff = coff_type.num_dims - 1;
+        int j;
+  
+!       if (coff_type.num_sizes - coff_type.bitfield != 1)
+  	{
+  	  as_warn ("Bad COFF debugging info");
+***************
+*** 2872,2887 ****
+  	    }
+  
+! 	  coff_type.num_sizes = i + 1;
+! 	  for (i--; i >= 0; i--)
+! 	    coff_type.sizes[i] = (coff_type.sizes[i + 1]
+! 				  / coff_type.dimensions[i + 1]);
+  	}
+-     }
+-   else if (coff_symbol_typ == st_Member
+- 	   && coff_type.num_sizes - coff_type.extra_sizes == 1)
+-     {
+-       /* Is this a bitfield?  This is indicated by a structure memeber
+- 	 having a size field that isn't an array.  */
+-       coff_type.bitfield = 1;
+      }
+  
+--- 2884,2892 ----
+  	    }
+  
+! 	  coff_type.num_sizes = coff_type.num_dims + coff_type.bitfield;
+! 	  for (diff--; diff >= 0; diff--)
+! 	    coff_type.sizes[diff] = (coff_type.sizes[diff + 1]
+! 				     / coff_type.dimensions[diff + 1]);
+  	}
+      }
+  
+*** gas/config/tc-mips.c.old	Thu Nov 16 20:51:05 1995
+--- gas/config/tc-mips.c	Tue Dec 19 19:51:31 1995
+***************
+*** 1925,1929 ****
+  	    as_bad ("PIC code offset overflow (max 16 signed bits)");
+  	  ex.X_op = O_constant;
+! 	  macro_build (p, counter, &ex,
+  		       mips_isa < 3 ? "addiu" : "daddiu",
+  		       "t,r,j", reg, reg, (int) BFD_RELOC_LO16);
+--- 1925,1929 ----
+  	    as_bad ("PIC code offset overflow (max 16 signed bits)");
+  	  ex.X_op = O_constant;
+! 	  macro_build ((char *) NULL, counter, &ex,
+  		       mips_isa < 3 ? "addiu" : "daddiu",
+  		       "t,r,j", reg, reg, (int) BFD_RELOC_LO16);
+*** ecoff.c.dec31	Wed Dec 27 08:39:21 1995
+--- ecoff.c	Sun Dec 31 14:05:30 1995
+*************** ecoff_directive_endef (ignore)
+*** 2886,2891 ****
+  	  coff_type.num_sizes = coff_type.num_dims + coff_type.bitfield;
+  	  for (diff--; diff >= 0; diff--)
+! 	    coff_type.sizes[diff] = (coff_type.sizes[diff + 1]
+! 				     / coff_type.dimensions[diff + 1]);
+  	}
+      }
+--- 2886,2894 ----
+  	  coff_type.num_sizes = coff_type.num_dims + coff_type.bitfield;
+  	  for (diff--; diff >= 0; diff--)
+! 	    coff_type.sizes[diff]
+! 	      = (coff_type.dimensions[diff + 1] != 0
+! 		 ? (coff_type.sizes[diff + 1]
+! 		    / coff_type.dimensions[diff + 1])
+! 		 : 0);
+  	}
+      }

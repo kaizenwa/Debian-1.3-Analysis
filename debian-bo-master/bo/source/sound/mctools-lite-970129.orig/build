@@ -1,0 +1,252 @@
+#!/bin/sh
+
+###############################################################################
+#
+# How it works
+#
+
+usage() {
+  echo "Usage:"
+  echo "  $myname makefiles       - Create all Makefiles"
+  echo "  $myname makefile <dir>  - Create Makefile in directory <dir>"
+  echo "  $myname all             - Compile everything"
+  echo "  $myname <dir>           - Compile everything in directory <dir>"
+  echo "  $myname install         - Install everything"
+  echo "  $myname install <dir>   - Install everything in directory <dir>"
+}
+
+###############################################################################
+#
+# Init
+#
+myname=`basename $0`
+
+while :; do
+  case "$1" in
+   -h|-\?|--help)	usage
+			exit 1
+			;;
+
+   -*)			echo "$myname: Illegal option -- $1"
+			echo "Try \`$myname --help' for more information."
+			exit 1
+			;;
+
+   *)			break
+			 ;;
+  esac
+  shift
+done
+
+if [ ! -f McTools/McApp.c ]; then
+  echo "$myname: You must be in the top directory of the McTools software to build it."
+  exit 1
+fi
+
+if [ ! -f config.h ]; then
+ echo "$myname: No config.h! Please copy config-dist.h to config.h and edit it."
+ exit 1
+fi
+
+###############################################################################
+#
+# Check if directory exists and contains a makefile.
+#
+check_makefile() {
+  if [ ! -d $1 ]; then
+    echo "$myname: $1 not present or not a directory.";
+    return 1
+  fi
+
+  if [ "$2" ]; then chk_makefile=$2; else chk_makefile=Makefile; fi
+  if [ ! -f $1/$chk_makefile ]; then
+    [ "$2" ] && echo "$myname: No $chk_makefile in $1."
+    return 1;
+  fi
+
+  return 0;
+}
+
+###############################################################################
+#
+# Creating a makefile
+#
+make_makefile() {
+  check_makefile $1 Imakefile || return 1
+  echo "------------------------------------------------------------------------------"
+  echo "$myname: Making Makefile in $1"
+  (cd $1 && xmkmf && make depend)
+}
+
+###############################################################################
+#
+# Install one app
+#
+do_install() {
+  check_makefile $1 || make_makefile $1 || exit 1
+
+  echo "------------------------------------------------------------------------------"
+  echo "$myname: Installing in $1"
+  APP=`echo $1 | awk '{ print tolower($0); }'`
+  rm -f $1/$APP
+  (cd $1 && make $make_args install) || return 1;
+#  Don't bother if make install.man fails... Who needs documentation anyway? ;)
+  (cd $1 && make $make_args install.man) || true;
+}
+
+###############################################################################
+#
+# Compile one app
+#
+compile() {
+  check_makefile $1 || make_makefile $1 || exit 1
+
+  echo "------------------------------------------------------------------------------"
+  echo "$myname: Building in $1"
+  APP=`echo $1 | awk '{ print tolower($0); }'`
+  rm -f $1/$APP
+  (cd $1 && make $make_args);
+}
+
+###############################################################################
+#
+# Clean up...
+#
+do_clean() {
+  if [ -d $1 ] && [ -f $1/Imakefile ]; then
+    echo "------------------------------------------------------------------------------"
+    echo "Cleaning up in $1"
+    ( cd $1
+      if [ ! -f Makefile ]; then
+        xmkmf
+      fi
+      make clean
+      (set -x; rm -f Makefile .depend)
+    )
+  fi
+}
+
+###############################################################################
+#
+# Cool...
+#
+wemadeit() {
+  echo "------------------------------------------------------------------------------"
+  exit 0;
+}
+
+###############################################################################
+#
+# Build makefile(s)
+#
+if [ "$1" = "makefiles" ]; then
+
+  for file in [A-Z]*; do
+    if [ -d $file ] && [ -f $file/Imakefile ]; then
+      make_makefile $file || exit 1
+    fi
+  done
+
+  wemadeit
+fi
+
+if [ "$1" = "makefile" ]; then
+  shift
+  while [ "$1" ]; do
+    make_makefile $1 || exit 1
+    shift
+  done
+  wemadeit
+fi
+
+
+###############################################################################
+#
+# Build everything
+#
+if [ "$1" = "all" ]; then
+
+  compile McTools || exit 1
+
+  for file in [A-Z]*; do
+    if [ -d $file ] && [ ! $file = McTools ]; then
+      compile $file || exit 1
+    fi
+  done
+  wemadeit
+fi
+
+###############################################################################
+#
+# install
+#
+if [ "$1" = "install" ]; then
+  if [ -z $2 ]; then
+    do_install McTools || exit 1
+    for file in [A-Z]*; do
+      if [ -d $file ] && [ ! $file = McTools ]; then
+        do_install $file || exit 1
+      fi
+    done
+    wemadeit;
+  fi
+
+  shift
+  while [ "$1" ]; do
+    check_makefile $1 || make_makefile $1 || exit 1
+    if [ -z "$mctools_installed" ]; then
+      do_install McTools || exit 1
+      mctools_installed=1
+    fi
+    do_install $1 || exit 1
+    shift
+  done
+  wemadeit
+fi
+
+###############################################################################
+#
+# clean up
+#
+if [ "$1" = "clean" ]; then
+  if [ -z $2 ]; then
+    for file in [A-Z]*; do
+      do_clean $file
+    done
+    wemadeit;
+  fi
+
+  shift
+  while [ "$1" ]; do
+    check_makefile $1 Imakefile || exit 1
+    do_clean $1
+    shift
+  done
+  wemadeit;
+fi
+
+###############################################################################
+#
+# build a program
+#
+if [ "$1" ]; then
+  mctools_compiled=""
+  while [ "$1" ]; do
+    check_makefile $1 Imakefile || exit 1
+    if [ -z "$mctools_compiled" ]; then
+      compile McTools || exit 1
+      mctools_compiled=1
+    fi
+    compile $1 || exit 1
+    shift
+  done
+  wemadeit
+fi
+
+###############################################################################
+#
+# Unknown argument
+#
+
+usage
+exit 1

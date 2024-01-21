@@ -1,0 +1,156 @@
+#!__PERL_BINARY__
+#
+#	Reencoding script, (c) Jan Kasprzak, 1994-1996. Version 3.0
+#	Sun Aug  4 23:28:47 MET DST 1996
+#
+
+$inputenc = "";
+$outputenc = "";
+$use_accent = "onebyone";
+$fillstring = " ";
+$notonebyone = 0;
+
+$cstocsdir = $ENV{"CSTOCSDIR"};
+$cstocsdir = "__DEFAULT_CSTOCSDIR__" if $cstocsdir eq "";
+
+sub usage() {
+	print <<EOF
+Usage: cstocs [options] inputencoding outputencoding [ file ... ]
+    or cstocs [options] --inputencoding=inputencoding \\
+              --outputencoding=outputencoding [ file ... ]
+Where [options] is zero or more from:
+    --help        Prints out this message.
+    --version     Prints out the version information.
+    --fillstring=string    Characters from input the encoding not defined
+                  in the output encoding nor in the accent file will be replaced
+	          by this string (default is single space).
+    --null        Equivalent to --fillstring=""
+    --nochange    Do not use accent file at all.
+    --onebyone    Use only those entries from the accent file, which will cause
+                  replacing of one character by exactly one character.
+		  (this is the default behavior).
+    --onebymore   Use all entries from the accent file.
+    --dir=string  Directory where to look encoding and accent files for.
+                  Default is __DEFAULT_CSTOCSDIR__.
+EOF
+}
+
+sub read_accent() {
+	if ($use_accent eq "no") {
+		%accent = ();
+		return;
+	}
+	open(ACCENT, "$cstocsdir/accent") || die "Cannot open accent file: $!";
+	local($line, $key, $val) = (0);
+	while (<ACCENT>) {
+		$line++;
+		chop;
+		next if /^#/;
+		s/^\s+//;
+		($key, $val) = split /\s+/;
+		die "Syntax error in accent file at line $line.\n"
+			if $val eq "";
+#		print "Key=<$key>, Val=<$val>\n";
+		next if $use_accent eq "onebyone" && length($val) != 1;
+		$notonebyone = 1 if length($val) != 1;
+		$accent{$key} = $val;
+	}
+	close (ACCENT);
+}
+
+sub setup() {
+	die "You need to set both input and output encoding."
+		if $inputenc eq "" || $outputenc eq "";
+	
+	local($line, $key, $val) = (0,0);
+	open (IENC, "$cstocsdir/$inputenc.enc") ||
+		die "Cannot open $inputenc.enc: $!";
+	while (<IENC>) {
+		$line++;
+		chop;
+		next if /^#/;
+		die "Syntax error in $inputenc.enc at line $line.\n"
+			if ! /\s*([0-9]+)\s+([a-zA-Z0-9]+)\s*$/;
+		$ienc[$1] = $2;
+	}
+	close(IENC);
+
+	open (OENC, "$cstocsdir/$outputenc.enc") ||
+		die "Cannot open $inputenc.enc: $!";
+	$line=0;
+	while (<OENC>) {
+		$line++;
+		chop;
+		next if /^#/;
+		die "Syntax error in $outputenc.enc at line $line.\n"
+			if ! /\s*([0-9]+)\s+([a-zA-Z0-9]+)\s*$/;
+		$oenc{$2} = $1;
+	}
+	close(OENC);
+
+	&read_accent;
+
+	$notonebyone = 1 if length $fillstring != 1;
+
+	foreach $i (0..255) {
+		if ($ienc[$i] eq "") {
+			$vector[$i] = chr $i;
+			next;
+		}
+		if ($oenc{$ienc[$i]} ne "") {
+			$vector[$i] = chr $oenc{$ienc[$i]};
+			next;
+		}
+		if ($accent{$ienc[$i]} ne "") {
+			$vector[$i] = $accent{$ienc[$i]};
+			next;
+		}
+		$vector[$i] = $fillstring;
+	}
+	if ($notonebyone) {
+		eval 'sub trans() { $_= join "", ( map { $vector[$_]; } unpack("C*", $_));}'
+	} else {
+# One-by-one case is heavily optimized:
+		local(@srclist, @dstlist, $srcstr, $dststr);
+		foreach $i (0..255) {
+			if ($vector[$i] ne chr $i) {
+				@srclist = (@srclist, sprintf "\\%03o", $i);
+				@dstlist = (@dstlist, sprintf "\\%03o",
+					unpack("C",$vector[$i]));
+			}
+		}
+		$srcstr = join "", @srclist;
+		$dststr = join "", @dstlist;
+		eval "sub trans() { tr/$srcstr/$dststr/;}";
+	}
+}
+
+use Getopt::Long;
+
+&GetOptions("null", sub {$fillstring="";},
+	"fillstring=s", \$fillstring,
+	"onebyone", sub {$use_accent="onebyone";},
+	"onebymore", sub {$use_accent="onebymore";},
+	"dir=s", \$cstocsdir,
+	"inputencoding=s", \$inputenc,
+	"outputencoding=s", \$outputenc,
+	"help", \&usage,
+	"version", sub {print "cstocs.pl version 3.0\n"; exit 0;});
+
+# if --inputencoding nor --outputencoding is entered, use the first two
+# values in @ARGV. This is for compatibility with cstocs 2.2 and for
+# easy invocation of cstocs.
+if ($inputenc eq "" && $outputenc eq "") {
+	$inputenc = shift;
+	$outputenc = shift;
+}
+
+&setup;
+
+
+while (<>) {
+	&trans;
+	print;
+}
+
+exit 0;

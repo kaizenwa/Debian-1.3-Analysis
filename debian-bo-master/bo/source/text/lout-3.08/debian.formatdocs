@@ -1,0 +1,39 @@
+#!/bin/sh
+set -e
+mkdir -p debian-doctmp
+cd debian-doctmp
+for f in include maps font hyph data
+do
+	mkdir -p l.$f
+	cd l.$f
+	ln -sf ../../$f/* .
+	cd ..
+done
+for f in user design expert slides
+do
+	mkdir -p $f
+	cd $f
+	ln -sf ../../doc/$f/* .
+	for z in 1 2 3 4 F ; do
+		case $f$z in
+		design[12F]|expert[123F]|slides[1F]|user[1234F])
+			echo === formatting $f-$z ===
+			if ! PATH=../..:$PATH lout \
+				-I../l.include -C../l.maps \
+				-F../l.font -H../l.hyph -D../l.data \
+				all >deboutput-stage$z.ps 2>deblog-stage$z
+			then
+				cat >&2 deblog-stage$z
+				exit 1
+			fi
+			;;
+		esac
+	done
+	cat >&2 deblog-stageF
+	case $f in
+	user)	;;
+	*)	if test -s deblog-stageF; then exit 1; fi ;;
+	esac
+	mv deboutput-stageF.ps ../$f.ps
+	cd ..
+done

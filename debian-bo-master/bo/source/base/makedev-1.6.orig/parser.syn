@@ -1,0 +1,353 @@
+{
+/*
+ * parser.c: Parser for MAKEDEV, a program to create entries in /dev.
+ *
+ * Based on the MAKEDEV shell script, version 2.0, distributed with
+ * util-linux 1.10 and written by Nick Holloway. 
+ *
+ * A number of bugs were fixed, and some additional features added.
+ * Written 10-Dec-94 by David A. Holland, dholland@husc.harvard.edu
+ * Rik Faith (faith@cs.unc.edu) contributed ideas and patches.
+ *
+ * Copyright 1994, 1995. All rights reserved. 
+ * See the file LEGAL.NOTICE for conditions of redistribution.
+ *
+ * Bugs:
+ *    None known right now.
+ *
+ * History:
+ *
+ * Version 2: 25-Mar-95    Fixed makefile. 
+ *    Look for config files in ".." under testing conditions.
+ *    Big source split: makedev.syn -> parser.syn and devices.c.
+ *    Consequently, this file's version numbers aren't the same as the
+ *    whole program's any more.
+ * Version 1.4b: 25-Mar-95 Merged Rik's changes. Additional bug fixes:
+ *    Don't leave off the last entry in a range.
+ *    Parse hex digits correctly [sigh...].
+ *    Now we actually *use* the ishex flag.
+ * Version 1.4a: 26-Feb-95 Forced devinfo and makedev.cfg to be in /etc.
+ *                         [from faith@cs.unc.edu]
+ * Version 1.4: 15-Jan-95  Wrote man pages. Now reads DEVINFO.local.
+ * Version 1.3: 31-Dec-94  Bug fixes. Added batches. Added omits.
+ * Version 1.2: 11-Dec-94  Add configuration file parsing.
+ * Version 1.1: 11-Dec-94  Distinguish block and character devices in the
+ *    table of major device numbers. Changed the name and format of the
+ *    update cache file to include the type. It appears that the old script
+ *    was broken in this regard.
+ * Version 1.0: 10-Dec-94  Initial version.
+ */
+
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdarg.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <pwd.h>
+#include <grp.h>
+#include <sys/stat.h>
+
+#include "devices.h"
+
+}
+{
+/************************* parsing support *************************/
+
+/*
+ * Don't use the built-in error printing.
+ */
+#define SYNTAX_ERROR
+#define PARSER_STACK_OVERFLOW
+#define REDUCTION_TOKEN_ERROR
+
+void doparse(FILE *f, int filetype, const char *filename) {
+  char *x;
+  int i=0, len;
+  if (filetype<1 || filetype>4) crash("tried to parse a bad file type");
+  if (filetype!=1) { /* /proc/devices won't stat intelligently */
+    struct stat buf;
+    if (fstat(fileno(f), &buf)) crash("fstat failed?!?");
+    len = buf.st_size;
+  }
+  else len=1023;
+  x = malloc(len+1);
+  if (!x) crash("Out of memory");
+
+  len = fread(x, 1, len, f);  /* it shouldn't return a short count... */
+  if (len<0) crash("fread failed?!?");
+  x[len]=0;
+
+  init_parse();
+  PCB.input_code = filetype+'0';
+  parse();
+  PCB.column--; /* correct for the filetype token */
+  while (!PCB.exit_flag) {
+    PCB.input_code = x[i++];
+    parse();
+  }
+  if (PCB.exit_flag == AG_SYNTAX_ERROR_CODE) {
+    warn("syntax error: %s, line %d, column %d in file %s",
+         PCB.error_message, PCB.line, PCB.column, filename);
+    crash("Sorry, can't continue.");
+  }
+  else if (PCB.exit_flag != AG_SUCCESS_CODE) {
+    crash("parser stack overflow!");
+  }
+}
+
+#define STRINGSIZE 8192
+static char string_space[STRINGSIZE];
+static int stringptr=0;
+
+static const char *string_start(int c) {
+  if (stringptr>=STRINGSIZE) crash("out of string space");
+  return string_space[stringptr]=c, string_space+stringptr++;
+}
+
+static void string_push(int c) {
+  if (stringptr>=STRINGSIZE) crash("out of string space");
+  string_space[stringptr++] = c;
+}
+
+static void string_finish(void) {
+  string_push(0);
+}
+
+}
+/************************* syntax begins here *************************/
+
+/*
+ * We read four different file formats here:
+ *     /proc/devices   1
+ *     MAKEDEV.cache   2
+ *     DEVINFO         3
+ *     MAKEDEV.config  4
+ */
+
+
+[
+  sticky {identifier}
+  disregard white space
+  lexeme {identifier, simple eol, quoted string}
+  distinguish keywords {'a-z' + 'A-Z'}
+  event driven
+  parser name = parse
+  line numbers
+]
+
+(void) file format $
+  -> '1', devices
+  -> '2', cache
+  -> '3', devinfo
+  -> '4', config
+
+
+/************************* /proc/devices *************************/
+
+(void) devices
+  -> eol?, device list..., eof
+
+(void) device list
+  -> "Character devices:", eol, character device...
+  -> "Block devices:", eol, block device...
+
+(void) character device
+  -> number:n, name:s, eol = set_major(s,YES,n);
+
+(void) block device
+  -> number:n, name:s, eol = set_major(s,NO,n);
+
+/************************* cache *************************/
+
+(void) cache
+  -> eol?, cachedevice..., eof
+
+(void) cachedevice
+  -> name:n, number:maj, devicetype:t, eol = updatefromcache(n,maj,t);
+
+(char) devicetype
+  -> 'b'       = 'b';
+  -> 'c'       = 'c';
+  -> "block"   = 'b';
+  -> "char"    = 'c';
+
+/************************* devinfo *************************/
+
+(void) devinfo
+  -> eol?, device block..., eof
+
+(void) device block
+  -> device header spec, '{', eol?, device decl?..., '}', eol?
+  -> device header spec, eol?, device decl
+  -> "ignore", '{', eol?, ignoramus..., '}', eol?
+  -> "batch", batch list, '}', eol?
+
+(batch *) batch list
+  -> name:n, '{', eol?, batch item:i, eol?  = add2batch(addbatch(n), i);
+  -> batch list:b, [',', eol?], batch item:i, eol? = add2batch(b,i);
+
+(const char *) batch item
+  -> name:n = n;
+
+(void) ignoramus
+  -> name:n, eol?, [',', eol?] = ignore_procname(n);
+
+{
+  static const char *cur_group=NULL, *cur_class=NULL;
+  static int cur_type;
+  static int cur_maj=0, cur_min=0, cur_bot=0, cur_top=0, ishex=0;
+
+  static void dhsproc(const char *g, const char *p, int t, int m) {
+    cur_group = g;
+    cur_type = t;
+    cur_maj = get_major(p, (t=='c'), m);
+    cur_min = 0;
+    cur_bot = cur_top = ishex = 0;
+    if (p) addalias(p,g);
+  }
+
+  static void newdev(const char *n) {
+    if (cur_maj<0) return;
+    init(n, cur_group, cur_class, cur_maj, cur_min, cur_type);
+  }
+  static void devrange(const char *n, const char *n1) {
+    char temp[32];
+    if (cur_maj<0) return;
+    sprintf(temp, "%s%%%c%s", n, ishex ? 'x' : 'd', n1 ? n1 : "");
+    initlots(temp, cur_bot, cur_top, cur_group, cur_class,
+	     cur_maj, cur_min, cur_type);
+  }
+  static void doinitlink(const char *src, const char *tg) {
+    if (cur_maj>=0) initlink(src, cur_group, tg);
+  }
+}
+
+(void) device header spec
+  -> devicetype:t, '(', groupname:g, '=', procname:p, ')' = dhsproc(g,p,t,-1);
+  -> devicetype:t, '(', groupname:g, '=', procname:p,
+                  ',', number:m, ')'                    = dhsproc(g,p,t,m);
+  -> devicetype:t, '(', groupname:g, ',', number:m, ')' = dhsproc(g,NULL,t,m);
+
+(const char *) class
+  -> '(', name:classname, ')' = classname;
+
+(void) device tail
+  -> class:c, ':', expr:min, eol = (cur_class=c, cur_min=min);
+
+(void) device range
+  -> '[', number:a, '-', number:b, ']'       = cur_bot=a, cur_top=b, ishex=0;
+  -> '[', hex number:a, '-', auto hex:b, ']' = cur_bot=a, cur_top=b, ishex=1;
+
+(void) device decl
+  -> devname:n,                           device tail = newdev(n);
+  -> devname:n, device range, devname:n1, device tail = devrange(n,n1);
+  -> devname:n, device range,             device tail = devrange(n,NULL);
+  -> devname:n, '[', letter:a, '-', letter:b,']', number:p,'/',number:m, eol =
+        initdisk(n, a, b, p, cur_maj, m);
+  -> devname:n, "->", name:tg, eol = doinitlink(n, tg);
+
+(const char *) devname -> name:n = n;
+(const char *) groupname -> name:n = n;
+(const char *) procname -> name:n = n;
+
+
+/************************* config *************************/
+
+(void) config
+  -> eol?, config decl..., eof
+
+(void) config decl
+  -> class decl
+  -> omit decl
+
+(void) class decl
+  -> "class", name:n, ':', name:o, name:g, mode:m, eol = addclass(n,o,g,m);
+
+(void) omit decl
+  -> "omit", name:n, eol = make(n, M_OMIT);
+  -> "omit", '{', eol?, single omit..., '}', eol?
+
+(void) single omit
+  -> name:n, eol?, [',', eol?] = make(n, M_OMIT);
+
+(int) mode
+ -> octal number:n = n;
+
+/************************* support *************************/
+
+eof         = -1 + 0
+digit       = '0-9'
+letter      = 'a-z' + 'A-Z' + '-' + '_'
+octal digit = '0-7'
+qchar       = 32..126 - '\\' - '"'
+
+(void) white space
+ -> ' ' + '\t' + '\r'
+ -> "/*", ~eof?..., "*/"
+
+
+(void) eol
+ -> simple eol...
+
+(void) simple eol
+ -> [{"//" | '#'}, ~'\n'?...], '\n'
+
+(const char *) name
+  -> identifier:s = string_finish(), s;
+  -> quoted string:s = s;
+
+(const char *) identifier
+  -> letter:c                       = string_start(c);
+  -> identifier:s, letter+digit:c   = string_push(c), s;
+
+(const char *) quoted string
+  -> '"', qstring:s, '"' = string_finish(), s;
+
+(const char *) qstring
+  -> qstring char:c            = string_start(c);
+  -> qstring:s, qstring char:c = string_push(c), s;
+
+(char) qstring char
+  -> qchar:c     = c;
+  -> '\\', '\\'  = '\\';
+  -> '\\', '"'   = '"';
+
+(int) number
+  -> digit:d           = d-'0';
+  -> number:n, digit:d = n*10 + d-'0';
+
+(int) hex number
+  -> {"0x" | "0X"}, hex digit:d    =d;
+  -> hex number:n, hex digit:d     =16*n+d;
+
+(int) auto hex
+  -> hex digit:d    =d;
+  -> auto hex:n, hex digit:d     =16*n+d;
+
+
+(int) hex digit
+  -> digit:d     = d-'0';
+  -> 'a-f':d     = 10 + d-'a';
+  -> 'A-F':d     = 10 + d-'A';
+
+(int) octal number
+ -> octal digit:d                  = d-'0';
+ -> octal number:n, octal digit:d  = n*8+d-'0';
+
+(int) expr
+ -> term
+ -> expr:x, '+', term:t         =x+t;
+ -> expr:x, '-', term:t         =x-t;
+
+(int) term
+ -> factor
+ -> term:t, '*', factor:f       =t*f;
+// -> term:t, '/', factor:f       =t/f;
+
+(int) factor
+ -> number
+ -> hex number
+ -> '-', factor:f               =-f;
+ -> '(', expr:x, ')'            =x;

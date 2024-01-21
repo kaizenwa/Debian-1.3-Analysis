@@ -1,0 +1,334 @@
+# @config_args@
+
+# Written by Peter Ekberg, peda@lysator.liu.se
+
+SHELL        = /bin/sh
+CC           = @CC@
+DD           = dd
+INSTALL      = @INSTALL@
+
+NO_PBM       = @no_pbm@
+NO_SVGA      = @no_svga@
+NO_X         = @no_x@
+SOUND        = @sound@
+POD2MAN      = @pod2man@
+
+prefix       = @prefix@
+exec_prefix  = @exec_prefix@
+BINDIR       = @bindir@
+MANDIR       = @mandir@
+STATEDIR     = @sharedstatedir@
+
+DEFINES      = $(strip \
+                 -DHIGHSCOREFILE=\"$(FULLHISCORE)\" \
+                 -DVERSION=\"$(VERSION)\" \
+                 @DEFS@)
+OPTIMIZE     = @optimize@
+COMPILE      = @cflags@
+ALL_CFLAGS   = $(strip \
+                 $(DEFINES) $(OPTIMIZE) $(COMPILE) \
+                 @X_CFLAGS@ @SVGA_CFLAGS@)
+SVGA_LIBS    = @SVGA_LIBS@ -lvgagl -lvga
+X_LIBS       = @X_PRE_LIBS@ @X_LIBS@ @X_EXTRA_LIBS@ -lXext -lX11
+LDFLAGS      = @LDFLAGS@
+
+PBM_FLAGS    = @PBM_CFLAGS@ @PBM_LIBS@ -lppm -lpgm -lpbm -DVERSION=\"0.5\"
+
+PRG          = thrust
+XPRG         = xthrust
+MAN          = $(PRG).man
+HIGHSCORE    = $(PRG).highscore
+FULLHISCORE  = $(STATEDIR)/$(HIGHSCORE)
+VERSION_NR   = 0.79
+VERSION      = $(VERSION_NR)c
+SOURCE       = src
+DATASRC      = datasrc
+
+LIBS         = -lm
+
+HELPPRG      = $(addprefix $(DATASRC)/, bin2c txt2c ppm2c reverse)
+
+BIN8         = $(addprefix $(DATASRC)/, \
+                 blocks0.bin blocks1.bin blocks2.bin blocks3.bin \
+                 blocks4.bin blocks5.bin blocks6.bin blocks7.bin \
+                 blocks8.bin blocks9.bin blocksa.bin blocksb.bin \
+                 blocksc.bin blocksd.bin blockse.bin blocksf.bin )
+
+SOURCEOBJS   = $(addprefix $(SOURCE)/, \
+                 thrust.o fast_gr.o highscore.o conf.o things.o init.o \
+		 level.o font5x5.o graphics.o @LIBOBJS@)
+DATAOBJS     = $(addprefix $(DATASRC)/, \
+                 font.o blocks.o ship.o shield.o colors.o bullets.o title.o \
+                 level1.o level2.o level3.o level4.o level5.o level6.o \
+                 demomoves.o)
+SOUNDITOBJS  = $(addprefix $(SOURCE)/, soundIt.o)
+SOUNDOBJS    = $(addprefix $(DATASRC)/, \
+                 boom.o boom2.o harp.o thrust.o zero.o)
+ifeq ($(SOUND),yes)
+OBJS         = $(SOURCEOBJS) $(DATAOBJS) $(SOUNDITOBJS) $(SOUNDOBJS)
+else
+OBJS         = $(SOURCEOBJS) $(DATAOBJS)
+endif
+X_OBJS       = $(addprefix $(SOURCE)/, X11key.o X11.o)
+SVGA_OBJS    = $(addprefix $(SOURCE)/, svgakey.o svga.o)
+
+TARFILE      = $(PRG)-$(VERSION)-src.tar
+BINTARFILE   = $(PRG)-$(VERSION)-bin.tar
+DISTFILES    = COPYING README INSTALL TODO CHANGES thrustrc \
+               $(PRG)-$(VERSION).lsm $(MAN) $(HIGHSCORE)
+SRCDISTFILES = $(addsuffix .pod.in, $(basename $(MAN))) Makefile*.in \
+               configure.in configure install-sh config.sub config.guess
+BINDISTFILES = Makefile.bindist
+
+
+#######################
+#
+# Targets.
+#
+#######################
+
+.PHONY: all install uninstall install-man uninstall-man \
+        clean distclean mostlyclean realclean \
+        dep TAGS info dvi man dist bindist
+
+ifeq ($(NO_X),yes)
+ ifeq ($(NO_SVGA),yes)
+all:
+	@echo Unable to find any one of X and Svgalib.
+	@echo Try reconfiguring.
+
+install:
+ else
+all: $(PRG)
+
+install: $(PRG)
+ endif
+else
+ ifeq ($(NO_SVGA),yes)
+all: $(XPRG)
+
+install: $(XPRG)
+ else
+all: $(PRG) $(XPRG)
+
+install: $(PRG) $(XPRG)
+ endif
+endif
+	$(INSTALL) -o root -g root -d $(BINDIR)
+ifneq ($(NO_SVGA),yes)
+	$(INSTALL) -o root -g root -m 4755 $(PRG) $(BINDIR)/$(PRG)
+endif
+ifneq ($(NO_X),yes)
+	$(INSTALL) -o root -g root -m 755 $(XPRG) $(BINDIR)/$(XPRG)
+endif
+	$(INSTALL) -o root -g root -d $(STATEDIR)
+	@if [ -f $(FULLHISCORE) ]; then \
+	  echo chown root:root $(FULLHISCORE); \
+	  chown root:root $(FULLHISCORE); \
+	  echo chmod 666 $(FULLHISCORE); \
+	  chmod 666 $(FULLHISCORE); \
+	else \
+	  echo $(INSTALL) -o root -g root -d $(STATEDIR); \
+	  $(INSTALL) -o root -g root -d $(STATEDIR); \
+	  echo $(INSTALL) -o root -g root -m 666 $(HIGHSCORE) $(FULLHISCORE); \
+	  $(INSTALL) -o root -g root -m 666 $(HIGHSCORE) $(FULLHISCORE); \
+	fi
+
+uninstall:
+	rm -i $(BINDIR)/$(PRG)
+	rm -i $(BINDIR)/$(XPRG)
+	rm -i $(FULLHISCORE)
+
+install-man: man
+	$(INSTALL) $(MAN) $(MANDIR)/man6/$(addsuffix .6,$(basename $(MAN)))
+
+uninstall-man:
+	rm $(MANDIR)/man6/$(addsuffix .6,$(basename $(MAN)))
+
+clean:
+	rm -rf $(strip *~ core $(PRG) $(XPRG) $(OBJS) $(X_OBJS) $(SVGA_OBJS) \
+                       $(HELPPRG) $(DATASRC)/blocks*.bin .depend )
+
+distclean: clean
+	rm -f $(SOURCE)/TAGS $(TARFILE).gz \
+              Makefile Makefile.bindist \
+              $(addsuffix .pod, $(basename $(MAN))) $(SOURCE)/config.h
+
+mostlyclean:
+	rm -rf *~ core $(PRG) $(XPRG) $(SOURCEOBJS) $(X_OBJS) $(SVGA_OBJS)
+
+realclean: distclean
+	rm -f $(MAN) $(DATASRC)/title.c $(BINTARFILE).gz \
+              config.cache config.log config.status configure
+
+dep:
+	$(CC) -M $(patsubst %.o,%.c,$(SOURCEOBJS)) > .depend
+ifneq ($(NO_SVGA),yes)
+	$(CC) -M $(patsubst %.o,%.c,$(SVGA_OBJS)) >> .depend
+endif
+ifneq ($(NO_X),yes)
+	$(CC) -M $(patsubst %.o,%.c,$(X_OBJS)) >> .depend
+endif
+
+TAGS:
+	etags $(SOURCE)/*.c -o $(SOURCE)/TAGS
+
+info:
+	@echo No documentation available.
+
+dvi:
+	@echo No documentation available.
+
+man: $(MAN)
+
+dist: man $(DATASRC)/title.c
+	mkdir $(PRG)-$(VERSION)
+	mkdir $(PRG)-$(VERSION)/$(SOURCE)
+	mkdir $(PRG)-$(VERSION)/$(DATASRC)
+	cp -dpf $(DISTFILES) $(PRG)-$(VERSION)
+	cp -dpf $(SRCDISTFILES) $(PRG)-$(VERSION)
+	cp -dpf $(SOURCE)/*.h $(SOURCE)/*.c $(SOURCE)/*.in \
+	        $(PRG)-$(VERSION)/$(SOURCE)
+	cp -dpf $(DATASRC)/*.c $(DATASRC)/*.bmp $(DATASRC)/*.snd \
+	        $(DATASRC)/*.pal $(DATASRC)/*.def $(DATASRC)/*.ppm \
+	        $(DATASRC)/demomoves.bin \
+	        $(PRG)-$(VERSION)/$(DATASRC)
+	rm -f $(PRG)-$(VERSION)/$(SOURCE)/config.h
+	chmod -R g-w $(PRG)-$(VERSION)/*
+	tar -cf $(TARFILE) $(PRG)-$(VERSION)/*
+	gzip -f9 $(TARFILE)
+	rm -rf $(PRG)-$(VERSION)
+
+ifneq ($(NO_SVGA),yes)
+ifneq ($(NO_X),yes)
+bindist: $(PRG) $(XPRG) man
+	mkdir $(PRG)-$(VERSION)
+	cp -dpf $(DISTFILES) $(BINDISTFILES) $(XPRG) $(PRG) $(PRG)-$(VERSION)
+	mv $(PRG)-$(VERSION)/Makefile.bindist $(PRG)-$(VERSION)/Makefile
+	chmod -R g-w $(PRG)-$(VERSION)/*
+	tar -cf $(BINTARFILE) $(PRG)-$(VERSION)/*
+	gzip -f9 $(BINTARFILE)
+	rm -rf $(PRG)-$(VERSION)
+else
+bindist:
+	@echo Only for Linux with both X and svgalib.
+endif
+else
+bindist:
+	@echo Only for Linux with both X and svgalib.
+endif
+
+
+#######################
+#
+# Implicit rules.
+#
+#######################
+
+# Compile C files to object files.
+%.o: %.c
+	$(CC) $(ALL_CFLAGS) -c -o $(addprefix $(dir $<), $(notdir $@)) $<
+
+
+# Extract palette information.
+%.bin: %.pal
+	$(DD) of=$@ if=$< bs=1 skip=790
+# Extract picture information.
+%.rbin: %.bmp
+	$(DD) of=$@ if=$< bs=1 skip=1078
+
+
+# The bmp format stores rows backwards (last row first).
+# These rules are used to "reverse" the order in which the rows are stored.
+# There is one rule for each of the three used widths of the line.
+%.bin: %.4.rbin
+	$(MAKE) $(DATASRC)/reverse
+	$(DATASRC)/reverse 4 < $< > $@
+%.bin: %.8.rbin
+	$(MAKE) $(DATASRC)/reverse
+	$(DATASRC)/reverse 8 < $< > $@
+%.bin: %.16.rbin
+	$(MAKE) $(DATASRC)/reverse
+	$(DATASRC)/reverse 16 < $< > $@
+
+
+# Make a C file out of a text file. The info is stored in an array of strings.
+# One line in the original text file will be stored in one cell of the array.
+%.c: %.def
+	$(MAKE) $(DATASRC)/txt2c
+	$(DATASRC)/txt2c $(notdir $(basename $<)) < $< > $@
+# Make a C file out of a binary file. The info is stored in a byte array.
+%.c: %.bin
+	$(MAKE) $(DATASRC)/bin2c
+	$(DATASRC)/bin2c bin_$(notdir $(basename $<)) < $< > $@
+# Make a C file out of a sound file.
+%.c: %.snd
+	$(MAKE) $(DATASRC)/bin2c
+	/bin/echo > $@
+	/bin/echo unsigned int sound_$(notdir $(basename $<))_len = \
+        `wc -c < $<`\; >> $@
+	$(DATASRC)/bin2c sound_$(notdir $(basename $<)) < $< >> $@
+# Make a C file out of a ppm picture file.
+%.c: %.ppm
+ifeq ($(NO_PBM),yes)
+	@echo Must configure with pbm to build ppm2c.
+	@echo Warning: Unable to rebuild $@ from $<.
+else
+	$(MAKE) $(DATASRC)/ppm2c
+	$(DATASRC)/ppm2c -n $(notdir $(basename $<)) -m 32 < $< > $@
+endif
+
+
+# Make a man page from a pod source
+%.man: %.pod
+ifeq ($(POD2MAN),)
+	@echo Must have pod2man to rebuild man page.
+	@echo Warning: Unable to rebuild $@ from $<.
+else
+	pod2man $< > $@
+endif
+
+
+#######################
+#
+# Secondary targets.
+#
+#######################
+
+ifneq ($(NO_SVGA),yes)
+$(PRG): $(OBJS) $(SVGA_OBJS)
+	$(CC) $(LDFLAGS) -o $(PRG) $(OBJS) $(SVGA_OBJS) $(SVGA_LIBS) $(LIBS)
+endif
+
+ifneq ($(NO_X),yes)
+$(XPRG): $(OBJS) $(X_OBJS)
+	$(CC) $(LDFLAGS) -o $(XPRG) $(OBJS) $(X_OBJS) $(X_LIBS) $(LIBS)
+endif
+
+$(DATASRC)/blocks.bin: $(BIN8)
+	cat $^ > $@
+
+$(DATASRC)/reverse: $(DATASRC)/reverse.c
+	$(CC) @DEFS@ $(COMPILE) $< -o $@
+
+$(DATASRC)/bin2c:  $(DATASRC)/bin2c.c
+	$(CC) @DEFS@ $(COMPILE) $< -o $@
+
+$(DATASRC)/txt2c:  $(DATASRC)/txt2c.c
+	$(CC) @DEFS@ $(COMPILE) $< -o $@
+
+ifneq ($(NO_PBM),yes)
+$(DATASRC)/ppm2c: $(DATASRC)/ppm2c.c
+	$(CC) @DEFS@ $(PBM_FLAGS) $< -o $@
+endif
+
+
+#######################
+#
+# Dependencies.
+#
+#######################
+
+ifeq (.depend,$(wildcard .depend))
+include .depend
+endif

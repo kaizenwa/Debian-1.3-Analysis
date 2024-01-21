@@ -1,0 +1,106 @@
+This will give you with-output-to-string function
+gwmsh uses to get back results from gwm.
+
+(with-output-to-string
+  <form1>
+  ...
+  <formN>)
+
+Forms are evaluated as in prog, but all output from calls to print
+is directed to string returned as with-output-to-string value.
+
+diff -c gwm-1.7o-dist/wool.c gwm-1.7o/wool.c
+*** gwm-1.7o-dist/wool.c	Fri Sep 30 21:06:51 1994
+--- gwm-1.7o/wool.c	Fri Sep 30 21:07:17 1994
+***************
+*** 1145,1150 ****
+--- 1145,1186 ----
+      return result;
+  }
+  
++ /*XXX-UWE-XXX*/
++ static int expand_string_stream ();
++ 
++ WOOL_OBJECT
++ wool_with_output_to_string (argc, argv)
++   int argc;
++   WOOL_OBJECT *argv;
++ {
++     WOOL_STRING_STREAM str, WOOL_STRING_STREAM_make (); 
++     int old_type;
++     char *old_stream;
++     WOOL_OBJECT result;
++ 
++     str = WOOL_STRING_STREAM_make (256, expand_string_stream);
++     old_type = wool_output_redirect (1, str, &old_stream);
++     progn (argc, argv);
++     wool_output_redirect (old_type, old_stream, NULL);
++ 
++     result = (WOOL_OBJECT) WLString_make (str->buffer);
++     WOOL_STRING_STREAM_free (str);
++     return result;
++ }
++ 
++ static int
++ expand_string_stream (str)
++   WOOL_STRING_STREAM str;
++ {
++     char *new_buf;
++     int nbytes = str->last - str->buffer + 1;
++     int ptr_pos = str->ptr - str->buffer;
++ 
++     str->buffer = Realloc (str->buffer, 2*nbytes);        
++     str->last = str->buffer + nbytes - 1;
++     str->ptr = str->buffer + ptr_pos;
++ }
++ /*XXX-UWE-XXX*/
+  /*
+   * (progn inst1 ... instn)
+   * evals the n instructions then return the last one's result
+***************
+*** 1987,1992 ****
+--- 2023,2032 ----
+      wool_subr_make(WLSubr, shell, "!", NARY);
+      increase_reference(wool_atom("print") -> c_val =
+  		       wool_subr_make(WLSubr, wool_print_nary, "?", NARY));
++ /*XXX-UWE-XXX*/
++     wool_subr_make(WLFSubr, wool_with_output_to_string,
++                    "with-output-to-string", NARY);
++ /*XXX-UWE-XXX*/
+      wool_subr_make(WLSubr, not, "not", 1);
+      wool_subr_make(WLFSubr, and, "and", NARY);
+      wool_subr_make(WLFSubr, or, "or", NARY);
+diff -c gwm-1.7o-dist/wool.flex gwm-1.7o/wool.flex
+*** gwm-1.7o-dist/wool.flex	Fri Sep 30 21:06:51 1994
+--- gwm-1.7o/wool.flex	Fri Sep 30 21:07:17 1994
+***************
+*** 135,142 ****
+  yyoutflush(){
+      if(yyout_is_string){
+          ASSERT(yystrout->overflow_handler);
+! 	(*(yystrout->overflow_handler))(yystrout->buffer);
+! 	yystrout->ptr = yystrout-> buffer;
+      }else{
+  	fflush(yyout);
+      }
+--- 135,144 ----
+  yyoutflush(){
+      if(yyout_is_string){
+          ASSERT(yystrout->overflow_handler);
+! /*XXX-UWE-XXX*/
+! 	(*(yystrout->overflow_handler))(yystrout);
+! 	/* yystrout->ptr = yystrout-> buffer; */
+! /*XXX-UWE-XXX*/
+      }else{
+  	fflush(yyout);
+      }
+***************
+*** 271,276 ****
+--- 273,279 ----
+      WOOL_STRING_STREAM str = (WOOL_STRING_STREAM)
+      	Malloc(sizeof(struct _WOOL_STRING_STREAM));
+      str->buffer = (char *) Malloc(nbytes);
++     *str->buffer = '\0';        /*XXX-UWE-XXX*/
+      str->ptr = str->buffer;
+      str->last = str->buffer + nbytes -1;
+      str->overflow_handler = handler;

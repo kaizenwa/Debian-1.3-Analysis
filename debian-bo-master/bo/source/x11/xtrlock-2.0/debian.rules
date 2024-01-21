@@ -1,0 +1,61 @@
+#!/usr/bin/make -f
+# debian.rules file for xtrlock-2.0
+# Based upon the sample debian.rules file by Ian Jackson.
+
+package=xtrlock
+version=2.0
+debian=2.1
+
+arch=$(shell dpkg --print-architecture)
+
+CFLAGS=-O2 -DSHADOW_PWD
+
+build:
+	$(checkdir)
+	xmkmf
+	$(MAKE) CFLAGS="$(CFLAGS)" LDFLAGS=-s
+	touch build
+
+clean:
+	$(checkdir)
+	-rm -f build
+	-rm -f xtrlock *.o *.bak Makefile
+	-rm -rf debian-tmp *~
+
+binary:		checkroot build
+	-rm -rf debian-tmp
+	install -m 755 -d debian-tmp/usr/X11R6/bin debian-tmp/usr/X11R6/man/man1
+	install -m 755 -d debian-tmp/usr/doc/copyright debian-tmp/DEBIAN
+	sed -e '2s/=/$(version)-$(debian)/' -e '12s/=/$(arch)/' \
+		debian.control > debian-tmp/DEBIAN/control
+	$(MAKE) CFLAGS="$(CFLAGS)" LDFLAGS=-s prefix=debian-tmp/usr install
+	# has to be setuid root to support shadow passwords.  --marekm
+	install -s -m 4755 xtrlock debian-tmp/usr/X11R6/bin/xtrlock
+	install -m 644 xtrlock.man debian-tmp/usr/X11R6/man/man1/xtrlock.1x
+	gzip debian-tmp/usr/X11R6/man/man1/xtrlock.1x
+	install -m 644 debian.README debian-tmp/usr/doc/copyright/$(package)
+	chown -R root.root debian-tmp
+	chmod -R g-ws debian-tmp
+	dpkg --build debian-tmp && dpkg-name -o -s .. debian-tmp.deb
+
+define checkdir
+	test -f $(package).c
+endef
+
+source:		clean
+	chmod +x debian.rules
+	cd .. && \
+	tar cf $(package)-$(version)-$(debian).tar $(package)-$(version) && \
+	gzip -9vf $(package)-$(version)-$(debian).tar
+ 
+diff:		clean
+	cd .. && \
+	(diff -ruN $(package)-$(version).orig $(package)-$(version) \
+	 >$(package)-$(version)-$(debian).diff; [ $$? = 1 ]) && \
+	gzip -9vf $(package)-$(version)-$(debian).diff
+
+checkroot:
+	$(checkdir)
+	test root = "`whoami`"
+
+.PHONY: binary source diff clean checkroot

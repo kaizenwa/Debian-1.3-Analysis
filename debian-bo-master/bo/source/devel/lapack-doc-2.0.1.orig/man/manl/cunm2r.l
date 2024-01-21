@@ -1,0 +1,90 @@
+.TH CUNM2R l "08 October 1994" "LAPACK version 2.0" "LAPACK routine (version 2.0)"
+.TH CUNM2R l "08 October 1994" "BLAS routine" "BLAS routine"
+.SH NAME
+CUNM2R - overwrite the general complex m-by-n matrix C with   Q * C if SIDE = 'L' and TRANS = 'N', or   Q'* C if SIDE = 'L' and TRANS = 'C', or   C * Q if SIDE = 'R' and TRANS = 'N', or   C * Q' if SIDE = 'R' and TRANS = 'C',
+.SH SYNOPSIS
+.TP 19
+SUBROUTINE CUNM2R(
+SIDE, TRANS, M, N, K, A, LDA, TAU, C, LDC,
+WORK, INFO )
+.TP 19
+.ti +4
+CHARACTER
+SIDE, TRANS
+.TP 19
+.ti +4
+INTEGER
+INFO, K, LDA, LDC, M, N
+.TP 19
+.ti +4
+COMPLEX
+A( LDA, * ), C( LDC, * ), TAU( * ), WORK( * )
+.SH PURPOSE
+CUNM2R overwrites the general complex m-by-n matrix C with
+
+where Q is a complex unitary matrix defined as the product of k
+elementary reflectors
+.br
+
+      Q = H(1) H(2) . . . H(k)
+.br
+
+as returned by CGEQRF. Q is of order m if SIDE = 'L' and of order n
+if SIDE = 'R'.
+.br
+
+.SH ARGUMENTS
+.TP 8
+SIDE    (input) CHARACTER*1
+= 'L': apply Q or Q' from the Left
+.br
+= 'R': apply Q or Q' from the Right
+.TP 8
+TRANS   (input) CHARACTER*1
+.br
+= 'N': apply Q  (No transpose)
+.br
+= 'C': apply Q' (Conjugate transpose)
+.TP 8
+M       (input) INTEGER
+The number of rows of the matrix C. M >= 0.
+.TP 8
+N       (input) INTEGER
+The number of columns of the matrix C. N >= 0.
+.TP 8
+K       (input) INTEGER
+The number of elementary reflectors whose product defines
+the matrix Q.
+If SIDE = 'L', M >= K >= 0;
+if SIDE = 'R', N >= K >= 0.
+.TP 8
+A       (input) COMPLEX array, dimension (LDA,K)
+The i-th column must contain the vector which defines the
+elementary reflector H(i), for i = 1,2,...,k, as returned by
+CGEQRF in the first k columns of its array argument A.
+A is modified by the routine but restored on exit.
+.TP 8
+LDA     (input) INTEGER
+The leading dimension of the array A.
+If SIDE = 'L', LDA >= max(1,M);
+if SIDE = 'R', LDA >= max(1,N).
+.TP 8
+TAU     (input) COMPLEX array, dimension (K)
+TAU(i) must contain the scalar factor of the elementary
+reflector H(i), as returned by CGEQRF.
+.TP 8
+C       (input/output) COMPLEX array, dimension (LDC,N)
+On entry, the m-by-n matrix C.
+On exit, C is overwritten by Q*C or Q'*C or C*Q' or C*Q.
+.TP 8
+LDC     (input) INTEGER
+The leading dimension of the array C. LDC >= max(1,M).
+.TP 8
+WORK    (workspace) COMPLEX array, dimension
+(N) if SIDE = 'L',
+(M) if SIDE = 'R'
+.TP 8
+INFO    (output) INTEGER
+= 0: successful exit
+.br
+< 0: if INFO = -i, the i-th argument had an illegal value

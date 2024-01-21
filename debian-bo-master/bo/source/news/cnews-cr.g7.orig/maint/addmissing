@@ -1,0 +1,101 @@
+#! /bin/sh
+# addmissing - add missing articles to history
+# Has a SORTTMP hook for feeding in a "-T dir" option if sort's default
+# temporary directory is short of space.
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/maint:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+dbzrebuild=n
+verbose=n
+for o
+do
+	case "$o" in
+	-d)	dbzrebuild=y	;;
+	-v)	verbose=y	;;
+	*)	echo "Usage: $0 [-d] [-v]" >&2
+		exit 2
+		;;
+	esac
+done
+
+# get main lock for history examination, and lock out expire too
+lock LOCK $$ || exit 1
+status=1
+trap "unlock LOCK ; trap 0 ; exit \$status" 0 1 2 15
+if lock -o LOCKexpire $$
+then
+	trap "unlock LOCK LOCKexpire ; trap 0 ; exit \$status" 0 1 2 15
+else
+	echo "$0: expire is running, $0 aborted" >&2
+	exit
+fi
+
+# note the time
+>/tmp/time$$
+
+# put together a list of known filenames from history
+egrep '	.*	' $NEWSCTL/history | sed 's/.*	//' | tr '. ' '/
+' | egrep '/' | sort -u $SORTTMP >/tmp/hist$$
+
+# release the main lock, temporarily
+trap "unlock LOCKexpire ; trap 0 ; exit \$status" 0 1 2 15
+unlock LOCK
+
+# sweep the tree, ignoring things that arrive while we're working
+cd $NEWSARTS
+them=
+for f in `ls | egrep -v '\.|(^lost\+found$)'`
+do
+	if test -d $f/.
+	then
+		them="$them $f"
+	fi
+done
+find $them -type f -name '[0-9]*' ! -newer /tmp/time$$ -print |
+	sort $SORTTMP >/tmp/tree$$
+
+# find missing files, and build history entries for them
+comm -13 /tmp/hist$$ /tmp/tree$$ | histinfo | sort $SORTTMP |
+	awk -f $NEWSBIN/maint/histdups |
+	sort $SORTTMP -t'	' +1n >/tmp/new$$
+
+# check for oddities
+if egrep '^<[^>]*@trash>	' /tmp/new$$ >/dev/null
+then
+	echo "$0: (warning) empty/trash articles found, will expire at once" >&2
+	echo "$0:     (grep history file for '@trash' to see them)" >&2
+fi
+
+# lock things up again and plug them in
+cd $NEWSCTL
+lock LOCK $$ || exit
+trap "unlock LOCK LOCKexpire ; trap 0 ; exit \$status" 0 1 2 15
+if test " $dbzrebuild" = " y"
+then
+	cat /tmp/new$$ >>history
+	dbz history
+else
+	dbz -a history /tmp/new$$
+fi
+
+case "$verbose" in
+y)	n="`wc -l </tmp/new$$ | tr -d ' '`"
+	echo "$0: found $n articles missing from history:"
+	if test " $n" -lt 50
+	then
+		cat /tmp/new$$
+	else
+		sed 3q /tmp/new$$
+		echo
+		echo "..."
+		echo
+		tail -3 /tmp/new$$
+	fi
+	;;
+esac
+
+rm -f /tmp/hist$$ /tmp/tree$$ /tmp/new$$ /tmp/time$$
+status=0

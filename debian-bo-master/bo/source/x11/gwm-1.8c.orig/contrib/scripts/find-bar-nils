@@ -1,0 +1,84 @@
+#!/usr/local/bin/klone
+;;Skeleton of a typical klone script
+;;(stack-dump-on-error t)
+;;(kdb t)
+
+(defvar ExpressionToFind '(bar-make ()))
+
+(setq files (getopts "USAGE: find-bar-nils files...
+prints usage of (bar-make ()) which will conflict with the new syntax"
+    ("-v" () verbose "verbose operation")
+))
+
+(setq *quote-inlines* t)
+
+(defun main (&aux
+  )
+  (dolist (file files)
+    (catch 'ALL
+      (process-file file)
+    )
+  )
+)
+
+(defun process-file (file &aux
+    (fd (open file))
+    expr
+  )
+  (catch 'EOF
+    (while t
+      (setq expr (read fd))
+      (setq is-in-expr:count 0)
+      (if (is-in-expr expr ExpressionToFind)
+	(print-format "%0:%1: %2 occurences in: %3\n"
+	  file (file-lineno fd) is-in-expr:count (truncate-to expr 40)
+)))))
+
+;; find current line in file
+(defun file-lineno (fd &aux
+    (cur-pos (file-position fd))
+    (line 0)
+  )
+  (file-position fd 0)			;rewind
+  (catch 'EOF
+    (while (< (file-position fd) cur-pos)	;count from start
+      (read-line fd)
+      (incf line)
+  ))
+  (file-position fd cur-pos)
+  line
+)
+
+(defvar is-in-expr:count 0)
+
+(defun is-in-expr (expr subexpr)
+  (if (= expr subexpr)
+    (incf is-in-expr:count)
+    (if (typep expr List)
+      (catch 'Found
+	(dolist (se expr)
+	  (if (is-in-expr se subexpr)
+	    (throw 'Found t)
+	))
+	()
+      )
+      () 
+)))
+
+(defun truncate-to (expr N &aux
+    (s (print-format String "%0" expr))
+  )
+  (if (> (length s) N)
+    (subseq s 0 N)
+    s
+  )
+)
+
+
+(main)
+
+;;; EMACS MODES
+;;; Local Variables: ***
+;;; mode:lisp ***
+;;; End: ***
+

@@ -1,0 +1,219 @@
+;; load-virtual.gwm --- Install and setup use of virtual.gwm & co.
+;;
+;; Author: Anders Holst  (aho@sans.kth.se)  
+;; Copyright (C) 1995  Anders Holst
+;; Version: virtual-1.0
+;; Last change: 17/6 1995
+;;
+;; This file is copyrighted under the same terms as the rest of GWM
+;; (see the X Inc license for details). There is no warranty that it
+;; works. 
+;;
+;; --------------------------------------------------------------------- 
+;;
+;; This file is intended for use with *other* profiles than VTWM. 
+;; It sets up the necessary things to use the virtual screen from 
+;; "virtual.gwm", and also loads "virtual-door.gwm" and "virtual-pan.gwm".
+;;
+;; Load it from somewhere at the end of your *rc.gwm. 
+;;
+
+
+;; First some necessary functions
+(if (not (boundp 'defname-in-screen))
+    (defunq defname-in-screen args
+      (for var args
+           (defname var screen.)))
+)
+(if (not (boundp 'black)) (: black (color-make "Black")))
+(if (not (boundp 'white)) (: white (color-make "White")))
+(if (or (not (boundp 'defaults-to))
+        (not (boundp 'declare-screen-dependent)))
+    (load "utils"))
+(if (not (boundp 'apply))
+    (defun apply (func lst)
+      (eval (+ (list func) (mapfor ele lst (list 'quote ele)))))
+)
+
+;;
+;;  Some reasonable user defaults.
+;;  ------------------------------
+;;  Change these in your own profile. Also check the three files "virtual.gwm",
+;;  "virtual-door.gwm" and "virtual-pan.gwm" for more customization variables.
+;;  
+(defaults-to
+  virtual-xpos 6
+  virtual-ypos 6
+  virtual-nailed-list '(XLoad XClock XBiff XConsole Gwm)
+  virtual-omit-list '(XLoad XClock XBiff Gwm)
+  virtual-omit-nailed () 
+
+  door-mgr-xpos 174
+  door-mgr-ypos 4
+  initial-doors '("Home" "Free")
+
+  show-pan-lists t
+  pan-on-click t
+)
+(declare-screen-dependent virtual-fancy-colors)
+(for screen (list-of-screens)
+  (if (= screen-type 'color)
+      (progn 
+        (defaults-to virtual-fancy-colors 
+          (list (list () (color-make "lightgray"))
+                (list 'XTerm () (color-make "lightskyblue"))
+                (list 'Emacs () (color-make "lightpink"))
+                (list t () (color-make "lightyellow")))
+          ))))
+
+;;----------------------------------------------------------------------------
+
+(defunq add-hook (hook expr)
+  (if (not (boundp hook))
+        (set hook expr)
+      (= (# 0 (eval hook)) 'progn)
+        (set hook (+ (eval hook) (list expr)))
+        (set hook (+ '(progn) (list (eval hook)) (list expr)))))
+
+(add-hook opening (virtual-add))
+
+(add-hook closing (virtual-remove))
+
+(add-hook screen-opening (virtual-show))
+(add-hook screen-opening (for d initial-doors (add-door d)))
+(add-hook screen-opening (if show-pan-lists (install-pan-lists)))
+
+(add-hook screen-closing (virtual-move-home))
+
+
+(if (not (boundp 'raise-window-orig))
+    (progn
+
+      (: raise-window-orig raise-window)
+
+      (defun raise-window arg
+        (if arg
+            (raise-window-orig (# 0 arg))
+          (raise-window-orig))
+        (virtual-update))
+))
+
+(if (not (boundp 'lower-window-orig))
+    (progn
+
+      (: lower-window-orig lower-window)
+
+      (defun lower-window arg
+        (if arg
+            (lower-window-orig (# 0 arg))
+          (lower-window-orig))
+        (virtual-update))
+))
+
+(if (not (boundp 'move-window-orig))
+    (progn
+
+      (: move-window-orig move-window)
+
+      (defun move-window args
+        (if args
+            (eval (+ (list 'move-window-orig) args))
+          (move-window-orig))
+        (if (window-is-mapped)
+            (virtual-update)))
+))
+
+(if (not (boundp 'resize-window-orig))
+    (progn
+
+      (: resize-window-orig resize-window)
+
+      (defun resize-window args
+        (if args
+            (eval (+ (list 'resize-window-orig) args))
+          (resize-window-orig))
+        (if (window-is-mapped)
+            (virtual-update)))
+))
+
+(if (not (boundp 'iconify-window-orig))
+    (progn
+
+      (: iconify-window-orig iconify-window)
+
+      (defun iconify-window ()
+        (iconify-window-orig)
+        (virtual-update))
+))
+
+
+(if (or (not (boundp 'matches-token))
+        (not (boundp 'matches-list))
+        (not (boundp 'matches-cond)))
+    (progn
+
+(defun matches-token (token)
+  (if (not token)                 ; True and false are literary
+         ()
+      (= token t)
+         t
+      (= (type token) 'atom)      ; Atom is client class
+         (= window-client-class token)
+      (= (type token) 'string)    ; String is regexp matching name
+         (match token window-name)
+      (and (= (type token) 'list) ; Lisp expression
+           (= (type (# 0 token)) 'atom)
+           (boundp (# 0 token))
+           (member (type (eval (# 0 token))) '(subr fsubr expr fexpr)))
+         (eval token)
+      (and (= (type token) 'list) ; Windowspec
+           (= (type (# 0 token)) 'atom))
+         (match-windowspec token)
+         ()))                     ; Else no match
+
+(defun matches-list (lst)
+  (tag return
+    (for ele lst
+       (if (matches-token ele)
+           (exit return t)))
+    ()))
+
+(defun matches-cond (condlst)
+  (tag return
+    (for lst condlst
+       (if (matches-token (# 0 lst))
+           (exit return 
+                 (sublist 1 (length lst) lst))))
+    ()))
+
+))       
+
+
+(load "virtual")
+(load "virtual-door")
+(load "virtual-pan")
+
+;; Sorry, have to do this to make doors work properly in the MWM-profile.
+(if (boundp 'tooClose)
+    (setq tooClose 0))
+
+; "Normal" profiles
+(if (boundp 'root-behavior)
+    (progn
+      (setq root-behavior (state-make root-behavior (virtual-behavior)))
+      (setq root-fsm (fsm-make root-behavior))))
+; Special for MWM-profile
+(if (and (boundp 'root-std-behavior)
+         (boundp 'do-bindings-state)
+         (boundp 'keyBindings))
+    (progn
+      (setq root-std-behavior (state-make root-std-behavior (virtual-behavior)))
+      (setq root-fsm (fsm-make (state-make
+                (do-bindings-state '(root))
+                (# 0 (# 'root keyBindings))
+                root-std-behavior)))))
+; Install new behavior
+(with (wob root-window)
+  (if (boundp 'root-fsm) (wob-fsm root-fsm))
+  (eval (+ '(set-grabs) (virtual-grabs))))
+

@@ -1,0 +1,87 @@
+#!/bin/sh
+#
+# Register a binary
+#
+
+function setperm()
+{
+	if [ -e $2 ]; then
+		chown $3.$4 $2
+		chmod $5 $2
+	fi
+}
+
+function compperm()
+{
+	if [ $1 != $4 -o $2 != $5 -o $3 != $6 ]; then
+		echo "$FILE PERMISSION MISMATCH: was $1.$2 $3 changed to $4.$5 $6"
+	fi
+}
+
+function permdiag()
+{
+	FILE=$2
+	if [ -e $FILE ]; then
+		compperm `find $2 -printf "%u %g %m"` $3 $4 $5
+	else
+		echo "File $FILE registered but not installed"
+	fi
+}
+
+function suidrun()
+{
+	while [ 1 ]; do
+		read X
+		if [ "$X" ]; then
+			permdiag $X
+			setperm $X
+		else
+			return
+		fi
+	done
+}
+
+if [ ! -f /etc/suid.conf ]; then
+	echo "/etc/suid.conf not present (suidmanager not configured yet?)"
+	exit 1
+fi
+
+if [ "$1" = "" ]; then
+	sed </etc/suid.conf -e "/^#/d" -e "/^$/d" | suidrun
+	exit 0
+fi
+
+if [ "$1" = "-s" ]; then
+	shift
+	PACKAGE=$1
+	shift
+else
+	PACKAGE=user
+fi
+
+if [ "$4" = "" ]; then
+	echo "Usage: suidregister file user group perm"
+	exit 1
+fi
+
+
+if [ ! -e $1 ]; then
+	echo "$1 not found"
+	exit 1
+fi
+
+X=`grep ".* $1" /etc/suid.conf`
+
+if [ "$X" ]; then
+	if expr "$X" : "user" >/dev/null; then
+		# Reinstate User overrides
+		setperm $X
+		echo "OVERRIDE: $X"
+		exit 0
+	else
+		suidunregister $1
+	fi
+fi
+
+echo "$PACKAGE $1 $2 $3 $4" >>/etc/suid.conf
+setperm $PACKAGE $1 $2 $3 $4

@@ -1,0 +1,137 @@
+# Commands covered:  job
+#
+# This file contains a collection of tests for one or more of the Scotty
+# built commands.  Sourcing this file into Scotty runs the tests and
+# generates output for errors.  No output means no errors were found.
+#
+# Copyright (c) 1995
+#
+# J. Schoenwaelder
+# TU Braunschweig, Germany
+# Institute for Operating Systems and Computer Networks
+#
+# Permission to use, copy, modify, and distribute this
+# software and its documentation for any purpose and without
+# fee is hereby granted, provided that this copyright
+# notice appears in all copies.  The University of Braunschweig
+# makes no representations about the suitability of this
+# software for any purpose.  It is provided "as is" without
+# express or implied warranty.
+#
+
+if {[string compare test [info procs test]] == 1} then {source defs}
+
+set VERBOSE 0
+
+foreach job [job info] {
+    $job status exiting
+}
+
+test job-1.1 {job info} {
+    job info
+} {}
+
+test job-1.2 {job info} {
+    list [catch {job info nase} msg] $msg
+} {1 {wrong # args: should be "job info"}}
+
+
+test job-2.1 {job object command} {
+    global j s
+    set j [job create {set s [[job current] status]} 1000]
+    string compare $j [job info]
+} {0}
+
+test job-2.2 {job object command} {
+    global j
+    $j interval
+} {1000}
+
+test job-2.3 {job object command} {
+    global j
+    $j interval 500
+} {500}
+
+test job-2.4 {job object command} {
+    global j
+    list [catch {$j interval 500 foo} msg] $msg
+} {1 {wrong # args: should be "job0 interval ?value?"}}
+
+test job-2.5 {job object command} {
+    global j
+    list [catch {$j interval foo} msg] $msg
+} {1 {expected integer but got "foo"}}
+
+test job-2.6 {job object command} {
+    global j
+    $j iterations
+} {0}
+
+test job-2.7 {job object command} {
+    global j
+    $j iterations 9876
+} {9876}
+
+test job-2.8 {job object command} {
+    global j
+    list [catch {$j iterations 500 foo} msg] $msg
+} {1 {wrong # args: should be "job0 iterations ?value?"}}
+
+test job-2.9 {job object command} {
+    global j
+    list [catch {$j iterations foo} msg] $msg
+} {1 {expected integer but got "foo"}}
+
+test job-2.10 {job object command} {
+    global j
+    $j status
+} {waiting}
+
+test job-2.11 {job object command} {
+    global j s
+    tkwait variable s
+    set s
+} {running}
+
+test job-2.12 {job object command} {
+    global j
+    $j status suspended
+} {suspended}
+
+test job-2.13 {job object command} {
+    global j
+    $j status running
+} {waiting}
+
+test job-2.14 {job object command} {
+    global j
+    list [catch {$j status running foo} msg] $msg
+} {1 {wrong # args: should be "job0 status ?value?"}}
+
+test job-2.15 {job object command} {
+    global j
+    list [catch {$j status foo} msg] $msg
+} {1 {unknown status "foo": should be suspended, waiting, running, or expired}}
+
+test job-2.16 {job object command} {
+    global j
+    $j status expired
+    job schedule
+    job info
+} {}
+
+
+test job-3.1 {many jobs} {
+    global cnt
+    set cnt 0
+    for {set i 0} {$i < 372} {incr i} {
+	job create "incr cnt" 2 2
+    }
+    job wait
+    list $cnt [job info]
+} {744 {}}
+
+
+foreach job [job info] {
+    $job status expired
+}

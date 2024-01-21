@@ -1,0 +1,80 @@
+------------------------------------------------------------------------------
+--                                                                          --
+--                 GNU ADA RUNTIME LIBRARY (GNARL) COMPONENTS               --
+--                                                                          --
+--                SYSTEM,COMPILER_EXCEPTIONS.MACHINE_SPECIFICS              --
+--                                                                          --
+--                                  B o d y                                 --
+--                                                                          --
+--                             $Revision: 1.1 $                             --
+--                                                                          --
+--     Copyright (C) 1992,1993,1994,1995 Free Software Foundation, Inc.     --
+--                                                                          --
+-- GNARL is free software; you can  redistribute it  and/or modify it under --
+-- terms of the  GNU General Public License as published  by the Free Soft- --
+-- ware  Foundation;  either version 2,  or (at your option) any later ver- --
+-- sion. GNARL is distributed in the hope that it will be useful, but WITH- --
+-- OUT ANY WARRANTY;  without even the  implied warranty of MERCHANTABILITY --
+-- or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License --
+-- for  more details.  You should have  received  a copy of the GNU General --
+-- Public License  distributed with GNARL; see file COPYING.  If not, write --
+-- to  the Free Software Foundation,  59 Temple Place - Suite 330,  Boston, --
+-- MA 02111-1307, USA.                                                      --
+--                                                                          --
+-- As a special exception,  if other files  instantiate  generics from this --
+-- unit, or you link  this unit with other files  to produce an executable, --
+-- this  unit  does not  by itself cause  the resulting  executable  to  be --
+-- covered  by the  GNU  General  Public  License.  This exception does not --
+-- however invalidate  any other reasons why  the executable file  might be --
+-- covered by the  GNU Public License.                                      --
+--                                                                          --
+-- GNARL was developed by the GNARL team at Florida State University. It is --
+-- now maintained by Ada Core Technologies Inc. in cooperation with Florida --
+-- State University (http://www.gnat.com).                                  --
+--                                                                          --
+------------------------------------------------------------------------------
+
+--  This is a dummy version of this package (no tasking support).
+
+package body System.Compiler_Exceptions.Machine_Specifics is
+
+   procedure Unimplemented (Feature : String);
+   --  This procedure prints out a message indicating that the feature
+   --  described by the Featur string is unimplemented and halts the program.
+
+   -------------------
+   -- Unimplemented --
+   -------------------
+
+   procedure Unimplemented (Feature : String) is
+   begin
+
+   --  Report as an assertion failure, since this is the only low-level
+   --  primitive available for either reporting errors or halting the
+   --  program.
+
+      System.Task_Primitives.LL_Assert
+        (False, Feature & " is unimplemented in this version of GNARL.");
+   end Unimplemented;
+
+   ------------------------
+   -- Identify_Exception --
+   ------------------------
+
+   --  This function identifies the Ada exception to be raised using
+   --  the information when the system received a synchronous signal.
+   --  Since this function is machine and OS dependent, different code
+   --  has to be provided for different target.
+
+   function Identify_Exception
+     (Which              : System.Task_Primitives.Machine_Exceptions;
+      Info               : System.Task_Primitives.Error_Information;
+      Modified_Registers : Pre_Call_State) return Ada.Exceptions.Exception_ID
+   is
+
+   begin
+      Unimplemented ("Exception Identification");
+      return Ada.Exceptions.Null_Id;
+   end Identify_Exception;
+
+end System.Compiler_Exceptions.Machine_Specifics;

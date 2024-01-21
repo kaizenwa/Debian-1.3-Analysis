@@ -1,0 +1,96 @@
+#! /bin/sh
+# bpfind classpat site batchparmsfile
+# find batchparms line, break it down into bits
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/batch:$NEWSBIN:$NEWSPATH ; export PATH
+
+classpat="$1"
+site="$2"
+shift ; shift
+
+awk 'BEGIN {
+	site = "'"$site"'"
+	classok = 1
+	disable = 0
+	defclassok = 1
+	defdisable = 0
+}
+/^#/ { next }
+/^[ 	]*$/ { next }
+$1 == site && $2 ~ /!/ { disable = 1 }
+$1 == site && $2 !~ /'"$classpat"'/ { classok = 0 }
+$1 == site { siteline = $0 }
+$1 == "/default/" && $2 ~ /!/ { defdisable = 1 }
+$1 == "/default/" && $2 !~ /'"$classpat"'/ { defclassok = 0 }
+$1 == "/default/" { defline = $0 }
+END {
+	q = "'"'"'"
+	if (disable == 1 || (siteline == "" && defdisable == 1)) {
+		print "bpokay=!"
+		exit
+	}
+	if (classok == 0 || (siteline == "" && defclassok == 0)) {
+		print "bpokay=x"
+		exit
+	}
+	if (siteline == "" && defline == "") {
+		print "bpokay=n"
+		print "bpgrump=" q "no applicable line" q
+		exit
+	}
+	if (siteline != "")
+		line = siteline
+	else
+		line = defline
+
+	s = line
+	nf = 0
+	for (i = 1; i <= 4; i++) {
+		n = 1
+		while (substr(s, n) ~ /^[^ 	]/)
+			n++
+		f[i] = substr(s, 1, n-1)
+		if (n > 1)
+			nf++
+		s = substr(s, n)
+		while (s ~ /^[ 	]/)
+			s = substr(s, 2)
+	}
+	if (length(s) > 0) {
+		f[i] = s
+		nf++
+	}
+	if (nf != 5) {
+		print "bpokay=n"
+		print "bpgrump=" q "line has wrong field count, nf=" nf q
+		exit
+	}
+
+	if (f[3] ~ /^[0-9]+-[0-9]*$/) {
+		dash = index(f[3], "-")
+		bpsize = substr(f[3], 1, dash-1)
+		bpmax = substr(f[3], dash+1)
+		if (bpmax == "")
+			bpmax = "1000000000"
+	} else {
+		bpsize = f[3]
+		bpmax = sprintf("%d", 3*f[3])
+	}
+
+	if (f[5] ~ /'"'"'/) {
+		print "bpokay=n"
+		print "bpgrump=" q "command contains single quote" q
+		exit
+	}
+
+	print "bpokay=y"
+	print "bpsite=" q f[1] q
+	print "bpclass=" q f[2] q
+	print "bpsize=" q bpsize q
+	print "bpmax=" q bpmax q
+	print "bpqueue=" q f[4] q
+	print "bpcmd=" q f[5] q
+}' $*

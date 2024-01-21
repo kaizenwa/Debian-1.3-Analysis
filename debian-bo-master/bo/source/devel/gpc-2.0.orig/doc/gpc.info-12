@@ -1,0 +1,1080 @@
+This is Info file ./gpc.info, produced by Makeinfo-1.55 from the input
+file ./gpc.texi.
+
+   This file documents the use and the internals of the GNU Pascal
+compiler.
+
+   Copyright (C) 1988, 1996 Free Software Foundation, Inc.
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+   Permission is granted to copy and distribute modified versions of
+this manual under the conditions for verbatim copying, provided also
+that the sections entitled "GNU General Public License," "Funding for
+Free Software," and "Protect Your Freedom--Fight `Look And Feel'" are
+included exactly as in the original, and provided that the entire
+resulting derived work is distributed under the terms of a permission
+notice identical to this one.
+
+   Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions, except that the sections entitled "GNU General Public
+License," "Funding for Free Software," and "Protect Your Freedom--Fight
+`Look And Feel'", and this permission notice, may be included in
+translations approved by the Free Software Foundation instead of in the
+original English.
+
+
+File: gpc.info,  Node: Passes,  Next: RTL,  Prev: Interface,  Up: Top
+
+Passes and Files of the Compiler
+********************************
+
+   The overall control structure of the compiler is in `toplev.c'.  This
+file is responsible for initialization, decoding arguments, opening and
+closing files, and sequencing the passes.
+
+   The parsing pass is invoked only once, to parse the entire input.
+The RTL intermediate code for a function is generated as the function
+is parsed, a statement at a time.  Each statement is read in as a
+syntax tree and then converted to RTL; then the storage for the tree
+for the statement is reclaimed.  Storage for types (and the expressions
+for their sizes), declarations, and a representation of the binding
+contours and how they nest, remain until the function is finished being
+compiled; these are all needed to output the debugging information.
+
+   Each time the parsing pass reads a complete function definition or
+top-level declaration, it calls either the function
+`rest_of_compilation', or the function `rest_of_decl_compilation' in
+`toplev.c', which are responsible for all further processing necessary,
+ending with output of the assembler language.  All other compiler
+passes run, in sequence, within `rest_of_compilation'.  When that
+function returns from compiling a function definition, the storage used
+for that function definition's compilation is entirely freed, unless it
+is an inline function
+
+   Here is a list of all the passes of the compiler and their source
+files.  Also included is a description of where debugging dumps can be
+requested with `-d' options.
+
+   * Parsing.  This pass reads the entire text of a function definition,
+     constructing partial syntax trees.  This and RTL generation are no
+     longer truly separate passes (formerly they were), but it is
+     easier to think of them as separate.
+
+     The tree representation does not entirely follow C syntax, because
+     it is intended to support other languages as well.
+
+     Language-specific data type analysis is also done in this pass,
+     and every tree node that represents an expression has a data type
+     attached.  Variables are represented as declaration nodes.
+
+     Constant folding and some arithmetic simplifications are also done
+     during this pass.
+
+     The language-independent source files for parsing are
+     `stor-layout.c', `fold-const.c', and `tree.c'.  There are also
+     header files `tree.h' and `tree.def' which define the format of
+     the tree representation.
+
+     The source files to parse C are `c-parse.in', `c-decl.c',
+     `c-typeck.c', `c-aux-info.c', `c-convert.c', and `c-lang.c' along
+     with header files `c-lex.h', and `c-tree.h'.
+
+     The source files for parsing C++ are `cp-parse.y', `cp-class.c',
+     `cp-cvt.c', `cp-decl.c', `cp-decl2.c', `cp-dem.c', `cp-except.c',
+     `cp-expr.c', `cp-init.c', `cp-lex.c', `cp-method.c', `cp-ptree.c',
+     `cp-search.c', `cp-tree.c', `cp-type2.c', and `cp-typeck.c', along
+     with header files `cp-tree.def', `cp-tree.h', and `cp-decl.h'.
+
+     The special source files for parsing Objective C are
+     `objc-parse.y', `objc-actions.c', `objc-tree.def', and
+     `objc-actions.h'.  Certain C-specific files are used for this as
+     well.
+
+     The file `c-common.c' is also used for all of the above languages.
+
+   * RTL generation.  This is the conversion of syntax tree into RTL
+     code.  It is actually done statement-by-statement during parsing,
+     but for most purposes it can be thought of as a separate pass.
+
+     This is where the bulk of target-parameter-dependent code is found,
+     since often it is necessary for strategies to apply only when
+     certain standard kinds of instructions are available.  The purpose
+     of named instruction patterns is to provide this information to
+     the RTL generation pass.
+
+     Optimization is done in this pass for `if'-conditions that are
+     comparisons, boolean operations or conditional expressions.  Tail
+     recursion is detected at this time also.  Decisions are made about
+     how best to arrange loops and how to output `switch' statements.
+
+     The source files for RTL generation include `stmt.c', `calls.c',
+     `expr.c', `explow.c', `expmed.c', `function.c', `optabs.c' and
+     `emit-rtl.c'.  Also, the file `insn-emit.c', generated from the
+     machine description by the program `genemit', is used in this
+     pass.  The header file `expr.h' is used for communication within
+     this pass.
+
+     The header files `insn-flags.h' and `insn-codes.h', generated from
+     the machine description by the programs `genflags' and `gencodes',
+     tell this pass which standard names are available for use and
+     which patterns correspond to them.
+
+     Aside from debugging information output, none of the following
+     passes refers to the tree structure representation of the function
+     (only part of which is saved).
+
+     The decision of whether the function can and should be expanded
+     inline in its subsequent callers is made at the end of rtl
+     generation.  The function must meet certain criteria, currently
+     related to the size of the function and the types and number of
+     parameters it has.  Note that this function may contain loops,
+     recursive calls to itself (tail-recursive functions can be
+     inlined!), gotos, in short, all constructs supported by GNU CC.
+     The file `integrate.c' contains the code to save a function's rtl
+     for later inlining and to inline that rtl when the function is
+     called.  The header file `integrate.h' is also used for this
+     purpose.
+
+     The option `-dr' causes a debugging dump of the RTL code after
+     this pass.  This dump file's name is made by appending `.rtl' to
+     the input file name.
+
+   * Jump optimization.  This pass simplifies jumps to the following
+     instruction, jumps across jumps, and jumps to jumps.  It deletes
+     unreferenced labels and unreachable code, except that unreachable
+     code that contains a loop is not recognized as unreachable in this
+     pass.  (Such loops are deleted later in the basic block analysis.)
+     It also converts some code originally written with jumps into
+     sequences of instructions that directly set values from the
+     results of comparisons, if the machine has such instructions.
+
+     Jump optimization is performed two or three times.  The first time
+     is immediately following RTL generation.  The second time is after
+     CSE, but only if CSE says repeated jump optimization is needed.
+     The last time is right before the final pass.  That time,
+     cross-jumping and deletion of no-op move instructions are done
+     together with the optimizations described above.
+
+     The source file of this pass is `jump.c'.
+
+     The option `-dj' causes a debugging dump of the RTL code after
+     this pass is run for the first time.  This dump file's name is
+     made by appending `.jump' to the input file name.
+
+   * Register scan.  This pass finds the first and last use of each
+     register, as a guide for common subexpression elimination.  Its
+     source is in `regclass.c'.
+
+   * Jump threading.  This pass detects a condition jump that branches
+     to an identical or inverse test.  Such jumps can be `threaded'
+     through the second conditional test.  The source code for this
+     pass is in `jump.c'.  This optimization is only performed if
+     `-fthread-jumps' is enabled.
+
+   * Common subexpression elimination.  This pass also does constant
+     propagation.  Its source file is `cse.c'.  If constant propagation
+     causes conditional jumps to become unconditional or to become
+     no-ops, jump optimization is run again when CSE is finished.
+
+     The option `-ds' causes a debugging dump of the RTL code after
+     this pass.  This dump file's name is made by appending `.cse' to
+     the input file name.
+
+   * Loop optimization.  This pass moves constant expressions out of
+     loops, and optionally does strength-reduction and loop unrolling
+     as well.  Its source files are `loop.c' and `unroll.c', plus the
+     header `loop.h' used for communication between them.  Loop
+     unrolling uses some functions in `integrate.c' and the header
+     `integrate.h'.
+
+     The option `-dL' causes a debugging dump of the RTL code after
+     this pass.  This dump file's name is made by appending `.loop' to
+     the input file name.
+
+   * If `-frerun-cse-after-loop' was enabled, a second common
+     subexpression elimination pass is performed after the loop
+     optimization pass.  Jump threading is also done again at this time
+     if it was specified.
+
+     The option `-dt' causes a debugging dump of the RTL code after
+     this pass.  This dump file's name is made by appending `.cse2' to
+     the input file name.
+
+   * Stupid register allocation is performed at this point in a
+     nonoptimizing compilation.  It does a little data flow analysis as
+     well.  When stupid register allocation is in use, the next pass
+     executed is the reloading pass; the others in between are skipped.
+     The source file is `stupid.c'.
+
+   * Data flow analysis (`flow.c').  This pass divides the program into
+     basic blocks (and in the process deletes unreachable loops); then
+     it computes which pseudo-registers are live at each point in the
+     program, and makes the first instruction that uses a value point at
+     the instruction that computed the value.
+
+     This pass also deletes computations whose results are never used,
+     and combines memory references with add or subtract instructions
+     to make autoincrement or autodecrement addressing.
+
+     The option `-df' causes a debugging dump of the RTL code after
+     this pass.  This dump file's name is made by appending `.flow' to
+     the input file name.  If stupid register allocation is in use, this
+     dump file reflects the full results of such allocation.
+
+   * Instruction combination (`combine.c').  This pass attempts to
+     combine groups of two or three instructions that are related by
+     data flow into single instructions.  It combines the RTL
+     expressions for the instructions by substitution, simplifies the
+     result using algebra, and then attempts to match the result
+     against the machine description.
+
+     The option `-dc' causes a debugging dump of the RTL code after
+     this pass.  This dump file's name is made by appending `.combine'
+     to the input file name.
+
+   * Instruction scheduling (`sched.c').  This pass looks for
+     instructions whose output will not be available by the time that
+     it is used in subsequent instructions.  (Memory loads and floating
+     point instructions often have this behavior on RISC machines).  It
+     re-orders instructions within a basic block to try to separate the
+     definition and use of items that otherwise would cause pipeline
+     stalls.
+
+     Instruction scheduling is performed twice.  The first time is
+     immediately after instruction combination and the second is
+     immediately after reload.
+
+     The option `-dS' causes a debugging dump of the RTL code after this
+     pass is run for the first time.  The dump file's name is made by
+     appending `.sched' to the input file name.
+
+   * Register class preferencing.  The RTL code is scanned to find out
+     which register class is best for each pseudo register.  The source
+     file is `regclass.c'.
+
+   * Local register allocation (`local-alloc.c').  This pass allocates
+     hard registers to pseudo registers that are used only within one
+     basic block.  Because the basic block is linear, it can use fast
+     and powerful techniques to do a very good job.
+
+     The option `-dl' causes a debugging dump of the RTL code after
+     this pass.  This dump file's name is made by appending `.lreg' to
+     the input file name.
+
+   * Global register allocation (`global.c').  This pass allocates hard
+     registers for the remaining pseudo registers (those whose life
+     spans are not contained in one basic block).
+
+   * Reloading.  This pass renumbers pseudo registers with the hardware
+     registers numbers they were allocated.  Pseudo registers that did
+     not get hard registers are replaced with stack slots.  Then it
+     finds instructions that are invalid because a value has failed to
+     end up in a register, or has ended up in a register of the wrong
+     kind.  It fixes up these instructions by reloading the
+     problematical values temporarily into registers.  Additional
+     instructions are generated to do the copying.
+
+     The reload pass also optionally eliminates the frame pointer and
+     inserts instructions to save and restore call-clobbered registers
+     around calls.
+
+     Source files are `reload.c' and `reload1.c', plus the header
+     `reload.h' used for communication between them.
+
+     The option `-dg' causes a debugging dump of the RTL code after
+     this pass.  This dump file's name is made by appending `.greg' to
+     the input file name.
+
+   * Instruction scheduling is repeated here to try to avoid pipeline
+     stalls due to memory loads generated for spilled pseudo registers.
+
+     The option `-dR' causes a debugging dump of the RTL code after
+     this pass.  This dump file's name is made by appending `.sched2'
+     to the input file name.
+
+   * Jump optimization is repeated, this time including cross-jumping
+     and deletion of no-op move instructions.
+
+     The option `-dJ' causes a debugging dump of the RTL code after
+     this pass.  This dump file's name is made by appending `.jump2' to
+     the input file name.
+
+   * Delayed branch scheduling.  This optional pass attempts to find
+     instructions that can go into the delay slots of other
+     instructions, usually jumps and calls.  The source file name is
+     `reorg.c'.
+
+     The option `-dd' causes a debugging dump of the RTL code after
+     this pass.  This dump file's name is made by appending `.dbr' to
+     the input file name.
+
+   * Conversion from usage of some hard registers to usage of a register
+     stack may be done at this point.  Currently, this is supported only
+     for the floating-point registers of the Intel 80387 coprocessor.
+     The source file name is `reg-stack.c'.
+
+     The options `-dk' causes a debugging dump of the RTL code after
+     this pass.  This dump file's name is made by appending `.stack' to
+     the input file name.
+
+   * Final.  This pass outputs the assembler code for the function.  It
+     is also responsible for identifying spurious test and compare
+     instructions.  Machine-specific peephole optimizations are
+     performed at the same time.  The function entry and exit sequences
+     are generated directly as assembler code in this pass; they never
+     exist as RTL.
+
+     The source files are `final.c' plus `insn-output.c'; the latter is
+     generated automatically from the machine description by the tool
+     `genoutput'.  The header file `conditions.h' is used for
+     communication between these files.
+
+   * Debugging information output.  This is run after final because it
+     must output the stack slot offsets for pseudo registers that did
+     not get hard registers.  Source files are `dbxout.c' for DBX
+     symbol table format, `sdbout.c' for SDB symbol table format, and
+     `dwarfout.c' for DWARF symbol table format.
+
+   Some additional files are used by all or many passes:
+
+   * Every pass uses `machmode.def' and `machmode.h' which define the
+     machine modes.
+
+   * Several passes use `real.h', which defines the default
+     representation of floating point constants and how to operate on
+     them.
+
+   * All the passes that work with RTL use the header files `rtl.h' and
+     `rtl.def', and subroutines in file `rtl.c'.  The tools `gen*' also
+     use these files to read and work with the machine description RTL.
+
+   * Several passes refer to the header file `insn-config.h' which
+     contains a few parameters (C macro definitions) generated
+     automatically from the machine description RTL by the tool
+     `genconfig'.
+
+   * Several passes use the instruction recognizer, which consists of
+     `recog.c' and `recog.h', plus the files `insn-recog.c' and
+     `insn-extract.c' that are generated automatically from the machine
+     description by the tools `genrecog' and `genextract'.
+
+   * Several passes use the header files `regs.h' which defines the
+     information recorded about pseudo register usage, and
+     `basic-block.h' which defines the information recorded about basic
+     blocks.
+
+   * `hard-reg-set.h' defines the type `HARD_REG_SET', a bit-vector
+     with a bit for each hard register, and some macros to manipulate
+     it.  This type is just `int' if the machine has few enough hard
+     registers; otherwise it is an array of `int' and some of the
+     macros expand into loops.
+
+   * Several passes use instruction attributes.  A definition of the
+     attributes defined for a particular machine is in file
+     `insn-attr.h', which is generated from the machine description by
+     the program `genattr'.  The file `insn-attrtab.c' contains
+     subroutines to obtain the attribute values for insns.  It is
+     generated from the machine description by the program `genattrtab'.
+
+
+File: gpc.info,  Node: Config,  Next: Fragments,  Prev: Target Macros,  Up: Top
+
+The Configuration File
+**********************
+
+   The configuration file `xm-MACHINE.h' contains macro definitions
+that describe the machine and system on which the compiler is running,
+unlike the definitions in `MACHINE.h', which describe the machine for
+which the compiler is producing output.  Most of the values in
+`xm-MACHINE.h' are actually the same on all machines that GNU CC runs
+on, so large parts of all configuration files are identical.  But there
+are some macros that vary:
+
+`USG'
+     Define this macro if the host system is System V.
+
+`VMS'
+     Define this macro if the host system is VMS.
+
+`FATAL_EXIT_CODE'
+     A C expression for the status code to be returned when the compiler
+     exits after serious errors.
+
+`SUCCESS_EXIT_CODE'
+     A C expression for the status code to be returned when the compiler
+     exits without serious errors.
+
+`HOST_WORDS_BIG_ENDIAN'
+     Defined if the host machine stores words of multi-word values in
+     big-endian order.  (GNU CC does not depend on the host byte
+     ordering within a word.)
+
+`HOST_FLOAT_WORDS_BIG_ENDIAN'
+     Define this macro to be 1 if the host machine stores `DFmode',
+     `XFmode' or `TFmode' floating point numbers in memory with the
+     word containing the sign bit at the lowest address; otherwise,
+     define it to be zero.
+
+     This macro need not be defined if the ordering is the same as for
+     multi-word integers.
+
+`HOST_FLOAT_FORMAT'
+     A numeric code distinguishing the floating point format for the
+     host machine.  See `TARGET_FLOAT_FORMAT' in *Note Storage Layout::
+     for the alternatives and default.
+
+`HOST_BITS_PER_CHAR'
+     A C expression for the number of bits in `char' on the host
+     machine.
+
+`HOST_BITS_PER_SHORT'
+     A C expression for the number of bits in `short' on the host
+     machine.
+
+`HOST_BITS_PER_INT'
+     A C expression for the number of bits in `int' on the host machine.
+
+`HOST_BITS_PER_LONG'
+     A C expression for the number of bits in `long' on the host
+     machine.
+
+`ONLY_INT_FIELDS'
+     Define this macro to indicate that the host compiler only supports
+     `int' bit fields, rather than other integral types, including
+     `enum', as do most C compilers.
+
+`OBSTACK_CHUNK_SIZE'
+     A C expression for the size of ordinary obstack chunks.  If you
+     don't define this, a usually-reasonable default is used.
+
+`OBSTACK_CHUNK_ALLOC'
+     The function used to allocate obstack chunks.  If you don't define
+     this, `xmalloc' is used.
+
+`OBSTACK_CHUNK_FREE'
+     The function used to free obstack chunks.  If you don't define
+     this, `free' is used.
+
+`USE_C_ALLOCA'
+     Define this macro to indicate that the compiler is running with the
+     `alloca' implemented in C.  This version of `alloca' can be found
+     in the file `alloca.c'; to use it, you must also alter the
+     `Makefile' variable `ALLOCA'.  (This is done automatically for the
+     systems on which we know it is needed.)
+
+     If you do define this macro, you should probably do it as follows:
+
+          #ifndef __GNUC__
+          #define USE_C_ALLOCA
+          #else
+          #define alloca __builtin_alloca
+          #endif
+
+     so that when the compiler is compiled with GNU CC it uses the more
+     efficient built-in `alloca' function.
+
+`FUNCTION_CONVERSION_BUG'
+     Define this macro to indicate that the host compiler does not
+     properly handle converting a function value to a
+     pointer-to-function when it is used in an expression.
+
+`HAVE_VPRINTF'
+     Define this if the library function `vprintf' is available on your
+     system.
+
+`MULTIBYTE_CHARS'
+     Define this macro to enable support for multibyte characters in the
+     input to GNU CC.  This requires that the host system support the
+     ANSI C library functions for converting multibyte characters to
+     wide characters.
+
+`HAVE_PUTENV'
+     Define this if the library function `putenv' is available on your
+     system.
+
+`POSIX'
+     Define this if your system is POSIX.1 compliant.
+
+`NO_SYS_SIGLIST'
+     Define this if your system *does not* provide the variable
+     `sys_siglist'.
+
+`DONT_DECLARE_SYS_SIGLIST'
+     Define this if your system has the variable `sys_siglist', and
+     there is already a declaration of it in the system header files.
+
+`USE_PROTOTYPES'
+     Define this to be 1 if you know that the host compiler supports
+     prototypes, even if it doesn't define __STDC__, or define it to be
+     0 if you do not want any prototypes used in compiling GNU CC.  If
+     `USE_PROTOTYPES' is not defined, it will be determined
+     automatically whether your compiler supports prototypes by
+     checking if `__STDC__' is defined.
+
+`NO_MD_PROTOTYPES'
+     Define this if you wish suppression of prototypes generated from
+     the machine description file, but to use other prototypes within
+     GNU CC.  If `USE_PROTOTYPES' is defined to be 0, or the host
+     compiler does not support prototypes, this macro has no effect.
+
+`MD_CALL_PROTOTYPES'
+     Define this if you wish to generate prototypes for the `gen_call'
+     or `gen_call_value' functions generated from the machine
+     description file.  If `USE_PROTOTYPES' is defined to be 0, or the
+     host compiler does not support prototypes, or `NO_MD_PROTOTYPES'
+     is defined, this macro has no effect.  As soon as all of the
+     machine descriptions are modified to have the appropriate number
+     of arguments, this macro will be removed.
+
+     Some systems do provide this variable, but with a different name
+     such as `_sys_siglist'.  On these systems, you can define
+     `sys_siglist' as a macro which expands into the name actually
+     provided.
+
+`NO_STAB_H'
+     Define this if your system does not have the include file
+     `stab.h'.  If `USG' is defined, `NO_STAB_H' is assumed.
+
+`PATH_SEPARATOR'
+     Define this macro to be a C character constant representing the
+     character used to separate components in paths.  The default value
+     is.  the colon character
+
+`DIR_SEPARATOR'
+     If your system uses some character other than slash to separate
+     directory names within a file specification, define this macro to
+     be a C character constant specifying that character.  When GNU CC
+     displays file names, the character you specify will be used.  GNU
+     CC will test for both slash and the character you specify when
+     parsing filenames.
+
+`OBJECT_SUFFIX'
+     Define this macro to be a C string representing the suffix for
+     object files on your machine.  If you do not define this macro,
+     GNU CC will use `.o' as the suffix for object files.
+
+`EXECUTABLE_SUFFIX'
+     Define this macro to be a C string representing the suffix for
+     executable files on your machine.  If you do not define this
+     macro, GNU CC will use the null string as the suffix for object
+     files.
+
+`COLLECT_EXPORT_LIST'
+     If defined, `collect2' will scan the individual object files
+     specified on its command line and create an export list for the
+     linker.  Define this macro for systems like AIX, where the linker
+     discards object files that are not referenced from `main' and uses
+     export lists.
+
+   In addition, configuration files for system V define `bcopy',
+`bzero' and `bcmp' as aliases.  Some files define `alloca' as a macro
+when compiled with GNU CC, in order to take advantage of the benefit of
+GNU CC's built-in `alloca'.
+
+
+File: gpc.info,  Node: Fragments,  Next: Index,  Prev: Config,  Up: Top
+
+Makefile Fragments
+******************
+
+   When you configure GNU CC using the `configure' script (*note
+Installation::.), it will construct the file `Makefile' from the
+template file `Makefile.in'.  When it does this, it will incorporate
+makefile fragment files from the `config' directory, named `t-TARGET'
+and `x-HOST'.  If these files do not exist, it means nothing needs to
+be added for a given target or host.
+
+* Menu:
+
+* Target Fragment:: Writing the `t-TARGET' file.
+* Host Fragment::   Writing the `x-HOST' file.
+
+
+File: gpc.info,  Node: Target Fragment,  Next: Host Fragment,  Up: Fragments
+
+The Target Makefile Fragment
+============================
+
+   The target makefile fragment, `t-TARGET', defines special target
+dependent variables and targets used in the `Makefile':
+
+`LIBGCC1'
+     The rule to use to build `libgpc1.a'.  If your target does not
+     need to use the functions in `libgpc1.a', set this to empty.
+
+`CROSS_LIBGCC1'
+     The rule to use to build `libgpc1.a' when building a cross
+     compiler.  If your target does not need to use the functions in
+     `libgpc1.a', set this to empty.
+
+`LIBGCC2_CFLAGS'
+     Compiler flags to use when compiling `libgpc2.c'.
+
+`LIB2FUNCS_EXTRA'
+     A list of source file names to be compiled or assembled and
+     inserted into `libgpc.a'.
+
+`CRTSTUFF_T_CFLAGS'
+     Special flags used when compiling `crtstuff.c'.  *Note
+     Initialization::.
+
+`MULTILIB_OPTIONS'
+     For some targets, invoking GNU CC in different ways produces
+     objects that can not be linked together.  For example, for some
+     targets GNU CC produces both big and little endian code.  For
+     these targets, you must arrange for multiple versions of
+     `libgpc.a' to be compiled, one for each set of incompatible
+     options.  When GNU CC invokes the linker, it arranges to link in
+     the right version of `libgpc.a', based on the command line options
+     used.
+
+     The `MULTILIB_OPTIONS' macro lists the set of options for which
+     special versions of `libgpc.a' must be built.  Write options that
+     are mutually incompatible side by side, separated by a slash.
+     Write options that may be used together separated by a space.  The
+     build procedure will build all combinations of compatible options.
+
+     For example, if you set `MULTILIB_OPTIONS' to `m68000/m68020
+     msoft-float', `Makefile' will build special versions of `libgpc.a'
+     using the options `-m68000', `-m68020', `-msoft-float', `-m68000
+     -msoft-float', and `-m68020 -msoft-float'.
+
+`MULTILIB_DIRNAMES'
+     If `MULTILIB_OPTIONS' is used, this variable specifies the
+     directory names that should be used to hold the various libraries.
+     Write one element in `MULTILIB_DIRNAMES' for each element in
+     `MULTILIB_OPTIONS'.  If `MULTILIB_DIRNAMES' is not used, the
+     default value will be `MULTILIB_OPTIONS', with all slashes treated
+     as spaces.
+
+     For example, if `MULTILIB_OPTIONS' is `m68000/m68020 msoft-float',
+     then the default value of `MULTILIB_DIRNAMES' is `m68000 m68020
+     msoft-float'.  You may specify a different value if you desire a
+     different set of directory names.
+
+`MULTILIB_MATCHES'
+     Sometimes the same option may be written in two different ways.
+     If an option is listed in `MULTILIB_OPTIONS', GNU CC needs to know
+     about any synonyms.  In that case, set `MULTILIB_MATCHES' to a
+     list of items of the form `option=option' to describe all relevant
+     synonyms.  For example, `m68000=mc68000 m68020=mc68020'.
+
+
+File: gpc.info,  Node: Host Fragment,  Prev: Target Fragment,  Up: Fragments
+
+The Host Makefile Fragment
+==========================
+
+   The host makefile fragment, `x-HOST', defines special host dependent
+variables and targets used in the `Makefile':
+
+`CC'
+     The compiler to use when building the first stage.
+
+`CLIB'
+     Additional host libraries to link with.
+
+`OLDCC'
+     The compiler to use when building `libgpc1.a' for a native
+     compilation.
+
+`OLDAR'
+     The version of `ar' to use when building `libgpc1.a' for a native
+     compilation.
+
+`INSTALL'
+     The install program to use.
+
+
+File: gpc.info,  Node: Machine Desc,  Next: Target Macros,  Prev: RTL,  Up: Top
+
+Machine Descriptions
+********************
+
+   A machine description has two parts: a file of instruction patterns
+(`.md' file) and a C header file of macro definitions.
+
+   The `.md' file for a target machine contains a pattern for each
+instruction that the target machine supports (or at least each
+instruction that is worth telling the compiler about).  It may also
+contain comments.  A semicolon causes the rest of the line to be a
+comment, unless the semicolon is inside a quoted string.
+
+   See the next chapter for information on the C header file.
+
+* Menu:
+
+* Patterns::            How to write instruction patterns.
+* Example::             An explained example of a `define_insn' pattern.
+* RTL Template::        The RTL template defines what insns match a pattern.
+* Output Template::     The output template says how to make assembler code
+                          from such an insn.
+* Output Statement::    For more generality, write C code to output
+                          the assembler code.
+* Constraints::         When not all operands are general operands.
+* Standard Names::      Names mark patterns to use for code generation.
+* Pattern Ordering::    When the order of patterns makes a difference.
+* Dependent Patterns::  Having one pattern may make you need another.
+* Jump Patterns::       Special considerations for patterns for jump insns.
+* Insn Canonicalizations::Canonicalization of Instructions
+* Peephole Definitions::Defining machine-specific peephole optimizations.
+* Expander Definitions::Generating a sequence of several RTL insns
+                         for a standard operation.
+* Insn Splitting::    Splitting Instructions into Multiple Instructions
+* Insn Attributes::     Specifying the value of attributes for generated insns.
+
+
+File: gpc.info,  Node: Patterns,  Next: Example,  Up: Machine Desc
+
+Everything about Instruction Patterns
+=====================================
+
+   Each instruction pattern contains an incomplete RTL expression, with
+pieces to be filled in later, operand constraints that restrict how the
+pieces can be filled in, and an output pattern or C code to generate
+the assembler output, all wrapped up in a `define_insn' expression.
+
+   A `define_insn' is an RTL expression containing four or five
+operands:
+
+  1. An optional name.  The presence of a name indicate that this
+     instruction pattern can perform a certain standard job for the
+     RTL-generation pass of the compiler.  This pass knows certain
+     names and will use the instruction patterns with those names, if
+     the names are defined in the machine description.
+
+     The absence of a name is indicated by writing an empty string
+     where the name should go.  Nameless instruction patterns are never
+     used for generating RTL code, but they may permit several simpler
+     insns to be combined later on.
+
+     Names that are not thus known and used in RTL-generation have no
+     effect; they are equivalent to no name at all.
+
+  2. The "RTL template" (*note RTL Template::.) is a vector of
+     incomplete RTL expressions which show what the instruction should
+     look like.  It is incomplete because it may contain
+     `match_operand', `match_operator', and `match_dup' expressions
+     that stand for operands of the instruction.
+
+     If the vector has only one element, that element is the template
+     for the instruction pattern.  If the vector has multiple elements,
+     then the instruction pattern is a `parallel' expression containing
+     the elements described.
+
+  3. A condition.  This is a string which contains a C expression that
+     is the final test to decide whether an insn body matches this
+     pattern.
+
+     For a named pattern, the condition (if present) may not depend on
+     the data in the insn being matched, but only the
+     target-machine-type flags.  The compiler needs to test these
+     conditions during initialization in order to learn exactly which
+     named instructions are available in a particular run.
+
+     For nameless patterns, the condition is applied only when matching
+     an individual insn, and only after the insn has matched the
+     pattern's recognition template.  The insn's operands may be found
+     in the vector `operands'.
+
+  4. The "output template": a string that says how to output matching
+     insns as assembler code.  `%' in this string specifies where to
+     substitute the value of an operand.  *Note Output Template::.
+
+     When simple substitution isn't general enough, you can specify a
+     piece of C code to compute the output.  *Note Output Statement::.
+
+  5. Optionally, a vector containing the values of attributes for insns
+     matching this pattern.  *Note Insn Attributes::.
+
+
+File: gpc.info,  Node: Example,  Next: RTL Template,  Prev: Patterns,  Up: Machine Desc
+
+Example of `define_insn'
+========================
+
+   Here is an actual example of an instruction pattern, for the
+68000/68020.
+
+     (define_insn "tstsi"
+       [(set (cc0)
+             (match_operand:SI 0 "general_operand" "rm"))]
+       ""
+       "*
+     { if (TARGET_68020 || ! ADDRESS_REG_P (operands[0]))
+         return \"tstl %0\";
+       return \"cmpl #0,%0\"; }")
+
+   This is an instruction that sets the condition codes based on the
+value of a general operand.  It has no condition, so any insn whose RTL
+description has the form shown may be handled according to this
+pattern.  The name `tstsi' means "test a `SImode' value" and tells the
+RTL generation pass that, when it is necessary to test such a value, an
+insn to do so can be constructed using this pattern.
+
+   The output control string is a piece of C code which chooses which
+output template to return based on the kind of operand and the specific
+type of CPU for which code is being generated.
+
+   `"rm"' is an operand constraint.  Its meaning is explained below.
+
+
+File: gpc.info,  Node: RTL Template,  Next: Output Template,  Prev: Example,  Up: Machine Desc
+
+RTL Template
+============
+
+   The RTL template is used to define which insns match the particular
+pattern and how to find their operands.  For named patterns, the RTL
+template also says how to construct an insn from specified operands.
+
+   Construction involves substituting specified operands into a copy of
+the template.  Matching involves determining the values that serve as
+the operands in the insn being matched.  Both of these activities are
+controlled by special expression types that direct matching and
+substitution of the operands.
+
+`(match_operand:M N PREDICATE CONSTRAINT)'
+     This expression is a placeholder for operand number N of the insn.
+     When constructing an insn, operand number N will be substituted
+     at this point.  When matching an insn, whatever appears at this
+     position in the insn will be taken as operand number N; but it
+     must satisfy PREDICATE or this instruction pattern will not match
+     at all.
+
+     Operand numbers must be chosen consecutively counting from zero in
+     each instruction pattern.  There may be only one `match_operand'
+     expression in the pattern for each operand number.  Usually
+     operands are numbered in the order of appearance in `match_operand'
+     expressions.
+
+     PREDICATE is a string that is the name of a C function that
+     accepts two arguments, an expression and a machine mode.  During
+     matching, the function will be called with the putative operand as
+     the expression and M as the mode argument (if M is not specified,
+     `VOIDmode' will be used, which normally causes PREDICATE to accept
+     any mode).  If it returns zero, this instruction pattern fails to
+     match.  PREDICATE may be an empty string; then it means no test is
+     to be done on the operand, so anything which occurs in this
+     position is valid.
+
+     Most of the time, PREDICATE will reject modes other than M--but
+     not always.  For example, the predicate `address_operand' uses M
+     as the mode of memory ref that the address should be valid for.
+     Many predicates accept `const_int' nodes even though their mode is
+     `VOIDmode'.
+
+     CONSTRAINT controls reloading and the choice of the best register
+     class to use for a value, as explained later (*note
+     Constraints::.).
+
+     People are often unclear on the difference between the constraint
+     and the predicate.  The predicate helps decide whether a given
+     insn matches the pattern.  The constraint plays no role in this
+     decision; instead, it controls various decisions in the case of an
+     insn which does match.
+
+     On CISC machines, the most common PREDICATE is
+     `"general_operand"'.  This function checks that the putative
+     operand is either a constant, a register or a memory reference,
+     and that it is valid for mode M.
+
+     For an operand that must be a register, PREDICATE should be
+     `"register_operand"'.  Using `"general_operand"' would be valid,
+     since the reload pass would copy any non-register operands through
+     registers, but this would make GNU CC do extra work, it would
+     prevent invariant operands (such as constant) from being removed
+     from loops, and it would prevent the register allocator from doing
+     the best possible job.  On RISC machines, it is usually most
+     efficient to allow PREDICATE to accept only objects that the
+     constraints allow.
+
+     For an operand that must be a constant, you must be sure to either
+     use `"immediate_operand"' for PREDICATE, or make the instruction
+     pattern's extra condition require a constant, or both.  You cannot
+     expect the constraints to do this work!  If the constraints allow
+     only constants, but the predicate allows something else, the
+     compiler will crash when that case arises.
+
+`(match_scratch:M N CONSTRAINT)'
+     This expression is also a placeholder for operand number N and
+     indicates that operand must be a `scratch' or `reg' expression.
+
+     When matching patterns, this is equivalent to
+
+          (match_operand:M N "scratch_operand" PRED)
+
+     but, when generating RTL, it produces a (`scratch':M) expression.
+
+     If the last few expressions in a `parallel' are `clobber'
+     expressions whose operands are either a hard register or
+     `match_scratch', the combiner can add or delete them when
+     necessary.  *Note Side Effects::.
+
+`(match_dup N)'
+     This expression is also a placeholder for operand number N.  It is
+     used when the operand needs to appear more than once in the insn.
+
+     In construction, `match_dup' acts just like `match_operand': the
+     operand is substituted into the insn being constructed.  But in
+     matching, `match_dup' behaves differently.  It assumes that operand
+     number N has already been determined by a `match_operand'
+     appearing earlier in the recognition template, and it matches only
+     an identical-looking expression.
+
+`(match_operator:M N PREDICATE [OPERANDS...])'
+     This pattern is a kind of placeholder for a variable RTL expression
+     code.
+
+     When constructing an insn, it stands for an RTL expression whose
+     expression code is taken from that of operand N, and whose
+     operands are constructed from the patterns OPERANDS.
+
+     When matching an expression, it matches an expression if the
+     function PREDICATE returns nonzero on that expression *and* the
+     patterns OPERANDS match the operands of the expression.
+
+     Suppose that the function `commutative_operator' is defined as
+     follows, to match any expression whose operator is one of the
+     commutative arithmetic operators of RTL and whose mode is MODE:
+
+          int
+          commutative_operator (x, mode)
+               rtx x;
+               enum machine_mode mode;
+          {
+            enum rtx_code code = GET_CODE (x);
+            if (GET_MODE (x) != mode)
+              return 0;
+            return (GET_RTX_CLASS (code) == 'c'
+                    || code == EQ || code == NE);
+          }
+
+     Then the following pattern will match any RTL expression consisting
+     of a commutative operator applied to two general operands:
+
+          (match_operator:SI 3 "commutative_operator"
+            [(match_operand:SI 1 "general_operand" "g")
+             (match_operand:SI 2 "general_operand" "g")])
+
+     Here the vector `[OPERANDS...]' contains two patterns because the
+     expressions to be matched all contain two operands.
+
+     When this pattern does match, the two operands of the commutative
+     operator are recorded as operands 1 and 2 of the insn.  (This is
+     done by the two instances of `match_operand'.)  Operand 3 of the
+     insn will be the entire commutative expression: use `GET_CODE
+     (operands[3])' to see which commutative operator was used.
+
+     The machine mode M of `match_operator' works like that of
+     `match_operand': it is passed as the second argument to the
+     predicate function, and that function is solely responsible for
+     deciding whether the expression to be matched "has" that mode.
+
+     When constructing an insn, argument 3 of the gen-function will
+     specify the operation (i.e. the expression code) for the
+     expression to be made.  It should be an RTL expression, whose
+     expression code is copied into a new expression whose operands are
+     arguments 1 and 2 of the gen-function.  The subexpressions of
+     argument 3 are not used; only its expression code matters.
+
+     When `match_operator' is used in a pattern for matching an insn,
+     it usually best if the operand number of the `match_operator' is
+     higher than that of the actual operands of the insn.  This improves
+     register allocation because the register allocator often looks at
+     operands 1 and 2 of insns to see if it can do register tying.
+
+     There is no way to specify constraints in `match_operator'.  The
+     operand of the insn which corresponds to the `match_operator'
+     never has any constraints because it is never reloaded as a whole.
+     However, if parts of its OPERANDS are matched by `match_operand'
+     patterns, those parts may have constraints of their own.
+
+`(match_op_dup:M N[OPERANDS...])'
+     Like `match_dup', except that it applies to operators instead of
+     operands.  When constructing an insn, operand number N will be
+     substituted at this point.  But in matching, `match_op_dup' behaves
+     differently.  It assumes that operand number N has already been
+     determined by a `match_operator' appearing earlier in the
+     recognition template, and it matches only an identical-looking
+     expression.
+
+`(match_parallel N PREDICATE [SUBPAT...])'
+     This pattern is a placeholder for an insn that consists of a
+     `parallel' expression with a variable number of elements.  This
+     expression should only appear at the top level of an insn pattern.
+
+     When constructing an insn, operand number N will be substituted at
+     this point.  When matching an insn, it matches if the body of the
+     insn is a `parallel' expression with at least as many elements as
+     the vector of SUBPAT expressions in the `match_parallel', if each
+     SUBPAT matches the corresponding element of the `parallel', *and*
+     the function PREDICATE returns nonzero on the `parallel' that is
+     the body of the insn.  It is the responsibility of the predicate
+     to validate elements of the `parallel' beyond those listed in the
+     `match_parallel'.
+
+     A typical use of `match_parallel' is to match load and store
+     multiple expressions, which can contain a variable number of
+     elements in a `parallel'.  For example,
+
+          (define_insn ""
+            [(match_parallel 0 "load_multiple_operation"
+               [(set (match_operand:SI 1 "gpc_reg_operand" "=r")
+                     (match_operand:SI 2 "memory_operand" "m"))
+                (use (reg:SI 179))
+                (clobber (reg:SI 179))])]
+            ""
+            "loadm 0,0,%1,%2")
+
+     This example comes from `a29k.md'.  The function
+     `load_multiple_operations' is defined in `a29k.c' and checks that
+     subsequent elements in the `parallel' are the same as the `set' in
+     the pattern, except that they are referencing subsequent registers
+     and memory locations.
+
+     An insn that matches this pattern might look like:
+
+          (parallel
+           [(set (reg:SI 20) (mem:SI (reg:SI 100)))
+            (use (reg:SI 179))
+            (clobber (reg:SI 179))
+            (set (reg:SI 21)
+                 (mem:SI (plus:SI (reg:SI 100)
+                                  (const_int 4))))
+            (set (reg:SI 22)
+                 (mem:SI (plus:SI (reg:SI 100)
+                                  (const_int 8))))])
+
+`(match_par_dup N [SUBPAT...])'
+     Like `match_op_dup', but for `match_parallel' instead of
+     `match_operator'.
+
+`(address (match_operand:M N "address_operand" ""))'
+     This complex of expressions is a placeholder for an operand number
+     N in a "load address" instruction: an operand which specifies a
+     memory location in the usual way, but for which the actual operand
+     value used is the address of the location, not the contents of the
+     location.
+
+     `address' expressions never appear in RTL code, only in machine
+     descriptions.  And they are used only in machine descriptions that
+     do not use the operand constraint feature.  When operand
+     constraints are in use, the letter `p' in the constraint serves
+     this purpose.
+
+     M is the machine mode of the *memory location being addressed*,
+     not the machine mode of the address itself.  That mode is always
+     the same on a given target machine (it is `Pmode', which normally
+     is `SImode'), so there is no point in mentioning it; thus, no
+     machine mode is written in the `address' expression.  If some day
+     support is added for machines in which addresses of different
+     kinds of objects appear differently or are used differently (such
+     as the PDP-10), different formats would perhaps need different
+     machine modes and these modes might be written in the `address'
+     expression.
+

@@ -1,0 +1,97 @@
+##
+## ntping:  Makefile					Jan 1993
+## (schoenfr)
+##
+
+## select your favourite c-compiler:
+# CC = gcc # -Wall
+CC = cc
+
+##
+## select your favourite compile options:
+##
+COPTS = -O
+# COPTS = -g -O
+
+# define HAVE_STDLIB_H if stdlib.h avail
+# define HAVE_UNISTD_H if unistd.h avail
+# define HAVE_MALLOC_H if malloc.h avail
+# define HAVE_USLEEP, if in libc
+## use this for all the good ones... (sun, linux, ...)
+FLAGS = -DHAVE_STDLIB_H -DHAVE_UNISTD_H -DHAVE_MALLOC_H -DHAVE_USLEEP
+
+## use this for hpux:
+# FLAGS = -DHAVE_STDLIB_H -DHAVE_UNISTD_H -DHAVE_MALLOC_H
+## use this for old pyramid:
+# FLAGS = 
+## use this for MACH 2.6 (from Mt Xinu)
+# FLAGS = -DHAVE_USLEEP
+
+
+## set RES_LIB to add resolver lib, if needed (or wanted):
+# RES_LIB = -lresolv
+
+## set DBM_DEF and DBM_LIB to include dbmalloc(3) (package not
+## included) and for installation not recomended:
+# DBM_DEF = -DDB_MALLOC
+# DBM_LIB = -ldbmalloc
+
+## any extra libraries, to be linked:
+ELIBS =
+## uncomment next entry for pyramid:
+# ELIBS = -lc /.attlib/libc.a
+
+## installation places:
+BINDIR = /usr/local/bin
+MANDIR = /usr/local/man/man8
+MANSUF = 8
+
+##
+## anything below should be independent:
+##
+SHELL=/bin/sh
+
+CFLAGS = $(COPTS) $(FLAGS) $(DBM_DEF)
+LIBS = $(RES_LIB) $(DBM_LIB) $(ELIBS)
+
+SRCS = ntping.c
+EXTR = README Makefile ntping.8 Makefile.in configure configure.in \
+	Makefile.handmade
+
+all:	ntping
+
+ntping:		ntping.c Makefile
+	-if [ -f ntping ] ; then mv -f ntping ntping.bak ; else true ; fi
+	rm -f ntping.bak || true
+	$(CC) $(CFLAGS) -o ntping ntping.c $(LIBS)
+
+clean clobber realclean distclean:
+	rm -f *.o core *~ \#*\# *.bak gmon.out ntping .emacs_*
+
+install:	ntping
+	-if [ ! -d $(BINDIR) ] ; then mkdir -p $(BINDIR) else /bin/true ; fi
+	rm -f $(BINDIR)/ntping || /bin/true
+	cp ntping $(BINDIR)
+	-chown root $(BINDIR)/ntping || /etc/chown root $(BINDIR)/ntping
+	-chmod u+s $(BINDIR)/ntping
+	-chmod a-w $(BINDIR)/ntping
+	-if [ ! -d $(MANDIR) ] ; then mkdir -p $(MANDIR) else /bin/true ; fi
+	rm -f $(MANDIR)/ntping.$(MANSUF) || /bin/true
+	cp ntping.8 $(MANDIR)/ntping.$(MANSUF)
+	-chmod g+w $(MANDIR)/ntping.$(MANSUF)
+
+check:
+	echo '-size 120 localhost' | ./ntping -b
+	echo '-size 60 -delay 30 -mask localhost' | ./ntping -b
+	echo '-retries 2 -timeout 1 -ttl 1 localhost' | ./ntping -b
+	echo '-size 100 -delay 10 -trace 1 localhost' | ./ntping -b
+	echo '-tstamp localhost' | ./ntping -b
+
+lcheck:
+	echo '-size 120 -delay 1 sol.ibr.cs.tu-bs.de prep.ai.mit.edu' | ./ntping -b
+	echo '-size 60 -mask -delay 10 sol.ibr.cs.tu-bs.de prep.ai.mit.edu' | ./ntping -b
+	echo '-retries 2 -timeout 1 -delay 100 -ttl 2 sol.ibr.cs.tu-bs.de prep.ai.mit.edu' | ./ntping -b
+	echo '-size 100 -trace 2 sol.ibr.cs.tu-bs.de prep.ai.mit.edu' | ./ntping -b
+	echo '-tstamp sol.ibr.cs.tu-bs.de prep.ai.mit.edu' | ./ntping -b
+
+## end of Makefile.

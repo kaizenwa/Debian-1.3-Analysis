@@ -1,0 +1,312 @@
+#################################################################
+#
+# cf.site - for iu.hioslo.no
+#
+# This file contains site specific data
+#
+#################################################################
+
+###
+#
+# BEGIN cf.site
+#
+###
+
+links:
+
+   basics::
+
+      /local     -> /$(site)/$(binserver)/local
+      /usr/local -> /local
+
+   AllBinaryServers.solaris::
+
+      /local/bin       +> /local/perl5/bin
+
+   XBootServer::
+
+      #
+      # Set up a /local/tftpboot area where all X terminal
+      # stuff will be kept.
+      #
+
+      /tftpboot                  -> /local/tftpboot
+      /local/tftpboot/td/configs -> /local/tftpboot/td/examples/configs
+      /etc/bootptab              -> /tftpboot/bootptab
+      /tftpboot/usr/lib/X11/td   -> /tftpboot/td
+
+   solaris::
+
+      #
+      # Some stuff to make things easier locally going from
+      # sun4 to solaris
+      #
+
+      /var/spool/mail       ->  /var/mail
+      /etc/mail/sendmail.cf ->! /local/mail/etc/sendmail.cf
+      /etc/mail/aliases     ->! /$(site)/$(main_server)/local/mail/aliases/aliases.oih   
+      /etc/sendmail.cf      ->  /$(site)/$(main_server)/local/mail/etc/sendmail.cf
+
+   NameServers::
+
+      /etc/named.boot -> /local/named/named.boot
+
+   borg::
+
+      /local/lib/irc -> /iu/nexus/local/lib/irc
+
+#############################################################
+
+disable:
+
+ WWWServers.Sunday::
+
+   #
+   # Disabling these log files weekly prevents them from
+   # growing so enormous that they fill the disk!
+   #
+
+   /local/httpd_1.4/logs/access_log
+   /local/httpd_1.4/logs/agent_log
+   /local/httpd_1.4/logs/error_log
+   /local/httpd_1.4/logs/referer_log
+
+#################################################################
+
+files:
+
+      /etc/motd              m=0644 r=0 o=root act=fixplain
+      /etc/motd              m=0644 r=0 o=root act=touch
+      /.cshrc                m=0644 r=0 o=root act=touch
+
+   NISserver::
+
+      /local/etc/passwd m=0644 o=root g=other action=fixplain
+      /local/etc/shadow m=0600 o=root g=other action=fixplain
+
+   WWWServers.Sunday::
+
+      #
+      # Better touch these again since we disabled them
+      #
+
+      /local/www/cgi-bin-public/.               act=touch
+      /local/httpd_1.4/logs/access_log          act=touch
+      /local/httpd_1.4/logs/agent_log           act=touch
+      /local/httpd_1.4/logs/error_log           act=touch
+      /local/httpd_1.4/logs/referer_log         act=touch
+
+   WWWServers::
+
+      /local/www r=inf group=www mode=775 act=fixall
+
+   FTPserver.solaris::
+
+      #
+      # Make sure anonymous ftp areas have the correct
+      # protection, or logins won't be able to read
+      # files - or perhaps a security risk. This is
+      # solaris 2 specific...
+      #
+
+      $(ftp)/pub        mode=755 o=ftp g=ftp r=inf act=fixall
+      $(ftp)/Obin       mode=111 o=root g=other act=fixall
+      $(ftp)/etc        mode=111 o=root g=other act=fixdirs
+      $(ftp)/usr/bin/ls mode=111 o=root g=other act=fixall
+      $(ftp)/dev        mode=555 o=root g=other act=fixall
+      $(ftp)/usr        mode=555 o=root g=other act=fixdirs
+
+   basics::
+
+      /etc/shells mode=0644 action=touch
+
+   AllBinaryServers.exclude::
+
+     /local m=-0002 r=inf o=root,sdt g=0,1,2,3,4,5,6,staff,sdtgrp links=tidy
+
+######################################################################
+
+directories:
+
+   solaris::
+
+     #
+     # httpd wants this defined
+     #
+
+      /usr/lib/X11/nls
+
+   borg::
+
+      #
+      # Create a local tmp file for users who want
+      # to make big files temporarily
+      #
+
+      /local/tmp  mode=1777 o=root g=0
+
+#################################################################
+
+tidy:
+
+   BackupHost::
+
+      # Here we tidy old backup tar files from the backup area
+      # A special tmp area gets cleared every 4 days. The files
+      # are created by Audun's backup help script (see shellcommands)
+
+      /iu/nexus/backup      pat=*  age=21
+
+   borg::
+
+      #
+      # Tidy the tmp area every 4 days
+      #
+
+      /local/tmp            pat=*             r=inf     age=4
+
+#################################################################
+
+shellcommands: 
+
+  BackupHost.Sunday::
+
+      #
+      # Make a system backup of /iu/nexus/u? with Audun's script
+      #
+
+      "$(cfbin)/cfbackup -p -s /iu/nexus/u1 -s /iu/nexus/u2" 
+
+  nexus.Sunday.exclude::
+
+      #
+      # See how much rubbish users have accumulated each Sunday
+      #
+
+      "$(cfbin)/noseyparker /iu/nexus/u1 ${sysadm} nomail"
+      "$(cfbin)/noseyparker /iu/nexus/u2 ${sysadm} nomail" 
+
+   nexus.exclude::
+
+      #
+      # Update the GNU find/locate database each night
+      #
+ 
+      "$(gnu)/lib/locate/updatedb"
+
+   AllBinaryServers.sun4.Saturday.exclude::
+
+      #
+      # Make sure the man -k / apropos data are up to date
+      #
+
+      "/usr/bin/catman  -M /local/man"
+      "/usr/bin/catman  -M /local/X11R5/man"
+      "/usr/bin/catman  -M /usr/man"
+      "/usr/bin/catman  -M /local/gnu/man"
+      "/usr/bin/catman  -M /usr/openwin/share/man"
+      "/usr/bin/catman  -M /local/X11R5/man"
+      "/usr/bin/catman  -M /local/mutils/man"
+
+    solaris::
+
+      #
+      # A crude way to set the system clock from a known
+      # reliable server. Would really like to have ntpd
+      #
+
+      "/usr/bin/rdate anyon.uio.no > /dev/null"
+
+
+###############################################################
+
+editfiles:
+
+   any::
+
+      #
+      # cfengine installs itself as a cron job - sneaky! :)
+      #
+
+      { /var/spool/cron/crontabs/root
+
+      AppendIfNoSuchLine "0 0 * * * $(cfbin)/cfwrap $(cfbin)/cfdaily"
+      }
+
+      #
+      # If tcsh (or other non standard shells) are not in /etc/shells
+      # ftp won't allow logins...
+      #
+
+      { /etc/shells
+
+      AppendIfNoSuchLine "/local/bin/tcsh"
+      }
+
+   solaris::
+
+      #
+      # Here's how to replace vanilla-finger with GNU finger
+      #
+
+      { /etc/inetd.conf
+
+      HashCommentLinesContaining "/usr/sbin/in.fingerd"
+      AppendIfNoSuchLine "finger stream tcp nowait root /local/etc/in.fingerd   in.fingerd"
+      AppendIfNoSuchLine "cfinger stream tcp nowait root /local/etc/in.cfingerd in.cfingerd"
+      }
+
+      #
+      # A painless way to add an rc.local script to the rc files
+      # under solaris without having to fight though inittab
+      #
+
+      { /etc/rc3.d/S15nfs.server
+
+      AppendIfNoSuchLine "sh /local/etc/rc.local"
+      }
+
+   XBootServer::
+
+      { /etc/inetd.conf
+
+      AppendIfNoSuchLine "bootp dgram udp wait root /local/bin/bootpd bootpd -i -d"
+      }
+
+   NISserver::
+
+      #
+      # Make sure the master NIS files contain some important stuff
+      #
+
+      { /local/etc/services
+
+      WarnIfNoLineContaining "pop"
+      AppendIfNoSuchLine     "bootpc          68/udp"
+      AppendIfNoSuchLine     "bootp           67/udp"
+      AppendIfNoSuchLine     "cfinger         2003/tcp"
+      AppendIfNoSuchLine     "http            80/tcp          www"
+      }
+
+      { /local/etc/networks
+
+      AppendIfNoSuchLine "iu-net          128.39.89"
+      }
+
+
+######################################################################
+
+required:
+
+   #
+   # Any host must have a /local, /usr/local fs. Check that
+   # it exists and looks sensible. (i.e. not empty)
+   #
+
+   /${site}/${binserver}/local
+
+###
+#
+# END cf.site
+#
+###

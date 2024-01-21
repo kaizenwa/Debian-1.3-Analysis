@@ -1,0 +1,422 @@
+# $Id: dtk-exp,v 5.0 1996/11/22 18:04:26 raman Exp $
+# Description:  Interfacing to a Dectalk via TCL. 
+# Keywords: Emacspeak, Dectalk, TCL
+# {{{ LCD Entry: 
+
+# LCD Archive Entry:
+# emacspeak| T. V. Raman |raman@crl.dec.com 
+# A speech interface to Emacs |
+# $date: $ |
+#  $Revision: 5.0 $ | 
+# Location undetermined
+#
+
+# }}}
+# {{{ Copyright:  
+
+# Copyright (c) 1994, 1995 by Digital Equipment Corporation.
+# All Rights Reserved. 
+#
+# This file is not part of GNU Emacs, but the same permissions apply.
+#
+# GNU Emacs is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+#
+# GNU Emacs is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GNU Emacs; see the file COPYING.  If not, write to
+# the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
+
+# }}}
+# {{{ procedures  
+
+proc dectalk_set_punctuations {mode} {
+    global dectalk_globals
+    puts $dectalk_globals(write) "\[:punc  $mode]"
+    set dectalk_globals(punctuations) $mode
+    return ""
+}
+
+proc dectalk_set_speech_rate {rate} {
+    global dectalk_globals
+    puts $dectalk_globals(write) "\[:rate  $rate]"
+    set factor $dectalk_globals(char_factor) 
+        set dectalk_globals(say_rate) [round \
+                                   [expr $rate  * $factor ]]
+    set dectalk_globals(speech_rate) $rate
+return ""
+}
+
+proc dectalk_set_character_scale {factor} {
+    global dectalk_globals
+set dectalk_globals(say_rate) [round \
+                          [expr $dectalk_globals(speech_rate) * $factor ]]
+set dectalk_globals(char_factor) $factor
+return ""
+}
+
+proc dectalk_say {text} {
+    global dectalk_globals
+    if {$dectalk_globals(talking?) } {
+set dectalk_globals(talking?) 0 
+        }
+set mode $dectalk_globals(punctuations) 
+#    set r $dectalk_globals(speech_rate)
+#    set f  $dectalk_globals(say_rate)
+    dectalk_gobble_acknowledgements
+    puts $dectalk_globals(write)\
+"   \[:punc all :say word]$text\[:punc $mode :say clause ]"
+return ""
+}
+
+proc dectalk_letter {text} {
+    global dectalk_globals
+    if {$dectalk_globals(talking?) } {
+set dectalk_globals(talking?) 0 
+        }
+    set r $dectalk_globals(speech_rate)
+    set f  $dectalk_globals(say_rate) 
+    puts $dectalk_globals(write)\
+"\[:rate $f  :say letter :sync]$text\[:rate $r :say clause :sync]"
+return ""
+}
+
+
+proc dectalk_speak {text} {
+    global dectalk_globals
+    if {$dectalk_globals(talking?) } {
+        queue_speech $text
+                } else {
+        queue_speech $text
+puts $dectalk_globals(write) "  \[:say clause]" 
+            speech_task
+        }
+return ""
+}
+
+proc dectalk_resume  {} {
+    global dectalk_globals 
+    puts     $dectalk_globals(write) "\[:resume \]"
+    speech_task
+return ""
+}
+
+
+proc dectalk_pause {} {
+    global dectalk_globals 
+    puts     $dectalk_globals(write) "\[:pause \]"
+    set dectalk_globals(talking?) 0 
+return ""
+}
+
+proc dectalk_stop {} {
+    global dectalk_globals
+    queue_clear
+dectalk_gobble_acknowledgements
+    puts $dectalk_globals(write)  "\003"
+        set status [select [list $dectalk_globals(read)] {} {} 1]
+            if {[lsearch $status $dectalk_globals(read)]   >=0} {
+        read $dectalk_globals(read) 1
+}
+    set dectalk_globals(talking?) 0
+dectalk_gobble_acknowledgements
+return stop
+}
+
+proc dectalk_tone  {{pitch 440} {duration 50}} {
+        global dectalk_globals 
+        queue_speech   "\[_ :tone $pitch $duration]"  
+        return ""
+}
+
+proc dectalk_synchronize {} {
+    global dectalk_globals 
+    queue_speech   "\[:sync\]" 
+return ""
+}
+
+proc dectalk_split_caps {flag} {
+    global dectalk_globals 
+    set dectalk_globals(split_caps) $flag
+return ""
+}
+
+proc dectalk_capitalize {flag} {
+    global dectalk_globals 
+    set dectalk_globals(capitalize) $flag
+return ""
+}
+
+proc dectalk_space_special_chars  {flag} {
+    global dectalk_globals 
+    set dectalk_globals(space_special_chars) $flag
+return ""
+}
+
+proc  read_pending_p  {file_handle} {
+    set status   [lsearch [select [list  $file_handle]  {} {} 0] $file_handle]
+    expr $status >= 0
+}
+
+proc dectalk_get_acknowledgement {} {
+    global dectalk_globals
+    set retval "" 
+    set status [select [list   $dectalk_globals(read) stdin ] {} {} {}]
+    if {[lsearch $status stdin]   >=0} {
+        set dectalk_globals(talking?) 0
+    } else {
+        while {[read_pending_p  $dectalk_globals(read) ] } {
+            append retval [read $dectalk_globals(read)  1]
+            select [list   $dectalk_globals(read)] {} {} 0.001
+        }
+    }
+    return $retval
+}
+
+#Gobble up any garbage the Dectalk has returned.
+
+proc dectalk_gobble_acknowledgements {} {
+    global dectalk_globals
+    while {[read_pending_p  $dectalk_globals(read) ] } {
+        read $dectalk_globals(read)  1
+    }
+}
+
+proc dectalk_reset {} {
+    global dectalk_globals
+    dectalk_gobble_acknowledgements
+    puts    $dectalk_globals(write)  {[:timeout 0]
+    [:punc some ]
+    [:phoneme arpabet speak on ]
+    [:tsr off ]
+    [:power interval 30 ]
+    [:power sleep 60]
+    [:np]
+    [:sync]
+    Restoring sanity to the Dectalk Express.
+    [:sync :power speak]
+    }
+}
+
+# }}}
+# {{{ speech task 
+
+proc speech_task {} {
+    global queue dectalk_globals
+    set index 1
+    set dectalk_globals(talking?) 1
+    dectalk_gobble_acknowledgements
+    while {$dectalk_globals(talking?) } { 
+        if {![queue_empty?]} {
+            puts $dectalk_globals(write) \
+"[queue_remove]\[:index reply $index  ]\013"
+            set retval [dectalk_get_acknowledgement ]
+            incr index
+            set status [select [list  file0]  {} {} 0]
+            if {[lsearch $status file0]   >=0} {
+                set dectalk_globals(talking?) 0
+                puts interrupt
+                break;
+            }
+    }  else {
+        set dectalk_globals(talking?) 0
+puts done 
+}
+}
+return ""
+}
+
+# }}}
+# {{{ queue:
+
+proc queue_empty? {} {
+    global dectalk_globals
+    expr $dectalk_globals(q_head) == $dectalk_globals(q_tail)
+}
+
+proc queue_clear {} {
+    global dectalk_globals queue
+    unset queue
+    set queue(-1) "" 
+    set dectalk_globals(q_head) 0
+    set dectalk_globals(q_tail) 0 
+return ""
+}
+
+proc queue_speech {element} {
+    global queue dectalk_globals
+    # first protect against dtk going into spell mode
+        if {[string match all $dectalk_globals(punctuations)] } {
+regsub -all  {[%&;()$+=/]} $element  { \0 }   element
+    } else {
+regsub -all  {([a-zA-Z])([,.!%&;()$+=/])([a-zA-z])} $element \
+    {\1 \2 \3} element
+    }
+    if {$dectalk_globals(capitalize) } {
+        regsub -all {[A-Z]} $element {[_ :tone 440 10 :sync]&} element
+    }
+    if {$dectalk_globals(split_caps) } {
+set allcaps [regexp {^[^a-zA-Z0-9]?([A-Z][A-Z0-9]+)[^a-zA-Z0-9]} $element full  match ]
+if {!$allcaps} {
+    set allcaps [regexp {[^a-zA-Z0-9]([A-Z][A-Z0-9]+)[^a-zA-Z0-9]} $element full  match ]
+}
+set tone {[_:sync  :tone 660 10 :sync]}
+while {$allcaps } {
+    if {[string length $match] <=3} {
+        set abbrev "\[_:sync :tone 660 10 :sync\]$match"
+        regsub -all {[A-Z]} $abbrev {&[*]} abbrev
+        regsub -all A $abbrev {[ey]} abbrev 
+        regsub $match $element  $abbrev element
+    } else {
+    regsub $match $element "$tone[string tolower $match]"  element
+    }
+    set allcaps [regexp {[^a-zA-Z0-9]([A-Z][A-Z0-9]+)[^a-zA-Z0-9]} $element full  match ]
+}
+regsub -all {[A-Z]} $element {[_<5>]&} element
+        regsub -all {([^ -_A-Z])([A-Z][a-zA-Z]* )} $element\
+            {\1[_<1>]\2[,] } element
+    regsub -all {([^ -_A-Z])([A-Z])} $element\
+        {\1[:pause 1]\2} element
+    }
+    if { [string match some  $dectalk_globals(punctuations)] } {
+regsub -all --  {--} $element { [_,]} element
+}
+    set queue($dectalk_globals(q_tail)) $element
+    incr dectalk_globals(q_tail)
+return ""
+}
+
+proc queue_remove {} {
+    global dectalk_globals queue 
+    if {![queue_empty? ]} {
+        set element  $queue($dectalk_globals(q_head))
+        unset queue($dectalk_globals(q_head))
+        incr dectalk_globals(q_head)
+        return $element
+    }
+}
+
+# }}}
+# {{{ globals
+
+
+set machine Linux 
+ catch {set machine [exec uname ]}
+switch -exact  -- $machine {
+    ULTRIX  -
+    OSF1  {
+if {[info exists env(DTK_PORT)] } {
+set port $env(DTK_PORT)
+} else {
+set port /dev/tty00
+}
+        set dectalk_globals(read)  [open $port  r]
+        set dectalk_globals(write)  [open $port  w]
+        #stty setting:
+ exec stty sane 9600 raw  -echo < $port 
+        exec stty ixon ixoff  <  $port 
+    }
+^SunOS.*5\.[0-9].*   {
+        if {[info exists env(DTK_PORT)] } {
+            set port $env(DTK_PORT)
+        } else {
+            set port /dev/ttya
+        }
+        set dectalk_globals(read)  [open $port  r]
+        set dectalk_globals(write)  [open $port  w]
+        set machine solaris
+        #stty setting:
+ exec /usr/bin/stty sane 9600 raw  -echo < $port 
+        exec /usr/bin/stty -echo <  $port 
+        exec /usr/bin/stty ignpar <  $port 
+        exec   /usr/bin/stty ixon ixoff <$port 
+    }
+SunOS   {
+set machine sunos4
+if {[info exists env(DTK_PORT)] } {
+set port $env(DTK_PORT)
+} else {
+set port /dev/ttya
+}
+        set dectalk_globals(read)  [open $port  r]
+        set dectalk_globals(write)  [open $port  w]
+        #stty setting:
+ exec stty sane 9600 raw  -echo > $port 
+        exec stty ixon ixoff  >  $port 
+    }
+    Linux -
+    default   {
+if {[info exists env(DTK_PORT)] } {
+set port $env(DTK_PORT)
+} else {
+set port /dev/ttyS0
+}
+        set dectalk_globals(read)  [open $port  r]
+        set dectalk_globals(write)  [open $port  w]
+        #stty setting:
+ exec stty sane 9600 raw  -echo <  $port 
+        #linux wants the -echo done separately
+        exec stty -echo <  $port 
+        exec stty ixon ixoff  < $port 
+    }
+}
+#set up the right kind of buffering:
+fcntl $dectalk_globals(read) nobuf 1
+fcntl $dectalk_globals(write) linebuf 1
+
+
+#split caps flag: 
+set dectalk_globals(split_caps) 1
+# Capitalize flag
+set dectalk_globals(capitalize)  0
+#space around special chars:
+set dectalk_globals(space_special_chars) 1 
+set dectalk_globals(talking?) 0
+set dectalk_globals(speech_rate) 425 
+set dectalk_globals(char_factor)  1.2
+set dectalk_globals(say_rate) [round \
+[expr $dectalk_globals(speech_rate) * $dectalk_globals(char_factor)]]
+set dectalk_globals(q_head)  0
+set dectalk_globals(q_tail) 0
+set dectalk_globals(punctuations) some
+set queue(-1) "" 
+
+# }}}
+# {{{ Initialize and set state.
+
+#do not die if you see a control-c
+signal ignore {sigint}
+# gobble up garbage that is returned on powerup 
+dectalk_gobble_acknowledgements
+
+puts    $dectalk_globals(write)  {[:timeout 0]
+    [:punc some ]
+    [:phoneme arpabet speak on ]
+    [:tsr off ]
+    [:power interval 30]
+    [:power sleep 60]
+    [:sync] [:np :ra 200]
+This is the Dectalk Express.
+[zhax<15> p'arl],
+    [/dh`ow<100,140> ],  [:np] [  zhax<13>  suw<45>\iy<140,100>]. 
+}
+
+#Start the main command loop:
+commandloop
+
+# }}}
+# {{{ Emacs local variables  
+
+### Local variables:
+### major-mode: tcl-mode 
+### voice-lock-mode: t
+### folded-file: t
+### End:
+
+# }}}

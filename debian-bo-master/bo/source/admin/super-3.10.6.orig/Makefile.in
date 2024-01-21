@@ -1,0 +1,205 @@
+
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+CC = @CC@
+CFLAGS = @CFLAGS@
+USER_DEFS = @DEFS@
+INSTALL = @INSTALL@
+LDFLAGS = @LDFLAGS@
+LIBS = @LIBS@
+
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+
+#
+# Where the binary is installed
+#
+BINDIR = $(exec_prefix)/bin
+
+#
+# Where the timestamps directory is created
+#
+LIBDIR = $(prefix)/lib
+
+#
+# Where the user man page is placed.
+#
+MAN1DIR = $(prefix)/man/man1
+# Do _not_ include a leading dot in the extension!
+MAN1EXT = 1
+
+#
+# Where the man page for the super.tab file is placed.
+#
+MAN_FORMAT_DIR = $(prefix)/man/man5
+# Do _not_ include a leading dot in the extension!
+MAN_FORMAT_EXT = 5
+
+#
+# Where the super.tab file goes.  This should be the full path to
+# the file: -DSUPERFILE=\"FullPathName\"
+# It gets included in the BASIC_DEFS macro.
+SUPERFILE = -DSUPERFILE=@SUPERFILE_BACKSLASHED@
+
+# TIMESTAMP_DIR is the directory in which timestamp files are
+#	kept for commands that require passwords to be entered.
+TIMESTAMP_DIR = -DTIMESTAMP_DIR=\"$(LIBDIR)/superstamps\"
+
+# SAFE_PATH is the search path for any command executed by super.
+# Set to a path that contains only trusted files.
+SAFE_PATH = -DSAFE_PATH=@SAFE_PATH@
+
+# SYSLOG_PRIORITY specifies the priority of syslog messages.
+#	If you don't define it, the default is LOG_ERR.
+#	(Regardless of this setting, _successful_ executions are logged
+#	at priority LOG_INFO.)
+
+#	If you are using standard syslog(), you may define it symbolically,
+#	for example:
+#		-DSYSLOG_PRIORITY=LOG_ERR
+#	or
+#		-DSYSLOG_PRIORITY="(LOG_LOCAL1 | LOG_WARNING)"
+
+#	But if you are using rsyslog(), you should define it differently:
+#	its value depends on the machine which will _receive_ the log
+#	messages, NOT the sending machine.  It should be defined in the
+#	Makefile because the value can differ on the machine that compiles
+#	and runs super, compared to the value on the log host.
+
+#	For example, if your receiving machine is a Sun running SunOS 4.1.3,
+#	or HP-UX 8.x or 9.x, using -DSYSLOG_PRIORITY='((17<<3)+4)' will set
+#	the priority of the networked syslog to the facility LOG_LOCAL1, with
+#	the priority LOG_WARNING.  The log machine should have a line that
+#	matches this in its syslog.conf file; for the above priority, use
+#	an entry like:
+#		/etc/syslog.conf:local1.warning        /var/adm/super.log
+#
+SYSLOG_PRIORITY = -DSYSLOG_PRIORITY=LOG_ERR
+
+BASIC_DEFS = $(SUPERFILE) $(TIMESTAMP_DIR) $(SYSLOG_PRIORITY)
+
+#
+# ###################################################################
+# You probably don't have to edit anything below here.
+# ###################################################################
+#
+COMPILE = $(CC) -c $(BASIC_DEFS) $(USER_DEFS) $(INCLUDES) $(CPPFLAGS) $(CFLAGS)
+LINK = $(CC) $(LDFLAGS) -o $@
+ 
+.SUFFIXES:
+.SUFFIXES: .c .o
+.c.o:
+	$(COMPILE) $<
+  
+####################################################################
+# You really shouldn't have to modify anything below this line.
+####################################################################
+
+SRC= $(SUPER_SRC) $(SETUID_SRC)
+
+SUPER_C_SRC = super.c approve.c checks.c colon.c braces.c error.c \
+	gsgroups.c hsearch.c options.c s_regex.c s_re_fail.c rsyslog.c \
+	strqtokS.c time.c utils.c wildmat.c
+
+SUPER_H_SRC = hsearch.h version.h options.h super.h
+
+SUPER_SRC = $(SUPER_C_SRC) $(SUPER_H_SRC)
+
+SETUID_SRC = setuid.c
+
+SUPER_OBJ= super.o approve.o checks.o colon.o braces.o error.o \
+	gsgroups.o hsearch.o options.o s_regex.o s_re_fail.o rsyslog.o \
+	strqtokS.o time.o utils.o wildmat.o
+
+# Files that go into the shar file.
+ALL= README INSTALL INSTALL.notes Artistic Copying WhatsNew \
+	configure configure.in install-sh localsys.h \
+	Makefile.in super.1.in super.5.in config.h.in \
+	setuid.1 sample.tab sample.cdmount $(SRC)
+
+all: config.h super setuid
+
+super: config.h $(SUPER_OBJ)
+	$(CC) $(LDFLAGS) -o super $(SUPER_OBJ) $(LIBS)
+
+debug: config.h $(SUPER_OBJ)
+	$(CC) $(LDFLAGS) -o super $(SUPER_OBJ) $(LIBS) /usr/lib/debug/malloc.o
+
+setuid: setuid.o
+	$(CC) $(LDFLAGS) -o setuid setuid.o
+
+config.h:
+	@echo "'config.h' doesn't exist... you must run './configure' to generate it."
+	@echo "If you are making 'super' for the first time on this system,"
+	@echo "you should probably do a 'make veryclean' before executing ./configure."
+	@exit 1
+
+cflow:
+	cflow $(SUPER_C_SRC) > cflow.out
+	cflow -r $(SUPER_C_SRC) > cflow.rev
+
+# NOTICE NOTICE NOTICE!
+# You must install super as "super", and not use any other program name.
+# This is because at run-time, the program assumes that if it's invoked
+# with a different name, it must have been invoked via a symlink, and
+# it treats
+#	% myothernameforsuper args
+# as if you typed
+#	% super myothernameforsuper args
+# If you insist on installing under another name, then you must
+# change the #define ONETRUENAME from "super" to your other
+# name, and edit the documentation to match.
+install:
+	cp super $(BINDIR)/super
+	chmod 04755 $(BINDIR)/super
+	cp setuid $(BINDIR)/setuid
+	cp super.1 $(MAN1DIR)/super.$(MAN1EXT)
+	cp setuid.1 $(MAN1DIR)/setuid.$(MAN1EXT)
+	cp super.5 $(MAN_FORMAT_DIR)/super.$(MAN_FORMAT_EXT)
+
+clean:
+	-rm -f super *.o
+
+distclean veryclean: clean
+	-rm -f super.1 super.5 config.h config.cache config.status config.log
+
+$(ALL): 
+	co $@
+
+# Because of the wide variation in shar commands, the shar arguments
+# used below sticks to a minimal set, and we generate various shar file
+# headers by hand.  
+shar: $(ALL)
+	( echo "#include <stdio.h>" ; \
+	echo '#include "version.h"' ; \
+	echo 'main() {printf("%s.%s",Version,Patchlevel);exit(0);}') > temp.c
+	cc temp.c
+	V=super-`./a.out`; mkdir $$V && cp $(ALL) $$V && \
+	    (echo "Submitted-by: will@ucolick.org" ; \
+	    echo "Archive-name: $$V/part01" ; echo "" ; \
+	    echo "---- Cut Here and feed the following to sh ----" ; \
+	    shar $$V ) > $$V.shar && rm -rf $$V
+	rm a.out temp.c
+
+tar: $(ALL)
+	( echo "#include <stdio.h>" ; \
+	echo '#include "version.h"' ; \
+	echo 'main() {printf("%s.%s",Version,Patchlevel);exit(0);}') > temp.c
+	cc temp.c
+	V=super-`./a.out`; mkdir $$V && cp $(ALL) $$V && \
+	    tar -cf $$V.tar $$V && rm -rf $$V
+	rm a.out temp.c
+
+gtar: $(ALL)
+	( echo "#include <stdio.h>" ; \
+	echo '#include "version.h"' ; \
+	echo 'main() {printf("%s.%s",Version,Patchlevel);exit(0);}') > temp.c
+	cc temp.c
+	V=super-`./a.out`; mkdir $$V && cp $(ALL) $$V && \
+	    gtar -czf $$V.tar.gz $$V && rm -rf $$V
+	rm a.out temp.c
+
+depend:
+	makedepend -- $(CFLAGS) -- $(SRC)
+

@@ -1,0 +1,470 @@
+                   The FREE TrueType Font Engine
+
+
+This document is a technical introduction to the FreeType project, an
+efficient, fast, portable TrueType font rendering engine, with *freely
+available* source code!. The reader's good knowledge of the TrueType Font
+specification is not required, though being an indeniable "plus" for the
+good understanding of the following.
+
+---------------------------------------------------------------------
+
+TABLE OF CONTENTS:
+
+   Introduction:
+
+I. Engine Design Goals:
+
+  1. Easy Maintenance.
+  2. System Independance.
+  3. Reliability.
+  4. High Quality.
+  5. Speed!
+
+II. Engine Architecture:
+
+  1. High-level Interface.
+  2. Component Hierarchy.
+  3. Runtime Execution.
+
+II. Internals:
+
+  1. Engine Memory Management.
+  2. Rasterizer mechanics.
+  3. Interpreting TrueType opcodes.
+
+III. Engine Characteristics:
+
+  1. Differences found between TrueType specs and real-world
+     font files.
+  2. Engine's behaviour with incorrect font files or glyphs.
+
+IV. Still to do:
+
+  1. Debug the whole interpreter...
+  2. Add more character-oriented functions.
+  3. Porting considerations (IMPORTANT).
+
+--------------------------------------------------------------------
+
+Introduction:
+-------------
+
+  [ 'A Brief history of digital font technology' is under ]
+  [ complete rewrite...                                   ]
+
+I. Engine Design Goals:
+-----------------------
+
+This section describes the several goals the engine has been developped for:
+
+
+  - Easy maintenance :
+
+      "Language is not all!!"
+
+      In an age where all "serious" development is made in C or C++, the
+      author of FreeType decided originally to code the engine in PASCAL!
+      This choice may seem rather weird, but this language comes on the PC
+      with high-quality programming environments (namely Borland's for DOS,
+      and Virtual Pascal's on OS/2) that allow light-speed compilation, real
+      module separation and easy debugging. Moreover, the language's simple
+      design and strong typing allows safe development and short
+      compile/run/debug cycles.
+
+      Of course, this had also several drawbacks (i.e. a poorly if ever
+      optimised generated code, and lack of "true" language portability) but
+      these could be easily tolerated during development as long as one
+      developer does not tie its code to very specific items of the
+      language.
+
+      Being doomed by a poor performance from the compiled code ;),
+      development focused on algorithm fine-tuning rather than clever
+      macro-tricks or the tendency to optimise 'on the run' so common under
+      C programmers (a practice that very easily leads to strange and hardly
+      maintainable code).
+
+      This approach, though quite constraining at first, paid back faster
+      than expected. Ultra-fast compile times allowed a lot of algorithmic
+      trials which finally led to a now very well crafted piece of software,
+      which runs fast even under Borland Pascal. A C version of the engine
+      has been written lately from the original Pascal source and seems to
+      be as stable as the Pascal version.
+
+      The current version has been compiled and tested on Borland's 16-bit
+      Pascal Compilers (Turbo-Pascal, Borland-Pascal Real Mode, and
+      Borland-Pascal DPMI) as well as the 32-bit OS/2 Virtual Pascal
+      compiler (a *must-have*). The 32-bit version is about 2.5 to 3 times
+      faster than its 16-bit counterpart; this is mainly due to the fact
+      that most of the data processed by the engine is 32-bit, a painful
+      task for 16-bit programs...
+
+      Compilation of the C version with GCC (all optimizations on) showed a
+      significant performance increase, at the cost of code size (namely
+      from 22kByte to 60kByte!!).
+
+      As a whole, the engine proved several times to be highly readable and
+      maintainable. It takes about 9000 lines of commented and airy Pascal
+      code, which is quite small for such a piece of software. The C version
+      has about 4000 code lines (with very few comments, though---the main
+      reason for the smaller code size is the still lacking instruction
+      interpreter).
+
+
+  - System Independence *and* Portability:
+
+      The Engine has been developed with portability in mind. This means
+      that we don't rely on any specific feature of the Pascal runtime
+      libraries. It thus manages resources in a specific way.
+
+
+          a. Memory management:
+
+             A client application should first allocate a block of memory
+             and pass it to the engine at elaboration. The engine has no
+             interface to any external memory manager to allocate or release
+             chunks of memory. Rather, it will use the passed memory block,
+             called the Font Storage Pool, for all its needs. Deallocation
+             of the pool is left to the client application.
+
+             This approach guarantees that the engine's memory requirements
+             during execution are limited to those defined by the client
+             application. Should the pool be too small, the engine will fail
+             to initialize or to load a font file in a gentle and
+             predictable way (typically with an error message).
+
+          b. File operations:
+
+             A simple unit called 'File' provides a basic I/O layer using
+             the simple Pascal FILE type (unbuffered file access). New
+             instances of 'File' can be written to take care of buffered or
+             memory-mapped files access when possible, or other system I/O
+             routines.
+
+          c. Endianess:
+
+             TrueType is built on big-endianess, used typically on Motorola
+             processors, where the high order byte is always in the first
+             memory position, while the lowest is in the last.
+
+             Endianess plays a role when reading data from the font file,
+             and when extracting constant values from the instruction
+             stream. In the modules where it is important ('Tables' and
+             'Ins'), the short/long int access has been well defined, and
+             ports to platforms with a different endianess has shown that
+             this causes only minor problems which will be removed
+             completely in future versions.
+
+          d. Processor Arithmetic:
+
+             The TrueType specs clearly defines fixed point formats that are
+             fitted for 32-bits 2's complement arithmetic.
+
+             The DOS (Borland Pascal) version of the engine works in 16-bit
+             mode to process 32-bit values which is rather painful (but
+             consider the fact that the Windows 3.11 engine works only on
+             16-bit values and thus has well-known problems when rendering
+             to large scales while printing).
+
+             Unfortunately, any decent implementation would require a great
+             amount of fixed point conversions spread in many parts of the
+             engine. This has not been done yet, so consider FreeType a 2's
+             complement-only project until now...
+             
+
+  - Reliability and Predictable Behaviour:
+
+      This means that in the case of processing a corrupt font file, the
+      engine will react gently by delivering an error message, rather than
+      puking garbage at the screen or at the application's memory space.
+      This is important if one wants to make the engine part of a windowing
+      system (its authors are considering seriously to write a TrueType
+      subsystem for OS/2, and maybe an X11 TrueType font server) and keep
+      it stable.
+
+
+  - High Quality:
+
+      The quality of the rendered glyphs should equal those found on the
+      Windows and Macintosh platforms. This implies an accurate rasterizer
+      (did you ask for *smooth* splines? ;), as well as a real TrueType
+      bytecode interpreter (did you ask for good hinting? ;).
+
+      Most shareware/commercial TrueType libraries do not include both
+      components. Their overall rendering quality is consequently poor to
+      disastrous, especially with small characters.
+
+      The FreeType Engine is currently the only freely available library
+      with support for TT instructions which comes with source code. It will
+      be placed under the GPL when finished.
+
+      NOTE:  Win95-style'a anti-aliasing "technology" is not considered
+             seriously right now.. This being a matter of time, not of
+             competence :-)
+
+
+  - Speed:
+
+      This may surprise the many programmers who think that portable code is
+      forced to be inefficient. The idea is to fine-tune every piece of
+      algorithm found in this engine, as long as it stays on touch with its
+      goals (accuracy, portability, maintainability).
+
+      For example, appropriate research led the rasterizer to become faster,
+      more accurate, and less memory-consuming as time passed. This is
+      Pascal code, with zero, nilch, nada, optimization; however, it
+      flies... just test it!
+
+
+
+II. Engine Architecture:
+
+
+  1. High-level Interface:
+  ------------------------
+
+  The unit 'FreeType.Pas' (or "freetype.h") is the engine's high level
+  #interface. It is the only source that should be used (or include'd in C)
+  by a client application in the final release. It defines a few necessary
+  types.
+
+  2. Component hierarchy:
+  -----------------------
+
+  The engine is made up of a lot of tiny components, each with a
+  well-defined role. A component is simply a Pascal unit (or C source file)
+  which name begins with the prefix 'TT' (or 'tt' for C components). Hence,
+  the 'Types' component is in file 'TTTypes.Pas' (or "tttypes.h" and
+  "tttypes.c").
+
+  We will now describe the components:
+
+    a. Base Components:
+
+      - 'Types':
+            Specification of the engine's most used internal types. It holds
+            no code nor data.
+
+      - 'Error':
+            Definition of common error codes and of the global 'Error'
+            variable.
+
+      - 'Calc':
+            This component holds all the computation  routines needed by the
+            engine. It comes in three flavours: a portable and slow version,
+            as well as two inline assembly optimized versions for the most
+            often used computations (for 16 and 32 bits modes, Intel i386
+            assembly). The C version is only portable (but gcc does
+            wonders!!---if we have time we will implement GNU assembler code
+            too).
+
+      - 'Memory':
+            A very simple component implementing a growing heap with only
+            Alloc/Mark/Release operations. This is by far the simplest and
+            fastest memory management you can find, though it requires a
+            programmer taking care of the orders of allocations. We *do*
+            take care :)
+
+      - 'File':
+            A simple file abstraction component. It could be modified later
+            to support buffered file access or memory-mapped files.
+
+      - 'Disp':
+            This component is not portable but very useful for debugging, as
+            it manages the display to a simple graphics screen (640x480x2
+            and 320x200x256)
+
+      - 'Tables':
+            A simple specification of the TrueType tables types and various
+            functions to load/search/use them.
+
+    b. Advanced Components:
+
+      - 'Raster':
+            This component is the scan-line renderer. It will convert any
+            glyph description into a bitmap. Fast and accurate. Now supports
+            graylevel rendering. This module is not dependent on the rest of
+            the library; it could be e.g. used for a PS rasterizer too.
+
+      - 'Ins':
+
+            The TrueType byte-code interpreter. Still about 5% lacking
+            functionality, and a lot of things to debug...
+
+    c. Test programs:
+
+      - 'Timer':
+            A program used to test the rendering performance of 'Raster'.
+            Define 'VIRTUAL' if you want to enable bitmap display (you will
+            then time both Raster's performance and buffer->VRAM copy).
+
+      - 'Zoom':
+            A simple program used to view any glyph from a TrueType font
+            file. Can scale and rotate them.
+
+      - 'Debug':
+            Still under construction. A full-screen debugger for the
+            byte-code interpreter. We'll dearly need it during development.
+
+            Using Borland's Turbo Vision Windowing Lib it may not make it to
+            a C version, but hey, that's only debugging !!
+
+
+  2. Runtime execution:
+  ---------------------
+
+    a. The Storage Pool:
+
+       Though written in Pascal, the engine has been developed to be as
+       platform, language, and system independent as possible. This simply
+       means two things:
+
+       The features, like File I/O, dependent on a specific runtime library
+       or system have been moved to well chosen modules, which are the only
+       ones that shall be touched to port the engine.
+
+       Moreover, the engine provides its own memory management routines. A
+       client application should allocate a memory block with its own
+       implementation of 'malloc', 'GetMem', or wathever similar function,
+       and pass a pointer and its size at engine elaboration.
+
+       This block is called the Storage Pool, as all engine routines
+       will allocate memory from it.
+
+
+    b. The Interpreter:
+
+      - code ranges:
+
+           To be written.
+
+
+    c. The Rasterizer:
+
+      - pixel coordinates:
+
+          According to the TrueType specifications, all pixel coordinates
+          managed by the rasterizer are in 6 bits fixed float format coded
+          on 32 bits (the famous F26dot6 type).
+
+      - contours:
+
+          A contour is a closed, oriented curve giving the borders of the
+          regions to be filled when rasterizing a glyph. One glyph is
+          commonly described using several contours.
+
+          According to the TrueType specs, contours must be oriented so that
+          the filled region is to the right of the contour orientation.
+          Unfortunately, many freely available fonts do not respect this
+          simple rule! FreeType can handle even such non-standard fonts.
+
+          Contours are given to the rasterizer as sets of segments and
+          simple arcs (second-degree Bezier polynomials).
+
+          They are first converted to sets of "Profiles".
+
+
+      - profiles:
+
+          Put it simply, a "profile" is a contour's portion that can only be
+          either ascending or descending, i.e. it is monotonous in the
+          vertical direction. There is no such thing as a horizontal
+          profile, as we shall see.
+
+          Here are a few examples:
+
+
+          this square
+                                            1         2
+           ---->----     is made of two
+          |         |                       |         |
+          |         |       profiles        |         |
+          ^         v                       ^    +    v
+          |         |                       |         |
+          |         |                       |         |
+           ----<----
+
+                                          up         down
+
+         this triangle
+
+              P2                             1          2
+
+              |\        is made of two       |         \
+           ^  | \  \                         |          \
+           | |   \  \      profiles         |            \      |
+          |  |    \  v                  ^   |             \     |
+            |      \                    |  |         +     \    v
+            |       \                   |  |                \
+         P1 ---___   \                     ---___            \
+                  ---_\                          ---_         \
+              <--__     P3                   up           down
+
+
+
+          A more general contour can be made of more than
+                           two profiles :
+
+             __     ^
+            /  |   /  ___          /    |
+           /   |     /   |        /     |       /     |
+          |    |    /   /    =>  |      v      /     /
+          |    |   |   |         |      |     ^     |
+       ^  |    |___|   |  |      ^   +  |  +  |  +  v
+       |  |           |   v      |                 |
+          |           |          |           up    |
+          |___________|          |    down         |
+
+               <--               up              down
+
+
+          Successive profiles are always joined by horizontal segments that
+          may or may not be visible according to their coordinates.
+
+          Each profile is an array that associates one horizontal *pixel
+          coordinate* to each bitmap *scanline* crossed by the contour's
+          section represented by the profile.
+
+          They are stored in a part of the Storage Pool called the Render
+          Pool.
+
+
+      - table overflow and sub-banding:
+
+           Some glyphs are really made from a good number of profiles, each
+           taking some memory (especially at high resolutions like when
+           rendering to a print bitmap buffer!). As the Storage Pool is
+           limited, the engine can automatically detect a "table overflow"
+           and then reconsider the way it will render the glyph.
+
+           Indeed, in case of overflow, the glyph will be sliced into
+           several horizontal strips, each taking less scanlines than
+           before, with each strip rendered separately. Inspite of this
+           "sub-banding" mechanism the generated bitmap will be exactly the
+           same. It will only take a little while longer for computation.
+
+           Tests have shown that the time taken by the sub-banding process
+           is not exhaustive (typically, a 4kByte Pool will render less than
+           twice slower than a 32kByte Pool!!).
+
+
+       - spans:
+
+           When all profile tables are computed, the glyph is rendered in
+           the destination bitmap. The algorithm used is quite
+           straightforward:
+
+           the vertical axis is swept for the presence of profiles, and
+           spans are drawn joining 'up' and 'down' profiles, sorted in the
+           horizontal direction (see any good book on polygon filling for
+           more details).
+
+           The dropout-control rules, defined in the TrueType specs, are
+           also used in the case of 'small' (i.e. pixel-sized) spans, and
+           an additional sweep of the horizontal axis is added to manage
+           horizontal dropouts when required.
+
+
+       - beziers :
+
+--------------------- Sorry, this document is not finished yet ..

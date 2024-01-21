@@ -1,0 +1,94 @@
+#!/usr/bin/make -f
+#
+# Last modification: Sun, 20 Apr 1997 18:10:41 +0300
+# rules to make pj97n08
+
+package=pj97n08
+index = idx_n08
+base = debian/tmp/usr/doc/pj/$(package)
+#
+# this is maybe out of debian's standards ???
+journal = debian/tmp/usr/doc/pluto-journal
+issue = $(journal)/$(package)
+
+
+build:
+	$(checkdir)
+	touch build
+
+clean:
+	$(checkdir)
+	-rm -f build
+	cd debian; for file in {pre,post}{inst,rm}; do \
+		if [ -s $$file.tpl ]; \
+		then rm -f $$file ; \
+		fi; \
+	done;
+	-rm -f `find . -name "*~"`
+	-rm -rf debian/tmp debian/files* core debian/substvars
+
+binary-arch:	checkroot build
+	$(checkdir)
+
+binary-indep:	checkroot build
+	$(checkdir)
+	-rm -rf debian/tmp
+	install -d -g root -m 755 -o root debian/tmp/DEBIAN
+	install -d -g root -m 755 -o root $(base)
+	install -d -g root -m 755 -o root $(issue)/images
+	install -d -g root -m 755 -o root $(issue)/.indexes
+	#
+	# populate the {issue} dirs
+	#
+	# build the html files (index.html in postinst)
+	# (executes in ./html )
+	# REQUIRES journal-dev
+	#
+	j_mkhtml ./html ../$(issue)
+	for file in `ls .indexes/*`; do \
+		j_latin2html $$file $(issue)/$$file; \
+	done
+	sed 's/href=[^>]*>/>/g' $(issue)/.indexes/$(index).full \
+				>$(issue)/.indexes/$(index).blind
+	#
+	cp -r images $(issue)
+	ln -s ../../images/minilogo.gif $(issue)/images
+	#
+	# hack to change background color in sgml.html article :-)
+	#
+	mv $(issue)/sgml.html $(issue)/sgml.tmp
+	sed 's/<body bgcolor="#ffffff">/<body bgcolor=white text=blue>/' \
+		$(issue)/sgml.tmp > $(issue)/sgml.html
+	rm -f $(issue)/sgml.tmp
+	#
+	# install pre,post-inst,rm templates.
+	cd debian; for file in {pre,post}{inst,rm}; do \
+		if [ -s $$file.tpl ]; \
+		then	sed  -e 's/@@pkg@@/\$(package)/g'       \
+			-e 's/@@idx@@/\$(index)/g'      \
+			$$file.tpl >$$file;        \
+		fi;     \
+	done
+	#
+	debstd 
+	dpkg-gencontrol
+	chown -R root.root debian/tmp
+	chmod -R go=rX debian/tmp
+	dpkg --build debian/tmp ..
+
+define checkdir
+	test -f html/html.list  -a -f debian/rules
+endef
+
+# Below here is fairly generic really
+
+binary:		binary-indep binary-arch
+
+source diff:
+	@echo >&2 'source and diff are obsolete - use dpkg-source -b'; false
+
+checkroot:
+	$(checkdir)
+	test root = "`whoami`"
+
+.PHONY: binary binary-arch binary-indep clean checkroot

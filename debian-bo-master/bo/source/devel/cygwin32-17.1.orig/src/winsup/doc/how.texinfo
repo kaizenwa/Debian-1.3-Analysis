@@ -1,0 +1,381 @@
+@chapter Question and Answer
+
+@section What is V ?
+
+(excepted from @file{http://www.cs.unm.edu/~wampler/aboutv.html})
+
+V is a portable C++ GUI Framework intended to develop a wide variety of
+applications on different graphical interface platforms. While it is
+probably not suitable for developing state-of-the art commercial
+applications with all the latest interface components, it is very
+complete and suitable for a large majority of custom GUI applications.
+Applications developed using V will have the look and feel of the native
+platform, yet will be portable across platforms.
+
+Most standard GUI objects are supported by V, including windows with
+menus, status bars, tool bars, and a drawing canvas; modal and modeless
+dialogs with the most common controls (buttons, lists, labels, text
+entry, check and radio buttons, etc.); and portable printing support.
+
+...
+
+V is also an excellent tool for developing many custom applications. It
+is a suitable tool for research labs, small custom software shops,
+engineering firms, or individuals that need to develop an application
+that needs a graphical user interface, especially for multiple
+platforms. Because of its design, V is far easier to learn and use than
+the native GUI tool kits. It is also easier to learn than larger
+frameworks such as MFC or OWL.  Since it is freeware, licensed under the
+GNU Library General Public License, it will always be available with its
+source code for public use.
+
+@section How does the new wildcarding (globbing) work.
+
+If an application using CYGWIN.DLL starts up, and can't find the
+@code{PID} environment variable, it assumes that it has been started
+from the a DOS style command prompt.  This is pretty safe, since the
+rest of the tools (including bash) set PID so that a new process knows what PID it has
+when it starts up.
+
+If the DLL thinks it has come from a DOS style prompt, it runs a `globber' over the
+arguments provided on the command line.  This means that if you type
+@code{LS *.EXE} from DOS, it will do what you might expect.
+
+Beware:  globbing uses @code{malloc}.  If your application defines @code{malloc}, that
+will get used.  This may do horrible things to you.
+
+@section What's this new net support stuff ?
+
+A tiny bit of Berkeley style networking is in the DLL.  Only finger
+and ftp work properly on my NT box now.  They don't work quite right on
+on Windows 95.
+
+@section Why can't I build the demos ?
+
+All you should need is /usr/bin in your path and a copy of 
+sh.exe in /bin.
+
+Bash likes to have a /tmp directory too.
+
+If the error you see is
+@example
+make: *** No target specified and no makefile found.  Stop
+@end example
+
+Then you are probably using Windows 95.  Use @code{make -f makefile}.
+
+You'll probably also get an error trying to find the C++ include files.
+Just add them explictly on your compile line, eg @code{gcc -I/usr/lib/g++-include ...}
+
+If the error you get is
+@example
+ld: cannot open -lcygwin: No such file or directory
+@end example
+
+Then you've probably unpacked the release using an unzipper which
+doesn't know about long filenames.  Either get a more recent unzipper,
+or rename lib/libcygwi.a lib/libcygwin.a. (It's probably better to
+upgrade your unzipper, since there are dozens of files which will have
+had their names truncated)
+
+@section How do I get to the floppy drives ?
+
+If the floppy is in a standard format, then you can just mount it,
+and it will become visible.
+
+eg
+@example
+bash$ mount a:/ /mnt/floppy
+bash$ ls /mnt/floppy
+....
+@end example
+
+If you want to write to the raw device, then use @code{/dev/fd0} for drive A or
+@code{/dev/fd1} for drive B.
+
+eg
+@example
+bash$ tar cf /dev/fd0 *.exe
+bash$ tar tvf /dev/fd0
+....
+@end example
+
+@section How do I build a DLL ?
+
+There's a demo of how to do it in the demo/makefile file.
+
+@section My old gnu-win32 programs don't work with bash/make/etc
+
+Sorry, that's just the way it is.  There is a dependency 
+between the DLL and the crt0.o which is linked into every gnu-win32
+application.  That interface doesn't change too often, but when
+it does everything should be relinked.
+
+You can run non-gnu32 applications from within bash.
+
+@section When it hangs, how do I get it back ?
+
+Sometimes the tools will just stop, (easy to do
+if you try and read a file called aux.sh).  To get your
+world back you can ^C a lot, and eventually you'll get
+to bash or the dos prompt.  
+
+If you start up another shell, and applications don't run,
+it's a good bet that the hung process is still running somewhere.
+
+If you have pview, fire it up and kill it. (if it's the aux
+thing, then the app will probably be cp).  If you don't have
+pview or an equivalent then you'll probably have to log out.
+
+@section How is the DOS/Unix CR/LF thing handled.
+
+
+By default, the tools are in unix binary mode. 
+
+You can enable the DOS CR/LF end of line in a text file mode by
+setting fmode_binary setting in the registry to 0.  I've tried to keep
+the file types 'natural'.  By default a file is opened in text mode.
+This can be changed by adding @code{O_BINARY} to the second argument of
+an @code{fopen} call, or @code{"b"} to second argument of an
+@code{fopen} call.
+
+@code{lseek} works on text files, but it's very inefficient.  
+
+@section How do I make files with base relocations ?
+
+LD is able to generate the reloc information, but it doesn't do it 
+by default.  With the current scheme, it would require another
+pass by dlltool and the linker, and will always make images bigger.
+
+If you want reloc info, you'll have to do something like:
+
+@example
+gcc -o foo.o foo.c
+gcc -o bar.o bar.c
+
+ld -s -o foo.jnk --base-file foo.base foo.o bar.o
+dlltool --dllname foo.exe --base-file foo.base --output-exp foo.exp
+ld -s -o foo.exe foo.o bar.o foo.exp 
+@end example
+
+The first link is just enough to work out where the relocs will be
+needed, and puts the list into foo.base.  Then dlltool will read this
+and generate foo.exp, which contains the reloc data. The second link
+will tie it all together again.
+
+
+@section How can I debug what's going on ?
+
+You can debug your application using GDB.  If the problem
+is inside the Unix emulation DLL, then you can 
+@code{set strace=1}, and get a whole load of debug stuff on your
+screen when a app runs.  @code{strace} is a bit map - a value of 1 turns
+everything on, @code{4} enables system clall printing, etc etc (look in 
+@code{winsup/include/sys/strace.h} for more info.
+
+If you're running bash, then you can @code{export STRACE=1}, and any processes
+forked will tell you what they think.
+
+@section How to you get to other disks ?
+
+You can mount them using the 'mount' command.  Eg, to get to a share
+
+@example
+$ mount i:/a /a
+$ mount 
+i:\a on /a type dos (normal)
+c:\ on / type dos (normal)
+@end example
+
+This is done with textual substitution whenever a file is opened.
+So if you're going to do @code{ls /a/bar} on a mount like the above
+the guts will turn that into @code{ls i:/a/bar}.
+
+The '-m' option tells mount that you want to enable the mixed case filename
+mode.
+
+If you want to put the release onto a drive that's not drive 'C', then you
+@emph{have} to use the @code{mount} command if you want to make progress.
+
+Eg, assume that you've installed the tree into @code{f:/fish}, so that the binaries
+live in @code{f:/fish/bin} etc etc.
+@example
+$ mount f:/fish /usr
+@end example
+This means that when you type @code{ls /usr/bin}, CYGWIN.DLL will look in
+@code{f:/fish/bin}.
+
+@section Using mixed case filenames
+
+Many unix programs expect to be able to use to filenames
+spelt the same way, but with different case.  A prime example
+of this is perl's configuration script, which wants @code{Makefile} and
+@code{makefile}.  WIN32 can't tell the difference between files with
+just different case, so the configuration fails.
+
+You can get round this if you enable the 'mixed' mount attibute.
+
+When this is enabled, cygwin32 will put a '^' sign in filenames
+where the case changes. You could create @code{Foo} and @code{FOO},
+and in the the files @code{^f^oo} and @code{^foo} will be in the
+directory behind the curtain.
+
+How these things are named behind the scenes isn't a problem if
+you live your life inside an application written on top of cygwin32,
+but if you want to move between cygwin32 and 'real life', you may
+be better off not enabling this switch.
+
+If you install the stuff with the switch disabled, and then enable it,
+you won't be able to do some things.  Eg, if you have
+@code{/usr/include/_G_config.h} and then turn on mixed case pathnames in
+that directory, you'll won't be able to get to @code{_G_config.h}
+anymore.  This is because when you ask for @code{_G_config.h}, cygwin32
+will turn that into a request for @code{_^G_^config.h}, which doesn't
+exist.
+
+You can get around this by mounting two directory trees, one 'mixed' and one
+not, and juggling the files around.
+
+I'd say that it probably isn't worth the pain.  
+
+@section How to you do symbolic links ?
+
+CYGWIN.DLL generates link files with a magic header.  When 
+you open a file which is a link to somewhere else, it follows
+the magic.  The magic isn't everywhere - so you can't execute
+a link or follow it as a directory.
+
+@section The linker complains that it can't find something.
+
+A common error is to put the library on the command line before
+the thing that needs things from it.
+
+This is wrong @code{gcc -lstdc++ hello.cc}.
+This is right @code{gcc hello.cc -lstdc++}.
+
+
+
+@section I use a function I know is in the API, but I still get a link error.
+
+The function probably isn't declared in the header files, or
+the UNICODE stuff for it isn't filled in.
+
+@section Can you make dll's that are linked against libc ?
+
+Yes.
+
+@section Why does bash say "foo: command not found"
+
+It can't find the command.  Either you spelt the name
+of the command wrong, or you don't have the command in your
+path.  This is a particularly common problem when you
+don't install onto drive 'C'.   In this case, you have
+to mount the drive you did install the tools on, so that
+the tools can see themselves.  Eg, if you install into E:\usr\bin,
+@example
+mount e:/usr /usr
+@end example
+From that point onwards, the tools will know that any reference
+to something in /usr/bin should come from e:/usr.
+
+
+@section What does the error @code{BASH.EXE ./<filename>: (null)}
+
+This is bash's way of telling you that you haven't copied /usr/bin/bash.exe
+to /usr/bin/sh.exe and /bin/sh.exe.
+
+@section Bash says that it can't fork (or just hangs) - why ?
+
+Most often this is because it can't find itself in the path.  Make sure that
+your path includes the directory where bash lives, before you start it.
+
+If you get errors like 'no such file or directory' when you're trying
+to run a shell script, which you know is there, then your problem probably
+that bash can't find @code{/bin/sh}.
+
+@section Why do some files, which are not executables have the 'x' type.
+
+When working out the unix-style attribute bits on a file, the library
+has to fill out some information not provided by the WIN32 API.  
+
+It guesses that files ending in .exe and .bat are executable, as are
+ones which have a "#!" as their first characters.
+
+
+@section How does it do it ?
+
+There's a C library which provides a Unix style API.  The applications
+are linked with it and voila - they run on Windows.  
+
+The aim is to add all the goop necessary to make your apps run on
+Windows into the C library.  Then your apps should run on Unix and
+Windows with no changes at the source level.
+
+The C library is in a DLL, which makes basic applications quite small.
+And it allows painless upgrades to the Win32/Unix translation layer.
+
+@section Why won't you/the mailing list answer my questions ?
+
+Perhaps the question has been answered already. Check out the
+mailing list archive for clues @file{http://www.cygnus.com/ml/gnu-win32}.
+
+Perhaps your question has an answer that's already in the FAQ.
+
+@section Tell me more about the net stuff
+
+The network support in cygwin32 is supposed to provide the Unix API, not
+the winsock API.
+
+There are differences between the semantics of functions with the same
+name under the API.
+
+Eg, the select system call on Unix can wait on a standard file handles
+and handles to sockets.  The select call in winsock can only wait on
+sockets.  Because of this, cygwin.dll does a lot of nasty stuff behind
+the scenes, trying to persuade various winsock/win32 functions to do what
+a Unix select would do.
+
+If you are porting an application which already uses winsock, then
+using the net support in cygwin32 is wrong.
+
+But you can still use native winsock, and use cygwin32.  I've named
+all the functions which cygwin.dll exports 'cygwin32_<name>'.  There
+are a load of defines which map the standard Unix names to the names
+exported by the dll - check out include/netdb.h..
+
+@example
+..etc..
+void		cygwin32_setprotoent (int);
+void		cygwin32_setservent (int);
+void		cygwin32_setrpcent (int);
+..etc..
+#ifndef __INSIDE_CYGWIN_NET__
+#define endprotoent cygwin32_endprotoent 
+#define endservent cygwin32_endservent 
+#define endrpcent  cygwin32_endrpcent  
+..etc..
+@end example
+
+The idea is that you'll get the Unix->cygwin32 mapping if you include
+the standard Unix header files.  If you use this, you don't need to
+link with libwinsock.a - all the net stuff is inside the dll.
+
+There is no need for a your-app->winsock mapping, just include
+winsock.h (which I left out of the distribution - sorry) and link
+against libwinsock.a.
+
+The mywinsock.h file is a standard winsock.h which I've hacked to
+remove the bits which conflict with the standard Unix API, or are
+defined in other headers.  Eg, in mywinsock.h, the definition of
+struct hostent is removed.  This is because on a Unix box, it lives in
+netdb.  It isn't a good idea to use it in your applications.
+
+
+
+
+
+
+
+
+
+

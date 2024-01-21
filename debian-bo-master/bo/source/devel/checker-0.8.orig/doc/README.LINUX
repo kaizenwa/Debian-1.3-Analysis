@@ -1,0 +1,228 @@
+Checker V0.7  (c) 1993,1994,1995 Tristan Gingold
+
+If you don't know what Checker is, please read the INTRO file.
+This file concerns the i[345]86-Linux users.
+NOTE: Two "versions" of Checker are available on Linux:
+	* the a.out version
+	* the ELF version
+      As you can imagine, the a.out version only works with a.out binaries
+      and the ELF version only works with ELF binaries.
+
+
+How do I compile Checker?
+ See INSTALL file.
+
+What's in the patches dir?
+ The patches directory contains changed files from packages used to build
+ tools in Checker. See the patches/README file for more information 
+ concerning these changes.
+ 
+ You don't actually have to build a new GAS or the other tools checker
+ uses, but the patches are there should you decide to.
+
+Questions and Answers:
+----------------------
+How can Checker be used ?
+
+  Checker can be used in tree ways:
+
+   libmdchecker.a is a dropin replacement for the standard malloc of libc.
+   Just insert /usr/lib/checker/libmdchecker.a in your link
+   command. This malloc will show some misuse of malloc and free
+   such as freeing a block twice, or a bloc which was never
+   malloced. libmdchecker.a feature also other capabilities such
+   as a mean to locate orphan block (block never freed). You have to create
+   libmdchecker.a with 'make libmdchecker.a'. Use it as a standard library:
+   % gcc -o my_prog my_prog.o -lm libmdchecker.a
+   You must have a patched vesion of ld.so. See Checker/bin/README
+
+   plchecker.o can be used as a preloaded object. To use it, just do:
+   % setenv LD_PRELOAD /my_path/plchecker.o
+   % ls (or any program)
+   You have to create plchecker.o with 'make plchecker.o'.  You also must
+   have installed the patched version of ld.so. See Checker/bin/README
+
+   The last way is to compile all the code in a program with
+   checkergcc.  To do this, the modified versions of as and ld must be
+   installed.  Checker will insert code into the compiled program to
+   validate all memory references.  Simply execute the result and
+   watch the show.  See the examples in testsuite/*.c
+
+Is it possible to use Checker on some part of a project, by
+only recompiling some sources and not others?
+   Yes, though this disables a large number of checks.  If there is
+   any part of a program which is not compiled with Checker, it
+   cannot tell whether certain types of memory locations are valid or
+   not.
+
+
+What does the environment variable CHECKEROPTS do?
+How can I control the behavior of Checker at run time?
+
+   The environment variable CHECKEROPTS and the file ~/.checker may be
+   used to give Checker a set of options.  These options are read by
+   the Checker library when a Checker-compiled program is run.
+
+   To set CHECKEROPTS with csh, use: setenv CHECKEROPTS "..."
+   To set CHECKEROPTS with sh, use:  export CHECKEROPTS="..."
+
+   Options are:
+	-s --silent          Do not print the welcome message.
+	-q --quiet           Same as --silent.
+	-a --abort           Abort on startup.
+	-h --help            Print this message.
+	-n --nosymtab        Do not use symbol table.
+	-o=file --output=file  Redirect Checker's output to 'file'.
+	-i=file --image=file Set the image file (Checker finds it for you)
+	-p --profile         Display profile information.
+	-d=xx --disable=xxx  Disable an address or a range of addresses.
+	-S --stop            Stop just before main.
+	-D=end --detector=end    Do leak detection at the end of the program.
+	-m=a --malloc0=a     Set the behavior of malloc(0). 'a' can be:
+				'warning' != 'no-warning': display a warning
+				'0': ANSI behavior: returns 0.
+				'1': malloc(0) is treated as malloc(1).
+	-v --verbose         Verbose
+        -u=end --inuse=end   Do inuse at the end.
+         --sig-warn=sig      Emit a warning when sig is caught
+   
+
+How do I use the ~/.checker file?  
+
+   ~/.checker is composed of groups of options, separated by a blank line.
+   Every group begins with a line of filenames separated by a '|', without
+   any blanks.  Then follow lines of options, each line of options begins
+   with a tab.
+
+   Lines starting with the '#' character are comments.
+
+   A filename matches the program name if:
+	o  the filename is the full path of the program 
+	   (ignoring occurrences of ./ ../ and // in the full path)
+        o  the filename is argv[0]
+	o  the filename is the last component of argv[0]
+	o  the filename is "default"
+
+   Example:
+	# a comment
+	try|./try
+		--help
+
+	/tmp/try
+		-S
+
+	default
+	# set --profile
+		-p --detector=end
+
+   If a program is run with './try', options '-p', '--detector' and '--help'
+   will be used.  Moreover, if the program is in '/tmp', the '-S' option
+   will also be enable.
+
+
+How do I disable certain types of memory access error?
+
+   Use the '-d=aaa' or '--disable=aaa' option in the CHECKEROPTS
+   environment variable or the ~/.cheker file.  'aaa' is the the error
+   type, which consists of three lower-case letters.  When Checker
+   reports a memory access error, in includes the error's type in
+   parenthesises before the description of the error.
+
+   The error types are:
+	(iei) internal error: instruction unknown.
+	(nza) null zone addressed.
+	(wro) write/modify read-only byte(s).
+	(bvh) block bounds violation in the heap.
+	(rfb) read in a free block.
+	(wfb) write/modify a free block.
+	(ruh) read uninitialized byte(s) in a block.
+	(rus) read uninitialized byte(s) in the stack.
+	(rsz) read on a red zone in the stack.
+	(wzs) write on a red zone in the stack.
+	(wus) modify uninitialized byte(s) in the stack.
+	(mzs) modify a red zone in the stack.
+	(nma) no memory addressed.
+	(bvm) bounds violation in mapped memory.
+	(apd) access permission denied in mapped memory.
+	(wrs) write in a read-only shared memory.
+	(zne) zone not executable.
+	(sbv) segment bound violation.
+	(fba) free called with an address not obtained from malloc.
+	(ffb) free an already free block.
+	(sba) sbrk called with a bad offset.
+	(fbm) free called before malloc.
+	(oom) warning: virtual memory exhausted.
+	(mna) memalign called with a null alignment.
+	(mba) alignment is not a power of 2.
+	(ieb) internal error while checking.
+	(bbs) bad bytes_per_state value. Used default value.
+	(bkc) brk/sbrk has been called.
+	(oos) out of system memory.
+	(brs) bad red zone size.
+	(tms) too many signal catched at the same time.
+	(ies) internal error: can't check this syscall.
+	(bfd) file descriptor reserved by Checker is used.
+	(sfd) the system has resturned a file descriptor reserved by Checker.
+	(ick) internal check.
+
+When I link Checker with my program, I get a link error:
+"Undefined symbol chkr_?_?_?_?_chkr referenced from text segment",
+where the '?' are numbers.
+
+   Send me mail about the omission so I can fix it in the next release.
+
+When I kill a program linked with Checker, some files are left in /tmp.
+
+   Checker creates some temporary files in /tmp containing the symbol
+   tables from the program.  Checker usually deletes the files on
+   program exit, but sometimes it doesn't get a chance to.  These
+   files may be safely removed.
+
+Why not open this file and immediatly unlink() it?
+   
+   Imagine the user close this fd and reopen it...
+
+What is 'symctl' ?
+
+   The program (symctl) controls which symbols are exported from an
+   object file.  This is used by libchecker.o to prevent some
+   internally used non-instrumented functions, such as 'strcmp', from
+   being used by the instrumented program.
+
+What are the new options of GAS?
+
+   Try /usr/(local)/lib/checker/as --help
+
+
+Sometimes Checker detects a memory access error in a libc.a function. Does 
+this mean the libc.a library is buggy? 
+
+   This is possible, but it more likely that a libc function was
+   called with a bad pointer.
+
+
+How to use other languages:
+
+   Compile Checker with 'make LANG=French'
+
+   Currently, only the French and English languages are implemented.
+   If you want to use yet another language, create a new directory in
+   ./config, copy the files from (e.g.) English, and translate them.
+
+
+What is insertor?
+
+   Insertor will be a new way to insert code: it will read a .o file
+   and directly insert the instrumentation code. It is not finished.
+
+
+I can't link a checkered program with libxxx.a ?
+
+   If libxxx.a is yours, and has been compiled with Checker, rename it
+   to libxx.chkr.a
+
+   If libxxx.a is a standard library, see previous questions.
+
+How would I port Checker to another system?
+
+   See doc/checker.texi for more information.

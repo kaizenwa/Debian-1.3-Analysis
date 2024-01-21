@@ -1,0 +1,107 @@
+#! /usr/bin/make -f
+#
+# Last updated: Sat Dec 17 10:52:20 EST 1994 by imurdock.
+#
+# To make the binary distribution package, the ``Debianized'' source package
+# and the context diff to the original package, type `./debian.rules dist'.
+# Make sure that `debian.rules' is executable before the final distribution
+# is made.
+#
+# Invoke each target with `./debian.rules <target>'.  All targets should be
+# invoked with the package root as the current directory.
+#
+# The `binary' target must be run as root, as it needs to install files with
+# specific ownerships.  The `diff' target assumes that you have the original
+# source package available, unpacked, in ../$(p)-$(v).orig, or that you have
+# the previous revision of the ``Debianized'' source package and context diff
+# in the parent directory.
+
+CC = gcc
+CFLAGS = -O2
+LDFLAGS = -s
+
+# The name of the package (for example, `emacs').
+p = elisp-manual
+# The version of the package (for example, `19.28').
+v = 19-2.4
+# The Debian revision of the package (for example, `2').
+d = 2
+
+INSTALL_PROGRAM= install -s -g root -m 755 -o root
+INSTALL_DIR= install -d -g root -m 755 -o root
+INSTALL_DATA= install -g root -m 644 -o root
+
+build:
+# Builds the binary package.
+	makeinfo elisp.texi
+	touch stamp-build
+
+clean:
+# Undoes the effect of `make -f debian.rules build'.
+	rm -f stamp-build
+	rm -rf debian-tmp
+
+binary:
+# Makes a binary package.
+	rm -rf debian-tmp
+	test -f stamp-build || make -f debian.rules build
+	$(INSTALL_DIR) debian-tmp
+	chmod g-s debian-tmp
+	$(INSTALL_DIR) debian-tmp/DEBIAN
+	$(INSTALL_DIR) debian-tmp/usr/info
+	$(INSTALL_DATA) elisp elisp-* debian-tmp/usr/info
+#	for file in elisp elisp-1 elisp-10 elisp-11 elisp-12 elisp-13     \
+#		    elisp-14 elisp-15 elisp-16 elisp-17 elisp-18 elisp-19 \
+#		    elisp-2 elisp-20 elisp-21 elisp-22 elisp-23 elisp-24  \
+#		    elisp-25 elisp-26 elisp-27 elisp-28 elisp-29 elisp-3  \
+#		    elisp-30 elisp-31 elisp-32 elisp-33 elisp-34 elisp-35 \
+#		    elisp-36 elisp-37 elisp-38 elisp-39 elisp-4 elisp-40 \
+#		    elisp-41 elisp-5 elisp-6 elisp-7 elisp-8 elisp-9; \
+#	do \
+#	  install -g root -m 644 -o root $$file debian-tmp/usr/info/$$file; \
+#	done
+	$(INSTALL_DIR) debian-tmp debian-tmp/usr/doc/copyright
+	$(INSTALL_DATA) debian.README debian-tmp/usr/doc/copyright/$(p)
+#	rm -f debian-tmp/usr/info/elisp*.gz
+	gzip -9f debian-tmp/usr/info/elisp*
+	sed -e '2s/=/$(v)-$(d)/' debian.control >debian-tmp/DEBIAN/control
+	chmod 644 debian-tmp/DEBIAN/control
+	$(INSTALL_PROGRAM) debian.postinst debian-tmp/DEBIAN/postinst
+	$(INSTALL_PROGRAM) debian.prerm debian-tmp/DEBIAN/prerm
+	dpkg --build debian-tmp && dpkg-name -o -s .. debian-tmp.deb
+
+source:
+# Makes a source package.
+	-test -f stamp-build && make -f debian.rules clean
+	( cd .. && tar cf - $(p)-$(v) | gzip -9f > $(p)-$(v)-$(d).tar.gz )
+
+diff:
+# Makes a context diff.
+	-test -f stamp-build && make -f debian.rules clean
+	-test -d ../$(p)-$(v).orig -o -f ../$(p)-$(v)-`expr $(d) - 1`.diff.gz \
+	  || ( echo "Original source package is not available." ; false )
+	-test -d ../$(p)-$(v).orig || make -f debian.rules orig
+	( cd .. && diff -cNr $(p)-$(v).orig $(p)-$(v) | gzip -9f \
+	  > $(p)-$(v)-$(d).diff.gz )
+	-test -f stamp-orig \
+	  && rm -rf ../$(p)-$(v).orig && rm -f stamp-orig
+
+dist: binary source diff
+# Prepares the package for distribution.
+
+orig:
+# Prepares the original package from the previous
+# Debian revision source package and context diff.
+	( cd .. \
+	  && mkdir $(p).orig \
+	  && cd $(p).orig \
+	  && tar xzf ../$(p)-$(v)-`expr $(d) - 1`.tar.gz \
+	  && cd $(p)-$(v) \
+	  && ( zcat ../../$(p)-$(v)-`expr $(d) - 1`.diff.gz \
+	    | patch -sER -p1 ) \
+	  && find . -name "*.orig" -exec rm -f {} \; \
+	  && cd .. \
+	  && mv $(p)-$(v) ../$(p)-$(v).orig \
+	  && cd .. \
+	  && rmdir $(p).orig )
+	touch stamp-orig

@@ -1,0 +1,167 @@
+############################################################################
+#
+#	File:     numbers.icn
+#
+#	Subject:  Procedures to format and convert numbers
+#
+#	Author:   Ralph E. Griswold, Tim Korb, and Robert J. Alexander
+#
+#	Date:     July 15, 1995
+#
+############################################################################
+#
+#     These procedures format numbers in various ways:
+#
+#     commas(s)		inserts commas in s to separate digits into groups of
+#			three.
+#
+#     digred(i)		reduction of number by adding digits until one digit is
+#			reached.
+#
+#     div(i, j)		produces the result of real division of i by j.
+#
+#     fix(i, j, w, d)	formats i / j as a real (floating-point) number in
+#			a field of width w with d digits to the right of
+#			the decimal point, if possible. j defaults to 1,
+#			w to 8, and d to 3. If w is less than 3 it is set
+#			to 3. If d is less than 1, it is set to 1. The
+#			function fails if j is 0 or if the number cannot
+#			be formatted.
+#
+#     roman(i)		converts i to Roman numerals.
+#
+#     spell(i)		spells out i in English.
+#
+#     unroman(s)	converts Roman numerals to integers.
+#
+############################################################################
+
+procedure commas(n)		#: insert commas in integer
+
+   if *n < 4 then return n
+   else return commas(left(n,*n - 3)) || map(",123","123",right(n,3))
+
+end
+
+procedure digred(i)		#: sum digits of integer
+   local j
+
+   until *i = 1 do {
+      j := 0
+      every j +:= !i
+      i := j
+      }
+
+   return i
+
+end
+
+procedure div(i, j)		#: real division
+
+   return i / real(j)
+
+end
+
+procedure fix(i,j,w,d)		#: format real number
+   local r, int, dec
+
+   /j := 1
+   /w := 8
+   /d := 3
+   if j = 0 then fail
+   w <:= 3
+   d <:= 1
+   r := real(i) / j
+
+   int := dec := "0"				# prepare for small number
+
+   if not(r < ("0." || repl("0", d - 1) || "1")) then {	# formats as zero
+      string(r) ? {
+         if upto('eE') then fail		# can't format
+         if int := tab(find(".")) then {
+            move(1)
+            dec := tab(0)
+            }
+         }
+      }
+
+   return right(int || "." || left(dec, d, "0"), w)
+
+end
+
+#  This procedure is based on a SNOBOL4 function written by Jim Gimpel.
+#
+procedure roman(n)		#: convert integer to Roman numeral
+   local arabic, result
+   static equiv
+
+   initial equiv := ["","I","II","III","IV","V","VI","VII","VIII","IX"]
+
+   integer(n) > 0 | fail
+   result := ""
+   every arabic := !n do
+      result := map(result,"IVXLCDM","XLCDM**") || equiv[arabic + 1]
+   if find("*",result) then fail else return result
+
+end
+
+procedure spell(n)		#: spell out integer
+   local m
+
+   n := integer(n) | stop(image(n)," is not an integer")
+   if n <= 12 then return {
+      "0zero,1one,2two,3three,4four,5five,6six,7seven,8eight,_
+         9nine,10ten,11eleven,12twelve," ? {
+            tab(find(n))
+            move(*n)
+            tab(find(","))
+            }
+      }
+   else if n <= 19 then return {
+      spell(n[2] || "0") ?
+         (if ="for" then "four" else tab(find("ty"))) || "teen"
+      }
+   else if n <= 99 then return {
+      "2twen,3thir,4for,5fif,6six,7seven,8eigh,9nine," ? {
+         tab(find(n[1]))
+         move(1)
+         tab(find(",")) || "ty" ||
+            (if n[2] ~= 0 then "-" || spell(n[2]) else "")
+         }
+      }
+   else if n <= 999 then return {
+      spell(n[1]) || " hundred" ||
+         (if (m := n[2:0]) ~= 0 then " and " || spell(m) else "")
+      }
+   else if n <= 999999 then return {
+      spell(n[1:-3]) || " thousand" ||
+         (if (m := n[2:0]) ~= 0 then " and " || spell(m) else "")
+      }
+   else if n <= 999999999 then return {
+      spell(n[1:-6]) || " million" ||
+         (if (m := n[2:0]) ~= 0 then " and " || spell(m) else "")
+      }
+   else fail
+
+end
+
+procedure unroman(s)		#: convert Roman numeral to integer
+   local nbr,lastVal,val
+   nbr := lastVal := 0
+   s ? {
+      while val := case map(move(1)) of {
+	 "m": 1000
+	 "d": 500
+	 "c": 100
+	 "l": 50
+	 "x": 10
+	 "v": 5
+	 "i": 1
+	 } do {
+	 nbr +:= if val <= lastVal then val else val - 2 * lastVal
+	 lastVal := val
+	 }
+      }
+   return nbr
+end
+

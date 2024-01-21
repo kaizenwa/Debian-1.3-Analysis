@@ -1,0 +1,155 @@
+SHELL=/bin/sh
+.SUFFIXES: .c .0
+
+####################################################################################################
+# History File Configuration Stuff
+####################################################################################################
+
+# Step1: Define the location of the History file(s)
+HISTORYF=/usr/lib/news/history
+
+# Step 2: Define ONE of the CHKHISTORY 
+CHKHISTORY=chkhistory.o		# use flat file history routine
+#CHKHISTORY=chkhistory_db.o	# use DB history routine, if you use DBM, NDBM, or DBZ
+
+# If you are using flat file, you can skip the rest, they don't matter
+
+# Step 3: Define ONE of the Database Types
+#DB_TYPE=-DUSE_DBM
+#DB_TYPE=-DUSE_NDBM
+#DB_TYPE=-DUSE_DBZ
+
+# Step 4: Define ONE Library that contains the functions
+#DB_LIB=-ldbm
+#DB_LIB=-lndbm
+#DB_LIB=-ldbz
+#DB_LIB=-linn
+
+# Step 5: IF your DB Library/Includes are in a non-standard place, define These
+#DB_INC_LOC=-I/usr/src/inn/include
+#DB_LIB_LOC=-L/usr/src/inn/lib
+
+########################################################################################################
+# COMPILE flags for GCC
+# IF you are not using GCC comment this out 
+########################################################################################################
+
+GCC_FLAGS =  -fno-strength-reduce -Wall -Wpointer-arith -Wcast-align -Wcast-qual -Wtraditional -Wshadow\
+  -Waggregate-return -Wmissing-prototypes -Wnested-externs -Wstrict-prototypes -Wwrite-strings \
+  -Wmissing-declarations -ansi -pedantic
+
+#####################################################################################################
+# YOU SHOULD NOT NEED TO TOUCH BELOW HERE
+#####################################################################################################
+
+# Ultrix 2.2 make doesn't expand the value of VPATH.
+VPATH = @srcdir@
+# This must repeat the value, because configure will remove `VPATH = .'.
+srcdir = @srcdir@
+
+# Suck Makefile
+PKGNAME=suck
+VERSION_MAJOR=3
+VERSION_MINOR=4
+VERSION_PATCH=1
+VERSION=$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_PATCH)
+DVERSION=-DSUCKVER=$(VERSION_MAJOR) -DSUCKVER_MINOR=$(VERSION_MINOR) -DSUCKVER_PATCH=$(VERSION_PATCH)
+
+CC = @CC@
+INSTALL = @INSTALL@
+
+CFLAGS = @CFLAGS@
+CPPFLAGS = -I. -I$(srcdir) @CPPFLAGS@
+LDFLAGS = @LDFLAGS@ 
+DEFS = @DEFS@ -DHISTORY_FILE=\"$(HISTORYF)\" $(DB_TYPE)
+LIBS = @LIBS@ 
+
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = $(exec_prefix)/bin
+manext = 1
+mandir = $(exec_prefix)/man/man$(manext)
+srcdir = @srcdir@
+MAN = $(srcdir)/man
+
+INSTALL = @INSTALL@
+INSTALL_DATA = @INSTALL_DATA@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+
+#List of .o files suck needs to compile:
+suckobjs = both.o both_phrases.o suck.o suckutils.o killfile.o timer.o killprg.o dedupe.o suck_phrases.o $(CHKHISTORY)
+rpostobjs = both.o both_phrases.o rpost.o rpost_phrases.o
+testhobjs = both.o both_phrases.o testhost.o test_phrases.o
+makepobjs = makephrases.o suck_phrases.o rpost_phrases.o test_phrases.o both_phrases.o
+ 
+all: phrases.h suck rpost testhost
+	@echo make done
+
+suck: $(suckobjs)
+	$(CC) $(LDFLAGS) $(DB_LIB_LOC) -o suck $(suckobjs) $(LIBS) $(DB_LIB)
+
+lpost: lpost.o
+	$(CC) $(LDFLAGS) -o lpost lpost.o $(LIBS)
+
+rpost: $(rpostobjs)
+	$(CC) $(LDFLAGS) -o rpost $(rpostobjs) $(LIBS)
+
+testhost: $(testhobjs)
+	$(CC) $(LDFLAGS) -o testhost $(testhobjs) $(LIBS)
+
+makephrases: $(makepobjs)
+	$(CC) $(LDFLAGS) -o makephrases $(makepobjs) $(LIBS)
+
+phrases: makephrases
+	./makephrases phrases.engl
+
+phrases.h: makephrases 
+	./makephrases phrases.h
+
+install: install_bin install_man
+
+install_bin: suck rpost testhost
+	- mkdir -p $(bindir)
+	- strip -s suck rpost testhost
+	$(INSTALL_PROGRAM) suck $(bindir)/suck
+	$(INSTALL_PROGRAM) rpost $(bindir)/rpost
+	$(INSTALL_PROGRAM) testhost $(bindir)/testhost
+
+install_man: $(MAN)/suck.1 $(MAN)/rpost.1 $(MAN)/testhost.1
+	- mkdir -p $(mandir)
+	$(INSTALL_DATA) $(MAN)/suck.1 $(mandir)/suck.$(manext)
+	$(INSTALL_DATA) $(MAN)/rpost.1 $(mandir)/rpost.$(manext)
+	$(INSTALL_DATA) $(MAN)/testhost.1 $(mandir)/testhost.$(manext)
+
+install_lpost: lpost
+	- strip -s lpost
+	$(INSTALL_PROGRAM) lpost $(bindir)/lpost
+	$(INSTALL_DATA) $(MAN)/lpost.1 $(mandir)/lpost.$(manext)
+
+installall: install lpost
+	
+clean:
+	rm -f `find . \( -name "*.o" -o -name "*[~%]" \) -print`
+
+.c.o:
+	$(CC) -c $(CFLAGS) $(DB_INC_LOC) $(GCC_FLAGS) $(DVERSION) $(CPPFLAGS) $(DEFS) $< 
+
+#------------------------------------------------------------------------------------------------
+# stuff for me compiling/debugging this sucker
+#------------------------------------------------------------------------------------------------
+
+cleanrun: 
+	rm -rf Msgs
+	rm -f suck.errlog suck.status suck.newrc suck.index suck.sorted suck.restart suck.lock suck.killlog debug.* gmon.out batch
+
+moreclean: clean cleanrun 
+	rm -f suck rpost testhost lpost makephrases
+
+distclean: clean cleanrun cleanconfig moreclean
+	rm -f sucknewsrc sucknewsrc.old suckkillfile suckothermsgs batch phrases.engl 
+
+cleanconfig:
+	rm -f Makefile Japanese.docs/Makefile Italian.docs/Makefile Spanish.docs/Makefile config.h config.cache config.status config.log
+
+maketar: phrases.h distclean
+	tar -czv -f ../$(PKGNAME)-$(VERSION).tar.gz -C .. suck-$(VERSION)

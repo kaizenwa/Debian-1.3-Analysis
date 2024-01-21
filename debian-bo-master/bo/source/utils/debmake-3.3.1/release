@@ -1,0 +1,131 @@
+#!/bin/sh
+#
+# Release: Manages the release issues for a debian package
+#
+# Created November 1, Christoph Lameter <clameter@debian.org>
+#
+# If there is a parameter then do an announcement
+
+LIB=/usr/lib/deb-make
+
+set -e
+# Look for debian/changelog
+
+until [ -f debian/changelog ]; do
+        cd ..
+        if [ `pwd` = "/" ]; then
+		echo "Cannot find debian/changelog anywhere."
+		exit 1
+	fi
+done
+
+# Figure out package info we need
+LINE=`head -1 debian/changelog`
+PACKAGE=`expr "$LINE" : '\(.*\) (.*)'`
+VERSION=`expr "$LINE" : '.* (\(.*\))'`
+DISTRIB=`expr "$LINE" : '.* (.*) \(.*\);'`
+
+MAILADDR="debian-devel-changes@lists.debian.org"
+
+for i in $DISTRIB; do
+	if grep -q "$i" $LIB/dist-changes; then
+		MAILADDR="debian-changes@lists.debian.org"
+	fi
+done
+
+#MAILADDR=postmaster@localhost
+
+
+CHANGES=`echo ../$PACKAGE\_$VERSION\_*.changes`
+if [ -r $CHANGES ]; then
+	FILES=`grep -E "^ [0-9a-f]+ [0-9]+ " $CHANGES|awk '{ print $5; }'`
+else
+	echo "Cannot find .changes file for this release"
+	exit 1
+fi
+
+# Check if dupload is to be used
+if [ -x /usr/bin/dupload ]; then
+	if ! dupload $CHANGES $*; then
+		exit 1
+	fi
+else
+
+	if [ "$DEBIAN_RELEASE_DESTINATION" = "" ]; then
+		DEBIAN_RELEASE_DESTINATION="master"
+	fi
+
+	if grep -q "^$1 " $LIB/upload.sites; then
+		DEBIAN_RELEASE_DESTINATION=$1
+		shift
+	fi
+
+	X="`grep "^$DEBIAN_RELEASE_DESTINATION " $LIB/upload.sites`"
+	if [ "$X" = "" ]; then
+		echo "Upload site $X unknown"
+		exit 1
+	fi
+
+	SCP_DEST=`expr "$X" : ".* \(.*\) .*"`
+	SCP_LOC=`expr "$X" : ".* .* \(.*\)"`
+
+	if [ ! -x /usr/bin/scp ]; then
+		echo "Secure Shell package not installed."
+		exit 1
+	fi
+
+	if [ "$1" = "silent" ]; then
+		SILENT=1
+		shift
+	fi
+
+	if [ "$1" = "announce" ]; then
+		NEW=1
+		shift
+	fi
+
+	echo "-- Copying Package $PACKAGE Release $VERSION to $SCP_DEST"
+	(cd ..;scp $FILES $SCP_DEST:$SCP_LOC 2>&1) |grep -v "^Warning:" >/tmp/$$ || echo
+	if [ -s /tmp/$$ ]; then
+		cat /tmp/$$
+		rm /tmp/$$
+		echo "Error transferring files. Aborting"
+		exit 1;
+	fi
+
+	# Send Changes File
+	scp $CHANGES $SCP_DEST:$SCP_LOC
+	if [ "$SILENT" = "" ]; then
+		echo "-- Announcing the package on $MAILADDR"
+		if [ "$NEW" ]; then
+			mail $MAILADDR -s"New Package: $PACKAGE $VERSION" <debian/tmp/DEBIAN/control
+		else
+			mail $MAILADDR -s"$PACKAGE $VERSION uploaded to $SCP_DEST" <$CHANGES
+		fi
+	fi
+fi
+
+echo "-- Generating marker debian/RELEASED"
+touch debian/RELEASED
+echo "-- Package successfully released"
+if grep -Eq "#[0-9]{4,5}" $CHANGES ; then
+	BUGS=`perl <$CHANGES -ne 'if (/#([0-9]{4,5})/) { print "$1 "; } '`
+	if [ "$BUGS" ]; then
+		if [ "$AUTOCLEAR_BUGS" ]; then
+			ANS="Y"
+		else
+			echo -n "Mark Bug# $BUGS mentioned in $CHANGES as done? Y/n"
+			read ANS
+		fi
+		if [ "$ANS" = "Y" -o "$ANS" = "y" -o "$ANS" = "" ]; then
+			for i in $BUGS; do
+				mail $i-done@bugs.debian.org -s"Fixed in Version $VERSION" <$CHANGES
+			done
+			echo -e "-- $BUGS marked as done."
+		else
+			echo "Warning: Bugs not cleared".
+		fi
+	else
+		echo "-- No bugs mentioned in $CHANGES"
+	fi
+fi

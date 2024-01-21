@@ -1,0 +1,197 @@
+#	This program generates macro definitions for macros that appear
+#	in itran.g. Input is translated into macro definitions. Code between
+#	lines starting with %{ and %} are copied unchanged. This code may
+#	consist of macro definitions or C definitions. The output is normally
+#	written to tdefs.h.
+#
+#	bsyms and usyms are files that relate operator names to
+#	the macro names used in itran.g.
+#
+#
+global usyms, bsyms
+global dfile
+
+procedure main(x)
+   bsyms := symbols("bsyms")	# table of binary operator/name correspondences
+   usyms := symbols("usyms")	# table of unary operator/name correspondences
+   every defs(!x)
+end
+
+procedure bgener(op,args,defn)	# enter generic binary operator definitions
+   local s, t, def, name
+   static optab
+   initial {
+      optab := table()	# operator symbols by category
+      optab["<bop>"] := ["&", "==", ">>=", ">>", "<<=", "<<", "~==", "=",
+         ">=", ">", "<=", "<", "~=", "===", "~===", "||", "|||", "+", "--",
+         "++", "-", "*", "**", "/", "%", "^", "@"]
+      optab["<aop>"] := [":=:", ":=", "<->", "<-", "--:=", "++:=", "+:=",
+         "-:=", "*:=", "**:=", "/:=", "%:=", "^:=", "=:=", "===:=", ">=:=",
+         ">:=", "<=:=", "<:=", "~=:=", "~===:=", "==:=", ">>=:=", ">>:=",
+         "<<=:=", "<<:=", "~==:=", "||:=", "|||:=", "&:=", "@:=", "?:="]
+      optab["<bcs>"] := ["|", "?", "\\", "!"]
+      }
+   every s := !optab[op] do {	# create a definition for each operator in list
+      if s == "\\" then t := "\\\\" else t := s
+      defn ? {
+         def := ""
+         while def ||:= tab(find(op)) do {
+            move(*op)
+            def ||:= t		# replace reference to generic
+            }
+         def ||:= tab(0)
+         }
+      name := bsyms[s]
+      write("#ifdef ", name)
+      write("#undef ", name)
+      write("#endif\t\t\t\t\t/* ", name, " */")
+      write("#define ", name, args, "\t", format(def))
+      }
+   return
+end
+
+procedure comment(line)	# ignore comment
+   if (*line = 0) | (line[1] == "#") then return else fail
+end
+
+procedure copy(line)
+   local s
+
+   if match("%{", line) then {
+      while s := read(dfile) do
+         if match("%}", s) then
+            break
+         else
+            write(s)
+      return
+      }
+   else
+      fail
+end
+
+procedure defs(s)
+   local line
+   # translate specifications into macro definitions
+   dfile := open(s) |
+      stop("cannot open ",s)
+   while line := read(dfile) do
+      (comment | copy | gendef | singledef)(line)
+   close(dfile)
+   return
+end
+
+procedure format(s)	# format defintion
+   local i, s1, s2
+   static ntab
+   initial ntab := ~'\t'
+   i := 0
+   s1 := ""
+   s ? while tab(many('\t')) do {
+      i +:= 1
+      case &subject[&pos] of {
+         "\"":  {	# "quote" literal
+            s2 := move(1)
+            # look for a non-escaped closing quote
+            repeat {
+               s2 ||:= tab(upto('\\"'))
+               if match("\\") then
+                  s2 ||:= move(2)
+               else
+                  break
+               }
+            s1 ||:= "q(" || s2 || move(1) || "),"
+            }
+         default:
+            s1 ||:= tab(many(ntab)) || ","
+         }
+      }
+   if i = 1 then return "$$ = " || s1[1:-1]
+   else return "$$ = cat(" || i || "," || s1[1:-1] || ")"	# concatenate if more than one
+end
+
+procedure gendef(line)	# process generic specification
+   local opset, args
+   line ? {
+      if opset := =("<" || ("bop" | "aop" | "bcs") || ">") &
+         args := tab(upto('\t')) then return bgener(opset,args,tab(0))
+      else if opset := =("<" || ("uop" | "ucs") || ">") &
+         args := tab(upto('\t')) then return ugener(opset,args,tab(0))
+     }
+   fail
+end
+
+procedure singledef(line)  # process specification for single macro or undef
+   local name, ops
+   line ? {
+      name := tab(upto('(') | 0)
+      ops := (tab(upto(')') + 1) | "")
+      name := smap(name, ops)
+      write("#ifdef ", name)
+      write("#undef ", name)
+      write("#endif\t\t\t\t\t/* ", name, " */")
+      if not pos(0) then
+         write("#define ", name, ops, "\t", format(tab(0)))
+      }
+   return
+end
+
+procedure smap(s, ops)	# map operator symbols into names
+   local pseudo, n_ops
+   static opsyms
+   initial {
+      opsyms := '.=:!@%^&*+~-+|<>?/\\'
+      }
+   n_ops := 1
+   ops ? every find(",") do n_ops +:= 1
+   s ? {
+      if pseudo := tab(many(opsyms)) & pos(0) then
+         if n_ops = 2 then
+            s := \usyms[pseudo] | stop("illegal operator")
+         else
+            s := \bsyms[pseudo] | stop("illegal operator")
+      }
+   return s
+end
+
+procedure symbols(type)	# build table of operator/name correspondences
+   local name, symbol, xtab, line, file
+   xtab := table()
+   file := open(type) | stop("cannot open ",type)
+   while line := read(file) do
+      line ? {
+         name := tab(upto('\t')) &
+         move(1) &
+         symbol := tab(0) &
+         xtab[symbol] := name
+         } | stop("error in ",type," file")
+   close(file)
+   return xtab
+end
+
+procedure ugener(op,args,defn)	# enter generic unary operator definitions
+   local s, t, def, name
+   static optab
+   initial {
+      optab := table()
+      optab["<uop>"] := [".", "!", "+", "++", "*", "**", "/", "^", "~", "~=",
+         "~==", "~===", "-", "--", "=", "==", "===", "?", "@", "\\"] 
+      optab["<ucs>"] := ["|", "||", "|||"]
+      }
+   every s := !optab[op] do {
+      if s == "\\" then t := "\\\\" else t := s
+      defn ? {
+         def := ""
+         while def ||:= tab(find(op)) do {
+            move(*op)
+            def ||:= t		# replace reference to generic
+            }
+         def ||:= tab(0)
+         }
+      name := usyms[s]
+      write("#ifdef ", name)
+      write("#undef ", name)
+      write("#endif\t\t\t\t\t/* ", name, " */")
+      write("#define ", name, args, "\t", format(def))
+      }
+   return
+end

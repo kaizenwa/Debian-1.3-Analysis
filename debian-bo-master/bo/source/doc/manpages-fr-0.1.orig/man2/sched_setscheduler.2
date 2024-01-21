@@ -1,0 +1,292 @@
+.\" Hey Emacs! This file is -*- nroff -*- source.
+.\"
+.\" Copyright (C) Tom Bjorkholm & Markus Kuhn, 1996
+.\"
+.\" This is free documentation; you can redistribute it and/or
+.\" modify it under the terms of the GNU General Public License as
+.\" published by the Free Software Foundation; either version 2 of
+.\" the License, or (at your option) any later version.
+.\"
+.\" The GNU General Public License's references to "object code"
+.\" and "executables" are to be interpreted as the output of any
+.\" document formatting or typesetting system, including
+.\" intermediate and printed output.
+.\"
+.\" This manual is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public
+.\" License along with this manual; if not, write to the Free
+.\" Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139,
+.\" USA.
+.\"
+.\" 1996-04-01 Tom Bjorkholm <tomb@mydata.se>
+.\"            First version written
+.\" 1996-04-10 Markus Kuhn <mskuhn@cip.informatik.uni-erlangen.de>
+.\"            revision
+.\"
+.\" Traduction 14/10/1996 par Christophe Blaess (ccb@club-internet.fr)
+.\"
+.TH SETSCHEDULER 2 "14 Octobre 1996" Linux "Manuel du programmeur Linux"
+.SH NOM
+sched_setscheduler, sched_getscheduler \-
+Lire ou fixer la politique d'ordonnancement et ses parametres.
+.SH SYNOPSIS
+.B #include <sched.h>
+.sp
+\fBint sched_setscheduler(pid_t \fIpid\fB, int \fIpolicy\fB, 
+const struct sched_param *\fIp\fB);
+.sp
+\fBint sched_getscheduler(pid_t \fIpid\fB);
+.sp
+.nf
+.ta 4n
+\fBstruct sched_param {
+	...
+	int \fIsched_priority\fB;
+	...
+};
+.ta
+.fi
+.SH DESCRIPTION
+.B sched_setscheduler
+fixe a la fois la politique d'ordonnancement et ses parametres pour 
+le processus identifie par \fIpid\fR. 
+Si \fIpid\fR vaut zero, la politique du processus en cours sera
+fixee.
+L'interpretation du parametre \fIp\fR depend de la politique 
+employee. Actuellement il y a trois politiques proposees par Linux :
+.IR SCHED_FIFO , 
+.IR SCHED_RR ,
+et
+.IR SCHED_OTHER.
+Leurs semantiques respectives sont decrites ci-dessous.
+
+.B sched_getscheduler
+lit la politique  d'ordonnancement et ses parametres pour 
+le processus identifie par \fIpid\fR. 
+Si \fIpid\fR vaut zero, la politique du processus en cours sera
+recuperee.
+
+
+.SS Politiques d'ordonnancement
+
+L'ordonnanceur est la partie du noyau qui decide quel processus
+pret va etre execute ensuite. L'ordonnanceur de Linux propose
+trois politiques differentes, une pour les processus classiques,
+et deux pour les applications a vocation temps-reel.
+
+Une valeur de priorite statique \fIsched_priority\fR est
+assignee a chaque processus, et ne peut etre modifiee que par
+l'intermediaire d'appels systemes.
+Conceptuellement, l'ordonnanceur dispose d'une liste de tous
+les processus prets pour chaque valeur possible de \fIsched_priority\fR
+(\fIsched_priority\fR est dans l'intervalle 0 a 99).
+
+Afin de determiner quel processus doit s'executer ensuite, 
+l'ordonnanceur de Linux recherche la liste non-vide de plus haute
+priorite statique et prend le processus en tete de cette liste.
+La politique d'ordonnancement determine pour chaque processus
+l'emplacement ou il sera insere dans la liste contenant les
+processus de meme priorite statique, et comment il se deplacera
+dans cette liste.
+
+
+\fISCHED_OTHER\fR est l'ordonnancement universel temps-partage
+par defaut, utilise par la plupart des processus.
+\fISCHED_FIFO\fR et \fISCHED_RR\fR sont prevus pour des 
+applications temps\-reel qui necessitent un controle precis de
+la selection des processus prets.
+
+Les processus ordonnances avec \fISCHED_OTHER\fR doivent avoir
+une priorite statique de 0, ceux ordonnances par \fISCHED_FIFO\fR ou
+\fISCHED_RR\fR peuvent avoir une priorite statique dans l'intervalle
+1 a 99.
+Seuls les processus disposant de privileges Super\-User peuvent
+obtenir une priorite statique superieure a 0 afin d'etre
+ordonnance par \fISCHED_FIFO\fR ou \fISCHED_RR\fR. 
+
+les appels systemes \fBsched_get_priority_min\fR et
+\fBsched_get_priority_max\fR permettent de determiner l'intervalle
+de priorites valides de maniere portable sur les systemes conformes
+a la norme POSIX.1b.
+
+Tout ordonnancement est preemptif : Si un processus avec une priorite
+statique plus elevee devient pret, le processus en cours est
+interrompu et retourne dans sa liste d'attente. La politique 
+d'ordonnancement determine simplement l'ordre utilise dans une
+liste de processus prets avec des priorites statiques egales.
+
+.SS SCHED_FIFO: Ordonnancement First In-First out (premier arrive, premier servi)
+
+\fISCHED_FIFO\fR ne peut etre utilise qu'avec des priorites statiques 
+superieures a 0, ce qui signifie que des qu'un processus \fISCHED_FIFO\fR
+devient pret, un processus normal \fISCHED_OTHER\fR en cours
+d'execution sera interrompu.
+\fISCHED_FIFO\fR est un ordonnancement simple a base de tranches
+de temps. Pour les processus ordonnances par \fISCHED_FIFO\fR 
+les regles suivantes sont appliquees :
+
+Un processus \fISCHED_FIFO\fR qui a ete preempte par un autre
+processus de priorite superieure restera en tete de sa liste
+et reprendra son execution des que tous les processus de
+priorites superieures sont a nouveau bloques.
+
+Quand un processus \fISCHED_FIFO\fR devient pret, il est
+insere a la fin de sa liste. 
+
+Un appel systeme
+\fBsched_setscheduler\fR ou \fBsched_setparam\fR placera le
+processus \fISCHED_FIFO\fR identifie par \fIpid\fR a la fin de
+sa liste s'il est pret.
+
+Un processus appelant \fBsched_yield\fR sera place a la fin de sa liste.
+
+Aucun autre evenement ne modifiera l'ordre des listes de priorites
+statiques egales avec \fISCHED_FIFO\fR.
+
+Un processus \fISCHED_FIFO\fR s'execute jusqu'a ce qu'il soit bloque
+par une operation d'entree/sortie, qu'il soit preempte par un processus
+de priorite superieure, ou qu'il appelle \fBsched_yield\fR.
+
+
+.SS SCHED_RR: Ordonnancement Round Robin 
+
+\fISCHED_RR\fR est une amelioration simple de la politique \fISCHED_FIFO\fR. 
+Tout ce qui est decrit pour \fISCHED_FIFO\fR s'applique aussi a \fISCHED_RR\fR,
+sauf que chaque processus ne dispose que d'une tranche temporelle
+limitee pour son execution.
+Si un processus sous politique \fISCHED_RR\fR s'est execute depuis
+une duree superieure ou egale a la tranche temporelle (time quantum),
+il sera place a la fin de la liste de sa priorite.
+
+Un processus sous \fISCHED_RR\fR qui a ete preempte par un
+processus de priorite superieure terminera sa tranche de temps
+lorsqu'il reprendra son execution.
+la longueur du time quantum peut etre lue avec \fBsched_rr_get_interval\fR.
+
+.SS SCHED_OTHER: Ordonnancement temps-partage par defaut
+
+La politique \fISCHED_OTHER\fR ne peut etre utilisee qu'avec des
+priorites statiques a 0. C'est la politique standard de l'ordonnanceur
+temps partage de Linux, et est concue pour tous les processus ne
+reclamant pas de fonctionnalites temps\-reel.
+
+Le processus a executer est choisi dans la liste des processus de
+priorites statiques nulles, en utilisant une priorite dynamique
+qui ne s'applique que dans cette liste.
+
+La priorite dynamique est basee sur la valeur de "gentillesse" du
+processus (fixee avec les appels systemes \fBnice\fR ou 
+\fBsetpriority\fR) et est incrementee a chaque time quantum 
+ou le processus est pret mais non selectionne par l'ordonnanceur.
+Ceci garantit une progression equitable de tous les processus
+\fISCHED_OTHER\fR.
+
+
+.SS Temps de reponse
+
+Un processus de haute priorite bloque en attente d'entrees/sorties
+est affecte d'un certain temps de reponse avant d'etre selectionne
+a nouveau. Le concepteur d'un gestionnaire de peripherique
+peut reduire grandement ce temps de reponse en utilisant
+un gestionnaire d'interruptions lentes comme decrit dans
+.BR request_irq (9).
+
+.SS Divers
+
+Les processus fils heritent de la politique d'ordonnancement et
+des parametres associes lors d'un
+.BR fork .
+
+Le verrouillage de pages en memoire est generalement necessaire
+pour les processus temps reel afin d'eviter les delais de
+pagination. Ceci peut etre effectue avec
+.BR mlock (2)
+ou
+.BR mlockall (2).
+
+
+Comme une boucle sans fin non bloquante dans un processus ordonnance
+sous une politique \fISCHED_FIFO\fR ou \fISCHED_RR\fR bloquera
+indefiniment tous les processus avec une priorite plus faible,
+le developpeur d'applications temps\-reel devrait toujours 
+conserver sur une console un schell ordonnance avec une priorite 
+superieure a celle de l'application testee.
+
+Ceci permettra un 
+.BR kill ((1)
+d'urgence des applications testees qui ne se bloquent pas ou
+qui ne se terminent pas comme prevu.
+Comme les processus sous \fISCHED_FIFO\fR et \fISCHED_RR\fR 
+peuvent preempter les autres processus normaux pour toujours,
+seuls les processus Super\-User ont le droit d'activer ces politiques
+sous Linux.
+
+Les systemes POSIX sur lesquels
+.B sched_setscheduler
+et
+.B sched_getscheduler
+sont disponibles definissent
+.I _POSIX_PRIORITY_SCHEDULING
+dans <unistd.h>.
+
+.SH "VALEUR RENVOYEE"
+.BR sched_setscheduler
+renvoie 0 s'il reussi
+.BR sched_getscheduler
+renvoie la politique pour le processus s'il reussit.
+
+En cas d'echec, \-1 est renvoye et
+.I errno
+contient le code d'erreur.
+.SH ERREURS
+.TP 0.8i
+.B ESRCH
+Le processus numero \fIpid\fR n'existe pas.
+.TP
+.B EPERM
+Le processus appelant n'a pas les privileges necessaires. Seul
+les processus Super\-User peuvent activer les politiques 
+\fISCHED_FIFO\fR et \fISCHED_RR\fR.
+Le processus appelant
+.BR sched_setscheduler
+doit avoir un UID effectif egal a celui du processus
+.IR pid ,
+ou etre Super\-User.
+.TP
+.B EINVAL
+La valeur de politique d'ordonnancement \fIpolicy\fR n'existe pas,
+ou le parametre \fIp\fR n'a pas de signification pour
+la politique \fIpolicy\fR.
+.SH STANDARDS
+POSIX.1b (POSIX.4)
+.SH BUGS
+Sous Linux 1.3.81,\fISCHED_RR\fR n'a pas ete teste totalement, et ne
+se comporte peut etre pas exactement comme decrit ci\-dessus.
+.SH "VOIR AUSSI"
+.BR sched_setparam (2), 
+.BR sched_getparam (2), 
+.BR sched_yield (2), 
+.BR sched_get_priority_max (2), 
+.BR sched_get_priority_min (2), 
+.BR nice (2), 
+.BR setpriority (2), 
+.BR getpriority (2), 
+.BR mlockall (2), 
+.BR munlockall (2), 
+.BR mlock (2), 
+.BR munlock (2).
+.PP
+.I Programming for the real world \- POSIX.4
+by Bill O. Gallmeister, O'Reilly & Associates, Inc., ISBN 1-56592-074-0
+.br
+.I IEEE Std 1003.1b-1993
+(POSIX.1b standard)
+.br
+.I ISO/IEC 9945-1:1996
+\- C'est une nouvelle revision 1996 de POSIX.1 qui regroupe en
+un seul standard les normes POSIX.1(1990), POSIX.1b(1993), POSIX.1c(1995), et
+POSIX.1i(1995).

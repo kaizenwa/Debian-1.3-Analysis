@@ -1,0 +1,275 @@
+# Makefile for xdvik --kb@cs.umb.edu.
+version = 18f
+
+ac_include ../make/paths.make
+
+# See INSTALL for compilation options.
+DEFS = @PS_DEF@ -DA4 -DBDPI=600 $(XDEFS)
+ifeq (true,$(FOIL))
+DEFS += -DFOIL_X_WCHAR_T
+endif
+
+ac_include ../make/common.make
+ac_include ../make/programs.make
+
+# If your X include files or libraries won't be found automatically by
+# the compiler or linker, define these appropriately.  If you are
+# compiling with -DNOTOOL, set tool_libs="".
+x_cppflags = @X_CFLAGS@ $(EXTRA_XINCLUDE_FLAG)
+x_ldflags = @X_LIBS@ $(EXTRA_XLIB_FLAG)
+x_pre_libs = @X_PRE_LIBS@
+x_extra_libs = @X_EXTRA_LIBS@
+
+ifeq (yes,$(BROKEN_SUNOS_LIBXMU))
+x_tool_libs = -lXaw /usr/openwin/lib/libXmu.a -lXt -lXext
+else
+# link X11 stuff statically with gcc:
+# x_tool_libs = -static -lXaw -lXmu -lXt -lXext -dynamic
+# link X11 stuff statically with cc on hpux:
+# x_tool_libs = -Wl,-a,archive -lXaw -lXmu -lXt -lXext -Wl,-a,shared
+x_tool_libs = -lXaw -lXmu -lXt -lXext
+endif
+x_libs = $(x_ldflags) $(x_tool_libs) $(x_pre_libs) -lX11 $(x_extra_libs)
+
+# So this gets included in the default CPPFLAGS.  (Don't do it by
+# default because then we'd include it for all the web2c compilations.)
+prog_cflags = $(x_cppflags)
+
+# We don't use alloca ourselves, but the X library might, and this way
+# we avoid the buggy versions in -lPW or -lucb.
+ALLOCA = alloca.o
+
+objects = xdvi.o dvi_draw.o dvi_init.o events.o font-open.o gf.o pk.o   \
+psdps.o psgs.o psheader.o psnews.o special.o util.o vf.o sfDir.o        \
+sfDraw.o sfPath.o sfSelFile.o xgetcwd.o $(ALLOCA)
+
+program = xdvi
+
+default all: $(program) xdvi.1
+
+$(program): $(kpathsea) $(objects)
+	$(link_command) $(x_ldflags) $(objects) $(x_libs) $(LOADLIBES)
+
+squeeze: squeeze.o
+	$(link_command) squeeze.o
+
+psheader.c: psheader.txt squeeze
+	./squeeze $(srcdir)/psheader.txt $@
+
+# One platform reported trouble when optimizing for special.o.
+special.o: special.c
+	$(CC) $(CPPFLAGS) -c special.c
+
+xdvi.1: xdvi.man sedscript
+	sed -f sedscript <$(srcdir)/xdvi.man >$@
+
+sedscript: mksedscript
+	$(SHELL) $(srcdir)/mksedscript pkpath sizes vfpath $(DEFS) >$@
+
+ac_include ../make/tkpathsea.make
+
+install: install-exec install-data
+uninstall: uninstall-exec uninstall-data
+
+install-exec: $(program)
+	$(SHELL) $(top_srcdir)/../mkdirchain $(bindir)
+	rm -f $(bindir)/$(program).bin $(bindir)/$(program)-X11R5 \
+	  $(bindir)/$(program)-X11R6
+	if test -f $(program); then \
+	  $(INSTALL_PROGRAM) $(program) $(bindir)/$(program).bin; fi
+	if test -f $(program)-X11R5; then \
+	  $(INSTALL_PROGRAM) $(program)-X11R5 $(bindir)/$(program)-X11R5; fi
+	if test -f $(program)-X11R6; then \
+	  $(INSTALL_PROGRAM) $(program)-X11R6 $(bindir)/$(program)-X11R6; \
+	  rm -f $(bindir)/$(program).bin; \
+	  ln -s $(program)-X11R6 $(bindir)/$(program).bin; fi
+
+uninstall-exec:
+	rm -f $(bindir)/$(program).bin
+
+install-data: xdvi.1
+	$(SHELL) $(top_srcdir)/../mkdirchain $(mandir)
+	$(INSTALL_DATA) xdvi.1 $(mandir)/xdvi.$(manext)
+uninstall-data:
+	rm -f $(mandir)/xdvi.$(manext)
+
+
+distname = xdvik
+program_files = xdvi.icon xdvi.man psheader.txt mksedscript
+version_files = patchlevel.h
+
+pre-dist-$(distname):
+post-dist-$(distname):
+	cd $(top_distdir); rm -f xdvik/psheader.c
+
+ac_include ../make/dist.make
+ac_include ../make/config.make
+
+info dvi check:
+
+ac_include ../make/misc.make
+
+distclean::
+	rm -f psheader.c sedscript xdvi.1
+
+clean::
+	rm -f xdvi xdvi-X11R[56]
+
+ac_include ../make/rdepend.make
+alloca.o: alloca.c
+dvi_draw.o: dvi_draw.c config.h $(kpathsea_srcdir)/config.h ./c-auto.h \
+  $(kpathsea_srcdir)/c-std.h \
+  $(kpathsea_srcdir)/c-unistd.h $(kpathsea_srcdir)/systypes.h \
+  $(kpathsea_srcdir)/c-memstr.h \
+  $(kpathsea_srcdir)/c-errno.h $(kpathsea_srcdir)/c-minmax.h \
+  $(kpathsea_srcdir)/c-limits.h \
+  $(kpathsea_srcdir)/c-proto.h \
+  $(kpathsea_srcdir)/lib.h $(kpathsea_srcdir)/types.h $(kpathsea_srcdir)/debug.h \
+  xdvi.h \
+  $(kpathsea_srcdir)/c-ctype.h \
+  $(kpathsea_srcdir)/c-fopen.h $(kpathsea_srcdir)/c-vararg.h dvi.h
+dvi_init.o: dvi_init.c config.h $(kpathsea_srcdir)/config.h ./c-auto.h \
+  $(kpathsea_srcdir)/c-std.h \
+  $(kpathsea_srcdir)/c-unistd.h $(kpathsea_srcdir)/systypes.h \
+  $(kpathsea_srcdir)/c-memstr.h \
+  $(kpathsea_srcdir)/c-errno.h $(kpathsea_srcdir)/c-minmax.h \
+  $(kpathsea_srcdir)/c-limits.h \
+  $(kpathsea_srcdir)/c-proto.h \
+  $(kpathsea_srcdir)/lib.h $(kpathsea_srcdir)/types.h $(kpathsea_srcdir)/debug.h \
+  xdvi.h \
+  $(kpathsea_srcdir)/c-fopen.h \
+  $(kpathsea_srcdir)/c-stat.h \
+  $(kpathsea_srcdir)/magstep.h $(kpathsea_srcdir)/tex-glyph.h $(kpathsea_srcdir)/tex-file.h dvi.h
+events.o: events.c ./config.h $(kpathsea_srcdir)/config.h ./c-auto.h \
+  $(kpathsea_srcdir)/c-std.h \
+  $(kpathsea_srcdir)/c-unistd.h $(kpathsea_srcdir)/systypes.h \
+  $(kpathsea_srcdir)/c-memstr.h \
+  $(kpathsea_srcdir)/c-errno.h $(kpathsea_srcdir)/c-minmax.h \
+  $(kpathsea_srcdir)/c-limits.h \
+  $(kpathsea_srcdir)/c-proto.h \
+  $(kpathsea_srcdir)/lib.h $(kpathsea_srcdir)/types.h $(kpathsea_srcdir)/debug.h \
+  ./xdvi.h 
+font-open.o: font-open.c config.h $(kpathsea_srcdir)/config.h ./c-auto.h \
+  $(kpathsea_srcdir)/c-std.h \
+  $(kpathsea_srcdir)/c-unistd.h $(kpathsea_srcdir)/systypes.h \
+  $(kpathsea_srcdir)/c-memstr.h \
+  $(kpathsea_srcdir)/c-errno.h $(kpathsea_srcdir)/c-minmax.h \
+  $(kpathsea_srcdir)/c-limits.h \
+  $(kpathsea_srcdir)/c-proto.h \
+  $(kpathsea_srcdir)/lib.h $(kpathsea_srcdir)/types.h $(kpathsea_srcdir)/debug.h \
+  xdvi.h \
+  $(kpathsea_srcdir)/c-fopen.h \
+  $(kpathsea_srcdir)/tex-glyph.h $(kpathsea_srcdir)/tex-file.h
+gf.o: gf.c config.h $(kpathsea_srcdir)/config.h ./c-auto.h $(kpathsea_srcdir)/c-std.h \
+  $(kpathsea_srcdir)/c-unistd.h $(kpathsea_srcdir)/systypes.h \
+  $(kpathsea_srcdir)/c-memstr.h \
+  $(kpathsea_srcdir)/c-errno.h $(kpathsea_srcdir)/c-minmax.h \
+  $(kpathsea_srcdir)/c-limits.h \
+  $(kpathsea_srcdir)/c-proto.h \
+  $(kpathsea_srcdir)/lib.h $(kpathsea_srcdir)/types.h $(kpathsea_srcdir)/debug.h \
+  xdvi.h 
+pk.o: pk.c config.h $(kpathsea_srcdir)/config.h ./c-auto.h $(kpathsea_srcdir)/c-std.h \
+  $(kpathsea_srcdir)/c-unistd.h $(kpathsea_srcdir)/systypes.h \
+  $(kpathsea_srcdir)/c-memstr.h \
+  $(kpathsea_srcdir)/c-errno.h $(kpathsea_srcdir)/c-minmax.h \
+  $(kpathsea_srcdir)/c-limits.h \
+  $(kpathsea_srcdir)/c-proto.h \
+  $(kpathsea_srcdir)/lib.h $(kpathsea_srcdir)/types.h $(kpathsea_srcdir)/debug.h \
+  xdvi.h 
+psdps.o: psdps.c
+psgs.o: psgs.c config.h $(kpathsea_srcdir)/config.h ./c-auto.h $(kpathsea_srcdir)/c-std.h \
+  $(kpathsea_srcdir)/c-unistd.h $(kpathsea_srcdir)/systypes.h \
+  $(kpathsea_srcdir)/c-memstr.h \
+  $(kpathsea_srcdir)/c-errno.h $(kpathsea_srcdir)/c-minmax.h \
+  $(kpathsea_srcdir)/c-limits.h \
+  $(kpathsea_srcdir)/c-proto.h \
+  $(kpathsea_srcdir)/lib.h $(kpathsea_srcdir)/types.h $(kpathsea_srcdir)/debug.h \
+  xdvi.h \
+  $(kpathsea_srcdir)/c-pathmx.h 
+psheader.o: psheader.c
+psnews.o: psnews.c
+sfDir.o: sfDir.c \
+  sfinternal.h \
+  $(kpathsea_srcdir)/config.h \
+  ./c-auto.h $(kpathsea_srcdir)/c-std.h \
+  $(kpathsea_srcdir)/c-unistd.h $(kpathsea_srcdir)/systypes.h \
+  $(kpathsea_srcdir)/c-memstr.h $(kpathsea_srcdir)/c-errno.h \
+  $(kpathsea_srcdir)/c-minmax.h $(kpathsea_srcdir)/c-limits.h \
+  $(kpathsea_srcdir)/c-proto.h \
+  $(kpathsea_srcdir)/lib.h $(kpathsea_srcdir)/types.h $(kpathsea_srcdir)/debug.h \
+  $(kpathsea_srcdir)/c-dir.h \
+  $(kpathsea_srcdir)/c-stat.h 
+sfDraw.o: sfDraw.c $(kpathsea_srcdir)/config.h ./c-auto.h $(kpathsea_srcdir)/c-std.h \
+  $(kpathsea_srcdir)/c-unistd.h $(kpathsea_srcdir)/systypes.h \
+  $(kpathsea_srcdir)/c-memstr.h \
+  $(kpathsea_srcdir)/c-errno.h $(kpathsea_srcdir)/c-minmax.h \
+  $(kpathsea_srcdir)/c-limits.h \
+  $(kpathsea_srcdir)/c-proto.h \
+  $(kpathsea_srcdir)/lib.h $(kpathsea_srcdir)/types.h $(kpathsea_srcdir)/debug.h \
+  $(kpathsea_srcdir)/c-stat.h \
+  sfinternal.h 
+sfPath.o: sfPath.c \
+  $(kpathsea_srcdir)/config.h ./c-auto.h $(kpathsea_srcdir)/c-std.h \
+  $(kpathsea_srcdir)/c-unistd.h $(kpathsea_srcdir)/systypes.h \
+  $(kpathsea_srcdir)/c-memstr.h \
+  $(kpathsea_srcdir)/c-errno.h $(kpathsea_srcdir)/c-minmax.h \
+  $(kpathsea_srcdir)/c-limits.h \
+  $(kpathsea_srcdir)/c-proto.h \
+  $(kpathsea_srcdir)/lib.h $(kpathsea_srcdir)/types.h $(kpathsea_srcdir)/debug.h \
+  $(kpathsea_srcdir)/c-stat.h \
+  sfinternal.h 
+sfSelFile.o: sfSelFile.c \
+  sfinternal.h 
+special.o: special.c config.h $(kpathsea_srcdir)/config.h ./c-auto.h \
+  $(kpathsea_srcdir)/c-std.h \
+  $(kpathsea_srcdir)/c-unistd.h $(kpathsea_srcdir)/systypes.h \
+  $(kpathsea_srcdir)/c-memstr.h \
+  $(kpathsea_srcdir)/c-errno.h $(kpathsea_srcdir)/c-minmax.h \
+  $(kpathsea_srcdir)/c-limits.h \
+  $(kpathsea_srcdir)/c-proto.h \
+  $(kpathsea_srcdir)/lib.h $(kpathsea_srcdir)/types.h $(kpathsea_srcdir)/debug.h \
+  xdvi.h \
+  $(kpathsea_srcdir)/c-fopen.h \
+  $(kpathsea_srcdir)/c-ctype.h $(kpathsea_srcdir)/line.h \
+  $(kpathsea_srcdir)/tex-file.h
+squeeze.o: squeeze.c 
+util.o: util.c config.h $(kpathsea_srcdir)/config.h ./c-auto.h $(kpathsea_srcdir)/c-std.h \
+  $(kpathsea_srcdir)/c-unistd.h $(kpathsea_srcdir)/systypes.h \
+  $(kpathsea_srcdir)/c-memstr.h \
+  $(kpathsea_srcdir)/c-errno.h $(kpathsea_srcdir)/c-minmax.h \
+  $(kpathsea_srcdir)/c-limits.h \
+  $(kpathsea_srcdir)/c-proto.h \
+  $(kpathsea_srcdir)/lib.h $(kpathsea_srcdir)/types.h $(kpathsea_srcdir)/debug.h \
+  xdvi.h \
+  $(kpathsea_srcdir)/c-fopen.h \
+  $(kpathsea_srcdir)/c-vararg.h
+vf.o: vf.c config.h $(kpathsea_srcdir)/config.h ./c-auto.h $(kpathsea_srcdir)/c-std.h \
+  $(kpathsea_srcdir)/c-unistd.h $(kpathsea_srcdir)/systypes.h \
+  $(kpathsea_srcdir)/c-memstr.h \
+  $(kpathsea_srcdir)/c-errno.h $(kpathsea_srcdir)/c-minmax.h \
+  $(kpathsea_srcdir)/c-limits.h \
+  $(kpathsea_srcdir)/c-proto.h \
+  $(kpathsea_srcdir)/lib.h $(kpathsea_srcdir)/types.h $(kpathsea_srcdir)/debug.h \
+  xdvi.h \
+  dvi.h
+xdvi.o: xdvi.c config.h $(kpathsea_srcdir)/config.h ./c-auto.h $(kpathsea_srcdir)/c-std.h \
+  $(kpathsea_srcdir)/c-unistd.h $(kpathsea_srcdir)/systypes.h \
+  $(kpathsea_srcdir)/c-memstr.h \
+  $(kpathsea_srcdir)/c-errno.h $(kpathsea_srcdir)/c-minmax.h \
+  $(kpathsea_srcdir)/c-limits.h \
+  $(kpathsea_srcdir)/c-proto.h \
+  $(kpathsea_srcdir)/lib.h $(kpathsea_srcdir)/types.h $(kpathsea_srcdir)/debug.h \
+  xdvi.h \
+  c-openmx.h $(kpathsea_srcdir)/c-ctype.h \
+  $(kpathsea_srcdir)/c-fopen.h $(kpathsea_srcdir)/c-pathch.h \
+  $(kpathsea_srcdir)/proginit.h $(kpathsea_srcdir)/progname.h $(kpathsea_srcdir)/tex-file.h \
+  patchlevel.h \
+  xdvi.icon 
+xgetcwd.o: xgetcwd.c $(kpathsea_srcdir)/config.h ./c-auto.h $(kpathsea_srcdir)/c-std.h \
+  $(kpathsea_srcdir)/c-unistd.h $(kpathsea_srcdir)/systypes.h \
+  $(kpathsea_srcdir)/c-memstr.h \
+  $(kpathsea_srcdir)/c-errno.h $(kpathsea_srcdir)/c-minmax.h \
+  $(kpathsea_srcdir)/c-limits.h \
+  $(kpathsea_srcdir)/c-proto.h \
+  $(kpathsea_srcdir)/lib.h $(kpathsea_srcdir)/types.h $(kpathsea_srcdir)/debug.h \
+  $(kpathsea_srcdir)/c-pathmx.h

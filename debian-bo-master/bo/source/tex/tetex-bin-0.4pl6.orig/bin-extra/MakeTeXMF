@@ -1,0 +1,105 @@
+#!/bin/sh
+
+TEMPDIR=${TMPDIR-/tmp}/mtmf.$$
+
+# Clean up on normal or abnormal exit.
+trap 'cd /; test -f $TEMPDIR/mtout.$$ && cat $TEMPDIR/mtout.$$; rm -rf $TEMPDIR; trap '' 0; exit 0' 0 1 2 15
+
+(
+test -d $TEMPDIR || mkdir $TEMPDIR || exit 1
+progname=`basename $0`
+
+DIR_PERMS=1777
+FILE_PERMS=644
+
+if test $# -lt 1 ; then
+  echo "Usage: $progname name."
+  exit 1
+fi
+
+if test ! -f "`kpsetool -w cnf texmf.cnf`"; then
+  echo "$progname: global Kpathsea configurarion file texmf.cnf not found."
+  echo
+  echo "Please set the environment variable TETEXDIR or TEXMFCNF correctly."
+  echo "For details see the teTeX and the Kpathsea manual."
+  exit
+fi
+
+NAME="`basename $1 .mf`"
+rootname=`echo "$NAME" | sed 's/[0-9]*$//'`
+pointsize=`echo "$NAME" | sed "s/^$rootname//"`
+
+sauterroot=`kpsetool -w mf b-$rootname 2>/dev/null`
+if test -n "$sauterroot"; then
+  rootfile=$sauterroot
+else
+  case $rootname in
+    wn*) 
+       lhname=`echo $NAME | sed 's/^wn/lh/'`
+       rootfile=`kpsetool -w mf $lhname 2>/dev/null`;;
+    *)
+       rootfile=`kpsetool -w mf $rootname 2>/dev/null`;;
+  esac
+fi
+{ test -z "$rootfile" || test ! -f "$rootfile"; } && exit 1
+
+set x `MakeTeXnames $NAME`; shift
+# next line is like `dirname ...` but more portable
+destdir=`echo $3 | sed 's/^[^\/]*$/./; s/\/[^\/]*$//'`
+test -d "$destdir" || MakeTeXmkdir "$destdir" || exit 1
+cd "$destdir" || exit 1
+
+case "$pointsize" in
+  "") echo "$progname: no pointsize."; exit 1;;
+  11) realsize=10.95444 ;;	# \magstephalf
+  14) realsize=14.4 ;;	# \magstep2
+  17) realsize=17.28 ;;	# \magstep3
+  20) realsize=20.74 ;;	# \magstep4
+  25) realsize=24.88 ;;	# \magstep5
+  ????|?????) realsize=`echo "$pointsize" | sed 's/\(..\)$/.\1/'`;;
+  *) realsize="$pointsize" ;;
+esac
+
+mfname="$NAME.mf"
+if test -f "$mfname"; then
+  echo "$destdir/$mfname already exists!"
+  echo $destdir/$mfname >$TEMPDIR/mtout.$$
+  append_db "$destdir" "$mfname"
+  exit
+fi
+
+case "$NAME" in
+  ec*|tc*) 
+    cat > "$mfname.tmp$$" <<-EOF
+	if unknown exbase: input exbase fi;
+	gensize:=$realsize;
+	generate $rootname;
+EOF
+    ;;
+  dc*) 
+    cat > "$mfname.tmp$$" <<-EOF
+	if unknown dxbase: input dxbase fi;
+	gensize:=$realsize;
+	generate $rootname;
+EOF
+    ;;
+  wn*)
+    cat > "$mfname.tmp$$" <<-EOF
+	wncoding:=1;
+	input $lhname;
+EOF
+    ;;
+  *)
+    cat > "$mfname.tmp$$" <<-EOF
+	design_size := $realsize;
+	input b-$rootname;
+EOF
+    ;;
+esac
+
+chmod "$FILE_PERMS" "$mfname.tmp$$"
+rm -f "$mfname"
+mv "$mfname.tmp$$" "$mfname"
+append_db "$destdir" "$mfname"
+echo "$destdir/$mfname" >$TEMPDIR/mtout.$$
+) 1>&2 </dev/null

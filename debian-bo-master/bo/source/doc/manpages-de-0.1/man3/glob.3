@@ -1,0 +1,219 @@
+.\" (c) 1993 by Thomas Koenig (ig25@rz.uni-karlsruhe.de)
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\" License.
+.\" Modified Wed Jul 28 11:12:17 1993 by Rik Faith (faith@cs.unc.edu)
+.\" Translated into german by Martin Schulze (joey@infodrom.north.de)
+.\"
+.TH GLOB 3 "13. Mai 1996" "GNU" "Bibliotheksfunktionen"
+.SH BEZEICHNUNG
+glob, globfree \- finde Dateinamen, die einem Muster genügen
+.SH BEZEICHNUNG
+.nf
+.B #include <glob.h>
+.sp
+.BI "int glob(const char *" pattern ", int " flags ","
+.nl
+.BI "         int " errfunc "(const char * " epath ", int " eerrno ),
+.nl
+.BI "         glob_t " "*pglob" );
+.nl
+.BI "void globfree(glob_t *" pglob ");"
+.fi
+.SH BESCHREIBUNG
+Die Funktion
+.B glob()
+sucht alle Dateien, die dem Muster
+.IR pattern ,
+gemäß den Regeln der Shell, genügen und gibt sie zurück.
+(siehe auch
+.BR glob (7))
+Tilde-Erweiterungen und Variablensubstitutionen werden nicht durchgeführt.
+.PP
+Die Funktion
+.B globfree()
+gibt den dynamisch alloziierten Speicher wieder frei, der noch von
+einem früheren Aufruf von
+.BR glob() 
+belegt wird.
+.PP
+Die Ergebnisse eines
+.BR glob() \-Aufrufes
+werden in einer Struktur gespeichert, auf die 
+.I pglob 
+zeigt.  Sie ist vom Typ
+.BR glob_t ,
+der in 
+.B <glob.h>
+wie folgt definiert ist.
+.PP
+.br
+.nf
+.in 10
+typedef struct
+{
+.in 14
+    int gl_pathc;       /* Anzahl der bisher gefundenen Dateinamen */
+    char **gl_pathv;    /* Liste der gefundenen Dateinamen */
+    int gl_offs;        /* Reservierte Einträge in `gl_pathv' */
+    int gl_flags;       /* Flags für glob() */
+.in 10
+} glob_t;
+.fi
+.PP
+Die Ergebnisse werden in der dynamisch alloziierten Datenstruktur
+gespeichert.
+.PP
+Das Argument 
+.I flags
+besteht aus einer ODER-Verknüpfungen der folgenden symbolischen
+Konstanten, die das Verhalten von
+.B glob()
+manipulieren:
+.TP
+.B GLOB_ERR
+läßt
+.B glob()
+bei einem Lesefehler (z.B. wenn ein Verzeichnis nicht gelesen werden
+kann) in das aufrufende Programm zurückkehren,
+.TP
+.B GLOB_MARK
+fügt an jeden gefundenen Pfad einen Slash an, wenn dieser auf ein
+Verzeichnis zeigt,
+.TP
+.B GLOB_NOSORT
+überspringt die Sortierung der Ergebnisse (normalerweise werden sie
+sortiert zurückgegeben),
+.TP
+.B GLOB_DOOFS
+bedeutet, daß
+.I pglob->gl_offs
+Einträge am Anfang der Liste
+.I pglob->pathv
+reserviert werden,
+.TP
+.B GLOB_NOCHECK
+bedeutet, daß, wenn keine Pfade dem Muster genügen, das Muster selbst
+zurückgegeben wird,
+.TP
+.B GLOB_APPEND
+bedeutet, daß die Ergebnisse eines vorherigen Aufrufs von 
+.B glob()
+angehängt werden sollen.  Dieses Flag sollte nicht beim ersten Aufruf
+gesetzt werden,
+.TP
+.B GLOB_NOESCAPE
+bedeutet, daß Meta-Zeichen nicht mit Backslashes gequotet werden
+können und
+.TP
+.B GLOB_PERIOD
+bedeutet, daß ein abschließender Punkt für jedes Zeichen steht.
+.PP
+Wenn
+.I errfunc
+nicht
+.B NULL
+ist, wird sie mit den Parametern
+.IR epath ,
+einem Zeiger auf den Pfad, bei dem der Fehler passierte,
+.IR eerrno ,
+dem Wert von 
+.IR errno ,
+wie er von 
+.BR opendir() ", " readdir() " bzw. " stat() .
+gesetzt wurde, aufgerufen, wenn ein Fehler auftritt.  Wenn
+.I errfunc
+einen Wert ungleich null zurückgibt oder wenn
+.B GLOB_ERR
+gesetzt ist, springt 
+.B glob()
+nach dem Aufruf von
+.IR errfunc
+in das aufrufende Programm zurück.
+.PP
+Nach erfolgreicher Ausführung enthält
+.I pglob->gl_pathc
+die Anzahl der gefundenen Pfade und
+.I pglob->gl_pathv
+ist ein Zeiger auf die Liste der gefundenen Pfade.  Der erste Zeiger
+nach dem letzten Pfad ist
+.BR NULL .
+.PP
+Es ist möglich,
+.B glob()
+mehrfach aufzurufen.  In diesem Fall muß
+.B GLOB_APPEND
+in
+.I flags
+beim zweiten und jedem weiteren Aufruf gesetzt werden .
+.SH "RÜCKGABEWERTE"
+Nach erfolgreicher Ausführung gibt
+.B glob()
+null zurück. Andere mögliche Werte sind:
+.TP
+.BR GLOB_NOSPACE ,
+falls der Speicher knapp wurde,
+.TP
+.BR GLOB_ABEND ,
+falls ein Lesefehler aufgetreten ist, und
+.TP
+.BR GLOB_NOMATCH ,
+falls keine Pfade gefunden wurden.
+.SH "BEISPIELE"
+Ein passendes Beispiel ist folgender Code, der ein
+.nl
+.B ls -l *.c ../*.c
+.nl
+in der Shell simuliert.
+.nf
+.in 10
+
+glob_t globbuf;
+
+globbuf.gl_offs = 2;
+glob("*.c", GLOB_DOOFS, NULL, &globbuf);
+glob("../*.c", GLOB_DOOFS | GLOB_APPEND, NULL, &globbuf);
+globbuf.gl_pathv[0] = "ls";
+globbuf.gl_pathv[1] = "-l";
+execvp("ls", &globbuf.gl_pathv[0]);
+.fi
+.SH "KONFORM ZU"
+Vorgeschlagen in POSIX.2
+.SH "FEHLER"
+Die Funktion
+.B glob()
+kann fehlschlagen bei Fehlern der zugrundeliegenden Systemaufrufe wie
+.BR malloc() " oder " opendir() .
+Diese speichern den Fehlercode in
+.IR errno .
+.PP
+POSIX.2 ist bisher noch kein anerkannter Standard, die Informationen
+in dieser Manual-Seite werden sich ändern.
+.SH "SIEHE AUCH"
+.BR ls (1),
+.BR sh (1),
+.BR exec (2),
+.BR stat (2),
+.BR malloc (3),
+.BR opendir (3),
+.BR readdir (3),
+.BR wordexp (3),
+.BR glob (7).

@@ -1,0 +1,163 @@
+
+                             SBC Additions to xinetd
+                             -----------------------
+
+                                  Nigel Verdon, 
+                             verdenn@gb.swissbank.com
+
+                                 7 June 1995
+
+
+
+1. Introduction
+---------------
+xinetd is a "drop in" replacement for inetd which allows much more 
+control over how services are started/controlled - see the xinetd
+documentation for more details.
+
+An additional parameter has been added to the xinetd configuration file
+to allow a service to be bound to a specific interface.  Therefore we
+can control explicitly which services are offered on which interfaces on 
+a firewall.  This facility works for tcp, udp and rpc based services.
+
+The modifications have only been tested on SunOS 4.1.3_U1.
+
+The rational behind modifying xinetd to offer services on specific
+interfaces was to allow:
+
+1. firewalls to be designed which allow explicit control over services 
+   offered.  This is to prevent people "port scanning" your firewall and 
+   obtaining "useful" information for attacks.
+
+2. to be able to bind services which are only required locally on a
+   firewall to the looback interface (e.g. the TIS firewall toolkit
+   authentication server) and never publish on external interface (
+   again to prevent port-scanning).  
+
+3. Internet service providers to offer "vitrual domains" for FTP,
+   archie, telnet, WWW (if started via xinetd) etc. etc.
+
+If you are intending using this facility on a machine (e.g. a firewall
+offering telnet proxy connections to the internal interface and not from 
+the external interface - assuming two interfaces) the host MUST HAVE
+IP FORWARDING SWITCHED OFF and perform no routing function - otherwise it
+is a simple matter to connect to the service on the internal interface 
+from an untrusted interface.
+
+If you must route packets then use a packet filter on each interface on
+your host to prevent such attacks happening.  A suitable package would be
+ip_fil by Darren Reed (avalon@coombs.anu.edu.au).
+
+2. Configuration
+----------------
+The parameter to specify which interface a service binds to is
+called:
+
+    interface
+
+and is of the following format:
+
+    interface x.x.x.x
+
+where x.x.x.x is a valid IP address or 0.0.0.0 (which specifies the
+service should be bound to all interfaces).  If the "interface" option
+is not given for a service the default behaviour is to bind to 0.0.0.0.
+
+See the xinetd documentation for more details on configuring services.
+
+
+3. Configuration Examples
+-------------------------
+Suppose we wanted to configure xinetd to:
+
+ - accept telnet connections on interface 128.1.1.1 only from 
+   host 128.1.1.3.
+
+ - accept telnet connections on interface 155.145.105.3 from 
+   any host on the 155.145.105 subnet.
+
+- only allow "internal" services (chargen, echo etc.) on the 
+  loopback interface 127.0.0.1.
+
+the xinetd configuration file to give us this functionality 
+would be:
+
+#
+# Telnet service on 128.1.1.1 interface
+#
+service telnet
+{
+    id            = telnet_128
+    socket_type   = stream
+    wait          = no
+    user          = root
+    server        = /usr/etc/in.telnetd
+    interface     = 128.1.1.1
+    only_from     = 128.1.1.3
+}
+
+#
+# Telnet service on 155.145.105.3 interface
+#
+service telnet
+{
+    id            = telnet_155
+    socket_type   = stream
+    wait          = no
+    user          = root
+    server        = /usr/etc/in.telnetd
+    interface     = 155.145.105.3
+    only_from     = 155.145.105.0
+}
+
+#
+# Internal echo service
+#
+service echo
+{
+    id            = echo-stream
+    type          = INTERNAL
+    socket_type   = stream
+    wait          = no
+    user          = root
+    interface     = 127.0.0.1
+}
+
+#
+# Internal echo service
+#
+service echo
+{
+    id            = echo-dgram
+    type          = INTERNAL
+    socket_type   = dgram
+    wait          = no
+    user          = root
+    interface     = 127.0.0.1
+}
+ 
+Please note that the above example shows how to configure xinetd
+to offer "differently configured telnets" by using the "id" tag.
+Without the "id" tag xinetd will refuse to start more than one 
+instance of a service.
+
+4. Notes
+--------
+4.1 If an invalid IP address is given the service will be disabled.
+
+4.2 Changing a service's IP address and sending a SIGHUP signal to
+    xinetd will cause all existing services bound to the original
+    address to be killed.
+
+4.3 We recommend all logging is done via syslog rather than explicit files
+    to prevent file access attacks via symbollic links.  The file opening
+    code should really be modified to prevent this (perhaps the next project).
+
+    This note is from Chuck Murcko <chuck@telebase.com>:
+    The current release of xinetd-2.1.7 logs a warning to the syslog
+    LOG_WARNING facility if a logfile is found to be a symlink. Please be
+    aware that, in general, you are in serious trouble if your xinetd logs
+    get changed to symlinks, as root permission is usually required to do
+    this. To monitor runtime state changes to the logfiles, a separate
+    daemon would be a better answer than added code in xinetd which can
+    impact performance on heavily loaded systems.

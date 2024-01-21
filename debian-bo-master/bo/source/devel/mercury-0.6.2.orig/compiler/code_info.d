@@ -1,0 +1,91 @@
+code_info.optdate code_info.c code_info.err code_info.o : code_info.m \
+	assoc_list.int \
+	bimap.int \
+	bool.int \
+	char.int \
+	code_exprn.int \
+	code_util.int \
+	globals.int \
+	hlds_data.int \
+	hlds_goal.int \
+	hlds_module.int \
+	hlds_pred.int \
+	instmap.int \
+	int.int \
+	list.int \
+	llds.int \
+	map.int \
+	mercury_builtin.int \
+	mode_util.int \
+	options.int \
+	prog_data.int \
+	require.int \
+	set.int \
+	shapes.int \
+	stack.int \
+	std_util.int \
+	string.int \
+	term.int \
+	tree.int \
+	type_util.int \
+	unify_proc.int \
+	varset.int \
+	delay_info.int2 \
+	float.int2 \
+	getopt.int2 \
+	io.int2 \
+	mode_errors.int2 \
+	mode_info.int2 \
+	modes.int2 \
+	ops.int2 \
+	relation.int2 \
+	special_pred.int2 \
+	tree234.int2
+
+code_info.date : code_info.m \
+	assoc_list.int3 \
+	bimap.int3 \
+	bool.int3 \
+	char.int3 \
+	code_exprn.int3 \
+	code_util.int3 \
+	globals.int3 \
+	hlds_data.int3 \
+	hlds_goal.int3 \
+	hlds_module.int3 \
+	hlds_pred.int3 \
+	instmap.int3 \
+	int.int3 \
+	list.int3 \
+	llds.int3 \
+	map.int3 \
+	mercury_builtin.int3 \
+	mode_util.int3 \
+	options.int3 \
+	prog_data.int3 \
+	require.int3 \
+	set.int3 \
+	shapes.int3 \
+	stack.int3 \
+	std_util.int3 \
+	string.int3 \
+	term.int3 \
+	tree.int3 \
+	type_util.int3 \
+	unify_proc.int3 \
+	varset.int3 \
+	delay_info.int3 \
+	float.int3 \
+	getopt.int3 \
+	io.int3 \
+	mode_errors.int3 \
+	mode_info.int3 \
+	modes.int3 \
+	ops.int3 \
+	relation.int3 \
+	special_pred.int3 \
+	tree234.int3
+
+code_info.dir/code_info_000.o: code_info.m
+	rm -rf code_info.dir
+	$(MCS) -s$(GRADE) $(MCSFLAGS) code_info.m

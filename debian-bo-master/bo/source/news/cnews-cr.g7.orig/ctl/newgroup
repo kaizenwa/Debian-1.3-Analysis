@@ -1,0 +1,215 @@
+#! /bin/sh
+# newgroup group flag - create group (4-field version: B-2.10.3+ compatible)
+#	subject to our sys file group pattern
+# also subject to $NEWSCTL/controlperm:  four fields per line, first
+# a newsgroup pattern, second an author name (or "any"), third a set of
+# operations ("n" newgroup, "r" rmgroup), and fourth a set of
+# flags ("y" do it, "n" don't, "q" don't report at all, "v" include
+# entire control message in report) (default "yv").
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN:$NEWSPATH; export PATH
+umask $NEWSUMASK
+
+g="$1"
+f="$2"
+
+posting=/tmp/np$$
+hdr=/tmp/nc$$
+tmp=/tmp/nt$$
+
+# get the full article, and its header, into files for inspection
+trap "rm -f $posting $hdr $tmp ; trap 0 ; exit 0" 0
+cat >$posting
+canonhdr $posting >$hdr
+
+# who sent it?
+author="`egrep '^From:' $hdr | sed 's/^[^:]*: *//'`"
+authorid="`echo \"$author\" | sed '/.*<\(.*\)>.*/s//\1/
+				   /\([^ ][^ ]*\)  *(.*).*/s//\1/'`"
+
+# was it approved?
+case "`egrep '^Approved:' $hdr`" in
+'')	reject=${reject-'no Approved header'}	;;
+esac
+
+# verify acceptable name syntax
+verdict="`echo \"$g\" | awk -f $NEWSBIN/namecheck.awk`"
+if test " $verdict" != " "
+then
+	reject=${reject-"$verdict"}
+fi
+
+# is this just a change of moderation status, or even a no-op?
+getst="\$1 == \"$g\" { print \$4 }"
+oldstatus="`awk \"$getst\" $NEWSCTL/active`"
+# nonempty $oldstatus means it's just a status change
+case "$oldstatus" in
+'')	old=e	;;
+m*)	old=m	;;
+x*)	old=x	;;
+*)	old=y	;;
+esac
+case "$f" in
+moderated)	new=m	;;
+unmoderated)	new=y	;;
+'')		new=y	;;
+*)		new=x
+		reject=${reject-'invalid moderation setting'}
+		;;
+esac
+case "$old-$new" in
+m-m|y-y)	exit	;;	# no-op
+x-*)		exit	;;	# disregard, group nulled out locally
+esac
+case "$oldstatus" in
+''|m|y)	;;
+*)	reject=${reject-'moderation status is not m or y, cannot change it'}	;;
+esac
+newstatus="$new"
+
+# consult control file, if present
+# Putting this after the no-op check is a heuristic:  in practice, there are
+# a lot of no-ops and many of them would flunk the control-file check, but
+# if it doesn't matter, why pollute the sysadmin's mailbox...
+perms=$NEWSCTL/controlperm
+action=yv
+if test -r $perms
+then
+	newaction=`gngp -a -r "$g" $perms | awk '$3 ~ /n/' |
+		awk '$2 == "any" || $2 == "'"$authorid"'" { print $4 }' |
+		sed -n 1p`
+	case "$newaction" in
+	?*)	action=$newaction	;;
+	esac
+fi
+case "$action" in
+*n*)	reject=${reject-'controlperm file denies permission'}	;;
+esac
+
+# check that my sys file allows this group
+# This is redundant if it's just a status change, but it's easier just
+# to do it anyway.
+me="`newshostname`"
+gngppat=`awk -f $NEWSBIN/canonsys.awk $NEWSCTL/sys |
+	egrep "^($me|ME)[:/]" |
+	awk -F: '
+{
+	fields = split($2, field2, "/")		# split ngs/dists
+	nngs = split(field2[1], ngs, ",")	# split ng,ng,ng
+	for (i = 1; i < nngs; i++)		# print field2[1] robustly
+		printf "%s,", ngs[i]
+	printf "%s\n", ngs[nngs]
+	exit
+}' `
+case "`echo \"$g\" | gngp -a \"$gngppat\"`" in
+'')	reject=${reject-'unsubscribed group'}	;;
+esac
+
+# the verdict
+case "$reject" in
+?*)	case "$action" in
+	*q*)	;;
+	*)	(
+			echo "newgroup: \`$author' tried"
+			case "$oldstatus" in
+			'')	echo "to create newsgroup \`$g'."	;;
+			*)	echo "to set newsgroup \`$g' to \`$f'."	;;
+			esac
+			echo "Request was refused:"
+			echo "	$reject"
+			case "$action" in
+			*v*)	echo '==='
+				cat $posting
+				echo '==='
+				;;
+			esac
+		) | report 'rejected newgroup request'
+		;;
+	esac
+	exit
+	;;
+esac
+
+# do the job
+case "$oldstatus" in
+'')	# new group
+	max=0000000000
+	d=`echo $g | tr . /`
+	hi=
+	if test -d $NEWSARTS/$d			# recreating old group
+	then
+		hi=`ls -f $NEWSARTS/$d | egrep '^[0-9]+$' | sort -n | tail -1`
+	fi
+	if test " $hi" != " "			# old articles still there
+	then
+		max=000$hi
+	fi
+	mkpdir $NEWSARTS/$d $NEWSOV/$d
+	touch $NEWSOV/$d/.overview
+	was="`wc -l <$NEWSCTL/active`"
+	echo "$g $max 00001 $newstatus" >>$NEWSCTL/active
+	echo "$g `now` $author" >>$NEWSCTL/active.times
+	if test `wc -l <$NEWSCTL/active` -le $was
+	then
+		fail='unable to append new entry to active file'
+	fi
+	# and a newsgroups entry, if any...
+	awk '	BEGIN { printit = 0 }
+		$0 == "For your newsgroups file:" { printit = NR+1 }
+		NR == printit { print }' $posting | tail -1 >$tmp
+	if test ! -s $tmp
+	then
+		echo "$g	--- no description supplied ---" >$tmp
+	fi
+	cat $tmp >>$NEWSCTL/newsgroups
+	;;
+*)	# status change
+	awk '$1 == "'"$g"'" { print $1, $2, $3, "'"$newstatus"'" ; next }
+		{ print }' $NEWSCTL/active >$NEWSCTL/active.tmp
+	if test `wc -l <$NEWSCTL/active.tmp` -lt `wc -l <$NEWSCTL/active`
+	then
+		fail="active.tmp is shorter than active, something's wrong"
+	elif mv $NEWSCTL/active.tmp $NEWSCTL/active
+	then
+		: okay
+	else
+		fail='cannot rename active.tmp to active'
+	fi
+	;;
+esac
+
+# and report it, if appropriate
+case "$action" in
+*q*)	;;
+*)	case "$oldstatus" in
+	'')	title="newgroup $g"	;;
+	*)	title="status change for $g"	;;
+	esac
+	(
+		echo "$author said to"
+		case "$oldstatus" in
+		'')	echo "create \`$g'."	;;
+		*)	case "$newstatus" in
+			m)	p=moderated	;;
+			*)	p=unmoderated	;;
+			esac
+			echo "set \`$g' to $p."	;;
+		esac
+		case "$fail" in
+		'')	echo "This was done."	;;
+		*)	echo "This failed:"
+			echo "	$fail"
+			;;
+		esac
+		case "$action" in
+		*v*)	echo '==='
+			cat $posting
+			echo '==='
+			;;
+		esac
+	) | report "$title"
+	;;
+esac

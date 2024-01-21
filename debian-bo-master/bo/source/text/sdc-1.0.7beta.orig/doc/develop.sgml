@@ -1,0 +1,524 @@
+		       <!-- -*-jfw-sgml-*- -->
+<!doctype book public "-//JFW//DTD Book//EN" [
+
+<!ENTITY sdc "<code/sdc/" >
+
+<!ENTITY notation SYSTEM "notations.sgml" SUBDOC >
+
+<!ENTITY bib SYSTEM "intro-bib.sgml" subdoc>
+<!ENTITY % f.text SYSTEM "common.ent" > %f.text;
+
+<!ENTITY loutcnv SYSTEM "../target/lout/preparse.scm" >
+
+<!ENTITY % LaTeX "IGNORE" >
+<![ %LaTeX [ <!ENTITY LaTeX SDATA "\LaTeX" > ]]>
+<!ENTITY LaTeX "LaTeX" >
+]>
+
+<book
+author="J&oe;rg Wittenberger"
+inst="University of Technology Dresden"
+date="26. 6. 1996, unfinished"
+>&sdc; -- developers documentation
+
+<intro>
+This document decribes <em/some/ internals of the &sdc;.
+
+Unfortunatly some code is inherited from older versions and some new
+code needs to be documented, but this is a lot of work. I must assume
+that only a few people will ever read this document, therfor I decided
+not to put too much efford in.
+
+If you encounter problems, can't understand what I could have been
+talking about etc. don't hesitate to mail me.
+
+</intro>
+
+<chapt>Overview
+
+&bib;
+
+First of all after parsing the command line &sdc; checks if it can
+derive a desired target format. It either uses the argument given to
+the <code/-O/ switch or if there is none it tries to guess the target
+format from the extension of the output file. Having this string it
+looks for a <code>target<var>name<code>preparse.scm</code> in the
+installation directory. If the file is readable, it is loaded as a
+scheme file
+<footnote>
+Throughout this paper the term "loaded" is used to refer to the
+process of loading a file as scheme does. This means the file must
+contain valid scheme source which is evaluated in the interpreter.
+</footnote>
+and the target format is treated valid. Through loading this file
+settings depending on the target formats are done. There are some
+hooks which can be set. Pre- and postpressors may be hooked in (but
+postprocessors may also be hooked in at a later stage).
+
+<note>
+In fact this <code/preparse.scm/ file may be empty, but if it is
+readable or not is used to decide whether a given name is a valid
+(implemented) target format. This check is no longer stricktly
+nessesary but there for historical reasons. It might be reduced just
+to check for the directory <code>target<var>name</var>.
+</note>
+
+Now &sdc; converts from SGML into the target format by first
+invoking sgmls or nsgmls on the SGML source, keeping the <code/esis/
+output in a temporary file. Prior to start sgmls/nsgmls the
+environment variable DOCPATH ist asked for. If it doesn't exist the
+current directory is assumed. This value is extended by the
+library directories and passed as <code/SGML_SEARCH_PATH/ to nsgmls
+and, each element of the path extended by <code>/%S</code>, as
+<code/ SGML_PATH/ to sgmls.
+
+<bf/A note about history and this manual/
+
+The 0.7 version of &sdc; is a mayor reimplementation of the former
+version.
+At the moment (version 0.7) all old code is still left in, as the rtf
+target is not yet reimplemented...
+Also there is still some code which came from even older time.
+I wrote about those ages ago:
+
+&sdc; has developed from it's precessor, which in turn was simillar
+to the <em/format/ from the QUERTZ project. It's precessor tried hard
+to do it's job using shell scripts, m4, sed and other things. But it
+turned out, that it is almost impossible to do everything &sdc; does
+with these tools. Therefore I choose to reimplement it using a
+language with excellent extension capabilities, scheme.
+
+At the other hand I've been new to scheme at that time -- &sdc; is
+in fact my first real scheme program. Also there were some more or
+less working code left. Tor these reasons some things are pretty
+straight forward implemented and will be changed some day. At the
+other hand some things are done in a way hard to understand. This is
+mostly because the code is left from the shell script time.
+
+I'll point it out if things are still to be changed.
+
+<chapt>The convertion process
+
+Preparse.scm can be used to set something due to the target
+format. Per convention it adds a option to the sgml preprocessor
+defining an system entity to identify the target format like this
+
+<verb>
+(set! sgml-opts (string-append "-i Lout " sgml-opts))
+</verb>
+
+Please note the naming convention: all system entities introduced
+through &sdc; or it's DTD's begin with a capital letter. The
+namespace for user defined entities is defined as that starting with
+lower case letters.
+
+<note>
+Also the <code/sgml-subdir/ is set here to point to the subdirectory
+<code/ sgml/.
+This is because older versions didn't have it, and those are still the
+default.
+This will change some day, but is won't hurd to set it anyway.
+
+The old version used also to set the variable 
+<code/doc-postprocess-hook/ here if nessesary.
+</note>
+
+As the old way is still the default the variable
+ <code/compile-function/ is set to the one defined within the file.
+
+The convertions for the targets <code/ascii/ and <code/ps/ use this
+file to redirect themself to invoke <code/lout/ adding the call to
+lout as postprocess.
+
+<sect>SGML parsing
+
+The value of the environment variable <code/DOCPATH/ is extended in a
+way that the front end parser will also look down from the
+subdirectory <code/sgml-subdir/ of the installation directory for
+system id's. It is passed to the parser as <code/SGML_PATH/ (for
+sgmls) and <code/SGML_SEARCH_PATH/ (for nsgmls).
+
+Directories given to &sdc; via the <code/-D/ option are prepended to
+that value.
+
+Also directories mentioned in the environment variable 
+<code/TYPESETLIB/ or introduced by the command line switch <code/-L/ 
+are looked up for here.
+These are appended to the path.
+
+ <quote>
+ There is a HACK to work around a bug in sgmls: The parsing of
+ SUBDOC's starts with an empty table of entities. Therefore a
+ temporary file is created holding those definitions explicitly and
+ included from the file <code>dtd/targets</code>. As we are forced to
+ use a well known name for it (to be able to include it) you can't
+ have more than one &sdc; run in the same directory at the same
+ time.
+ (This file is written into the cwd.)
+
+
+ For nsgmls this hack is removed at compile time (depending on a
+ makefile config setting.
+ </quote>
+
+Then the input files are parsed by sgmls and converted into the 
+<code/esis/ format. The output of this process is read by &sdc; into
+the list <code/sgmls-output/. This list consists of pairs where the
+car is the command character and the cdr is the rest of the line. The
+variable is not supposed to be touched until the end of compilation.
+
+The executable for <code/sgmls/ is searched along
+the <code/bin/ subdirectories of the library path
+and is called <code/sdc-sgmls/.
+This is to avoid confusion with other software
+and
+because I can't keep up to date
+with the frequent changes made to sgmls.
+
+<note>
+Most systems suffer from having sgmls version 1.1 installed
+under the name "sgmls".
+As the 1.1.91 version behaves the same as 1.1 there is
+ <em/no/ need to keep the 1.1 version.
+</note>
+
+<sect id=Convertion>Converting the esis representation
+<index id="compile-function"
+>
+
+Next a function <code/compile-function/ is called from &sdc;. This
+receives three arguments: a list of the esis lines.
+The format (contents) of this variable (argument) is to be changed.
+It's only purpose is to be feed to the function <code/token-stream/,
+which converts it into a stream suitable for further processing.
+
+The stream consists now of tokens of the form:
+<desc>
+<dt/<code>#(STARTTAG <var>GI AttributeList<code>)</dt>
+This represents start tags.
+The <var/GI/ is a symbol of the same name as the tags name in the DTD.
+The <var/AttributeList/ is a list of vectors of the form:
+
+<code>#(<var>AttributeName
+<meta>[ <code>TOKEN <meta>| <code>CDATA <meta>]
+<var>AttributeValue
+<code/)/
+
+<dt/<code>#(ENDTAG <var>GI<code>)</dt>
+
+End tags
+
+<dt/<code/#(PI/ <var/text/)</dt>
+
+Processing instructions
+
+<dt/<code/#(DATA/ <var/text/)</dt>
+
+Data.
+
+</desc>
+
+There are some more not mentioned here. These are used when dealing
+ with NDATA external entities.
+
+There are a some test and extract functions for the elements of these
+ tokens.
+Always use those as the internal representation might change in sake
+ of speed.
+
+<sect>"Normalizing"
+
+Most targets (in fact currently all but the literate one) pass the
+ stream of token through a "normalizer" pass.
+
+This pass adds nothing for the formating. But it adds informations of
+ common value. For instance: All divisions get a hirarchical
+ name. (That is, if you used to part your document with
+ &lt;division>'s you end up here with &lt;sect>'s again.)
+
+The following things are done:
+
+<list>
+
+<o>Remove "side effects" of the use of a mixed content model and short
+references.
+That is, <code/DATA/-tokens are removed if they appear, where no data
+should be allowed if we used an element only model.
+Also <code/&lt;p>/-tags which are inserted for empty lines from the
+short reference mechanism are removed at those positions.
+
+<o>Change to use of hirarchical names for all divisions.
+
+<o>Add a <code/NO/-Attribute to both the division's token and it's
+head token.
+
+<o>Add a <code/NO/ attribute with a running number to list items and a
+ <code/LEVEL/ attribute with the nesting level too.
+
+<o>Add a <code/NO/-Attribute to figures.
+
+<o>Convert <code/&lt;inline>/ elements to look like external
+ <code/NDATA/ entities and process both.
+
+<o>Convert <code/SUBDOC/ entities to appear as a <code/&lt;division>/
+ element of the outer document.
+
+<o>If requested by load options, change some document types (i.e.,
+manpage) to look like a simple document, if the target doesn't
+implement a special formating for it.
+
+<o>If requested by load options and the <code/FACE/ attribute, add
+extra sections for the index and the bibliography.
+
+</list>
+
+<sect>Main processing
+
+Next a simmilar process is launched to convert all the tokens into
+appropriate commands for the target format.
+
+This is somewhat simmilar between the varios formats.
+In fact most formats do not care about the documents structure anymore
+at this stage.
+This is because a) the structure is correct (plus or minus a bug) b)
+it should simpify the program.
+In fact this slows down the execution as large lists are to be
+searched for the propper action.
+
+Only a few tags per target format need a special handling.
+Those appear still to be handled the same way one can learn from the
+ <code>include/normal.scm</code> file.
+All the other are defined by a replacement mechanism.
+These list look like:
+
+<verb>
+(SPLIT #f #"\n")
+</verb>
+The first element of each entry is the name of the GI.
+The second is the value to be replaced for the open tag.
+If <code/#f/ is given, the open tag is removed.
+The third is what is to be replaced for the closing tag.
+The values to be replaced can be a list. In that case all listed
+values are replaced.
+If the value (or an element of the list) is a symbol, the value of the
+attribute with the same name is replaced.
+
+As said, most conversions are quite simmilar.
+Only the info target is somewhat different
+as it has the need to know the
+tree structure of the document
+all the time.
+
+If a target needs to know <em/a lot/ about
+this tree structure
+visit the <code>info/preparse.scm</code> file.
+
+The code:
+ <code>(hook 'rdpl 'add (lambda f (list rdpl-accu)))</code>
+ configures the <code>include/normal.scm</code>
+ to parse the whole document
+into just one token,
+the tree structure of the document.
+
+Unfortunatly the rest of the processing
+(particular the part below the info-old-tbl stuff)
+is not too clean.
+though it might be a little hard to read.
+
+For all the <em/other/ targets
+it's a good idea
+to read through the code of
+ <code>target/lout/preparse.scm</code>.
+
+I'm going to comment this code some more.
+
+<sect>Post processing
+<p>
+
+Some target format invoke a formating tool after the conversation.
+
+Other like info, have one implemented within their own code body.
+
+&sdc; has no idea about use of temporary files
+by post processing tools.
+This might be added at some time.
+(E. g., a notation processing step <ref id=notation// might have
+produced a temporary file
+to be used by the post processing step.)
+Therefor it leaves temp files around some times.
+Also some error conditions are only catched by Scheme runtime errors.
+The handling of those doesn't include deleting of temp Files.
+To make sure those are found by the user
+they are always left in the current directory.
+
+Besides this practical reason
+having temporary files in some (pseudo) random directory
+would be fatal if the user
+was using &sdc; to handle private documens.
+
+</chapt>
+<InclDiv>&notation;
+
+<chapt>Character handling
+
+<index id="Files" sub="chrproc.scm" <index id="Files" sub="procchar.c"
+<index id="process-char"
+<index id="Character handling"
+>
+
+Character handling is the treatment applied to plain text
+(<code/#PCDATA/) in the DTD and to the attributes of tags.
+
+This treatment is to ensure, that only the special characters of SGML
+have a special meaning in the source. All characters special to the
+backend have to be escaped due to the rules of the backend.
+
+A second job of this handling is the support of <code/SDATA/ declared
+entities. <code/Sgmls/ will put them into text lines enclosed by 
+"<code/\|/"-sequences. Those <code/SDATA/ entities contain stuff which
+might have backend specials (e.g., &amp;aplha; is declared for &LaTeX;
+als <code/&lt;ENTITY alpha SDATA "$\alpha$">/). For those Entities the
+escaping has to be turned off.
+
+Third <code/sgmls/ assumes systems which are not 8-bit
+clean. Therefore it converts all characters with the eight bit set
+into octal sequences. These are converted back here.
+
+<chapt>Hooks
+
+There are some hooks defined:
+
+Most hooks are reached via the dynamic hook managment. To run a hook
+type:
+
+<quote/<code>(hook 'run '<var>Name Arguments<code/)//
+
+In general the <code/hook/ function takes a symbol, the command to
+perform, a second symbol, the name of the (dynamic) hook, and a rest
+argument passed to the command.
+
+Command available:
+<desc>
+<dt/run/ The first function is applied to rest argument. Then the next
+function is applied to the return value of the first and so on. The
+last return value is returned.
+
+Hooks run without being defined just return their arguments, i.e.,
+they run the identical function. No error is produced.
+
+<dt/add/ add the function in the rest argument in front of the hook
+
+<dt/append/ append it
+
+<dt/doc/ return the documentation string, if available
+
+<dt/set-doc!/ set the documentation string
+
+</desc>
+
+At the moment there are probably too few hooks defined.
+Hooks in &sdc;:
+<desc>
+<dt/face/ The <code/face/ attribute of the top level element get's
+feed through prior to any use.
+
+<dt/rdpl/ From <code>include/normal.scm</code>. Merely for internal
+use. Wraped around elements wherever either the (normal) stream or a
+tree representation is to be returned from the parser.
+
+<dt/p-body*-frame-body*/ From <code>include/normal.scm</code>.
+Defines which style (%Body)* within an virtual &lt;!element body o o
+(%Body)* > is used.
+
+<dt/p-body*/ Defines which virtual contents definition to use for
+entity %Body.
+
+<dt/normalize-raw, normalize-cooked/ Called with the raw/cooked stream
+feed to/delivered by normalize. Supposed to include debugging
+statements. See <code>rc/watch</code> how it can be set.
+
+<dt/external-messages/ Called with some of the tokens with external
+impact. By default errors ar displayed.
+
+<dt/doc-preprocess-hook, doc-postprocess-hook/ Old, not dynamic hooks
+invoked without any arguments before and after processing the
+document. Use simmilar to the dynamic hook like 
+<code/(doc-process-hook 'add (lambda () ...))/. Better forget about
+them, they might disappear.
+
+</desc>
+
+<chapt>Toolbox
+
+Under the toolbox topic procedures and comcepts will be discussed
+which have proofen to be widly useful for implementing converters or
+implement simple things which might come in handy some time.
+
+Things wich are found in the <code/include/ directory are either there
+for easy and centralized configuration or are candidates for
+generalization and implementation in the compiled part.
+
+<sect>rdp.scm
+
+An implementation of functions to
+implement recursive descendant parsers
+in a descriptive way.
+
+It is based on streams.
+
+The way it's implemented
+it should'nt be too hard to created a parser
+from analysing a DTD.
+That's the way future versions are supposed to overcome the need of
+sgmls.
+
+<sect>Stream.scm
+
+An implementation of streams. It's close to <ref t=B id="SICP"//.
+
+<sect>Strings.scm
+
+<sect>Control.scm
+
+<sect1>Indexing
+
+<sect1>Memoziation for arbitrary functions
+
+<code/(memoize function . ac)/
+
+Function must use as many arguments as there are elements in the
+ <code/ac/-list.
+
+<code/ac/ is a list of comparators.
+Each gets invoked on an argument of the current call
+and the argument to the memoized calls.
+If it returns <code/#t/,
+the arguments are considered to be equal.
+If all arguments are found to be equal,
+the memoized result is used
+otherwise it's computed and remembered.
+
+Example:
+<verb>
+(define m-func
+  (memoize
+    (lambda (a1 a2)  ; the function of some (2) args
+      ...)
+    eq? equal?)      ; an equivalence predicate for each arg
+  )
+</verb>
+
+<sect1>Lists
+
+There are some procedures operating on lists and specially useful with
+&sdc;.
+
+<desc>
+<dt/<code/append-to//<dd>
+<dt/<code/list-flat-once//<dd>
+<dt/<code/(rm1 obj list)//<dd>
+<dt/<code/(remove-all objs list)//<dd>
+</desc>
+
+<sect1>Queues and Stacks
+

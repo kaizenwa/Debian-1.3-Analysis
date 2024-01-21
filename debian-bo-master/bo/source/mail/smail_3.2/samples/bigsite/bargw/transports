@@ -1,0 +1,126 @@
+#ident "@(#) transports,v 1.2 1990/10/24 05:20:46 tron Exp"
+
+# See smail(5) for a complete description of the contents of this
+# file.
+
+# local - deliver mail to local users
+#
+# Tell smail to append directly to user mailbox files in the /usr/mail
+# directory.
+local:	driver = appendfile,		# append message to a file
+	return_path,			# include a Return-Path: field
+	local,				# use local forms for delivery
+	from,				# supply a From_ envelope line
+	unix_from_hack;			# insert > before From in body
+
+	file = /usr/mail/${lc:user},	# use this location for System V
+	group = mail,			# group to own file for System V
+	mode = 0660,			# under System V, group mail can access
+	suffix = "\n",			# append an extra newline
+	append_as_user,
+
+# pipe - deliver mail to shell commands
+#
+# This is used implicitly when smail encounters addresses which begin with
+# a vertical bar character, such as "|/usr/lib/news/recnews talk.bizarre".
+# The vertical bar is removed from the address before being given to the
+# transport.
+pipe:	driver = pipe,			# pipe message to another program
+	return_path, local, from, unix_from_hack;
+
+	cmd = "/bin/sh -c $user",	# send address to the Bourne Shell
+	parent_env,			# environment info from parent addr
+	pipe_as_user,			# use user-id associated with address
+	umask = 0022,			# umask for child process
+	-log_output,			# do not log stdout/stderr
+	ignore_status,			# exit status may be bogus, ignore it
+	ignore_write_errors,		# ignore broken pipes
+
+# file - deliver mail to files
+#
+# This is used implicitly when smail encounters addresses which begin with
+# a slash or squiggle character, such as "/usr/info/list_messages" or
+# perhaps "~/Mail/inbox".
+file:	driver = appendfile,
+	return_path, local, from, unix_from_hack;
+
+	file = $user,			# file is taken from address
+	append_as_user,			# use user-id associated with address
+	expand_user,			# expand ~ and $ within address
+	suffix = "\n",
+	mode = 0644
+
+# uux - deliver to the rmail program on a remote UUCP site
+#
+# As many as five recipient addresses will be delivered to the remote
+# host in one UUCP transaction.
+uux:	driver = pipe,
+	uucp,				# use UUCP-style addressing forms
+	from,				# supply a From_ envelope line
+	max_addrs = 5,			# at most 5 addresses per invocation
+	max_chars = 200;		# at most 200 chars of addresses
+
+	# the -r flag prevents immediate delivery, parentheses around the
+	# $user variable prevent special interpretation by uux.
+	cmd = "/usr/bin/uux - -r -g$grade $host!rmail $((${strip:user})$)",
+	umask = 0022,
+	pipe_as_sender
+
+# uux_one_addr - deliver mail over UUCP to a remote host that can take
+#		 one address at a time.
+#
+# This is often necessary when delivering to a site running an unmodified
+# version of 4.1BSD.
+uux_one_addr:
+	driver = pipe,
+	uucp,				# use UUCP-style addressing forms
+	from;				# supply a From_ envelope line
+
+	# the -r flag prevents immediate delivery
+	cmd = "/usr/bin/uux - -r -g$grade $host!rmail (${strip:user})",
+	umask = 0022, pipe_as_sender
+
+# demand - deliver to a remote rmail program, polling on demand
+demand:	driver = pipe,
+	uucp, from, max_addrs = 5, max_chars = 200;
+
+	# with no -r flag, try to contact remote site immediately
+	cmd = "/usr/bin/uux - -g$grade $host!rmail $(($user)$)",
+	umask = 0022, pipe_as_sender
+
+# uusmtp - deliver to the rsmtp program on a remote UUCP site
+#
+# Deliver using a simple Batched SMTP protocol to the remote machine.
+# This allows much more arbitrary addresses to be used.  It also
+# removes the limit on recipient addresses per invocation of uux.
+uusmtp:	driver = pipe,
+	bsmtp,				# send batched SMTP commands
+	-max_addrs,			# there is no limit on the number or
+	-max_chars;			#   total size of recipient addresses.
+
+	# supply -r to prevent immedate delivery, the recipient addresses
+	# are stored in the data sent to the standard input of rsmtp.
+	cmd = "/usr/bin/uux - -r -g$grade $host!rsmtp",
+	umask = 0022, pipe_as_sender
+
+# demand_uusmtp - deliver to a remote rsmtp program, polling on demand
+demand_uusmtp:
+	driver = pipe,
+	bsmtp, -max_addrs, -max_chars;
+
+	# with no -r flag, try to contact remote site immediately
+	cmd = "/usr/bin/uux - -g$grade $host!rsmtp",
+	umask = 0022, pipe_as_sender
+
+# smtp - deliver using SMTP over TCP/IP
+#
+# Connect to a remote host using TCP/IP and initiate an SMTP conversation
+# to deliver the message.  The smtp transport is included only if BSD
+# networking exists.
+
+# NOTE:	It may be necessary to restrict max_addrs to 100, as this is the
+#	lower limit SMTP requires an implementation to handle for one
+#	message.
+smtp:	driver = smtp,
+	-max_addrs,
+	-max_chars

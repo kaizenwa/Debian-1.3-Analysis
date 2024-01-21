@@ -1,0 +1,108 @@
+# Commands covered:  tcp
+#
+# This file contains a collection of tests for one or more of the Scotty
+# built commands.  Sourcing this file into Scotty runs the tests and
+# generates output for errors.  No output means no errors were found.
+#
+# Copyright (c) 1994, 1995
+#
+# J. Schoenwaelder
+# TU Braunschweig, Germany
+# Institute for Operating Systems and Computer Networks
+#
+# Permission to use, copy, modify, and distribute this
+# software and its documentation for any purpose and without
+# fee is hereby granted, provided that this copyright
+# notice appears in all copies.  The University of Braunschweig
+# makes no representations about the suitability of this
+# software for any purpose.  It is provided "as is" without
+# express or implied warranty.
+#
+
+if {[string compare test [info procs test]] == 1} then {source defs}
+
+# set VERBOSE 1
+
+catch { foreach file [tcp info] { catch {tcp close $file} } }
+test tcp-1.1 {tcp info} {
+    tcp info
+} {}
+test tcp-1.2 {tcp connect} {
+    string match file* [tcp connect 127.0.0.1 echo]
+} {1}
+test tcp-1.3 {tcp listen} {
+    string match file* [tcp listen 8765]
+} {1}
+test tcp-1.4 {tcp connect & tcp info} {
+    set f [tcp connect 127.0.0.1 echo]
+    lrange [tcp info $f] 2 end
+} {127.0.0.1 7}
+
+catch { foreach file [tcp info] { catch {tcp close $file} } }
+test tcp-2.1 {tcp close} {
+    set f [tcp connect 127.0.0.1 echo]
+    tcp close $f
+    tcp info
+} {}
+test tcp-2.2 {tcp close error} {
+    list [catch {tcp close stdin} msg] $msg
+} {1 {bad tcp handle "stdin"}}
+test tcp-2.3 {tcp close error} {
+    set f [tcp connect 127.0.0.1 echo]
+    tcp close $f
+    catch {tcp close $f}
+} {1}
+
+catch { foreach file [tcp info] { catch {tcp close $file} } }
+test tcp-3.1 {tcp accept} {
+    set s [tcp listen 8765]
+    set c [tcp connect 127.0.0.1 8765]
+    set t [tcp accept $s]
+    set res "[lindex [tcp info $s] 1] [lrange [tcp info $c] 2 3]"
+} {8765 127.0.0.1 8765}
+test tcp-3.2 {tcp accept error} {
+    set f [tcp connect 127.0.0.1 echo]
+    catch {tcp accept $f}
+} {1}
+test tcp-3.3 {tcp accept error} {
+    catch {tcp accept stdin} msg]
+} {1}
+
+catch { foreach file [tcp info] { catch {tcp close $file} } }
+test tcp-4.1 {tcp shutdown} {
+    set f [tcp connect 127.0.0.1 echo]
+    tcp shutdown $f all
+    tcp close $f
+} {}
+test tcp-4.2 {tcp shutdown error} {
+    catch {tcp shutdown stdin all}
+} {1}
+
+catch { foreach file [tcp info] { catch {tcp close $file} } }
+test tcp-5.1 {tcp communication} {
+    set msg "What PROGRAM are they watching?"
+    set f [tcp connect 127.0.0.1 echo]
+    puts $f $msg
+    gets $f msg
+    tcp shutdown $f all
+    tcp close $f
+    set msg
+} {What PROGRAM are they watching?}
+
+catch { foreach file [tcp info] { catch {tcp close $file} } }
+# test tcp-6.1 {tcp read/write} {
+#     set f [tcp listen]
+#     set p [lindex [tcp info $f] 1]
+#     set A [tcp connect localhost $p]
+#     set B [tcp accept $f]
+# 
+#     puts $A does; catch {flush $A}; gets $B r1;	catch {flush $B}
+#     puts $B it;   catch {flush $B}; gets $A r2;	catch {flush $A}
+#     puts $A work; catch {flush $A}; gets $B r3;	catch {flush $B}
+#     puts $B ?;    catch {flush $B}; gets $A r4; catch {flush $A}
+# 
+#     tcp close $B
+#     tcp close $A
+#     tcp close $f
+#     concat $r1 $r2 $r3 $r4
+# } {does it work ?}

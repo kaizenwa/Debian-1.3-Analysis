@@ -1,0 +1,220 @@
+#!/usr/bin/make -f
+
+# Package name
+PKG := ncurses
+
+# Library soname
+SON := 3.0
+
+# Package version
+VER := 1.9.9e
+
+# Package revision
+DEB := 1
+
+# Top directory of pre-deb hierarchy
+TMP := $(shell pwd)/tmp
+TMP-BASE := $(TMP)-base
+TMP-BIN := $(TMP)-bin
+TMP-DEV := $(TMP)-dev
+TMP-PIC := $(TMP)-pic
+TMP-TERM := $(TMP)-term
+	
+# Get the architecture for the binary
+ARC := $(shell dpkg --print-architecture)
+	
+# Miscellaneous directories we need
+TMPDIRS = $(PKG)-src \
+	$(TMP-BASE)/DEBIAN \
+	$(TMP-BASE)/etc/terminfo/a \
+	$(TMP-BASE)/etc/terminfo/d \
+	$(TMP-BASE)/etc/terminfo/l \
+	$(TMP-BASE)/etc/terminfo/r \
+	$(TMP-BASE)/etc/terminfo/s \
+	$(TMP-BASE)/etc/terminfo/v \
+	$(TMP-BASE)/etc/terminfo/x \
+	$(TMP-BASE)/usr/doc/copyright \
+	$(TMP-BASE)/usr/lib/tabset \
+	$(TMP-BASE)/usr/lib/terminfo/a \
+	$(TMP-BASE)/usr/lib/terminfo/d \
+	$(TMP-BASE)/usr/lib/terminfo/l \
+	$(TMP-BASE)/usr/lib/terminfo/r \
+	$(TMP-BASE)/usr/lib/terminfo/s \
+	$(TMP-BASE)/usr/lib/terminfo/v \
+	$(TMP-BASE)/usr/lib/terminfo/x \
+	$(TMP-DEV)/DEBIAN \
+	$(TMP-DEV)/usr/doc/copyright \
+	$(TMP-DEV)/usr/doc/examples/$(PKG)-dev \
+	$(TMP-DEV)/usr/doc/$(PKG)-dev \
+	$(TMP-DEV)/usr/include \
+	$(TMP-DEV)/usr/lib \
+	$(TMP-DEV)/usr/lib/tabset \
+	$(TMP-DEV)/usr/man/man1 \
+	$(TMP-DEV)/usr/man/man3 \
+	$(TMP-DEV)/usr/man/man5 \
+	$(TMP-DEV)/usr/man/man7 \
+	$(TMP)/DEBIAN \
+	$(TMP)/lib \
+	$(TMP)/usr/doc/copyright \
+	$(TMP)/usr/lib \
+	$(TMP-BIN)/DEBIAN \
+	$(TMP-BIN)/usr/bin \
+	$(TMP-BIN)/usr/doc/copyright \
+	$(TMP-BIN)/usr/man/man1 \
+	$(TMP-PIC)/DEBIAN \
+	$(TMP-PIC)/usr/doc/copyright \
+	$(TMP-PIC)/usr/lib \
+	$(TMP-TERM)/DEBIAN \
+	$(TMP-TERM)/usr/doc/copyright \
+	$(TMP-TERM)/usr/lib/terminfo
+
+DOCUMENTS := ANNOUNCE \
+ 	NEWS \
+ 	README \
+ 	TO-DO \
+ 	announce.html \
+ 	misc/ncurses-intro.doc \
+ 	misc/ncurses-intro.html \
+ 	menu/READ.ME
+
+# All of our targets are just actions
+.PHONY: all build binary source diff
+
+# Perform all important actions by default
+all: binary source diff
+
+# Makes a binary package.
+build:
+	./configure --with-shared --disable-termcap --enable-warnings --prefix=/usr --with-includedir=/usr/include --with-normal --with-debug
+	make all "LIB_CURSES=../lib/libncurses.so"
+
+# Makes a binary package.
+binary: build $(TMPDIRS)
+	make prefix=$(TMP-DEV)/usr exec_prefix=$(TMP-BIN)/usr includedir=$(TMP-DEV)/usr/include libdir=$(TMP-DEV)/usr/lib mandir=$(TMP-DEV)/usr/man devel_mandir=$(TMP-DEV)/usr/man runtime_mandir=$(TMP-BIN)/usr/man ticdir=$(TMP-TERM)/usr/lib/terminfo install
+	# Create the PIC libraries for Bruce
+	sh pic_libraries.sh $(SON)
+	# ncurses.h now goes in /usr/include, but we want to preserve
+	# the illusion of a /usr/include/ncurses directory so autoconf
+	# programs and the like will be happy.
+	install -o root -g root -m 644 ncurses.h $(TMP-DEV)/usr/include/ncurses.h
+	ln -sf . $(TMP-DEV)/usr/include/ncurses
+	# The tabset stuff should be in base, not dev (but we don't want CVS dir
+	rm -rf $(TMP-DEV)/usr/lib/tabset/CVS
+	cp $(TMP-DEV)/usr/lib/tabset/* $(TMP-BASE)/usr/lib/tabset
+	rm -rf $(TMP-DEV)/usr/lib/tabset
+	# Our section 1 man pages are for stuff in the -bin package,
+	# not the -dev package
+	mv $(TMP-DEV)/usr/man/man1/* $(TMP-BIN)/usr/man/man1/
+	rmdir $(TMP-DEV)/usr/man/man1
+	ln -s outopts.3ncurses $(TMP-DEV)/usr/man/man3/clearok.3ncurses
+	ln -s termcap.3ncurses $(TMP-DEV)/usr/man/man3/tgetent.3ncurses
+	# Move the libraries from the developer area (where ncurses
+	# installs them) to the libraries package.
+	mv $(TMP-DEV)/usr/lib/libform.so.$(VER) $(TMP)/usr/lib/libform.so.$(SON)
+	mv $(TMP-DEV)/usr/lib/libmenu.so.$(VER) $(TMP)/usr/lib/libmenu.so.$(SON)
+	mv $(TMP-DEV)/usr/lib/libncurses.so.$(VER) $(TMP)/lib/libncurses.so.$(SON)
+	mv $(TMP-DEV)/usr/lib/libpanel.so.$(VER) $(TMP)/usr/lib/libpanel.so.$(SON)
+	# Get rid of extraneous links in the developer area
+	rm -rf $(TMP-DEV)/usr/lib/lib*so*
+	# The links for ld should be in the dev package
+	ln -sf libform.so.$(SON) $(TMP-DEV)/usr/lib/libform.so
+	ln -sf libmenu.so.$(SON) $(TMP-DEV)/usr/lib/libmenu.so
+	ln -sf ../../lib/libncurses.so.$(SON) $(TMP-DEV)/usr/lib/libncurses.so
+	ln -sf libpanel.so.$(SON) $(TMP-DEV)/usr/lib/libpanel.so
+	# libcurses is no more, all hail libncurses.
+	rm -rf $(TMP-DEV)/usr/lib/libcurses.a
+	ln -sf libncurses.a $(TMP-DEV)/usr/lib/libcurses.a
+	ln -sf ../../lib/libncurses.so.$(SON) $(TMP-DEV)/usr/lib/libcurses.so
+	# Create our minimum terminfo set, and links so older programs
+	# can reliably find things.
+	mv $(TMP-TERM)/usr/lib/terminfo/a/ansi $(TMP-BASE)/etc/terminfo/a/ansi
+	ln -sf ../../../../etc/terminfo/a/ansi $(TMP-BASE)/usr/lib/terminfo/a/ansi
+	mv $(TMP-TERM)/usr/lib/terminfo/d/dumb $(TMP-BASE)/etc/terminfo/d/dumb
+	ln -sf ../../../../etc/terminfo/d/dumb $(TMP-BASE)/usr/lib/terminfo/d/dumb
+	mv $(TMP-TERM)/usr/lib/terminfo/l/linux $(TMP-BASE)/etc/terminfo/l/linux
+	ln -sf ../../../../etc/terminfo/l/linux $(TMP-BASE)/usr/lib/terminfo/l/linux
+	mv $(TMP-TERM)/usr/lib/terminfo/r/rxvt $(TMP-BASE)/etc/terminfo/r/rxvt
+	ln -sf ../../../../etc/terminfo/r/rxvt $(TMP-BASE)/usr/lib/terminfo/r/rxvt
+	mv $(TMP-TERM)/usr/lib/terminfo/s/sun $(TMP-BASE)/etc/terminfo/s/sun
+	ln -sf ../../../../etc/terminfo/s/sun $(TMP-BASE)/usr/lib/terminfo/s/sun
+	mv $(TMP-TERM)/usr/lib/terminfo/v/vt100 $(TMP-BASE)/etc/terminfo/v/vt100
+	ln -sf ../../../../etc/terminfo/v/vt100 $(TMP-BASE)/usr/lib/terminfo/v/vt100
+	mv $(TMP-TERM)/usr/lib/terminfo/v/vt102 $(TMP-BASE)/etc/terminfo/v/vt102
+	ln -sf ../../../../etc/terminfo/v/vt102 $(TMP-BASE)/usr/lib/terminfo/v/vt102
+	mv $(TMP-TERM)/usr/lib/terminfo/v/vt220 $(TMP-BASE)/etc/terminfo/v/vt220
+	ln -sf ../../../../etc/terminfo/v/vt220 $(TMP-BASE)/usr/lib/terminfo/v/vt220
+	mv $(TMP-TERM)/usr/lib/terminfo/v/vt52 $(TMP-BASE)/etc/terminfo/v/vt52
+	ln -sf ../../../../etc/terminfo/v/vt52 $(TMP-BASE)/usr/lib/terminfo/v/vt52
+	mv $(TMP-TERM)/usr/lib/terminfo/x/xterm $(TMP-BASE)/etc/terminfo/x/xterm
+	ln -sf ../../../../etc/terminfo/x/xterm $(TMP-BASE)/usr/lib/terminfo/x/xterm
+	mv $(TMP-TERM)/usr/lib/terminfo/x/xterm-color $(TMP-BASE)/etc/terminfo/x/xterm-color
+	ln -sf ../../../../etc/terminfo/x/xterm-color $(TMP-BASE)/usr/lib/terminfo/x/xterm-color
+	# Install our copyright documentation
+	install -o root -g root -m 644 debian.copyright $(TMP-BASE)/usr/doc/copyright/$(PKG)-base
+	install -o root -g root -m 644 debian.copyright $(TMP-DEV)/usr/doc/copyright/$(PKG)$(SON)-dev
+	install -o root -g root -m 644 debian.copyright $(TMP)/usr/doc/copyright/$(PKG)$(SON)
+	install -o root -g root -m 644 debian.copyright $(TMP-BIN)/usr/doc/copyright/$(PKG)-bin
+	install -o root -g root -m 644 debian.copyright $(TMP-PIC)/usr/doc/copyright/$(PKG)-pic
+	install -o root -g root -m 644 debian.copyright $(TMP-TERM)/usr/doc/copyright/$(PKG)-term
+	# Install the developer's documentation
+	cp $(DOCUMENTS) $(TMP-DEV)/usr/doc/$(PKG)-dev
+	chmod 644 $(TMP-DEV)/usr/doc/$(PKG)-dev/*
+	chown root.root $(TMP-DEV)/usr/doc/$(PKG)-dev/*
+	rm -f $(TMP-DEV)/usr/doc/$(PKG)-dev/*.gz
+	gzip -9vf $(TMP-DEV)/usr/doc/$(PKG)-dev/*
+	# Install the examples (but not the exes)
+	cd test && $(MAKE) clean
+	cp -a test/* $(TMP-DEV)/usr/doc/examples/$(PKG)-dev
+	-rm -rf $(TMP-DEV)/usr/doc/examples/$(PKG)-dev/CVS
+	chown -R root.root $(TMP-DEV)/usr/doc/examples/$(PKG)-dev
+	# Install all control files
+	sed -e 's/=V/$(VER)-$(DEB)/g' -e 's/=S/$(SON)/g' -e 's/=A/$(ARC)/g' < debian.control-base > $(TMP-BASE)/DEBIAN/control
+	chmod 644 $(TMP-BASE)/DEBIAN/control
+	sed -e 's/=V/$(VER)-$(DEB)/g' -e 's/=S/$(SON)/g' -e 's/=A/$(ARC)/g' < debian.control-dev > $(TMP-DEV)/DEBIAN/control
+	chmod 644 $(TMP-DEV)/DEBIAN/control
+	sed -e 's/=V/$(VER)-$(DEB)/g' -e 's/=S/$(SON)/g' -e 's/=A/$(ARC)/g' < debian.control > $(TMP)/DEBIAN/control
+	chmod 644 $(TMP)/DEBIAN/control
+	sed -e 's/=V/$(VER)-$(DEB)/g' -e 's/=S/$(SON)/g' -e 's/=A/$(ARC)/g' < debian.control-bin > $(TMP-BIN)/DEBIAN/control
+	chmod 644 $(TMP-BIN)/DEBIAN/control
+	sed -e 's/=V/$(VER)-$(DEB)/g' -e 's/=S/$(SON)/g' -e 's/=A/$(ARC)/g' < debian.control-term > $(TMP-TERM)/DEBIAN/control
+	chmod 644 $(TMP-TERM)/DEBIAN/control
+	sed -e 's/=V/$(VER)-$(DEB)/g' -e 's/=S/$(SON)/g' -e 's/=A/$(ARC)/g' < debian.control-pic > $(TMP-PIC)/DEBIAN/control
+	chmod 644 $(TMP-PIC)/DEBIAN/control
+	# Install the installation files
+	install -o root -g root -m 755 debian.preinst-bin $(TMP-BIN)/DEBIAN/preinst
+	install -o root -g root -m 755 debian.postinst $(TMP)/DEBIAN/postinst
+	install -o root -g root -m 755 debian.preinst-base $(TMP-BASE)/DEBIAN/preinst
+	# Build the packages
+	dpkg --build $(TMP-BASE)
+	dpkg --build $(TMP-DEV)
+	dpkg --build $(TMP)
+	dpkg --build $(TMP-BIN)
+	dpkg --build $(TMP-PIC)
+	dpkg --build $(TMP-TERM)
+	# Move the packages to the appropriate name
+	mv $(TMP-BASE).deb ../$(PKG)-base-$(VER)-$(DEB).all.deb
+	mv $(TMP-DEV).deb ../$(PKG)$(SON)-dev-$(VER)-$(DEB).$(ARC).deb
+	mv $(TMP).deb ../$(PKG)$(SON)-$(VER)-$(DEB).$(ARC).deb
+	mv $(TMP-BIN).deb ../$(PKG)-bin-$(VER)-$(DEB).$(ARC).deb
+	mv $(TMP-PIC).deb ../$(PKG)$(SON)-pic-$(VER)-$(DEB).$(ARC).deb
+	mv $(TMP-TERM).deb ../$(PKG)-term-$(VER)-$(DEB).all.deb
+
+# Creates temporary directory hierarchy
+$(TMPDIRS):
+	install -d -g root -o root -m 755 $@
+	chmod g-s $@
+
+# Undoes the effect of `make -f debian.rules build'.
+clean:
+	-make distclean
+	-rm -rf $(TMP) $(TMP-BASE) $(TMP-BIN) $(TMP-DEV) $(TMP-PIC) $(TMP-TERM) $(PKG)-src
+
+# Makes a context diff.
+diff: 
+	cvs rdiff -u -r DIST debian/$(PKG) | gzip -9f > ../$(PKG)-$(VER)-$(DEB).diff.gz
+
+# Makes a source package.
+source:
+	cvs export -d $(PKG)-src/$(PKG)-$(VER) -D now debian/$(PKG)
+	cd $(PKG)-src && tar cf - $(PKG)-$(VER) | gzip -9f > ../../$(PKG)-$(VER)-$(DEB).tar.gz
+	rm -rf $(PKG)-src

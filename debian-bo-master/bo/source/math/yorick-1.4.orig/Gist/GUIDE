@@ -1,0 +1,2391 @@
+
+                    GIST - User's Guide
+
+     A Portable Graphics Package for Scientific Applications
+
+                      David H. Munro
+           Lawrence Livermore National Laboratory
+             P.O. Box 808, Livermore, CA  94550
+           munro@icf.llnl.gov       (510)422-5428
+
+   $Id: GUIDE,v 1.1 1993/08/27 17:11:32 munro Exp $
+
+
+1. Overview
+===========
+
+   One of the obvious advantages of the new Cray-class workstations
+over traditional mainframes is the possibility of good interactive
+graphics.  Unfortunately, neither I nor anyone in my group has
+discovered a graphics package suitable for our hydrodynamics and
+atomic physics programs, either commercially or available on Internet.
+For us, "suitable" means:
+
+     1) Able to drive X windows, make PostScript files, and make
+        some sort of graphics metafile for archival storage.  There
+        must be a program to view and print selected frames from an
+        archived metafile.
+     2) Available on all UNIX platforms.
+     3) Within a reasonable factor of hardware speed.
+     4) Able to produce x-vs-y plots with "good" tick marks and
+        tick labels, able to handle log and linear axes.  We also
+        want to be able to plot 2-D quadrilateral meshes and
+        contours, vector fields, or pseudocolor maps on such meshes.
+     5) Include intelligible source code, or, at least, be reasonably
+        bug-free.
+
+Eventually, I realized that I could write a graphics package quicker
+than we were likely to find one.  Here it is.
+
+   Gist comes as a compressed tar file, gist.tar.Z.  Use uncompress to
+decompress it, and tar to unpack it.  Follow the instructions in the
+README file to build the library and the metafile viewer.  The package
+is written in ANSI C, so you will need to get an ANSI C compiler
+before you can use it.  If you don't have one, I recommend you try the
+GNU C compiler (available by anonymous ftp from prep.ai.mit.edu, along
+with a great deal of other useful GNU software).
+
+   Gist currently supports three graphics output devices: X windows
+are used for interactive output (Gist provides the hooks for X input,
+but only handles expose, unmap, and resize events itself).  PostScript
+files are the lingua franca of laser printers; I regard a PostScript
+file as the moral equivalent of hardcopy.  Finally, I chose the binary
+CGM format as the archival metafile for Gist.  The disadvantage of the
+CGM standard is that, unlike PostScript, CGM is not a page description
+language.  There is enough information in the file to describe a page,
+but the ANSI standard does not specify precisely how that information
+is to be used to put marks on a page.  Therefore, any graphics package
+which writes CGM files is implicitly required to supply a program
+capable of converting its CGM files into X window and PostScript
+output.  The Gist package includes a reasonably nice CGM browser
+(called "gist"), which you can use to look through typical
+multi-hundred page archived CGM files to view selected frames in an X
+window, or send them to a PostScript file, or to a smaller CGM file.
+
+   The Gist subroutine library contains routines at four levels:
+
+P level- output primitives (e.g.- draw polyline or draw text) and
+         primitive control functions (e.g.- new page)
+A level- more complicated output functions implemented by multiple
+         calls to P level routines (e.g.- draw decorated polyline or
+         draw ticks and labels)
+D level- display list functions.  D level routines build and maintain
+         display lists for use by interactive post-processor codes.
+         Any A or P level function has a D level counterpart.  A display
+         list may be "played back" onto any output device any number of
+         times.  An interactive code would use this feature to allow a
+         user to modify plot limits or log/linear axis scaling without
+         having to regenerate the entire plot.  When the user has the
+         picture he wants in an X window, the display list can be
+         "played back" to a PostScript or CGM file.
+H level- high level control functions.  These are again intended for
+         use by an interactive code.  The final section of the Gist
+         README file describes the interactive plotting interface I
+         have in mind.
+
+The P level routines are based on the GKS, but I have modified this
+outdated standard to ease the pain of implementation.  A nearly
+complete GKS Level ma FORTRAN binding is a included as part of the
+Gist library.  If you are writing a code from scratch, please don't
+use this, but if you can painlessly convert an existing code to Gist,
+be my guest.  Don't be afraid to modify the code in fort.c if it
+doesn't quite work for you.
+
+   Gist is written in an object oriented style.  There are two base
+classes, representing the graphics engine (at P level), and a display
+list element (at D level).
+
+  Each X window, PostScript file, or CGM file is an instance of an
+Engine (which you should normally treat as a pointer to an opaque
+struct).  If you don't reference the Gist function which creates a
+particular type of Engine, say an X Engine, then your code will not
+load any of the part of Gist which references Xlib.  (In fact, by
+setting switches in the Makefile, you can build Gist on systems which
+have no Xlib.  Details are given in README.)  The Engine data
+structure contains function pointers to routines which supply the
+P level functions.  In order to create a new type of output device
+(Tektronics 4014 output is the most often requested), you merely
+supply the required virtual functions.  The easiest way to do this is
+to start with either the X Engine (source xbasic.c), the PostScript
+Engine (source ps.c), or the CGM Engine (source cgm.c).
+
+
+1A. References
+--------------
+
+   I wrote Gist to conform to the X Window System, as described in
+Volumes Zero, One, and Two of the O'Reilly books:
+
+     Volume 0: X Protocol Reference Manual (May 1990, second printing)
+     Volume 1: Xlib Programming Manual (July 1990, fifth printing)
+     Volume 2: Xlib Reference Manual (July 1990, fifth printing)
+     O'Reilly & Associates, Inc.
+     632 Petaluma Ave., Sebastopol, CA 95472  1-800-338-6887
+
+The Gist X engine should work under releases 3, 4, or 5 of X11,
+although the Makefile must be adjusted for R3 (see Makefile), and I
+have only tested it under R4.  If you don't have them, you should get
+at least some of the Adobe fonts provided on the MIT R4 tapes
+(available from export.lcs.mit.edu on Internet).  (You should also
+consider switching vendors.)
+
+   The authority for the Gist PostScript engine is:
+
+     PostScript Language Reference Manual (second edition)
+     Adobe Systems Inc.
+     Addison-Wesley, first printing, December 1990
+
+A Gist-generated PostScript file should be interpretable by a level 1,
+level 1 with CMYK color extensions, or level 2 PostScript interpreter.
+The Courier, Times, Helvetica, Symbol, and New Century Schoolbook fonts
+are assumed available; if your printer doesn't have some of them, don't
+use the ones you don't have.
+
+   The authority for the Gist CGM engine is:
+
+     Computer Graphics - Metafile for the Storage and Transfer of
+     Picture Description Information, ANSI X3.122-1986,
+     approved August 27, 1986
+     (also ISO DIS 8632-1987)
+     American National Standards Institute, Inc.
+     1430 Broadway, New York, NY 10018
+
+A Gist-generated CGM file should be fully compatible with this
+standard, with the caveat that the standard is not a page description
+language.  There are two insignificant exceptions: First, I use the
+PostScript font names (e.g.- "Times-Roman" or "Helvetica-BoldOblique")
+in the FONT LIST command, rather than the recommended ISO standard
+font names.  (This does not actually make a Gist file non-conforming
+in my reading of the standard.)  Second, I use an APPLICATION DATA
+command (known outside of ANSI standards commitees as a "comment") to
+mark polylines which are to be smoothed with Bezier curves.  The
+"correct" result of interpreting the CGM file is therefore a polyline,
+not a poly-Bezier curve.  Since the latter approximates the former,
+this presents a less severe practical problem than the intentional
+omission of rendering instructions from the standard.
+
+
+
+
+
+
+2. Low Level (P and A) Gist User Interface
+==========================================
+
+   A C (or C++) program will normally require either:
+
+     #include <gist.h>
+
+   or
+
+     #include <hlevel.h>
+
+in order to use Gist graphics routines.  You will need hlevel.h if and
+only if you use H level routines.  The other header files are mostly
+intended for internal use; unless you are implementing a new Engine
+type you shouldn't need them.  The one exception is the dispas.h
+header, which you will need if you want to use Gist's input event loop
+(this is very handy for interactive codes using X windows -- without
+it there is no way for your code to handle input from either stdin or
+an X window).  The input event loop is discussed in section 3 below.
+
+
+2A. Error handling
+------------------
+
+   Most Gist routines return int 0 on success, non-zero on failure.
+The global variable
+     extern char gistError[128];
+will contain a string describing the error.  If you can't understand my
+error string, remember that you have the source code.
+
+
+2B. Engine lifecycle functions
+------------------------------
+
+   The first thing you will need to do is to create one or more
+graphics engines.  You would do this with the following lines of code:
+
+     Engine *xEngine, *psEngine, *cgmEngine;
+     int landscape= 0;
+     int colorMode= 0;  /* see section 2H below */
+     int dpiX= 100;
+
+     xEngine= GpBXEngine("Name of X window", landscape, dpiX,
+                         "host:server.screen");
+     psEngine= GpPSEngine("Title of PostScript file", landscape, colorMode,
+                          "example.ps");
+     cgmEngine= GpCGMEngine("Title of CGM file", landscape, colorMode,
+                            "example.cgm");
+
+You may create as many engines of as many types as you like.  If the
+routines should fail, a 0 Engine* is returned, and the global variable
+gistError will contain a string describing the problem.
+
+   A new X window should appear immediately after GpBXEngine is
+called.  Gist manages server connections, so you needn't worry about
+calling GpBXEngine multiple times with the same display string
+("host:server.screen") or equivalent display strings; Gist will make
+only one connection to each server.
+
+   The file "example.ps" (or "example.cgm") is not created by the call
+to GpPSEngine (or GpCGMEngine); Gist defers file creation until the
+first attempt to write to the file.  Any existing file of that name
+will then be overwritten.
+
+   Like GKS workstations, Gist engines can be either active, that is,
+ready to draw when an output primitive function is invoked, or not.
+All engines are born inactive.  You activate or deactivate them using
+GpActivate and GpDeactivate.  Unlike GKS, Gist provides a second means
+for activating an engine, GpPreempt.  Call GpPreempt when you want to
+direct all output primitives to a single engine, independent of the
+activity states of other engines, then return to the activity state
+before the preempt.  This operation is intended to be used to echo a
+display list, which has already been drawn in an X window, to a
+hardcopy file, or to repair damage to a single X window.  As a rule of
+thumb, do not use GpPreempt unless (1) you turn off preempting in the
+same subroutine in which you turned it on, and (2) you are certain
+that no subroutine you call while you are preempting itself calls
+GpPreempt (GpPreempt does NOT save a stack of preempting engines).
+
+     GpActivate(xEngine);
+        /* ... output primitives rendered to X window */
+     GpActivate(cgmEngine);
+        /* ... output primitives rendered to X window AND CGM file */
+     GpPreempt(psEngine);
+        /* ... output primitives rendered to PostScript file ONLY */
+     GpPreempt(0);   /* turn off preempting */
+        /* ... output primitives rendered to X window AND CGM file */
+     GpDeactivate(cgmEngine);
+        /* ... output primitives rendered to X window only */
+
+   Gist keeps a multiply linked list of all engines.  To cycle through
+the list, you may use the GpNextEngine function:
+
+     Engine *eng;
+
+     for (eng=GpNextEngine(0) ; eng ; eng=GpNextEngine(eng)) {
+        /* code to be done on every engine (eng) ... */
+     }
+
+The Gist output primitives all eventually invoke the engines' virtual
+rendering functions in the following loop (if some engine is
+preempting, there will be exactly one pass through the loop):
+
+     for (eng=GpNextActive(0) ; eng ; eng=GpNextActive(eng)) {
+        /* code to be done on every engine (eng) ... */
+     }
+
+Gist can perform certain operations only once before fanning out to
+render an output primitive on each active device (the floating point
+clipping operation is the most important example).  This economy
+justifies the greater logical complexity of the active/inactive engine
+model, as compared with a model in which each output primitive
+function takes an Engine as a parameter.
+
+
+   Engines generally buffer their output; use GpFlush to flush the
+buffers.  This operation is unnecessary for PostScript and CGM
+Engines, which automatically flush their buffers at the end of each
+page, and for which a partial page does not constitute a legal file.
+However, it is important to call GpFlush for a X Engine to make sure
+the contents of the X window are current.  If the input parameter to
+GpFlush is 0, output buffers are flushed for all active engines;
+otherwise, only the buffers for the specified engine are flushed:
+
+     GpFlush(0);   /* flush output buffers to all active engines */
+
+   To begin a new page of graphics, call GpClear.  The first parameter
+to GpClear works like the parameter to GpFlush -- if it is 0, all
+active engines are affected, otherwise, only the specified engine.
+The second parameter to GpClear is a flag, which may be either of the
+#define'd constants CONDITIONALLY or ALWAYS.  With ALWAYS, a new page
+is always generated.  With CONDITIONALLY, a new page is generated only
+if marks have been made on the current page.  For an X Engine, there
+will be no visible difference, since the X window will be empty after
+GpClear in either case.  For the PostScript and CGM engines, ALWAYS
+may create a blank page.
+
+     GpClear(0, CONDITIONALLY);   /* start a new page of output */
+
+   When you want to destroy the X window or close the output file
+associated with an engine, call GpKillEngine:
+
+     GpKillEngine(cgmEngine);    /* finish and close the CGM file */
+
+This also frees the memory pointed to by cgmEngine, so do not attempt
+to use cgmEngine afterwards.  A PostScript file will not conform to
+the PostScript Document Structuring Conventions (DSC) until
+GpKillEngine has been called, because the trailing comments will not
+be in place.  However, the PostScript portion of the file should
+still be valid, which means that if your print spooler is not too
+smart, it should still be printable.  A Gist CGM file will be a
+complete, valid CGM file after each GpClear (as well as after
+GpKillEngine).  If the current page has been marked, GpKillEngine
+does a GpClear to finish the last page.
+
+
+2C. P level output primitives
+-----------------------------
+
+   A page of Gist graphical output is constructed by repeated calls to
+the six P level output primitves.  Coordinates are specified in the
+floating point data type GpReal, which is typedef'd to double in the
+distributed gist.h.
+
+   The polyline and polymarker primitives are the workhorses of any
+scientific graphics package; each takes a list of points as a
+parameter.  A natural tension arises here -- the rendering engine
+naturally takes an array of points (x1,y1), (x2,y2), ... (xN,yN) as
+its parameter, while a physics code naturally keeps the coordinates
+in two separate lists (x1,x2,...xN) and (y0,y1,...,yN).  Since Gist
+handles the required transformation from "world coordinates" to
+"device coordinates" (see section 2D), it also handles the transpose
+operation from two lists of coordinates to one list of points.
+
+     long n;            /* number of points */
+     GpReal *px, *py;   /* pointers to lists of coordinates */
+        /* GpReal is double */
+
+     GpLines(n, px, py);   /* connect the points into a polyline */
+     GpMarkers(n, px, py); /* place a marker at each point */
+     GpFill(n, px, py);    /* fill the specified n-sided polygon */
+
+     ...
+     GpReal *qx, *qy;   /* a second pair of coordinate lists */
+
+     GpDisjoint(n, px, py, qx, qy);  /* connect (px[i],py[i]) to */
+                        /* (qx[i],qy[i]) to form n line segments */
+
+     ...
+     GpReal x0, y0;     /* the position of text */
+     char *text;        /* pointer to a 0-terminated text string */
+
+     GpText(x0, y0, text);
+        /* draw text at (x0,y0)
+           Several lines of text may be output by a single call to
+           GpText by including newline characters "\n" in the text
+           string.  Other control characters (e.g.- tabs "\t") are
+           not handled by GpText).  */
+
+     ...
+     GpReal llx, lly, urx, ury;    /* lower left and upper right */
+     long width, height, nColumns; /* cell array size */
+     GpColor *colors;              /* cell colors */
+        /* GpColor is unsigned char */
+
+     GpCells(llx, lly, urx, ury, width, height, nColumns, colors);
+        /* Divide the interval from llx to urx into width equal cells,
+           and divide the interval from lly to ury into height equal
+           cells.  This defines a rectangular array of width rectangles
+           along the x (horizontal) direction, and height rectangles in
+           the y (vertical) direction.  (If llx>urx or lly>ury, the
+           "lower left" point and the "upper right" point are
+           misnomers -- the array of rectangles is always generated
+           as described.)  Starting from the cell at (llx,lly) and
+           proceeding toward (urx,lly), fill the rectangular cells
+           with colors[0], colors[1], ..., colors[width-1].  Go back
+           to the cell at the beginning of the next row, and fill
+           the next row with colors[nColumns], colors[nColumns+1],
+           ..., colors[nColumns+width-1].  Continue filling rows of
+           cells, so that the last row of cells, which begins at
+           (llx,ury) and ends at (urx,ury), is filled with
+           colors[(height-1)*nColumns], ...,
+           colors[(height-1)*nColumns + width-1]                      */
+
+   The cell array primitive is obviously many times more complicated
+than the others; it is intended for rendering images.  The primitives
+are not independent; obviously all of them could conceivably be drawn
+using GpLines and GpFill (with stroked text for GpText).  In fact,
+since Xlib has no polymarker primitive, GpMarkers is implemented by
+n calls to GpText.  Furthermore, if a new Engine type were added to
+Gist, it would make perfect sense to omit or water down any of the
+six primitives which were difficult or impossible on the given
+output device.
+
+   Each primitive returns a non-0 int if ANY active engine failed, so
+if you try to detect such failures, be aware that other engines may
+have worked fine.  The string stored in gistError should indicate
+whether the problem was generic (e.g.- memory manager failure) or
+specific to a single engine (e.g.- no write access to an output file).
+If multiple engines fail, the error message will reflect the one
+called last.
+
+
+2D. Coordinate transformations
+------------------------------
+
+   Gist output primitives require floating point "world coordinates".
+Gist will rescale and translate these "world coordinates" to the
+coordinates appropriate to each output device (this is one of the
+tasks assigned to the virtual functions associated with each type of
+engine).  Rotations are not supported, so x is always a horizontal
+coordinate and y is always a vertical coordinate.  You may change the
+coordinate transformation whenever you wish by calling GpSetTrans.  To
+enable you to specify a coordinate transformation, Gist supports the
+notion of "normalized device coordinates".  In Gist, "normalized
+device coordinates", or NDC, have definite units:
+
+     One point = 1/72.27 inch = 0.0013 NDC unit
+
+This scale factor is the round number which makes 11 inches as nearly
+equal to 1.0 NDC unit as possible.  None of the engines "hardwires"
+this scale into the graphical output.  That is, if the PostScript file
+is included as part of another PostScript file, the "outer" file can
+easily rescale the Gist generated "inner" file, and a CGM interpreter
+is free to interpret the Gist CGM file at whatever scale it wishes.
+Nevertheless, if you send a Gist PostScript file directly to a
+standard laser printer, one point on the output will correspond to
+0.0013 NDC unit, and similarly if you use the gist CGM browser to
+convert a Gist CGM file into hardcopy.  Furthermore, the conversion
+from X window pixels to Gist NDC units will be according to the above
+scaling for the two dpi settings (75 dots per inch and 100 dots per
+inch) supported by the Gist X engine.
+
+   With this scaling, an 8.5-by-11 inch sheet of paper is 0.798584-
+by-1.033461 NDC units.  The problem of determining whether the 11 inch
+edge is vertical ("portrait" style) or horizontal ("landscape" style)
+is a thorny one.  Like PostScript, the lower left hand corner of the
+sheet of paper is always at the point (0.0, 0.0) in NDC space, whether
+the sheet is in protrait or landscape orientation.  If you intend to
+use Gist output as an Encapsulated PostScript figure for a larger
+document (see the discussion of the gist browser in section 5 below),
+stay in the default portrait orientation.  If the Gist output is
+intended to be printed "as is", then you may safely use the landscape
+orientation, if that is what you want.
+
+   For an X window, portrait or landscape mode simply determines how
+the page is cropped to fit into the window (remember, a Gist X window
+always displays at either 75 dpi or 100 dpi, as specified in the call
+to GpBXEngine.  For a PostScript file, Gist generates a PostScript
+command to rotate the output 90 degrees, on the assumption that the
+default is to print a page in portrait style (if this is not the
+default on your system, you will have some problems printing Gist
+output files).  For a CGM file, Gist uses the "VDC EXTENT" CGM command
+to specify a drawing area that has either portrait or landscape shape,
+and the gist CGM browser knows how to interpret this.
+
+   If you are using D level Gist routines, landscape or portrait mode
+will be specified in your drawing style (.gs) file.  Otherwise, you
+may toggle any engine between portrait and landscape mode using the
+GpLandscape routine.  Like GpClear and GpFlush, passing GpLandscape
+a 0 Engine* causes the mode to be set on all active engines:
+
+     GpLandscape(0, 1);  /* all active engines to landscape mode */
+     GpLandscape(psEngine, 0);      /* psEngine to portrait mode */
+
+   A Gist coordinate transformation relies on two data structures:
+GpBox specifies a rectangle as ranges of x and y.  GpTransform
+specifies two boxes; the transform maps the second box into the first.
+The range of the transform is called the viewport, which is normally
+in NDC, and the domain is called the window, which is normally in WC
+("world coordinates").
+
+     typedef struct GpBox GpBox;
+     struct GpBox {
+       GpReal xmin, xmax, ymin, ymax;
+     };
+
+     typedef struct GpTransform GpTransform;
+     struct GpTransform {
+       GpBox viewport, window;
+     };
+
+The GpTransform representation of a coordinate transformation is
+redundant.  A non-redundant, lower level representation of coordinate
+transformations is described below.
+
+   The coordinate transformation in effect at the time an output
+primitive function is called determines the meaning of the (x,y)
+coordinates for that primitve.  To set this coordinate transformation,
+use GpSetTrans:
+
+     GpTransform myTransform= {{0.2, 0.6, 0.4, 0.8},
+                               {0.0, 1.0, 0.0, 1.0}};
+
+     myTransform.window.xmin= xmin;
+     myTransform.window.xmax= xmax;
+     myTransform.window.ymin= ymin;
+     myTransform.window.ymax= ymax;
+     GpSetTrans(&myTransform);
+        /* (xmin,ymin) in an output primitive now means (0.2,0.6) in NDC,
+           (xmin,ymax) means (0.2,0.8), (xmax,ymax) means (0.4,0.8),
+           and so on  */
+
+The names "ymin" and "ymax" are merely suggestive; ymin>ymax is both
+legal and meaningful.  (The several permuted ways of specifying a
+coordinate mapping are equivalent, but I recommend using xmin<xmax,
+then ymin<ymax as much as possible for clarity.  Obviously you can't do
+this if your intent is to invert an axis, but in such cases, I have
+tried to stick to the convention that both xmin<xmax and ymin<ymax
+for the viewport.)  Setting xmin==xmax or ymin==ymax will eventually
+result in a zero divide -- don't ever do this, as Gist doesn't check.
+
+   The current coordinate transformation is kept in a global variable
+called "gistT" (of type GpTransform).  You may examine gistT, but DO
+NOT MODIFY IT.  GpSetTrans does more than set gistT.  A GpTransform
+is a good way to think about a coordinate transformation, but it is
+not in a practical form for computing the transform.  The practical
+data structure derived from a GpTransform is the GpXYMap:
+
+     typedef struct GpMap GpMap;
+     struct GpMap {
+       GpReal scale, offset;
+     };
+
+     typedef struct GpXYMap GpXYMap;
+     struct GpXYMap {
+       GpMap x, y;
+     };
+
+Each engine has a private GpTransform with a viewport representing NDC
+space, and a window representing "device coordinates" (DC).
+GpSetTrans loops over all engines, forming the composition of its
+input WC->NDC transformation and the private NDC->DC transformation,
+and saving the result in a private GpXYMap.  The virtual function for
+an output primitive uses this GpXYMap to convert directly from WC->DC.
+Coordinate transformations are so useful that a convenience routine,
+GpSetMap, is declared in gist.h:
+
+     GpBox domain, range;
+     GpXYMap domainToRange;
+     GpReal xd, yd, xr, yr;
+
+     domain= ...; range= ...;
+     GpSetMap(&domain, &range, &domainToRange);
+
+     xr= domainToRange.x.scale*xd + domainToRange.x.offset;
+     yr= domainToRange.y.scale*yd + domainToRange.y.offset;
+
+   The default transformation is the unit transform, with WC the same
+as NDC.
+
+
+2E. Clipping
+------------
+
+   Gist uses allows two schemes for clipping, depending on the
+characteristics of the particular output engine.  First, the engine
+MAY always clip to the viewport (in NDC) specified in the most recent
+GpSetTrans (this is beyond the edge of an ordinary page if GpSetTrans
+has never been called).  Second, the engine MUST clip to the most
+recently specified viewport if the global int variable "gistClip" has
+been set to a non-zero value.  Initially, gistClip==0.  The WC passed
+to the virtual output primitive functions will be ALWAYS be clipped to
+the window in the most recent call to GpSetTrans if gistClip is
+non-zero; the WC passed to the engine primitives will NEVER be clipped
+if gistClip is zero.  (The GpText and GpCells primitives are
+exceptions; they pass their arguments along to the corresponding
+virtual functions unclipped, even if gistClip is non-zero.)
+
+   I apologize for this confusing model.  There really are TWO
+clipping operations involved, first, the floating point clip to the WC
+window (which is controlled by gistClip), and second, the clip to the
+image of the viewport in DC (which merely trims thick lines or
+overhanging text, and is not necessarily turned off by setting
+gistClip==0).  The first operation is performed by Gist; the second
+operation is performed by each particular engine (e.g.- the X server).
+
+     gistClip= 1;  /* Turn on floating point clip to WC window */
+     gistClip= 0;  /* Turn off floating point clip to WC window */
+
+
+2F. Output attributes for P level primitives
+--------------------------------------------
+
+   Instead of several dozen "set and get" routines to control the
+precise appearance of the output primitives, you directly modify or
+examine the global variable gistA.  The attributes affecting the
+appearance of P level primitives are (the values shown in the C
+assignment statements are the default values):
+
+   (1) gistA.l sets the attributes of lines for the GpLines and
+GpDisjoint output primitives:
+     gistA.l.type= L_SOLID;
+        /* Value: One of the #define'd constants L_NONE, L_SOLID,
+                  L_DASH, L_DOT, L_DASHDOT, L_DASHDOTDOT  */
+     gistA.l.width= 1.0;
+        /* Value: Relative thickness of a line; 1.0 is the normal
+                  line thickness DEFAULT_LINE_WIDTH or
+                  0.5*ONE_POINT in NDC units
+                  The DEFAULT_LINE_WIDTH is device independent,
+                  but carefully chosen to print nicely as PostScript
+                  and to give zero line width (1 pixel) for both
+                  75 and 100 dpi X windows.  */
+     gistA.l.color= FG_COLOR;
+        /* Value: see section 2H, negative for predefined colors,
+                  zero or positive for index into palette */
+
+To completely specify the appearance of a polyline, the algorthms for
+drawing the join from one line segment to the next, and for drawing
+the cap at each endpoint must be specified.  Gist uses round joins and
+caps for GpLines, and projecting caps (there are no joins) for
+GpDisjoint.  This is actually the only sensible choice, since miters
+or bevels fail in the degenerate case of zero length lines, and Only
+with round caps can a curve be correctly closed merely by specifying
+the last point to be the same as the first.  A further consideration
+is that the CGM standard does not provide any mechanism for storing
+join or cap style in the metafile.
+
+   (2) gistA.m sets the attributes of markers for the GpMarkers
+output primitive:
+     gistA.m.type= M_ASTERISK;
+        /* Value: One of the #define'd constants M_POINT, M_PLUS,
+                  M_ASTERISK, M_CIRCLE, M_CROSS,
+                  or any printable ASCII character  */
+     gistA.m.size= 1.0;
+        /* Value: Relative size of a marker; 1.0 is the normal
+                  marker size DEFAULT_MARKER_SIZE or
+                  10.0*ONE_POINT in NDC units
+                  Like DEFAULT_LINE_WIDTH, DEFAULT_MARKER_SIZE is
+                  device independent, but chosen to be reasonable.  */
+     gistA.m.color= FG_COLOR;
+        /* Value: see section 2H, negative for predefined colors,
+                  zero or positive for index into palette  */
+
+   (3) gistA.f sets the attributes of the filled area for the GpFill
+output primitive:
+     gistA.f.color= FG_COLOR;
+        /* Value: see section 2H, negative for predefined colors,
+                  zero or positive for index into palette  */
+
+   (4) gistA.t sets the attributes of text for the GpText
+output primitive:
+     gistA.t.font= T_HELVETICA;
+        /* Value: One of the #define'd constants T_COURIER,
+                  T_TIMES, T_HELVETICA, T_SYMBOL, or T_NEWCENTURY,
+                  optionally or'ed with T_BOLD or T_ITALIC or both  */
+     gistA.t.height= 12.0*ONE_POINT;
+        /* Value: Absolute point size for the text in NDC units.
+                  Point size is defined as the normal vertical
+                  separation between consecutive lines of text.  */
+     gistA.t.color= FG_COLOR;
+        /* Value: see section 2H, negative for predefined colors,
+                  zero or positive for index into palette  */
+     gistA.t.orient= TX_RIGHT;
+        /* Value: One of the #define'd constants TX_RIGHT, TX_UP, TX_LEFT,
+                  or TX_DOWN to read text to right (ordinary orientation),
+                  up, upside down, or down, respectively.  */
+     gistA.t.alignH= TH_NORMAL;
+        /* Value: One of the #define'd constants TH_NORMAL, TH_LEFT,
+                  TH_CENTER, TH_RIGHT.  Controls the horizontal alignment
+                  of text with respect to the point (x0,y0) input to
+                  GpText.  TH_NORMAL is a synonym for TH_LEFT.  For
+                  rotated text, horizontal refers to the direction the
+                  text reads, which may be vertical on the page.  */
+     gistA.t.alignV= TV_NORMAL;
+        /* Value: One of the #define'd constants TV_NORMAL, TV_TOP, TV_CAP
+                  TV_HALF, TV_BASE, or TV_BOTTOM.  Controls the vertical
+                  alignment of text with respect to the point (x0,y0)
+                  input to GpText.  The vertical alignment applies to the
+                  entire block of text in multiline text strings.
+                  TV_NORMAL is a synonym for TH_BASE.  See alignH.  */
+     gistA.t.opaque= 0;
+        /* Value: non-zero if the smallest box containing the text is
+                  to be cleared to the background color before drawing
+                  the text  */
+
+
+2G. A level output primitives
+-----------------------------
+
+   In order to directly support scientific applications, Gist provides
+a few higher level output primitives, which call the P level
+primitives repetitively.
+
+   A simple way to distinguish several curves is to occasionally place
+a character on the curve.  You can then speak of "curve A" or "curve
+W".  A curve may also have a definite direction (e.g.- if it
+represents a trajectory or ray path), which you may wish to indicate
+by occasionally drawing an arrowhead on the curve.  A curve may be
+closed.  Finally, you may want to smooth a curve by connecting the
+points by a spline instead of by straight line segments.  The Gist
+decorated line primitive, GaLines, supports all four of these types of
+decoration.  The calling sequence for GaLines is identical to that for
+GpLines, but in addition to setting the attributes in gistA.l, you
+must also set the attributes in gistA.dl, and the attributes in
+gistA.m if you requested occasional curve markers:
+
+     gistA.dl.closed= 0;
+        /* Value: non-zero if (xp[n-1],yp[n-1]) should be connected to
+                  (xp[0],yp[0])  */
+     gistA.dl.smooth= 0;
+        /* Value: Set non-zero if the points should be connected by Bezier
+                  curves instead of straight lines.  Use 1 to get a little
+                  smoothing, 2 or 3 to get more, 4 to get a lot.
+                  If dl.marks or dl.rays (below) are non-zero, then
+                  dl.smooth is ignored -- you always get straight lines.
+                  Only the PostScript engine can generate Bezier curves;
+                  the CGM and X engines simply plot the Bezier control
+                  and knot points as a polyline.  However, Gist places a
+                  comment in the CGM file so that the gist CGM browser
+                  can correctly play back a smoothed line to a PostScript
+                  file.  */
+     gistA.dl.marks= 0;
+        /* Value: non-zero if occasional curve markers are to be plotted
+                  If gistA.l.type==L_NONE and gistA.dl.marks is non-zero,
+                  then a marker is plotted at every point via GpMarkers
+                  instead of just occasionally.  */
+     gistA.t.mSpace= 0.16;
+        /* Value: Absolute spacing between occasional markers in NDC units
+                  measured along the curve.  */
+     gistA.t.mPhase= 0.14;
+        /* Value: Initial phase of occasional marker odometer in NDC units
+                  measured along the curve.  The phase is roughly
+                  proportional to arc length along the visible (clipped)
+                  sections of the polyline.  */
+     gistA.dl.rays= 0;
+        /* Value: non-zero if occasional ray arrowheads are to be plotted */
+     gistA.t.rSpace= 0.13;
+        /* Value: Absolute spacing between occasional rays in NDC units
+                  measured along the curve.  */
+     gistA.t.rPhase= 0.11375;
+        /* Value: Initial phase of occasional ray odometer in NDC units
+                  measured along the curve.   (See gistA.t.mPhase.)  */
+     gistA.dl.arrowL= 1.0;
+        /* Value: Relative length of a ray arrowhead; 1.0 is the normal
+                  arrowhead lenght DEFAULT_ARROW_LENGTH or
+                  10.0*ONE_POINT in NDC units */
+     gistA.dl.arrowW= 1.0;
+        /* Value: Relative half-width of a ray arrowhead; 1.0 is the normal
+                  arrowhead half-width DEFAULT_ARROW_WIDTH or
+                  4.0*ONE_POINT in NDC units */
+
+     GaLines(n, px, py);
+
+   Several A level primitives operate on a quadrilateral mesh: GaMesh
+draws the grid of mesh lines (by repeated calls to GpLines).
+GaFillMesh fills each zone of the mesh with a specified color.
+GaVectors draws a vector (represented by a triangular dart) at each
+point of the mesh.  Finally, the convenience routines GaContourInit
+and GaContour return lists of points which can be presented to GaLines
+to draw contours of functions known at the mesh points.  For each of
+these functions, the mesh is passed as a pointer to a GaQuadMesh data
+structure (note that each primitive correctly handles missing zones,
+where reg==0):
+
+   typedef struct GaQuadMesh GaQuadMesh;
+   struct GaQuadMesh {
+     long iMax, jMax;
+     GpReal *x, *y;
+        /* mesh coordinate arrays of length iMax*jMax
+           The logical i-coordinate varies fastest.  */
+     int *reg;
+        /* region number array for the mesh, of length iMax*(jMax+1)+1 .
+           reg[i+j*iMax] is non-zero if and only if the zone bounded
+           by the points (i-1,j-1), (i,j-1), (i,j), (i-1,j) exists.
+           reg[i]==0 for 0<=i<iMax, reg[j*iMax]==0 for 0<=j<jMax,
+           and reg[iMax+j*iMax]==0 for j<=0<=jMax.  The crude
+           diagram shows points (P) in the x and y arrays, and
+           zones (Z) in the reg array for the case iMax= 4,
+           jMax= 5.  i= j= 0 is the lower left corner.  The zero
+           (0) marks show where reg must always be zero.
+
+         +---------+---------+---------+---------+---------+
+         |         |         |         |         |         |
+         |    0    |    0    |    0    |     0   |    0    |
+         |         |         |         |         |         |
+         +---------P---------P---------P---------P---------+
+         |         |         |         |         |
+         |    0    |    Z    |    Z    |    Z    |
+         |         |         |         |         |
+         +---------P---------P---------P---------P
+         |         |         |         |         |
+         |    0    |    Z    |    Z    |    Z    |
+         |         |         |         |         |
+         +---------P---------P---------P---------P
+         |         |         |         |         |
+         |    0    |    Z    |    Z    |    Z    |
+         |         |         |         |         |
+         +---------P---------P---------P---------P
+         |         |         |         |         |
+         |    0    |    Z    |    Z    |    Z    |
+         |         |         |         |         |
+         +---------P---------P---------P---------P
+         |         |         |         |         |
+         |    0    |    0    |    0    |    0    |
+         |         |         |         |         |
+         +---------+---------+---------+---------+
+
+           The "extra" elements in reg assure that the four zones
+           surrounding each point can always be computed by index
+           arithmetic without any bounds checking.  */
+     short *triangle;
+        /* iMax-by-jMax triangulation array, indexed as reg
+           This is used to resolve the ambiguity in "saddle" zones,
+           which must be communicated between contours at different
+           levels to assure that they do not cross in "saddle" zones.
+           Normally, you initialize triangle to all zeroes, and
+           GaContour updates it.  However, if GaContour makes what
+           you consider the "wrong" choice in a "saddle" zone, you
+           may set triangle yourself before any calls to GaContour.
+           triangle[i+j*iMax]== 1, -1, or 0 depending on whether the
+           zone has been triangulated by drawing the diagonal from
+           (i-1,j-1) to (i,j), from (i-1,j) to (i,j-1), or has not
+           yet been triangulated, respectively.  */
+   };
+
+     GaQuadMesh mesh;
+     mesh.iMax= iMax;
+     mesh.jMax= jMax;
+     mesh.x= x;
+     mesh.y= y;
+     mesh.reg= reg; /* If reg==0, GaMesh, GaFillMesh, GaVectors, or
+                       GaContourInit will create a region number map
+                       (all zones exist and are in region number 1).  */
+     mesh.triangle= 0; /* If triangle==0, GaContourInit creates a
+                          triangulation array of all 0.  */
+
+If any of the A level routines create a reg array or a triangle array,
+you are responsible for freeing the associated memory when you are
+done plotting.  Use free(mesh.reg) or free(mesh.triangle) to do this.
+For the D level routines described later, you are NOT responsible for
+managing this memory.
+
+     int region= 0;
+        /* The GaMesh, GaFillMesh, GaVectors, and GaContourInit routines
+           can each operate on the entire mesh (all zones with non-zero
+           mesh->reg), if region==0; OR operate on only the zones with a
+           given non-zero region number.  */
+
+     GaMesh(&mesh, region, 0);  /* plot all mesh lines */
+     GaMesh(&mesh, region, 1);  /* plot mesh boundary lines only */
+     GaMesh(&mesh, 0, 0);  /* plot the entire mesh */
+     GaMesh(&mesh, 0, 1);  /* plot just the boundary of the mesh */
+     GaMesh(&mesh, 6, 0);  /* plot the mesh lines in region 6 only */
+     GaMesh(&mesh, 6, 1);  /* plot just the boundary of region 6 */
+
+     long nColumns;
+     GpColors *colors;
+        /* an (iMax-1)-by-(jMax-1) array of colors, organized in
+           memory as rows of nColumns (>=iMax-1) colors.  That is,
+           colors[i+j*nColumns] represents the color in the zone
+           bounded by the mesh points at (i-1,j-1), (i,j-1), (i,j),
+           (i-1, j).  */
+
+     GaFillMesh(&mesh, region, colors, nColumns);
+        /* Fill each zone */
+
+     GpReal *u, *v;
+        /* iMax-by-jMax arrays representing a vector field on the mesh */
+     GpReal scale;
+        /* scale*(u,v) is the displacement for the vector in the
+           same units as the mesh (x,y), e.g.- If (x,y) represents a
+           positional mesh, and (u,v) is a velocity field, then
+           scale would be the time elapsed for a particle to get from
+           the tail to the head of a vector arrow.  */
+
+     gistA.vect.hollow= 0;
+        /* Value: non-zero to draw only the outline of the triangular
+                  dart (according to gistA.l), otherwise fill the dart
+                  (according to gistA.f)  */
+     gistA.vect.aspect= 0.125;
+        /* Value: half-width/length ratio for the darts */
+
+     GaVectors(&mesh, region, u, v, scale);
+        /* plot the vector field
+           The centroid of the triangular dart goes at the mesh point. */
+
+     GpReal *z;
+        /* iMax-by-jMax array of function values at the points (x,y) */
+     GpReal level;
+        /* value of z at which to produce contours */
+     long cn;
+     GpReal *cx, *cy;
+     int closed;
+
+     /* plot the contour curve(s) where z==level */
+     if (GaContourInit(&mesh, region, z, level) {
+       while (GaContour(&cn, &cx, &cy, &closed)) {
+         /* (cx,cy) are set to point to internal scratch space managed
+            by Gist.  DO NOT attempt to free this space.
+            See <gist.h> for routines to free the internal scratch
+            space.  (You shouldn't need to do this...)  */
+         /* loop because there may be several disconnected parts of
+            the contour */
+         gistA.dl.closed= closed;
+         GaLines(cn, cx, cy); /* alternatively could use GpLines here;
+                                 GaLines can make occasional markers */
+       }
+     }
+
+   The final Gist A level otuput primitive is GaTicks, which draws a
+system of ticks and labels around the viewport of the current
+coordinate transform.  The ticks correspond to "nice" values in the WC
+window, laid out in a hierarchy of a few long ticks, subdivided again
+and again by shorter and shorter ticks to give the appearance of the
+scale on a ruler.  The algorithm has many adjustable parameters.  Both
+linear and logarithmic rulers can be produced.  A practical scheme for
+dealing with scales of arbitrarily small dynamic range is implemented.
+(A plot with limits varying from 1.234567890 to 1.234567891, although
+not unusual for many scientific problems, causes many tick labelling
+algorithms to produce illegible plots.)
+
+   The parametric description of the tick system is passed to GaTicks
+via a GaTickStyle data structure, which itself contains a horizontal and
+vertical GaAxisStyle data structure:
+
+     typedef struct GaAxisStyle GaAxisStyle;
+     struct GaAxisStyle {
+     #define TICK_LEVELS 5
+       GpReal nMajor, nMinor, logAdjMajor, logAdjMinor;
+       int nDigits, gridLevel;
+       int flags;   /* TICK_L, ... LABEL_L, ... GRID_F below */
+
+       GpReal tickOff, labelOff;  /* offsets in NDC from the edge of the
+				viewport to the ticks or labels */
+       GpReal tickLen[TICK_LEVELS];  /* tick lengths in NDC */
+
+       GpLineAttribs tickStyle, gridStyle;
+       GpTextAttribs textStyle;   /* alignment ignored, set correctly */
+       GpReal xOver, yOver;       /* position for overflow label */
+
+     /* Flags determine whether there are ticks at the lower or upper
+        (left or bottom is lower) edges of the viewport, whether the ticks
+        go inward or outward, whether the lower or upper edge ticks have
+        labels, and whether there is a full grid, or a single grid line
+        at the origin.  */
+     #define TICK_L 0x001
+     #define TICK_U 0x002
+     #define TICK_C 0x004
+     #define TICK_IN 0x008
+     #define TICK_OUT 0x010
+     #define LABEL_L 0x020
+     #define LABEL_U 0x040
+     #define GRID_F 0x080
+     #define GRID_O 0x100
+     };
+
+     typedef struct GaTickStyle GaTickStyle;
+     struct GaTickStyle {
+       GaAxisStyle horiz, vert;
+       int frame;
+       GpLineAttribs frameStyle;
+     };
+
+   If you use the D level Gist routines, the GaTickStyle structure is
+read as a part (the largest part, actually) of the drawing style (.gs)
+file, and you never need to worry about it, unless you want to develop
+a custom drawing style.  Otherwise, I strongly recommend that you
+copy the values from one of the style files (work.gs is my personal
+favorite) into your C code as a starting point.  Note that you can
+control:
+(1) The density of ticks on each axis, with separate control over
+    the density of major ticks (via nMajor) and the number of minor
+    ticks (via nMinor).  You can also nudge the density up a little
+    for log scales, which don't "look logarithmic" unless ticks
+    start far apart and end close together.
+(2) The maximum number of digits after the decimal point (nDigits)
+    for tick labels, before they are printed in "overflow mode".
+    In overflow mode, only the final two digits are printed adjacent
+    to the tick marks, with the other digits printed at (xOver,yOver)
+    (in NDC).  I usually leave enough space for a single line of
+    text under the viewport.  The y overflow goes on the left side of
+    this line, while the x overflow goes on the right.
+(3) The level in the tick hierarchy to which the grid lines (if any)
+    will descend (gridLevel).
+(4) The offset (in NDC) between the edge of the viewport and the ticks
+    (tickOff) and between the edge of the viewport and the tick labels
+    (labelOff).
+(5) The length (in NDC) of each level of tick in the hierarchy
+    (tickLen).
+(6) Whether a frame is drawn around the viewport (frame).
+(7) The line attributes for ticks, grid lines, and frame box
+    (tickStyle, gridStyle, and frameStyle), which are drawn using
+    GpDisjoint, and the text attributes for the tick labels
+    (textStyle), which are drawn using GpText.
+(8) The layout of the ticks and labels (flags)
+    - whether ticks should go above, below, in the middle of the
+      viewport (to get coordinate axes), or not be drawn at all
+    - the justification of the tick marks, should they stick into
+      the viewport, out of the viewport, or both
+    - whether the tick labels should be drawn above or below the
+      viewport, or not be drawn at all
+    - whether grid lines should be drawn not at all, at all ticks
+      down to gridLevel, or only at the origin (especially for use
+      with centered ticks to make the axes)
+
+Consider the following example:
+
+     GaTickStyle tickStyle;  /* set to values in work.gs to start with */
+
+     xIsLog= yIsLog= 0;   /* first, plot with linear scale */
+     GpSetTrans(&myTransform);
+     gistClip= 0;
+     GaTicks(&tickStyle, xIsLog, yIsLog);
+     gistClip= 1;
+     GaLines(n, px, py);
+
+     GpClear(0, ALWAYS);
+
+     yIsLog= 1;           /* next, do semi-log plot */
+     myTransform.window.ymin= log10(myTransform.window.ymin);
+     myTransform.window.ymax= log10(myTransform.window.ymax);
+     GpSetTrans(&myTransform);
+     gistClip= 0;
+     GaTicks(&tickStyle, xIsLog, yIsLog);
+     gistClip= 1;
+     for (i=0 ; i<n ; i++) py[i]= log10(py[i]);
+     GaLines(n, px, py);
+
+Note well that GaTicks will produce logarithmic rulers, but that the
+application program must explicitly take logarithms of both the
+transformation window passed to GpSetTrans, and the coordinates passed
+to any output primitive.
+
+
+2H. Color model
+---------------
+
+   Gist provides color support for two reasons: first, to distinguish
+among several curves or other objects shown on the same plot, and
+second, to support images (GpCells) and filled meshes (GaFillMesh).
+
+   The first reason for color demands a simple model -- you can always
+specify that an output primitve (excluding a cell array) be rendered
+in one of ten standard colors: background, foreground, black, white,
+red, green, blue, cyan, magenta, or yellow.  You get these standard
+colors by setting the corresponding color in gistA (gistA.l.color for
+polylines or disjoint lines, gistA.m.color for polymarkers,
+gistA.t.color for text, or gistA.f.color for filled areas) to a
+negative value, -1 through -10.  The constants BG_COLOR, FG_COLOR,
+BLACK_COLOR, WHITE_COLOR, RED_COLOR, GREEN_COLOR, BLUE_COLOR,
+CYAN_COLOR, MAGENTA_COLOR, and YELLOW_COLOR are predefined for this
+purpose.  The default is, of course, FG_COLOR.  For X engines, the
+foreground color is usually black and the background is white, as for
+hardcopy onto paper, but if you have changed this by setting a
+"*background:" or "*foreground" in the RESOURCE_MANAGER property on
+your root window, Gist will pick up your preferences.  You should bear
+in mind that colors Xerox poorly, if you can get color hardcopy at
+all; generally for final output, line type (L_SOLID, L_DASH, etc.)  is
+a better way to distinguish curves than color.
+
+   The second reason for color demands a continuous range of colors
+for rendering pseudo-color images and filled meshes.  This is an
+indispensible use for color, and prints reasonably well (in grays) on
+a standard laser printer.  Gist supports pseudo-color images by means
+of a palette, which is a list of GpColorCell-s:
+
+     typedef struct GpColorCell GpColorCell;
+     struct GpColorCell {
+       unsigned char red, green, blue, gray;
+     };
+
+The color cells specify each component of a color (0 is zero
+intensity, and 255 is full intensity).  The gray component is NOT the
+fourth component in a fancy color processing scheme; it is provided so
+that you can specify the gray scale to be used on devices which cannot
+render colors.  When you are building a palette, I recommend that you
+set the red, green, and blue components for each cell, then call
+either GpPutNTSC or GpPutGray to set the gray components; or, if you
+want a gray scale, set the gray components, then call GpPutRGB to set
+the red, green and blue components:
+
+     GpColorCell palette1[64], palette2[240], palette3[240];
+
+     for (i=0 ; i<64 ; i++) palette1[i].gray= i<<2;
+     GpPutRGB(64, palette1);
+
+     for (i=0 ; i<240 ; i++) {
+       palette2[i].red= palette3[i].green= (i<<8)/240;
+       palette2[i].green= palette3[i].blue= 254 - (i<<8)/240;
+       palette2[i].blue= palette3[i].red= 0;
+     }
+     GpPutNTSC(240, palette2); /* gray= 0.30*red+0.59*green+0.11*blue */
+     GpPutGray(240, palette3); /* gray= (red+green+blue)/3.0 */
+
+   Once a palatte has been defined, it must be installed into each
+engine you want to use that palette:
+
+     GpSetPalette(xEngine, palette2, 240);
+        /* install palette2 into the xEngine */
+
+The new palette is installed immediately in an X engine, but for both
+of the hardcopy engine types installation is deferred until the next
+page, if the current page has been marked.
+
+I strongly recommend that you restrict Gist palettes to no more than
+240 colors, which is adequate for pseudocoloring images and filled
+meshes.  The CGM color model is the most restrictive, since there is
+no way to separate the 8 standard colors (black, white, primaries and
+secondaries) from the rest of the palette.  Consequently, a CGM engine
+can use at most 248 palette colors.
+
+The X color model is quite complicated.  Gist allows you to use either
+the best sharable ("public") colors approximating your color table, or
+to get exactly the colors you request, possibly requiring the creation
+of a private colormap (see the discussion of color modes below).  If
+you force a private colormap, Gist tries to duplicate the most
+important colors in the default colormap, so the screen does not flash
+too badly when the window manager installs Gist's colormap (usually
+when the mouse moves into the Gist window), but it doesn't always
+succeed.  Window managers which allow you to lock a colormap in place
+exist (e.g.- mwm or olwm) and work well if you have this problem.
+Installing a colormap on a monochrome engine is not an error.
+
+   Designing general purpose pseudo-color palettes is tedious work, so
+Gist has a mechanism for calling up your favorites:
+
+     GpColorCell storedPalette;
+     int nColors;
+
+     /* load the "earth.gp" palette into both xEngine and psEngine */
+     nColors= GpReadPalette(xEngine, "earth.gp", &storedPalette, 240);
+     GpSetPalette(psEngine, storedPalette, nColors);
+
+By convention, Gist palette files end with ".gp"; they are text files,
+and you can copy the format from one of the standard palettes if you
+want to make your own.  GpReadPalette looks for the specified palette
+file along the GISTPATH (see section 6).  My favorite palettes come
+with the Gist distribution:
+   earth.gp   - earth tones
+   stern.gp   - David Stern's palette from the commercial program IDL
+   heat.gp    - "hot iron" colors
+   rainbow.gp - psychedelic spectral palette
+   gray.gp    - black to white gray scale
+   yarg.gp    - white to black gray scale
+If the fourth argument to GpReadPalette is greater than 1, the palette
+will be scaled to that number of colors if the palette found in the file
+exceeds that number.  All of the predefined palettes have 240 colors.
+
+   You can get the current palette for an engine with GpGetPalette.
+Managing the memory associated with a palette is entirely your
+responsibility; GpSetPalette does NOT copy the palette, GpKillEngine
+makes no attempt to release the palette, and you must call
+free(storedPalette) yourself to free the memory associated with the
+palette read by GpReadPalette in the example (but NOT UNTIL you have
+installed another palette).
+
+   Once a palette has been installed, the "colors" parameters to the
+GpCells and GaFillMesh output functions are arrays of indices into the
+palette.  (Note that this means the interpretation of these primitives
+will be different on engines which have different palettes installed.)
+Furthermore, non-negative values for any of the color members in the
+gistA data structure (gistA.l.color, gistA.m.color, gistA.t.color, or
+gistA.f.color) will be interpreted according to the current palette on
+each active engine.  Initially, there is no palette, so the number of
+non-standard colors is zero, and calls to GpCells or GaFillMesh will
+not work properly (color indices beyond nColors-1 are set to
+nColors-1, or, if this is zero, the foreground color is used).
+
+   There is one final twist to the Gist color model:  For PostScript
+and CGM output, each page of output is required to be independent of
+all other pages.  In both cases, Gist installs a default gray scale
+palette, but any change of palette away from this default must be
+repeated on each page.  This is wasteful, since most printers can't
+deal with color output anyway.  Therefore, Gist offers two modes of
+color support for PostScript and CGM engines:
+   Color mode 0 - Use the gray entry of the GpColorCell specified by
+                  requested color index to map into the default gray
+                  scale color map.  No color table (palette) is
+                  dumped at the beginning of a page.
+   Color mode 1 - Dump the palette as a color table at the beginning
+                  of each page, then write color indices "as is"
+                  with no mapping.
+You select an initial color mode when you create the engine with
+GpPSEngine or GpCGMEngine.  At any later time, you may change color
+mode with:
+
+     colorMode= 1;  /* or 0 */
+     GpDumpColors(psEngine, colorMode);
+
+Note that color mode 0 does not exempt you from specifying a palette!
+A palette is still required in order to perform the remapping onto
+the default palette.
+
+   For an X Engine, the color mode is always 0 initially, which means
+that the engine will use the "best available" shared or public colors
+when a new palette is installed.  This has the side effect that two
+Gist windows which each load the same large palette will preclude each
+other from ever changing to a new palette.  The call
+
+     GpSetPalette(xEngine, 0, 0);
+
+will free the colors used by one of the two Gist windows, allowing the
+other to change its palette, but also precluding the first from
+displaying images or filled meshes correctly (at least until its
+palette is restored).
+
+   Alternatively,
+
+     GpDumpColors(xEngine, 1);
+
+will set the X Engine to color mode 1, in which it will use private,
+non-sharable colors.  If fewer than nColors such colors are available,
+Gist will create a private colormap, which will be installed by the
+window manager.  This mode works best if your window manager allows
+you to lock the colormap of a particular window in place.
+
+
+
+
+
+3. Gist Support for Handling X Events
+=====================================
+
+   If you use Gist X engines, you will probably need to know something
+about how Gist handles input from X.  It is impossible to ignore X
+input entirely, since Gist is required to listen for the first
+expose event when the server maps the window.  Also, Gist does not
+provide any means for setting the size of an X window (if necessary,
+I expect you to do this with your window manager), so it must also
+listen for reconfigure events.
+
+   This turns out to pose a severe constraint on the nature of the
+Gist user interface.  For the simplest programs, you will be unable to
+block waiting for keyboard input by calling gets or fgets, because
+important input from the X server will be ignored until the keyboard
+input arrives.  For more sophistocated programs which get input from
+an X toolkit, there is also a problem, because the Gist window will
+not be known to the toolkit.  To make a solution to these problems
+possible, Gist includes an event dispatcher.  The source for the
+generic dispatcher is in dispat.c and dispat.h.  The special case of a
+dispatcher for input streams (such as stdin) is covered in dispas.c
+and dispas.h, while the case of an X event dispatcher is covered in
+dispax.c and dispax.h.  These source files are not long; I urge you to
+read them if you will be writing a major program which uses Gist.
+Unfortunately, the Gist dispatching routines must be near the trunk
+of your input tree, so you won't be able to easily avoid them if
+you want to use X engines.
+
+
+3A. Using Gist with input from stdin
+------------------------------------
+
+   You must recast a very simple program which performs a task for
+each input line read from stdin, into a more general event-driven
+form.  Such a program might originally have the following form:
+
+     #include <stdio.h>
+     ...
+     while (gets(inputLine)) {
+       ... perform some task depending on inputLine ...
+     }
+
+You must rewrite it as follows:
+
+     #include <dispas.h>
+        /* dispas.h includes stdio.h */
+     int HandleInput(FILE *file, void *context);
+     ...
+     void *context= 0;  /* will be passed to your event handler */
+     AddFDispatcher(stdin, &HandleInput, context);
+     DispatchEvents();  /* replaces above while () loop */
+
+     ...
+
+     int HandleInput(FILE *file, void *context)
+     {
+       if (!gets(inputLine)) return 1;
+          /* non-zero return value causes DispatchEvents to return */
+
+       ... perform some task depending on inputLine ...
+
+       return 0;
+          /* zero return causes DispatchEvents to wait for
+             the next input to arrive on stdin before HandleInput
+             is called -- however, events generated by the X server
+             will be handled properly in the meantime */
+     }
+
+Both the "bench" test program and the "gist" CGM browser are examples
+of this style of programming.  (See bench.c for a simple way to use
+#ifdef to allow for either the presence or absence of the Gist event
+handling routines.)  The gist CGM browser is slightly more
+complicated, in that it includes a worker routine which DispatchEvents
+calls repeatedly while it is waiting for input.  You do this by
+setting the global variable DispatchWorker (a pointer to a function)
+declared and documented in the <dispat.h> header file.
+
+
+3B. Using Gist with input from an X toolkit widget
+--------------------------------------------------
+
+   I wrote Gist to be completely independent of all X toolkits; an X
+engine will reference only Xlib (libX11.a, actually) routines.
+However, the dispatching routines declared in dispax.h are flexible
+enough to allow for the possiblity of mixing Gist graphics windows
+with Athena Widget, Motif, or Open Look windows (or all three).  I
+expect you to do this by NOT calling the main loop routine for the
+toolkit you are using, but instead calling Gist's DispatchEvents()
+function.  This will work as long as you supply a call to
+AddXDispatcher for each top level window, and supply a (trivial) event
+dispatcher appropriate for each toolkit you are using.  Read the
+comments in dispax.h for more information about how to do this.
+
+
+3C. Handling X events in a Gist X window
+----------------------------------------
+
+   If you want to handle keyboard or mouse input in the X window
+created by GpBXEngine, you must call the function GxInput, declared
+in xbasic.h:
+
+     #include <xbasic.h>
+     GxHandler HandleExpose, HandleResize, HandleOther;
+        /* Note: set any of these to 0 to get default behavior */
+     ...
+
+     int eventMask= KeyPressMask | ButtonPressMask | ButtonReleaseMask;
+        /* See Appendix E. Event Reference, in Vol. 2 of O'Reilly
+           for a complete list of possible event masks.
+           GxInput always sets ExposureMask and StructureNotifyMask,
+           so you needn't include these in eventMask.  */
+     xEngine= GpBXEngine("Name of X window", landscape, dpiX,
+                         "host:server.screen");
+     GxInput(xEngine, HandleExpose, HandleResize, HandleOther,
+             eventMask);
+     ...
+
+     void HandleExpose(Engine *engine, Drawing *drawing, XEvent *event)
+     {
+       /* The basic Gist X event handler will set the engine->mapped
+          flag, then call this routine (if HandleExpose!=0 in the call
+          to GxInput).  The default action is to redraw the display
+          list "drawing", if drawing!=0; you must duplicate the code
+          in xbasic.c:BasicXHandler if you want this effect.  */
+       ...
+     }
+
+     void HandleResize(Engine *engine, Drawing *drawing, XEvent *event)
+     {
+       /* The basic Gist X event handler will reset the engine->mapped
+          flag on an UnmapNotify event, NEVER calling this routine.  On
+          a ConfigureNotify event, the graphics window will be
+          recentered in the top level window, THEN, if HandleResize!=0,
+          this routine will be called.  */
+       ...
+     }
+
+     void HandleOther(Engine *engine, Drawing *drawing, XEvent *event)
+     {
+       /* If HandleOther!=0 in the call to GxInput, any event other
+          than Expose, UnmapNotify, or ConfigureNotify will be
+          forwarded to this routine without any default action.  */
+       ...
+     }
+
+
+
+
+
+4. High Level (D and H) Gist User Interface
+===========================================
+
+   If you are building an interactive graphics interface, Gist can
+supply display list creation and manipulation facilities.  A Gist
+display list is contained in a data structure called a "Drawing".
+Like a Gist Engine, a Gist Drawing is intended to be an opaque data
+structure; if you need its members in ordinary use, I probably have
+designed the interface routines poorly.
+
+   After creating a Drawing (display list), you can add to it by
+calling a set of D level functions which mirror the A and P level
+output primitive functions.  Unlike engines, there is at most a
+single "active" drawing, the "current drawing", to which the D level
+primitives append display list elements.  (You may keep as many
+Drawing-s around as you wish, but only one is "current" at any given
+time.)  You may "play back" the current drawing to all active
+engines, automatically generating the appropriate A and P level
+calls, whenever you wish by calling the GdDraw routine.
+
+   A Drawing specifies not only a sequence of A and P level output
+primitive calls, but also the associated attributes (in gistA), and
+coordinate transformations (by GpSetTrans).  The coordinate
+transformations are specified as follows:
+
+   Each Drawing is organized into a list of (coordinate) "systems",
+plus a list of elements not belonging to any system.  Each system
+consists of its current coordinate transformation and associated tick
+style (GaTickStyle), plus a list of elements belonging to that system.
+Gist "plays back" the Drawing by setting the transform for coordinate
+system 1, calling GaTicks for that system, then rendering each element
+in the system (with gistClip set to 1).  This sequence is repeated for
+coordinate systems 2, 3, and so on until all coordinate systems have
+been exhausted.  The coordinate transform is then reset to the unit
+transform, and the non-system elements (the "system index" is 0 for
+these elements) are rendered (with gistClip set to 0).
+
+   A vanilla plot will have only one coordinate system.  If you want
+different ticks and labels on the left and right sides of the
+viewport, you will need two coordinate systems (which have coincident
+viewports).  To make "small multiple" style plots, you will need many
+coordinate systems.
+
+
+4A. Drawing lifecyle routines
+-----------------------------
+
+   You create a Drawing by calling GdNewDrawing:
+
+     Drawing *drawing= GdNewDrawing("work.gs");
+
+The parameter to GdNewDrawing is the name of any "drawing style file",
+whose name conventionally ends with ".gs".  The layout of the
+coordinate systems on the page is specified in the drawing style file.
+The file GISTPATH path (see section 6) is searched for the drawing
+style file, if the given filename is relative.  The following drawing
+styles are supplied with the Gist distribution:
+
+     work.gs     - my personal favorite, a single coordinate system
+                   with outward ticks and no frame box
+     work2.gs    - like work.gs, but two overlayed coordinate systems
+                   System 0 has ticks and labels on the left and bottom
+                   sides of the common viewport.  System 1 has ticks on
+                   the right and top, and labels on the right side of
+                   the viewport.
+     boxed.gs    - ugly inward ticks with a frame box, like most
+                   scientific journal graphics  (The inward ticks
+                   unavoidably interfere with the graphic, and the
+                   frame box cannot be distinguished from a line
+                   in the data near the edge of the viewport.  Also,
+                   the density of ticks must be reduced compared to
+                   work.gs, where the visual function of the frame
+                   box is taken over by densely ticked rulers.)
+     boxed2.gs   - A left and right overlayed system version
+                   of boxed.gs
+     axes.gs     - Traditional x and y axes cut through the middle of
+                   the viewport.  Often, the data will scribble out
+                   the tick labels.
+
+See section 6 for the format of a ".gs" file.  In a nutshell, a drawing
+style file specifies:
+     (1) The page orientation (portrait or landscape)
+     (2) The number of coordinate systems, and the NDC viewport
+         associated with each coordinate system
+     (3) The GaTickStyle (see section 2G) for each coordinate system
+     (4) The NDC position and style of curve and contour legends
+
+   GdNewDrawing makes the newly created Drawing the current Drawing.
+To make a previously created Drawing current, use GdSetDrawing:
+
+     Drawing *drawing2= GdNewDrawing("work.gs");
+        /* drawing2 now the current Drawing */
+     GdSetDrawing(drawing);
+        /* drawing now the current Drawing */
+
+If its parameter is not 0, GdSetDrawing remembers the current Drawing,
+and GdSetDrawing(0) will restore the last such saved Drawing.  This
+feature is intended to be used by X event handlers to repair damage
+to a window by playing back a non-current Drawing.
+
+   The GdDraw function "plays back" the current Drawing to all
+active Gist engines.  If its parameter is non-zero, then each active
+Engine receives the minimum number of primitives required to update
+the picture on that Engine.  (If the changes have been profound, a
+GpClear is issued, and the entire Drawing is played back.  However, if
+the only changes have been additive, then only the added elements are
+played back.)  Conversely, GdDraw(0) generates a GpClear(0,
+CONDITIONALLY), followed by a complete playback.  Each Engine
+remembers the most recent Drawing that has been played back, as well
+as state information about the Drawing that enables it to compute what
+part of the Drawing must be replayed on GdDraw(1).
+
+     GdDraw(1);  /* play back only changes since last GdDraw */
+     GdDraw(0);  /* play back entire current Drawing */
+
+   To discard all the display list elements in the current Drawing,
+use GdClear(0).  If non-zero, the parameter to GdClear is the Drawing
+to be cleared, whether that Drawing is current or not.  GdClear
+generates no A or P level primitives.  In fact, GdClear only marks the
+Drawing as cleared, so that an X window which needs the display list
+for damage repair still has access to the display list elements.  The
+display list elements are actually deleted the next time you add to
+the display list by calling one of the D level primitives.  Only the
+display list elements, both within and outside of coordinate systems,
+are deleted; coordinate systems themselves are not deleted.
+
+     GdClear(0);  /* mark current Drawing as cleared */
+     GdClear(drawing);    /* mark drawing as cleared */
+
+   If you never intend to use a Drawing again, free the associated
+memory with GdKillDrawing:
+
+     GdKillDrawing(drawing2);  /* this calls GdClear if necessary */
+
+
+4B. Routines to add elements to a Drawing
+-----------------------------------------
+
+   Gist supports 7 types of display list elements, which allow you to
+"record" any of the A or P level output primitive functions as a
+display list element.  Each type of display list element has a
+corresponding D level routine which adds an element of that type to
+the current coordinate system in the current display list.  These
+routines are:
+
+     int id;
+        /* Each routine which adds an element to a Drawing returns an
+           identifier (unique for that Drawing).  If you want to be
+           able to refer to a specific element later, save this
+           identifier.  You do NOT need it if you only need to loop
+           through all the lements you create (see section 4C).  */
+
+     id= GdLines(n, px, py);
+        /* copies n, px, py, gistA.dl, gistA.l, and gistA.m to be
+           able to reconstruct a call to GaLines (which is GpLines
+           if gistA.dl.marks and gistA.dl.rays are both 0, and
+           GpMarkers if gistA.l.type is L_NONE).
+           If gistA.m.type==0, gistA.m.type is set to the letter of
+           the alphabet corresponding to the number of elements in
+           the current Drawing; the first element gets 'A', the
+           second 'B', the third 'C', and so on, until the 27th gets
+           'A' again.  */
+
+     id= GdDisjoint(n, px, py, qx, qy);
+        /* copies n, px, py, qx, qy, and gistA.l to be able to
+           reconstruct a call to GpDisjoint */
+
+     id= GdText(x0, y0, text, toSys);
+        /* copies x0, y0, text, and gistA.t to be able to reconstruct
+           a call to GpText
+           If the toSys parameter is non-zero, the resulting display
+           list element will go in the current coordinate system,
+           like all other D level primitives.  If toSys==0, the
+           resulting display list element will go outside of all
+           coordinate systems, which is usually where it belongs.  */
+
+     id= GdCells(llx, lly, urx, ury, width, height, nColumns, colors);
+        /* copies llx, lly, urx, ury, width, height, nColumns, and
+           colors in order to be able to reconstruct a call to GpCells */
+
+     id= GdFill(n, colors, px, py, pn)
+        /* copies n, px, py, pn, and colors in order to be able to
+           reconstruct n calls to GpFill (colors[n] are used to set
+           gistA.f.color and pn[n] are the lengths of each of the n
+           polygons in px and py, which are of length sum(pn) -- the
+           polygons are all closed) */
+
+   The D level primitives GdMesh, GdFillMesh, GdVectors, and GdContours
+involve mesh-sized arrays, which may be large enough that you don't want
+them copied, particularly if several calls will be made refering to the
+same mesh.  Therefore, an additional parameter "noCopy" tells each of
+these routines precisely which mesh sized arrays you want copied, and
+which you don't.  If you set any of the bits in noCopy, you are
+responsible for not releasing the corresponding array(s) for the
+lifetime of the Drawing element (usually until the next GdClear).
+Obviously, Gist cannot free arrays it didn't copy, so you when you mark
+an array with a noCopy bit, don't expect Gist to free it when it deletes
+the Drawing element.
+
+     int noCopy= 0;
+        /* 0 means to make copies of all array arguments.  If you don't
+           want this, OR together any combination of the following
+           constants:
+           NOCOPY_MESH   none of the mesh arrays (x, y, reg, or triangle)
+                         will be copied.  If mesh.reg==0, or
+                         mesh.triangle==0, these will be created and
+                         deleted as necessary.
+           NOCOPY_COLORS the colors argument to GdFillMesh will not be
+                         copied.
+           NOCOPY_UV     the u and v parameters to GdVectors will not be
+                         copied.
+           NOCOPY_Z      the z parameter to GdContours will not be
+                         copied.  */
+
+     id= GdMesh(noCopy, &mesh, region, boundary);
+        /* copies region, boundary, gistA.mesh, and gistA.l to be able
+           to reconstruct a call to GaMesh */
+
+     id= GdFillMesh(noCopy, &mesh, region, colors, nColumns);
+        /* copies colors and gistA.mesh to be able to reconstruct a
+           call to GaFillMesh */
+
+     id= GdVectors(noCopy, &mesh, region, u, v, scale);
+        /* copies u, v, scale, gistA.mesh. gistA.vect, gistA.f, and gistA.l
+           to be able to reconstruct a call to GaVectors */
+
+     GpReal *levels;   /* array of level values for GaContourInit */
+     int nLevels;      /* length of levels array */
+
+     id= GdContours(noCopy, &mesh, region, z, levels, nLevels);
+        /* copies z, triangle, levels, nLevels, gistA.mesh. gistA.dl,
+           gistA.l, and gistA.m to be able to reconstruct a series of
+           calls to GaLines, in loops controlled by GaContourInit and
+           GaContours (see example for GaContours above)
+           If the triangle parameter is 0, a triangle array of appropriate
+           size will be created.  */
+
+   All of the D level primitives have two properties, which are picked
+up from gistD, in the same way that A and P level routines pick up
+attributes from gistA:
+
+     gistD.legend= "Some descriptive legend string";
+        /* use gistD.legend= 0; if you want no legend */
+     gistD.hidden= 0;
+        /* If non-zero, this display list element will be ignored when
+           the display list is played back.  */
+
+Be sure to set gistD.legend and gistD.hidden before every call to
+GdLines, GdDisjoint, GdText, GdCells, GdMesh, GdFillMesh, GdVectors,
+or GdContours.  (Or never set them, so they will always be 0.)
+
+
+4C. Routines to modify or delete elements of a Drawing
+------------------------------------------------------
+
+   In addition to a current drawing, the Gist D level routines also
+keep track of a current coordinate system, a current display list
+element, and a current contour level if the current display list
+element is contours (made with GdContours).  Each of the 7 D level
+primitives (GdLines, GdText, etc.) leaves the current display list
+element set to the newly created element.  All relevant attributes in
+gistA, and all relevant properties in gistD are set to the values of
+the current display list element (or current contour level).
+
+     GdSetDrawing(drawing);  /* set current drawing (see section 2A) */
+
+     int elType;
+        /* GdSetSystem, GdSetElement, and GdSetContour return one of
+           the enumerated values:
+           E_LINES, E_DISJOINT, E_TEXT, E_MESH, E_FILLED, E_VECTORS,
+           E_CONTOURS, E_CELLS, or E_SYSTEM if they succeed,
+           or E_NONE (==0) if they fail.  */
+
+     if (GdSetSystem(2) == E_NONE) {
+        /* There is no coordinate system number 2, so the current
+           coordinate system remains unchanged.  You should call
+           GdNewDrawing with a style file that defines at least two
+           coordinate systems (number 1 and number 2).  */
+       ...
+     }
+     ... D level primitives here will be added to coordinate system 2
+
+     GdSetSystem(0);
+     ... D level primitives here will be added to the current Drawing
+     ... OUTSIDE of any coordinate system
+
+     elType= GdSetElement(4);
+        /* Make the fifth display list element current (0 would be the
+           first).  */
+     if (elType == E_NONE) {
+        /* The current coordinate system (or list of elements outside
+           any coordinate system) does not have five elements.  */
+       ...
+     }
+
+     if (elType == E_CONTOURS) {
+       if (GdSetContour(2)==E_NONE) {
+          /* The current element, which is contours, has nLevels<3.  */
+         ...
+       }
+       ... current contour is level index 2 (the third contour level)
+     }
+
+   Use GdRemove to remove the current element from the display list of
+the current Drawing.  This operation changes the element indices (for
+the purposes of GdSetElement) of all subsequent elements in the
+current coordinate system:
+
+     GdRemove();  /* remove currnet element from display list */
+
+Instead of GdRemove, consider simply hiding the element by editing its
+hidden flag using GdEdit, which is a reversible operation.
+
+   Note that GdRemove changes the indices of any subsequent elements
+in the coordinate system.  If you remember the element id (returned
+when you created the element with GdLines or whatever), you can use
+the GdFindIndex function to get the index of that particular element
+at any later time:
+
+     id= GdLines(n, px, py);
+     ... other stuff, possiby incuding GdRemove-s ...
+     GdSetElement(GdFindIndex(id));
+        /* returns E_LINES, and makes the element created by the
+           call to GdLines the current element */
+
+If you have changed (or may have changed) to a different coordinate
+system, you may need to precede the call to GdFindIndex by a call to
+GdFindSystem:
+
+     GdSetSystem(GdFindSystem(id));
+        /* GdFindIndex will fail if the specified element is not in
+           the CURRENT coordinate system */
+     GdSetElement(GdFindIndex(id));
+        /* Now GdFindIndex has worked for sure... */
+
+Both GdFindIndex and GdFindSystem return -1 if there is no element
+with the specified id.
+
+   The properties of the current system, element, and contour level
+are always placed in the gistD global data structure, and any relevant
+attributes are placed in gistA.  For example, if GdSetElement returns
+E_LINES, then gistA.l, gistA.m, and gistA.dl are set to the values
+picked up when GdLines was called to create the element.  Both
+GdSetElement and GdLines set the property values (n, px, py, legend,
+and hidden) describing the polyline.  The members of the gistD global
+data structure correspond with the parameters for all of the D level
+primitive functions:
+
+     typedef struct GdProperties GdProperties;
+     struct GdProperties {
+       /* Properties of all elements */
+       int hidden;           /* 1 if element should not be plotted */
+       char *legend;         /* description of this element */
+
+       /* Properties of coordinate systems */
+       GaTickStyle ticks;    /* for GaTicks to produce ticks and labels */
+       GpTransform trans;    /* transform for GpSetTrans for current system */
+       int flags;            /* flags for computing the limits */
+     #define D_XMIN 0x001
+     #define D_XMAX 0x002
+     #define D_YMIN 0x004
+     #define D_YMAX 0x008
+     #define D_RESTRICT 0x010
+     #define D_NICE 0x020
+     #define D_SQUARE 0x040
+     #define D_LOGX 0x080
+     #define D_LOGY 0x100
+       GpBox limits;       /* current trans->window or exp10(trans->window) */
+
+       /* Properties of elements */
+       /* --- GdLines- also uses gistA.l, gistA.dl, gistA.m, GdFill */
+       int n;
+       GpReal *x, *y;
+       /* --- GdDisjoint */
+       GpReal *xq, *yq;
+       /* --- GdText- also uses gistA.t */
+       GpReal x0, y0;
+       char *text;
+       /* --- GdCells */
+       GpReal px, py, qx, qy;
+       long width, height;
+       /* --- GdCells, GdFillMesh */
+       long nColumns;    /* if colors copied, this is width or iMax-1 */
+       /* --- GdCells, GdFillMesh, GdFill */
+       GpColor *colors;
+       /* --- GdMesh, GdFillMesh, GdVectors, GdContours */
+       int noCopy;
+       GaQuadMesh mesh;
+       int region;
+       /* --- GdMesh- also uses gistA.l */
+       int boundary;
+       /* --- GdVectors- also uses gistA.l, gistA.f, gistA.vect */
+       GpReal *u, *v, scale;
+       /* --- GdContours- individual level curves are like GdLines
+               contour itself uses gistA.l, gistA.dl, gistA.m as defaults */
+       GpReal *z, *levels;
+       int nLevels;
+       /* --- GdFill */
+       int *pn;
+     };
+
+   Use GdEdit to change any attributes (gistA) or properties (gistD)
+of the current display list element.  If you have changed the mesh for
+a E_MESH, E_FILLED, E_VECTORS, or E_CONTOURS element, you should set
+the CHANGE_XY bit in the parameter to GdEdit.  If you have changed the
+contour function or contour levels for a E_CONTOURS element, you
+should set the CHANGE_Z bit.  
+
+Thus, to search for the curve (E_LINES) which uses marker 'D', and
+change its linestyle to dash-dot-dot, the following code would
+suffice:
+
+     for (i=0 ; elType=GdSetElement(i) ; i++) {
+        /* GdSetElement has set gistA and gistD */
+       if (elType!=E_LINES || gistA.m.type!='D') continue;
+       gistA.l.type= L_DASHDOTDOT;
+       GdEdit(0);
+       break;
+     }
+
+
+4D. Setting plot limits and tick styles
+---------------------------------------
+
+   The GdGetLimits routine updates gistD.trans, gistD.limits, and
+gistD.flags to their current values in the current coordinate system
+(if any flags were set for extreme values, then adding or removing an
+element from the system may have changed the limits, without changing
+gistD.limits).  Construct flags by ORing together any combination of
+the following bits:
+
+     #define D_XMIN 0x001
+     #define D_XMAX 0x002
+     #define D_YMIN 0x004
+     #define D_YMAX 0x008
+     #define D_RESTRICT 0x010
+     #define D_NICE 0x020
+     #define D_SQUARE 0x040
+     #define D_LOGX 0x080
+     #define D_LOGY 0x100
+
+After GdNewDrawing, the default is 0xf (for every coordinate system),
+which tells GdDraw to scan every element of the display list for
+extreme values of x and y, and to set the window using these extreme
+values.  The trans in gistD is the coordinate transformation which
+will be fed to GdSetTrans before calling GaTicks and the other A and P
+level output primitive functions for the current coordinate system.
+If gistD.flags has neither D_LOGX nor D_LOGY set so that the plot is
+linear, then gistD.trans.window will be identical to gistD.limits.
+
+   The other flags have the following meanings:
+
+     D_RESTRICT   - When scanning for extreme values in x, limit
+                    the search to those values of y which lie above
+                    a specified lower y limit (if D_YMIN is not set)
+                    and below a specified upper y limit (if D_YMAX is
+                    not set).  Similarly, restrict the search for
+                    extreme values in y when D_XMIN or D_XMAX is not
+                    set.
+     D_NICE       - Round extreme values out to "nice" numbers.
+     D_SQUARE     - Alter extreme values in either x or y to force
+                    the ratio of dy/dx in the window to match the
+                    ratio of dy/dx in the viewport.  (Noop if none of
+                    D_XMIN, D_XMAX, D_YMIN, or D_YMAX is set, or if
+                    semi-logarithmic axes are selected.)
+     D_LOGX
+     D_LOGY       - Use logarithmic scaling for the X or Y axis (or
+                    both).  Unlike the A and P level output primitives,
+                    GdDraw will take logarithms of the parameters to
+                    GdLines, GaMesh, gistD.limits, etc., as necessary,
+                    taking absolute values and protecting against zeroes.
+
+If neither the minimum nor the maximum extreme value flags is set, then
+the limits may meaningfully have xmin>xmax (or ymin>ymax).  If the
+gistD.limits has xmin==xmax (or ymin==ymax), it will be adjusted
+slightly by GdDraw to prevent zero divides.
+
+   Thus, to set the X axis limits to the interval [0,1], set the
+lower y limit to 0, and have the data scanned for its maximum y for
+points with 0<=x<=1, you would make the following calls:
+
+     GdGetLimits();  /* get gistD.limits, gistD.flags for the current
+                        coordinate system */
+     gistD.limits.xmin= 0.0;
+     gistD.limits.xmax= 1.0;
+     gistD.limits.ymin= 0.0;
+     gistD.flags= D_XMIN | D_XMAX | D_YMIN | D_RESTRICT;
+     GdSetLimits();  /* sets gistD.limits, gistD.flags into the
+                        current coordinate system, and updates
+                        gistD.trans.window */
+
+   The ticks and viewport members of gistD are set by GdSetSystem.
+(GdNewDrawing and GdSetDrawing also set these members of gistD.  All
+three functions also set the trans, limits, and flags members of gistD
+as well.)  You shouldn't really need to change the tick style or
+viewport, if your drawing style file has been set up properly, but the
+GdSetPort function is provided for completeness:
+
+     GdSetPort();  /* reads gistD.ticks and gistD.viewport into
+                      the current coordinate system */
+
+If the notion of drawing style files just doesn't work for you, the
+GdReadStyle, GdNewSystem, GdLandscape, and GdLegendBox routines are
+also provided for completeness.  These are the worker routines used
+by Gist to interpret the contents of a drawing style file, making
+the corresponding modifications to the current Drawing.  Their use
+is explained in the comments in gist.h.
+
+
+4E. Printing plot legends
+-------------------------
+
+   The legends for a drawing may be retrieved by looping through
+all elements in the display list:
+
+      /* Process legends in order elements are drawn by GdDraw.  */
+     for (j=0 ; GdSetSystem(j) ; j++) {
+       for (i=0 ; elType=GdSetElement(i) ; i++) {
+         ProcessLegendSomehow(elType, gistD.legend);
+       }
+     }
+     GdSetSystem(0);
+     for (i=0 ; elType=GdSetElement(i) ; i++) {
+       ProcessLegendSomehow(elType, gistD.legend);
+     }
+
+   I designed Gist with the notion that curve legends would not be
+displayed in Gist graphical X windows; instead, the interactive
+program should be able to print the legends to the terminal on request
+(e.g.- ProcessLegendSomehow above could be a simple printf).  However,
+for archival plots in CGM or PostScript files, you may well want a
+record of the curve legends.  Thus, the drawing style file allows you
+to specify the layout of the legends (see section 6B).  This legend
+layout (location and text style for legend boxes) is stored in each
+Drawing data structure.  The legends can be dumped in this format by
+means of the single command:
+
+      /* Play back the current Drawing list to cgmEngine.  */
+     GpPreempt(cgmEngine);
+     GdDraw(0);    /* draw entire picture, on new page if necessary */
+     GpPreempt(0); /* important to put this here, as GdDrawLegends
+                      uses the GpPreempt mechanism (see section 2B) */
+      /* Dump the corresponding legends to cgmEngine.  */
+     GdDrawLegends(cgmEngine);
+
+
+4F. H level default attribute mechanism
+---------------------------------------
+
+   It is somewhat tedious to keep track of the current values in the
+gistA data structure, and to be sure that the appropriate members are
+all set correctly before a call to some output primitive (at P, A, or
+D level).  A simple default attribute mechanism, based on the D level
+primitives, is therefore supplied when you use the <hlevel.h>
+header file:
+
+     GhGetLines();  /* get current defaults for GdLines */
+     ... set particular members in gistA.l, gistA.m, or gistA.dl
+     GhSetLines();  /* set current defaults for GdLines to current
+                       values in gistA.l, gistA.m, and gistA.dl */
+
+     GhGetText();   /* get current defaults for GdText */
+     ... set particular members in gistA.t
+     GhSetText();   /* set current defaults for GdText to current
+                       values in gistA.t */
+
+     GhGetMesh();   /* get current defaults into gistA.l */
+     ... set particular members in gistA.l
+     GhSetMesh();   /* set current defaults for gistA.l to current
+                       values in gistA.l */
+
+     GhGetVectors(); /* get current defaults for GdVectors */
+     ... set particular members in gistA.l, gistA.f, or gistA.vect
+     GhSetVectors(); /* set current defaults for GdVectors to current
+                       values in gistA.l, gistA.f, or gistA.vect */
+
+After calling one of the GhGet routines, you must still set
+gistD.legends and gistD.hidden before calling the D level primitive,
+but at least you won't need to set gistA "by hand" each time.
+
+
+4G. H level control functions
+-----------------------------
+
+   The H level Gist routines, declared by including <hlevel.h>
+instead of <gist.h>, support my own favorite model of interactive
+graphical interface.  In this model, you have up to 8 simultaneous
+drawings (that is, up to 8 instances of Drawing).  Each drawing is
+displayed in its own X window.  There is a single, default hardcopy
+Engine, to which you can replay the contents of any of your drawings.
+Additionally, each drawing may optionally have its own private
+hardcopy Engine, to which it alone directs hardcopy.  This model does
+not allow all imaginable permutations of engines and drawings, but it
+is easily comprehended, and covers the bulk of the situations of any
+practical importance in interactive scientific graphics.
+
+   The hlevel.h header declares the high level data structure
+ghDevices, which the interactive application must manage:
+
+     typedef struct GhDevice GhDevice;
+     struct GhDevice {
+       Drawing *drawing;
+       Engine *display, *hcp;
+       int doLegends;
+       int fmaCount;
+       void *hook;
+     };
+
+     /* Allow up to 8 windows per application */
+     extern GhDevice ghDevices[8];
+
+     /* The default hardcopy device is used for hcp commands whenever
+        the current device has no hcp engine of its own.  */
+     extern Engine *hcpDefault;
+
+The ghDevices[i].display should be the X Engine which displays Drawing
+ghDevices[i].drawing.  If ghDevices[i].hcp is non-zero, hardcopy for
+this drawing will be rendered on the specified engine; otherwise,
+hardcopy will be rendered on hcpDefault.  If ghDevices[i].doLegends is
+non-zero, GdDrawLegends will be called whenever a page of hardcopy
+output is finished.  The fmaCount keeps track of the number of calls
+to GhFMA (see below).  Every 100 pages, all scratch space used by Gist
+graphics is freed as a sort of primitive garbage collection.  The
+ghDevices[i].hook is an expansion slot for use by your interactive
+application, if you need it.
+
+   Once you have created the required Drawing and Engines, you make
+GhDevice index i the current drawing device by calling:
+
+     GhSetPlotter(i);
+
+You can get the index of the current plotter using:
+
+     i= GhGetPlotter();
+        /* Will return -1 if GhSetPlotter never called.  */
+
+You control the default hardcopy Engine by simply setting hcpDefault
+directly.  If hcpDefault==0, there is currently no default hardcopy
+engine.
+
+   This model imagines a half dozen actions initiated by interactive
+commands:
+
+   (1) The user creates a new X window, directs output to a different
+       X window, or changes a hardcopy engine:
+
+         ghDevices[i] or hcpDefault modified, GhSetPlotter(i)
+         called
+
+   (2) Before pausing for more input, the current X window must
+       be flushed:  (This guarantees that ALL X windows are current.)
+
+         GhBeforeWait();
+
+   (3) Erase the current page of graphics and begin a new page
+       ("frame advace"):
+
+         GhFMA();
+
+   (4) Redraw the current X window from scratch:
+
+         GhRedraw();
+
+   (5) Play back the current drawing (as displayed in the current
+       X window) on its associated hardcopy Engine, or on the default
+       hardcopy Engine:
+
+         GhHCP();
+
+   In order to realize maximum efficiency in situations where
+everything sent to the X window Engine should also be sent to the
+corresponding hardcopy Engine, the "frame advance" action has a mode
+in which both the hardcopy Engine and the X Engine are activated
+before the display list is played back.  This avoids some overhead
+relative to using the GhHCP() command (which preempts to the hardcopy
+Engine) immediately before every GhFMA() call.
+
+   Finally, Gist supports an "animation" mode, in which output to an X
+window is drawn to an offscreen pixmap, then blitted onscreen, so that
+you don't have to watch every line segment be drawn.  The P level
+interface to this mechanism uses the GxAnimate, GxStrobe, and GxDirect
+functions declared and documented in <xbasic.h>, and the
+GdClearSystem function declared and documented in <gist.h>.  The
+H level interface consists of a special animation mode for the "frame
+advance" action.  In animation mode, GhFMA plays back the display list
+to an offscreen pixmap, then blits the pixmap onscreen, then removes
+every element of the current coordinate system in preparation for the
+next frame of the animation.  You can only animate one coordinate
+system at a time with this model.  The offscreen pixmap will include
+the ticks and tick labels UNLESS all four window limits for the
+current coordinate system are fixed (and the ticks do not protrude
+into the viewport), in which case only the interior of the viewport is
+redrawn with each frame.  If all four limits are fixed, you must be
+careful to draw the first frame of the animation BEFORE turning on
+animation mode, in order to be sure the (fixed) ticks and labels are
+drawn.
+
+   Use GhFMAMode to set, reset, or toggle hardcopy-on-newframe mode or
+animation mode or both:
+
+     GhFMAMode(0, 0);
+     ... GhFMA() does NOT do either send-to-hardcopy or animation
+
+     GhFMAMode(1, 0);
+     ... GhFMA() does send-to-hardcopy, but no animation
+
+     GhFMAMode(0, 1);
+     ... GhFMA() does animation, but no send-to-hardcopy
+
+     GhFMAMode(2, 1);
+     ... GhFMA() does animation, send-to-hardcopy mode not changed
+
+     GhFMAMode(0, 2);
+     ... GhFMA() does NOT do send-to-hardcopy, animation mode not changed
+
+
+
+
+
+
+5. The GIST CGM Browser
+=======================
+
+   The Gist CGM browser is called "gist".  Its purpose is to precisely
+read back the contents of a Gist-generated CGM file, redirecting
+arbitrary pages to another CGM file (which might be a few frames from
+one file, or a combination of frames from several files), or to a
+PostScript file for printing (using the UNIX lpr utility), or to one
+or more X windows.  This section merely catalogues the features of
+gist; for operating instructions, see the Gist/gist/README file.
+
+   The gist browser may be run interactively, in batch mode, or as the
+first program in a pipeline (a variant of batch mode in which the
+PostScript output is placed on stdout).  It handles families of CGM
+files transparently.  (By default, the Gist CGM Engine will close a
+CGM output file when it exceeds 1 Megabyte.  The next page will go in
+a file whose name has been incremented.)
+
+   An important additional capability of gist is that individual pages
+can be output as Encapsulated PostScript files, complete with a
+256x256 crude preview.  These files can be imported into programs
+like FrameMaker to further "decorate" graphics, without loosing the
+correct treatment of thick lines and line types unique to Gist.
+
+
+
+
+
+
+6. Customizing Gist Graphics
+============================
+
+   The appearance of a plot may be customized in several important
+ways, without changing a single line of source code.  In this respect,
+Gist palette (.gp) and style (.gs) files are similar to the
+customizations made possible by X Window System resource files.
+The GpReadPalette and GdNewDrawing functions search for the named
+file along the following path:
+
+     (1) First, in the current working directory
+     (2) Second, along the GISTPATH environment variable, if any
+     (3) Third, along the default GISTPATH set when the Gist
+         library was compiled (see Makefile)
+
+By using relative filenames (as opposed to absolute filenames
+beginning with "/") in the calls to GpReadPalette and GdNewDrawing,
+you allow the fussy user to interpose his own palette or drawing
+style.  At the system manager level, you can provide a variety of
+standard palettes and drawing styles in the default GISTPATH, which
+should be enough for the casual user.
+
+   The GISTPATH environment variable and the default GISTPATH have the
+same syntax and semantics as the PATH environment variable.  Namely,
+the GISTPATH should be a colon (:) delimited list of directory names.
+Each directory name should be an absolute pathname; if the first
+character is tilde (~), the value of the HOME enviroment variable
+will be substituted, otherwise no shell-like substitutions are
+performed.  The directories in the list are searched left to right in
+the GISTPATH string.
+
+   For example, I prefer outward ticks with no box drawn around the
+viewport.  If you find this barbaric, I suggest you read Edward
+Tufte's wonderful book "The Visual Display of Quantitative
+Information" ("no non-data ink" is one of Tufte's rules).  IF you
+still want inward ticks and a box drawn around the viewport, you want
+to use the drawing style "boxed.gs" instead of my preference,
+"work.gs".  You should then find the default GISTPATH (ask whoever
+installed Gist on your system), and locate these two style files.
+Suppose they are in /usr/local/lib/Gist.  Then do the following:
+
+     cd ~
+     mkdir Gist
+     cd Gist
+     cp /usr/local/lib/Gist/boxed.gs .
+     mv boxed.gs work.gs
+
+Now, since ~/Gist is the first thing on the default GISTPATH, you will
+get "boxed.gs" whenever one of my codes refers to "work.gs".  This
+will make your plots less legible, but presumably you'll be happy.  Of
+course, you can also modify the contents of a ".gp" or ".gs" file, and
+keep the modified file in your ~/Gist, if your system manager is a
+tasteless buffoon, and his default palettes and drawing styles are
+intolerable.  (Anyone who does not like the styles and palettes
+supplied with the Gist distribution is, by definition, a "fussy
+user".)
+
+6A. Palette file format
+-----------------------
+
+   A palette file (.gp) looks like this:
+
+     # Gist earth.gp palette
+     # $Id: GUIDE,v 1.1 1993/08/27 17:11:32 munro Exp $
+
+     # dk blue - lt blue - dk green - yellow green - lt brown - white
+     # sort of like mapmakers colors from deep ocean to snow capped peak
+
+     ncolors= 240
+
+     # ntsc gray scale looks slightly better than straight intensity
+     ntsc= 1
+
+     #  r   g   b
+        0   0   0
+        0   0  46
+     ... 236 more lines of color triples ...
+      253 251 251
+      255 255 255
+
+Any line beginning with "#" is a comment and is ignored, as are blank
+lines.  An "ncolors=" line is required; the "ntsc=" line is optional.
+Blanks and tabs are ignored.  The red-green-blue triples should be
+between 0 (zero intensity) and 255 (full intensity); each triple
+must occupy a single line.
+
+6B. Drawing style file format
+-----------------------------
+
+   A drawing style file (.gs) looks like this:
+
+     # Gist work.gs drawing style
+     # $Id: GUIDE,v 1.1 1993/08/27 17:11:32 munro Exp $
+
+     # A single coordinate system on a portrait page
+     # Legends: two columns below viewport, contours in single column to right
+
+     # This actually repeats the default values in gread.c
+
+     landscape= 0
+
+     default = {
+       legend= 0,
+
+       viewport= { 0.19, 0.60, 0.47, 0.88 },
+
+       ticks= {
+
+         horiz= {
+           nMajor= 7.5,  nMinor= 50.0,  logAdjMajor= 1.2,  logAdjMinor= 1.2,
+           nDigits= 3,  gridLevel= 1,  flags= 0x033,
+           tickOff= 0.0007,  labelOff= 0.0182,
+           tickLen= { 0.0143, 0.0091, 0.0052, 0.0026, 0.0013 },
+           tickStyle= { color= -2,  type= 1,  width= 1.0 },
+           gridStyle= { color= -2,  type= 2,  width= 1.0 },
+           textStyle= { color= -2,  font= 0x08,  height= 0.0182,
+             orient= 0,  alignH= 0,  alignV= 0,  opaque= 0 },
+           xOver= 0.395,  yOver= 0.400 },
+
+         vert= {
+           nMajor= 7.5,  nMinor= 50.0,  logAdjMajor= 1.2,  logAdjMinor= 1.2,
+           nDigits= 4,  gridLevel= 1,  flags= 0x033,
+           tickOff= 0.0007,  labelOff= 0.0182,
+           tickLen= { 0.0143, 0.0091, 0.0052, 0.0026, 0.0013 },
+           tickStyle= { color= -2,  type= 1,  width= 1.0 },
+           gridStyle= { color= -2,  type= 2,  width= 1.0 },
+           textStyle= { color= -2,  font= 0x08,  height= 0.0182,
+             orient= 0,  alignH= 0,  alignV= 0,  opaque= 0 },
+           xOver= 0.150,  yOver= 0.400 },
+
+         frame= 0,
+         frameStyle= { color= -2,  type= 1,  width= 1.0 }}}
+
+     # The one coordinate system matches the default template exactly
+     system= { legend= "System 0" }
+
+     legends= {
+       x= 0.04698,  y= 0.400,  dx= 0.3758,  dy= 0.0,
+       textStyle= { color= -2,  font= 0x00,  height= 0.0156,
+         orient= 0,  alignH= 1,  alignV= 1,  opaque= 0 },
+       nchars= 36,  nlines= 21,  nwrap= 2 }
+
+     clegends= {
+       x= 0.6182,  y= 0.8943,  dx= 0.0,  dy= 0.0,
+       textStyle= { color= -2,  font= 0x00,  height= 0.0156,
+         orient= 0,  alignH= 1,  alignV= 1,  opaque= 0 },
+       nchars= 14,  nlines= 28,  nwrap= 1 }
+
+Again, any line beginning with "#" is a comment, and blank lines are
+ignored as well.  This time, the syntax is:
+
+     keyword= value
+
+Where value is an integer (in decimal, hex, or octal notation, as in
+the C programming language), a floating point number (in fixed point
+or scientific notation), an array of floating point numbers, or a data
+structure.  Data structures have the format
+
+     { keyword1= value1, keyword2= value2, ... }
+
+and may continue for any number of lines.  A keyword in a data
+structure must correspond to the name of one of the members of the
+data structure, but the order of the keywords is unimportant.  Also,
+all keywords have default values, so omitting a keyword is not an
+error.
+
+   The top-level keywords are:
+
+     landscape   - 0 or 1 to get portrait or landscape mode
+     default     - to change the default coordinate system
+                   parameters
+     system      - to specify a particular coordinate system
+                   The first system will be system number 0, the
+                   second, system number 1, and so on.  Usually,
+                   you should specify a default= which includes all
+                   of the properties shared by all your coordinate
+                   systems, then each system= keyword should
+                   specify only differences between the default
+                   and the particular system.  See work2.gs.
+     legends     - to specify the layout of curve legends
+     clegends    - to specify the layout of contour legends
+
+The keywords for a system (or default) are:
+
+     legend      - 0 or a quoted string, this will be the name of
+                   the coordinate system
+     viewport    - { xmin, xmax, ymin, ymax } in NDC
+     ticks       - to specify the layout of tick marks and their labels
+
+The keywords for ticks are:
+
+     horiz       - to specify the layout of the horizontal ticks
+     vert        - to specify the layout of the vertical ticks
+     frame       - 1 or 0 to draw or not draw a box around the viewport
+     frameStyle  - line style to use in drawing frame box
+
+The keywords for horiz or vert are the same as the GaTickStyle data
+structure:
+
+     nMajor      - (floating point) maximum number of major ticks
+     nMinor      - (floating point) maximum number of minor ticks
+     logAdjMajor - factor to increase nMajor by for log axes
+     logAdjMinor - factor to increase nMinor by for log axes
+     nDigits     - number of digits after decimal point to allow
+                   before switching to oveflow format
+     gridLevel   - level in tick heirarchy at which to stop full
+                   grid lines (level 0 is major ticks, 1 next smaller,
+                   and so on)
+     flags       - are flags as in the GaTickStyle data structure
+                   (see section 2G above, TICK_L etc.)
+     tickOff     - NDC offset of ticks from viewport edge (+ out - in)
+     labelOff    - NDC offset of labels from viewport edge (+ out - in)
+     tickLen     - { len0, len1, len2, len3, len4 }
+                   lengths of the five levels of ticks in NDC
+     tickStyle   - to specify linestyle for ticks
+     gridStyle   - to specify linestyle for grid lines
+     textStyle   - to specify text style for tick labels
+     xOver       - NDC x coordinate of overflow text (after nDigits)
+     yOver       - NDC y coordinate of overflow text (after nDigits)
+
+The frameStyle, tickStyle, and gridStyle keywords are:
+
+     color       - -1 to -10, line color (-2 is foreground)
+     type        - 1 to 5, 1 for solid, others as in L_DASH, etc.
+     width       - relative line width, 1.0 is 0.5*ONE_POINT
+
+The textStyle keywords are:
+
+     color      - -1 to -10, line color (-2 is foreground)
+     font       - 0 to 19 (0 is Courier, 4 Times-Roman, 8 Helvetica,
+                  16 New Century Schoolbok)
+     height     - point size in NDC (ONE_POINT==0.0013 NDC units)
+     orient     - 0 to read right, 1 up, 2 upside down, 3 down
+     alignH     - 0 to 3 to specify horizontal alignment
+                  0 normal, 1 left, 2 center, 3 right
+     alignV     - 0 to 5 to specify vertical alignment
+                  0 normal, 1 top, 2 cap, 3 half, 4 base, 5 bottom
+     opaque     - 0 or 1 for transparent or opaque text
+
+The legends and clegends keywords are:
+
+     x          - NDC x coordinate for legend box
+     y          - NDC y coordinate for legend box
+     dx         - NDC dx to second legend box (none if dx and dy both 0.0)
+     dy         - NDC dy to second legend box
+                  (Use dy==0.0, dx>0 to put the legends in 2 columns)
+     textStyle  - to specify textstyle for legends.  Courier works best.
+     nchars     - maximum number of characters per line
+     nlines     - maximum number of lines (use nlines==0 to get no legends)
+     nwrap      - maximum number of lines before truncating long legend
+
+
+6C. Gist PostScript file
+------------------------
+
+   The file ps.ps contains the prolog (procedure definitions) for the
+Gist PostScript engine.  Gist searches for this file along the
+GISTPATH, so, in principle, you can customize ps.ps as well.  The Gist
+source distribution contains a fully commented version of this file
+called pscom.ps, which you should consult if you are having PostScript
+problems.  The ghostscript PostScript interpreter, freely available
+with other project GNU software at prep.ai.mit.edu, is an invaluable
+debugging tool if you need to tweak Gist PostScript.
+
+   I mention one easy modification to ps.ps here: Changing the meaning
+of the Gist fonts is easy.  If your printer does not have New Century
+Schoolbook fonts, for example, simply change the definition of the
+/NCen procedure in ps.ps to reference a font which you have, and all
+Gist PostScript files will use your fonts when Gist requests the New
+Century fonts.  Obviously, you can also do this by editing an
+individual Gist-generated PostScript file.

@@ -1,0 +1,199 @@
+How to get a multihomed Smail?
+------------------------------
+
+  In these days it seems to be neat having multihomed sites. This is
+  common mostly with webservers serving a bunch of companies on only
+  one host. This is of interest especially for internet providers as
+  they don't have to put down one machine for each customer.
+
+  A multihomed mail server would avoid misuse of addresses since users
+  or customers could use different addresses (especially some they
+  don't pay for).
+
+  I will give one example:
+
+    One machine is responsible for both infodrom.north.de and
+    ariweg.uni-oldenburg.de using more_hostnames, pathaliases or the
+    like.
+
+    In this case the address
+
+      Martin.Schulze@ariweg.uni-oldenburg.de
+
+    would imply
+
+      Martin.Schulze@infodrom.north.de
+
+    also being valid and vice versa. In this special case this isn't
+    legal since one has to be a member of north.de to have this in
+    ones address and the other way round one has to live in a special
+    student's home to carry ariweg.uni-oldenburg.de in ones address.
+
+  So this is bad and has to be fixed sometime. Many people told me
+  that this could only be solved using sendmail as MTA. But since I'm
+  not familiar with sendmail, but with Smail, this wasn't a good idea.
+
+  For one week I was thinking of this problem and how this could be
+  solved using Smail. I once had the idea using perl controlling a
+  special alias file and defining a special transport. This was a good
+  approach, but not necessary.
+
+  Some days later I thought that it should be possible to pipe
+  everything for one site or domain through another incarnation of
+  Smail that uses a different bunch configuration files.
+
+The solution
+------------
+
+  Indeed this was the solution. Everything for a specific site or
+  domain is piped to another Smail with different configuration files
+  and - which is really important - with different alias files.
+
+  Because one can tell Smail to use a different config file with the
+  "-C" command line argument you even don't have to recompile it. You
+  have to define a special transport that does the piping:
+
+The special transport
+---------------------
+
+  You only have to define a special transport (of course in the
+  transports file) to pipe the mail into another Smail:
+
+  # multihome - deliver mail for pseudo hosts
+  #
+  # It's another Smail... :-)
+  #
+  multihome:
+	  driver = pipe,	# Use pipe for delivering
+	  bsmtp,		# Use bsmtp as the easiest mechanism
+	  -max_addrs;		# Don't limit adresses
+
+	  cmd = "/usr/sbin/smail -C multihome/${host}/config -bS",
+	  user = root,		# Run as root
+  #
+  # from, may be skipped
+
+  The line -max_addrs lien is very important, otherwise you will call
+  the new one Smail for every recipant. In this case one Smail is
+  called for all recipants and all the mails are piped in using SMTP
+  commands.
+
+  If you really want to emulate these sites you should add the "from"
+  option to add the hostname to the From_ envelope line.
+
+  You may already assume the directory layout. Beneath the Smail
+  lib_dir a directory "multihome" is created which itself contains
+  one directory for each ${host} that is served this way. This `host'
+  has to be specified for each site that is served this way.
+
+  This command has to be executed with root permission because
+  otherwise it would be nobody.nobody, in which case Smail would moan
+  about not being able to write log files.
+
+Another router
+--------------
+
+  We now have to tell the main Smail that it has to behave different
+  for some sites or domains. This could easily be done using another
+  router. The easiest way is specifiying a special pathalias file. Of
+  course you could use any other driver, but this is the simpliest one.
+
+  # multihome - deliver mail for pseudo hosts
+  #
+  # It's another Smail... :-)
+  multihome:
+	  driver = pathalias,
+	  transport = multihome;
+
+	  file = paths/multihome,
+	  proto = lsearch,
+	  optional,
+
+  This should speek for itself. If you want to use bsearch or dbz for
+  lookups go ahead. The file is optional so Smail won't complain if
+  the file is absent.
+
+  Looking in this pathalias file all seems to be very easy. It's just
+  another pathalias file:
+
+    ariweg.uni-oldenburg.de       ariweg!%s
+
+  The host in front of `!' is the `host' mentioned above. It is
+  assumed that you have a directory called "multihome" beneath the
+  global Smail lib_dir. In this directory you have to have one
+  directory for each site that is served with this multihome driver.
+
+  These directories should contain at least another main configuration
+  file called "config" in which the new hostname and another Smail
+  library directory are set. You may have to copy some of your
+  directors, routers and transport file, too, depending on your needs.
+
+Finishing the example
+---------------------
+
+  The easiest way, of course, would be to only define the following
+  config file.
+
+    # Tell Smail to use a different library directory
+    #
+    smail_lib_dir=/var/lib/smail/multihome/ariweg
+
+    hostname=ariweg.uni-oldenburg.de
+    uucp_name=ariweg
+
+    # All unknown addresses are served by this host, reachable via
+    # SMTP. (ok it's the same host, but...)
+    #
+    smart_transport=smtp
+    smart_path=infodrom.north.de
+
+  The "uucp_name" entry is very important otherwise the new Smail
+  won't accept messages that come in using uucp bang path notation
+  like "ariweg!joey". This is the case in this configuration. Instead
+  the mail would be sent out to the smart host.
+
+  Then you'd define an aliasfile director by creating a file
+  "directors" and filling it with:
+
+    aliases:
+	    driver = aliasfile,		# general-purpose aliasing director
+	    sender_okay,		# sender never removed from expansion
+	    owner = postmaster;		# problems go to the postmaster
+
+	    file = aliases/general,	# file general in the aliases directory
+	    proto = lsearch,		# use linear search through text file
+
+  This alias file should contain at least the first three system
+  aliases. Here you could specify your served addresses. And, of
+  course, you could define another Majordomo to make it multihomed,
+  too.
+
+  The aliasfile could look like:
+
+    root		joey@finlandia
+    postmaster		joey@finlandia
+    usenet		joey@finlandia
+
+    Martin.Schulze	joey@finlandia.infodrom.north.de
+
+  A good approach for defining a second Smail would be copying all of
+  the main Smail configuration into another directory and tune it to
+  act as a multihomed client. You could provide a special Received:
+  header, special pathaliases, special uucpnames and the like.
+
+Special Thanks
+--------------
+
+  Special Thanks go to Ronald S. Karr, Greg A. Woods and Nigel
+  Metheringham who made it possible to use Smail and to Ian Jackson
+  who did proofreading.
+
+Author
+------
+
+  Martin Schulze
+  Infodrom Oldenburg, Linux Support
+  joey@infodrom.north.de
+
+  If you have any additions or ideas belonging to this topic please
+  let know.

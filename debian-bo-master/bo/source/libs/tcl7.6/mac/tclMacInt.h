@@ -1,0 +1,68 @@
+/*
+ * tclMacInt.h --
+ *
+ *	Declarations of Macintosh specific shared variables and procedures.
+ *
+ * Copyright (c) 1996 Sun Microsystems, Inc.
+ *
+ * See the file "license.terms" for information on usage and redistribution
+ * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
+ *
+ * SCCS: @(#) tclMacInt.h 1.14 96/10/02 15:53:06
+ */
+
+#ifndef _TCLMACINT
+#define _TCLMACINT
+
+#ifndef _TCL
+#   include "tcl.h"
+#endif
+#include <Events.h>
+#include <Files.h>
+
+/*
+ * Typedefs used by Macintosh parts of Tcl.
+ */
+typedef pascal void (*ExitToShellProcPtr)(void);
+typedef int (*TclMacConvertEventPtr) _ANSI_ARGS_((EventRecord *eventPtr));
+
+/*
+ * Prototypes for functions found in the tclMacUtil.c compatability library.
+ */
+
+EXTERN int 	FSpGetDefaultDir _ANSI_ARGS_((FSSpecPtr theSpec));
+EXTERN int 	FSpSetDefaultDir _ANSI_ARGS_((FSSpecPtr theSpec));
+EXTERN int 	FSpLocationFromPath _ANSI_ARGS_((int length, char *path,
+		    FSSpecPtr theSpec));
+EXTERN OSErr 	FSpFindFolder _ANSI_ARGS_((short vRefNum, OSType folderType,
+		    Boolean createFolder, FSSpec *spec));
+EXTERN OSErr 	FSpPathFromLocation _ANSI_ARGS_((FSSpecPtr theSpec,
+		    int *length, Handle *fullPath));
+EXTERN void	GetGlobalMouse _ANSI_ARGS_((Point *mouse));
+
+/*
+ * Prototypes of Mac only internal functions.
+ */
+
+EXTERN void	TclCreateMacEventSource _ANSI_ARGS_((void));
+EXTERN char *	TclMacConvertTextResource _ANSI_ARGS_((Handle resource));
+EXTERN int	TclMacConsoleInit _ANSI_ARGS_((void));
+EXTERN int 	TclMacEvalResource _ANSI_ARGS_((Tcl_Interp *interp,
+		    char *resourceName, int resourceNumber, char *fileName));
+EXTERN void	TclMacExitHandler _ANSI_ARGS_((void));
+EXTERN Handle	TclMacFindResource _ANSI_ARGS_((Tcl_Interp *interp,
+		    char *resourceType, char *resourceName,
+		    int resourceNumber, char *resFileRef));
+EXTERN void	TclMacFlushEvents _ANSI_ARGS_((Tcl_Time *timePtr));
+EXTERN void	TclMacInitExitToShell _ANSI_ARGS_((int usePatch));
+EXTERN OSErr	TclMacInstallExitToShellPatch _ANSI_ARGS_((
+		    ExitToShellProcPtr newProc));
+EXTERN int	TclMacNotifySocket _ANSI_ARGS_((void));
+EXTERN int	TclMacOSErrorToPosixError _ANSI_ARGS_((int error));
+EXTERN void	TclMacRemoveTimer _ANSI_ARGS_((void *timerToken));
+EXTERN void 	TclMacSetEventProc _ANSI_ARGS_((TclMacConvertEventPtr procPtr));
+EXTERN int	TclMacSocketReady _ANSI_ARGS_((Tcl_File file, int mask));
+EXTERN void *	TclMacStartTimer _ANSI_ARGS_((long ms));
+EXTERN int	TclMacTimerExpired _ANSI_ARGS_((void *timerToken));
+EXTERN void	TclMacWatchSocket _ANSI_ARGS_((Tcl_File file, int mask));
+#endif /* _TCLMACINT */

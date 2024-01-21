@@ -1,0 +1,102 @@
+#! /usr/bin/make -f
+
+CC = gcc
+CFLAGS = -O2 -fomit-frame-pointer
+LDFLAGS = -s
+
+# The name of the package (for example, `emacs').
+p = sysutils
+# The version of the package (for example, `19.28').
+v = 1.2
+# The Debian revision of the package (for example, `2').
+d = 1
+# The target architecture
+a = $(shell dpkg --print-architecture)
+
+build:
+# Builds the binary package.
+	( cd procinfo-0.9 && make CFLAGS="$(CFLAGS) -s" LDFLAGS="$(LDFLAGS)" LDLIBS="-lncurses" )
+	( cd memtest-1.0.1 && make CFLAGS="$(CFLAGS) -s" LDFLAGS="$(LDFLAGS)" )
+	( cd bogo-1.2 && make CFLAGS="$(CFLAGS) -s -N -finline-functions -Wall" LDFLAGS="$(LDFLAGS)" )
+	( cd tofrodos-1.0 && make CFLAGS="$(CFLAGS) -c -s -Wall" LDFLAGS="$(LDFLAGS)" )
+	touch stamp-build
+
+clean:
+# Undoes the effect of `make -f debian.rules build'.
+	( cd bogo-1.2 && make clean )
+	( cd memtest-1.0.1 && make clean )
+	( cd procinfo-0.9 && make clean )
+	( cd tofrodos-1.0 && make clean )
+	rm -f stamp-build
+	rm -rf debian-tmp
+
+binary:
+# Makes a binary package.
+	test -f stamp-build || make -f debian.rules build
+	install -d -g root -m 755 -o root debian-tmp
+	chmod g-s debian-tmp
+	install -d -g root -m 755 -o root debian-tmp/DEBIAN
+	install -d -g root -m 755 -o root debian-tmp/usr/doc/copyright
+	install -d -g root -m 755 -o root debian-tmp/usr/bin
+	install -d -g root -m 755 -o root debian-tmp/usr/sbin
+	install -d -g root -m 755 -o root debian-tmp/usr/man/man1
+	install -d -g root -m 755 -o root debian-tmp/usr/man/man8
+	install -g root -m 644 -o root sysutils.1 debian-tmp/usr/man/man1
+	install -g root -m 755 -o root procinfo-0.9/procinfo debian-tmp/usr/bin
+	install -g root -m 644 -o root procinfo-0.9/procinfo.8 debian-tmp/usr/man/man8
+	install -g root -m 755 -o root procinfo-0.9/lsdev.pl debian-tmp/usr/bin/lsdev
+	install -g root -m 755 -o root procinfo-0.9/lsdev.8 debian-tmp/usr/man/man8/lsdev.8
+	install -g root -m 755 -o root memtest-1.0.1/memtest debian-tmp/usr/sbin
+	install -g root -m 644 -o root memtest-1.0.1/memtest.1 debian-tmp/usr/man/man1
+	install -g root -m 755 -o root bogo-1.2/bogomips debian-tmp/usr/bin
+	install -g root -m 644 -o root bogo-1.2/bogomips.1 debian-tmp/usr/man/man1
+	install -g root -m 755 -o root tofrodos-1.0/fromdos debian-tmp/usr/bin/fromdos
+	( cd debian-tmp/usr/bin ; ln -s fromdos todos )
+	( cd debian-tmp/usr/bin ; ln -s fromdos dos2unix )
+	( cd debian-tmp/usr/bin ; ln -s fromdos unix2dos )
+	install -g root -m 644 -o root tofrodos-1.0/fromdos.1 debian-tmp/usr/man/man1/fromdos.1
+	( cd debian-tmp/usr/man/man1 ; ln -s fromdos.1 todos.1 )
+	( cd debian-tmp/usr/man/man1 ; ln -s fromdos.1 dos2unix.1 )
+	( cd debian-tmp/usr/man/man1 ; ln -s fromdos.1 unix2dos.1 )
+	install -g root -m 644 -o root debian.README \
+	  debian-tmp/usr/doc/copyright/$(p)
+	sed -e '3s/=V-=D/$(v)-$(d)/' -e '4s/=A/$(a)/' debian.control \
+	  > debian-tmp/DEBIAN/control
+	chmod 644 debian-tmp/DEBIAN/control
+	dpkg --build debian-tmp && dpkg-name -o -s .. debian-tmp.deb
+
+source:
+# Makes a source package.
+	-test -f stamp-build && make -f debian.rules clean
+	( cd .. && tar cf - $(p)-$(v) | gzip -9f > $(p)_$(v)-$(d).tar.gz )
+
+diff:
+# Makes a context diff.
+	-test -f stamp-build && make -f debian.rules clean
+	-test -d ../$(p)-$(v).orig -o -f ../$(p)_$(v)-`expr $(d) - 1`.diff.gz \
+	  || ( echo "Original source package is not available." ; false )
+	-test -d ../$(p)-$(v).orig || make -f debian.rules orig
+	( cd .. && diff -cNr $(p)-$(v).orig $(p)-$(v) | gzip -9f \
+	  > $(p)_$(v)-$(d).diff.gz )
+	-test -f stamp-orig \
+	  && rm -rf ../$(p)-$(v).orig && rm -f stamp-orig
+
+dist: binary source diff
+# Prepares the package for distribution.
+
+orig:
+# Prepares the original package from the previous
+# Debian revision source package and context diff.
+	( cd .. \
+	  && mkdir $(p).orig \
+	  && cd $(p).orig \
+	  && tar xzf ../$(p)_$(v)-`expr $(d) - 1`.tar.gz \
+	  && cd $(p)-$(v) \
+	  && ( zcat ../../$(p)_$(v)-`expr $(d) - 1`.diff.gz \
+	    | patch -sER -p1 ) \
+	  && find . -name "*.orig" -exec rm -f {} \; \
+	  && cd .. \
+	  && mv $(p)-$(v) ../$(p)-$(v).orig \
+	  && cd .. \
+	  && rmdir $(p).orig )
+	touch stamp-orig

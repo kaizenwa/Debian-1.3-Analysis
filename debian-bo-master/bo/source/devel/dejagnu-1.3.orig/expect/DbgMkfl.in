@@ -1,0 +1,139 @@
+#
+# Makefile for tcl debugger
+#
+
+VERSION = 1.4.3
+SHORT_VERSION = 1.4
+
+# Compatible with Tcl version 6.5 through 7.4
+# Compatible with Tk version 3.3 through 3.6
+
+srcdir 	= @srcdir@
+VPATH = @srcdir@
+
+######################################################################
+# The following lines are things you are likely to want to change
+######################################################################
+
+# Tcl include files.  (If you haven't installed Tcl yet, read the README file).
+# This must point to the directory that contains ALL of Tcl's include
+# files, not just the public ones.
+TCLHDIR = @TCLHDIR@
+
+# flags to pass to cc
+# -O for production version
+# -g for debuggable version
+CFLAGS = -g
+
+# which C compiler to use
+CC = @CC@
+
+# By default, `make install' will install the appropriate files in
+# /usr/local/bin, /usr/local/lib, /usr/local/man, etc.  You can specify
+# an installation prefix other than /usr/local here:
+prefix = @prefix@
+
+# You can specify a separate installation prefix for architecture-specific
+# files such as binaries and libraries.
+exec_prefix = @exec_prefix@
+
+# If you have ranlib but it should be avoided, change this from "ranlib" #
+# to something innocuous like "echo".  Known systems with this problem:
+# older SCO boxes.
+RANLIB = @RANLIB@
+
+######################################################################
+# End of things you are likely to want to change
+######################################################################
+
+libdir 	= $(exec_prefix)/lib
+datadir	= $(prefix)/lib
+includedir = $(prefix)/include
+
+# Where to store utility scripts.  This corresponds to the variable
+# "dbg_library".
+DBG_SCRIPTDIR	= $(datadir)/dbg
+
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = $(INSTALL)
+INSTALL_DATA = $(INSTALL)
+
+AR = ar
+ARFLAGS = cr
+
+# TCLHDIR includes "-I"
+CPPFLAGS =	-I. -I$(srcdir) $(TCLHDIR) -DDBG_SCRIPTDIR=\"$(DBG_SCRIPTDIR)\"
+
+CFLAGS_INT = $(MH_CFLAGS) $(CPPFLAGS) $(CFLAGS)
+
+.c.o:
+	$(CC) -c $(CFLAGS_INT) $(HDEFS) $<
+
+CFILES = Dbg.c Dbg_cmd.c
+OFILES = Dbg.o Dbg_cmd.o
+LIBDEBUG = libtcldbg.a
+
+all: $(LIBDEBUG)
+
+Makefile: $(srcdir)/Makefile.in $(host_makefile_frag) config.status
+	@echo "Rebuilding the Makefile..."
+	$(SHELL) config.status
+
+$(LIBDEBUG): $(OFILES)
+	$(AR) $(ARFLAGS) $(LIBDEBUG) $(OFILES)
+	-$(RANLIB) $(LIBDEBUG)
+
+install:	$(LIBDEBUG)
+	$(INSTALL_DATA) $(LIBDEBUG) $(libdir)/$(LIBDEBUG)
+	-$(RANLIB) $(libdir)/$(LIBDEBUG)
+	$(INSTALL_DATA) $(srcdir)/Dbg.h $(includedir)
+# create utility-script directory
+	$(INSTALL_DATA) $(srcdir)/Dbg_lib.tcl $(DBG_SCRIPTDIR)
+	$(INSTALL_DATA) $(srcdir)/tclIndex $(DBG_SCRIPTDIR)
+
+clean:
+	-rm -f *~ *.o core $(LIBDEBUG)
+
+distclean: clean
+	-rm -f Makefile config.status
+
+configure: $(srcdir)/configure.in $(srcdir)/Makefile.in
+	autoconf configure.in > configure
+	-@chmod a+x configure
+     
+config.status: $(srcdir)/configure
+	@echo "Rebuilding config.status..."
+	$(SHELL) ./config.status --recheck
+
+tclIndex: Dbg_lib.tcl
+	expect -c "auto_mkindex . *.tcl;exit"
+
+lint:
+	lint $(LINTFLAGS) $(CPPFLAGS) $(CFILES) $(TCLLINTLIB) | tee debug.lint
+
+nist:
+	configure --verbose --prefix=/depot/tcl --exec-prefix=/depot/tcl/arch
+
+FTPDIR = /proj/elib/online/pub/expect
+
+ftp:	tcl-debug-$(SHORT_VERSION).tar.Z tcl-debug-$(SHORT_VERSION).tar.gz
+	cp tcl-debug-$(SHORT_VERSION).tar.Z $(FTPDIR)/tcl-debug.tar.Z
+	cp tcl-debug-$(SHORT_VERSION).tar.gz $(FTPDIR)/tcl-debug.tar.gz
+	rm tcl-debug-$(SHORT_VERSION).tar*
+	ls -l $(FTPDIR)/tcl-debug.tar*
+
+tcl-debug-$(SHORT_VERSION).tar:
+	rm -f ../tcl-debug-$(SHORT_VERSION)
+	ln -s `pwd` ../tcl-debug-$(SHORT_VERSION)
+	rm -f ../pubfile
+	ln pubfile ..
+	cd ..;tar cvfh $@ `pubfile tcl-debug-$(SHORT_VERSION)`
+	mv ../$@ .
+
+tcl-debug-$(SHORT_VERSION).tar.Z:	tcl-debug-$(SHORT_VERSION).tar
+	compress -fc tcl-debug-$(SHORT_VERSION).tar > $@
+
+tcl-debug-$(SHORT_VERSION).tar.gz:	tcl-debug-$(SHORT_VERSION).tar
+	gzip -fc tcl-debug-$(SHORT_VERSION).tar > $@
+
+Dbg.o: $(srcdir)/Dbg.c $(srcdir)/Dbg.h

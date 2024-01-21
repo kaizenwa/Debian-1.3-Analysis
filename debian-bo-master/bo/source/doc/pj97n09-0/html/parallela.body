@@ -1,0 +1,398 @@
+<!--	impaginazione di Fabrizio Polacco
+	Last modification: Sun, 16 Mar 1997 21:39:19 +0200
+  -->
+<meta name="author"	content="Alessandro Rubini">
+<meta name="description"
+	content="In questo articolo si introduce l'uso delle porte di
+	I/O vedendo in particolare la parallela, sia dallo spazio kernel
+	sia dallo spazio utente">
+<meta http-equiv="reply-to" content="rubini@linux.it">
+
+<center>
+<font size=+2 color=blue>
+	Uso dell'Interfaccia Parallela
+</font>
+</center>
+
+<address>
+<p align=right>
+	<font size=-1 color=green>
+	di
+	<a href="mailto:rubini@linux.it?Subject=PJ 9: uso dell'interfaccia parallela">
+	Alessandro Rubini</a>
+	</font>
+</address>
+
+<p align=left>
+	In questo articolo vedremo come si può utilizzare l'interfaccia
+	parallela in Linux. L'interfaccia parallela riveste un certo
+	interesse per chi si diverte a giocare con il saldatore a stagno
+	in quanto è un'interfaccia molto semplice da usare e si può
+	trovarla in molti computer: la discussione seguente vale per PC
+	e Alpha, ma non per Sparc; per le altre piattaforme supportate
+	non so dire...
+
+<h3>Cos'è la parallela</h3>
+
+<p>
+	L'interfaccia parallela del calcolatore, nella sua forma più
+	utilizzata, è la periferica più semplice che si possa
+	immaginare. Non mi riferisco qui ai nuovi standard, quelli con
+	nomi tipo EPP, ma al protocollo originale della parallela, che è
+	supportato da tutti i PC, dall'8088 in poi.
+<p>
+	In pratica, sul connettore a 25 piedini si trovano direttamente
+	i segnali corrispondenti ad alcuni bit di I/O, in logica TTL
+	(con segnali a 0V e 5V). Con "direttamente" intendo dire che i
+	bit che vengono scritti dal processore sulle porte di output
+	appaiono sui piedini del connettore, e i bit della porta di
+	ingresso vengono letti dal segnale di tensione sul connettore.
+<p>
+	Il connettore parallelo porta 12 bit di output e 5 bit di input,
+	più 8 segnali di terra. L'interfaccia software si compone quindi
+	di due porte di output ed una porta di input. Per rendere le
+	cose un pò più complicate, alcuni bit subiscono una inversione
+	tra quello che appare sul connettore e quello che viene visto
+	dal processore.
+<p>
+	Prima che qualcuno colleghi lampadine da 20W ai segnali di
+	output della parallela è forse il caso di dire due parole sui
+	segnali elletrici utilizzati: TTL (Transistor-Transistor Logic)
+	è una famiglia logica molto utilizzata, almeno in passato, che
+	presenta specifiche di ingresso/uscita non simmetriche: mentre
+	un'uscita bassa (0V) può assorbire una corrente significativa,
+	un'uscita alta (5V nominali) non è in grado di erogare più di un
+	paio di mA di corrente, e risulta spesso a tensione molto più
+	bassa di 5V (il minimo assicurato è 2.7 V). Allo stesso modo,
+	per abbassare un ingresso occorre assorbire tanta corrente,
+	mentre per alzarlo basta una resistenza di 5k verso 5V.
+
+<P>
+	Le porte parallele più recenti forniscono prestazioni elettriche
+	migliori, ma la cosa non è affatto garantita; lampade da 20W non
+	possono comunque essere collegate direttamente, e l'uso di
+	fotoaccoppiatori è comunque consigliabile per proteggere il
+	calcolatore (ma io personalmente non l'ho mai fatto).
+
+<h3>L'interfaccia software</h3>
+
+<p>
+	Ogni porta parallela del sistema viene vista tramite tre
+	indirizzi di I/O consecutivi: "base", "base+1", "base+2". Ad
+	ogni porta parallela è anche associata un'interruzione, che
+	vedremo a breve. I valori di "base" più utilizzati ed i relativi
+	numeri di interruzione sono <code>0x378</code> (IRQ 7),
+	<code>0x278</code> (IRQ 2) e <code>0x3bc</code> (IRQ 5).
+<p>
+	Il registro "base+1" è un registro di input, e viene usato per
+	leggere i 5 segnali di ingresso del connettore, "base" e
+	"base+2", invece, sono registri di output, e quando vengono
+	letti restituiscono l'ultimo valore scritto (cioè lo stato
+	attuale dei segnali al connettore).
+<p>
+	L'effettiva mappatura tra i bit nei registri e i piedini del
+	connettore è spiegata meglio con una figura che a parole.
+
+<hr>
+	<img src="images/parportcolor.gif" border=2>
+<hr>
+
+<p>
+	Poichè non interessa qui spiegare come si possa controllare una
+	stampante, non resta nient'altro da dire sulla parallela. Chi
+	non è interessato a questioni hardware può tranquillizzarsi, in
+	quanto non parlerò più di segnali elettrici fino agli esempi
+	finali.
+
+<h3>Le porte di I/O</h3>
+
+<p>
+	La discussione dell'uso delle porte di input/output ripete
+	parzialmente quanto detto nel primo articolo sui device drivers,
+	ma un minimo di introduzione mi sembra dovuta.
+<p>
+	In Linux sono definite le seguenti funzioni per accedere alle
+	porte:
+
+<ul>
+<li>	<code>inb(port)</code> legge la porta <code>port</code> e ne
+	ritorna il valore (8 bit).
+
+<li>	<code>outb(value, port)</code> scrive sulla porta
+	<code>port</code> il valore <code>value</code>.
+
+<li>	<code>outw(value, port)</code> scrive un valore a 16 bit su di
+	una porta a 16 bit. L'equivalente <code>inw(port)</code> esiste
+	per l'input.
+
+<li>	<code>outl(value, port)</code> scrive un valore a 32 bit. Per
+	l'input si usa <code>inl(port)</code>.
+
+<li>	<code>outsb(port, address, count)</code> effettua un ciclo di
+	istruzioni <code>outb()</code> per scrivere <code>count</code>
+	bytes sulla porta <code>port</code> a partire dall'indirizzo
+	<code>address</code>. Le equivalenti funzioni <code>w</code>
+	ed <code>l</code> sono definite, come per le tre funzioni di
+	input. 
+
+</ul>
+
+<p>
+	Le funzioni precedenti sono definite sia per Intel che per
+	Alpha, nonostante il processore Alpha non supporti uno "spazio
+	di I/O".  Alpha supporta solo l'I/O mappato in memoria, e i
+	segnali di I/O per il bus vengono generati da circuiti che
+	rimappano alcune locazioni di memoria sullo spazio di I/O
+	(questo permette di usare periferiche ISA e PCI in calcolatori
+	basati su Alpha, con l'ulteriore ausilio di un emulatore 8086
+	per eseguire l'inizializzatione delle schede stesse che si trova
+	sulla loro stessa ROM in forma di codice intel).
+<p>
+	L'architettura Sparc è differente da questo punto di vista, e
+	non esiste nessuna delle funzioni precedenti quando Linux gira
+	su Sparc.  L'I/O per Sparc è mappato in memoria come per Alpha,
+	e le stesse periferiche non hanno alcuna nozione di indirizzi di
+	input/output. Poichè le nuove Sparc supportano PCI è probabile
+	che verrà introdotto un modo per accedere al bus compatibilmente
+	con le funzioni introdotte sopra e circuiteria simile a quella
+	per Alpha.
+<p>
+	È interessante notare come le funzioni di "I/O di stringa" sono
+	singole istruzioni sulla piattaforma Intel mentre vengono
+	implementate da cicli software per Alpha. La versione 2.0 del
+	kernel non esporta <code>outsl()</code> e <code>insl()</code>
+	per Alpha, mentre linux-2.1.3 e seguenti le esportano. Questo
+	non è comunque un problema finchè ci limitiamo ad usare porte a
+	8 bit.
+<p>
+	Per alcune architetture sono anche definite delle istruzioni
+	"con pausa" per operare su periferiche lente, ma non è questo il
+	luogo per parlarne. Il lettore curioso può sempre guardare in
+	<code>&lt;asm/io.h&gt;</code>
+
+<h3>Uso delle porte dallo spazio utente</h3>
+
+<p>
+	Il modo più semplice per leggere e scrivere sulle locazioni di
+	I/O è farlo nello spazio utente. Questo però comporta alcune
+	limitazioni:
+
+<ul>
+<li>	Occorre essere <code>root</code>.
+<li>	Bisogna chiamare <code>ioperm(from, num, on_or_off)</code> per
+	abilitare l'uso delle porte nel processo corrente.
+<li>	Non si ha accesso alle interruzioni
+</ul>
+
+<p>
+	Avendo il vizio di attaccare semplici circuiti al mio
+	calcolatore, ho scritto due stupidi programmi per leggere e
+	scrivere le porte dallo spazio utente. Si chiamano
+	<code>inp</code> e <code>outp</code>, ed utilizzano solo le
+	porte ad 8 bit. I sorgenti si chiamano, ovviamente, <a
+	href="para/inp.c"><code>inp.c</code></a> e <a
+	href="para/outp.c"><code>outp.c</code></a>.
+<p>
+	<code>inp</code> e <code>outp</code> possono essere fatti
+	"set-userid" root in modo da non dover diventare esplicitamente
+	root per usarli. Io difficilmente lavoro come root sulla mia
+	macchina, per cui ho usato questa tecnica; bisogna però fare
+	molta attenzione perchè lasciare <code>outp</code> libero a
+	tutti gli utenti è un serio rischio per la sicurezza della
+	macchina -- io non saprei esattamente cosa farci, ma un utente
+	smaliziato e abbastanza competente può tirar fuori di tutto da
+	un buchetto del genere.
+<p>
+	L'unica attenzione da ricordare quanto si compilano programmi
+	che usano le funzioni di I/O è di specificare <code>-O</code>
+	tra le opzioni del compilatore. Questo perchè le funzioni di I/O
+	sono dichiarate come "<code>extern inline</code>", e le funzioni
+	<code>inline</code> non vengono espanse da <code>gcc</code> se
+	l'ottimizzazione non è abilitata. La problematica è spiegata in
+	maniera chiara nella pagine del manuale di <code>gcc</code>.
+
+<h3>Uso delle porte dallo spazio kernel</h3>
+
+<p>
+	Il codice per accedere alle porte di I/O da parte del kernel è
+	uguale a quello usato nello spazio utente, tranne che non
+	occorre usare <code>ioperm()</code>, in quanto il codice del
+	kernel (che gira in "modo supervisore" sul processore), ha
+	sempre accesso a tutte le risorse hardware.
+<p>
+	Quello che occorre per utilizzare la porta parallela è un device
+	driver che permetta di leggere o scrivere le porte in questione.
+	Il modulo "<code>short</code>" (Simple Hardware Operations and
+	Raw Tests) permette di leggere e/o scrivere quattro porte a 8
+	bit consecutive: i nodi in <code>/dev</code> creati da
+	<code>short</code> sono direttamente mappati sulle porte di I/O:
+	<code>/dev/short0</code> serve per leggere/scrivere la porta
+	<code>base</code>, <code>/dev/short1</code> accede a
+	<code>base+1</code> eccetera. Il valore di default di
+	<code>base</code> è <code>0x378</code> e permette quindi di
+	usare la porta parallela; una linea di comando come
+	"<code>insmod short.o short_base=0x278</code>" si può usare per
+	accedere a porte diverse.
+<p>
+	Inoltre, per permettere di vedere il differente comportamento di
+	<code>outb()</code>, <code>outsb()</code> e
+	<code>outb_p()</code> (la versione con pausa), il modulo crea
+	diversi nodi in <code>/dev</code> a questo fine:
+
+<ul>
+<li>	<code>/dev/short0</code> usa le normali chiamate
+	<code>inb()</code>/<code>outb()</code>.
+<li>	<code>/dev/short0p</code> usa le chiamate con pausa.
+<li>	<code>/dev/short0s</code> usa
+	<code>outsb()</code>/<code>insb()</code>.
+</ul>
+
+<p>
+	Il seguente esempio mostra il tempo che il dispositivo impiega a
+	scrivere 1MB sulla porta usando i tre diversi nodi:
+<pre><code>
+morgana.root# time dd bs=1k count=1000 if=/dev/zero of=/dev/short0
+0.020u 2.040s 0:02.06 100.0% 0+0k 0+0io 64pf+0w
+morgana.root# time dd bs=1k count=1000 if=/dev/zero of=/dev/short0p
+0.020u 3.510s 0:03.57 98.8% 0+0k 0+0io 64pf+0w
+morgana.root# time dd bs=1k count=1000 if=/dev/zero of=/dev/short0s
+0.020u 1.640s 0:01.66 100.0% 0+0k 0+0io 64pf+0w
+</code></pre>
+
+<p>
+	Come si vede, le chiamate con pausa aggiungono un attesa di
+	circa un microsecondo dopo ogni operazione, mentre le chiamate
+	"stringa" sono circa il 25% più veloci dei cicli software.
+<p>
+	Bisogna però dire che scrivere tanti dati consecutivamente sulla
+	porta parallela è difficilmente di interesse, e il controllo di
+	semplici periferiche esterne viene di solito effettuato
+	scrivendo o leggendo un byte alla volta.
+
+<h3>Uso delle interruzioni della parallela</h3>
+
+<p>
+	La porta parallela è anche in grado di generare interruzioni
+	quando il piedino numero 10 passa da una tensione bassa ad una
+	alta. Le interruzioni, però, a differenza delle porte, non si
+	possono gestire nello spazio utente, e bisogna appoggiarsi a
+	codice nel kernel. Perchè la porta parallera interrompa il
+	processore occorre scrivere un 1 nel bit 4 della porta
+	<code>base+2</code>.
+<p>
+	Il modulo <code>short</code> è in grado di gestire le
+	interruzioni: quando il modulo viene caricato abilita
+	l'interfaccia a riportare interruzioni.
+<p>
+	Il device <code>/dev/shortint</code> riporta nello spazio utente
+	gli istanti di tempo (in secondi e microsecondi) in cui il
+	processore viene interrotto dall'interfaccia. La scrittura di
+	<code>/dev/shortint</code> fa si che vengano scritti
+	alternativamente <code>0x00</code> e <code>0xff</code> sulla
+	porta dat (<code>base+0</code>). Si possono perciò generare
+	delle interruzioni collegando insieme il piedino 9 e il piedino
+	10 dell connettore della parallela. Questo è quello che succede
+	sulla mia macchina mettendo il ponticello:
+
+<pre><code>
+morgana% echo 1122334455 > /dev/shortint ; cat /dev/shortint
+50588804.876653
+50588804.876693
+50588804.876720
+50588804.876747
+50588804.876774
+</code></pre>
+
+<p>
+	Una trattazione approfondita della gestione delle interruzioni è
+	fuori argomento in questa sede.
+
+<h3>Il pacchetto <code>short</code></h3>
+
+<p>
+	Il driver <code>short</code> è distribuito in formato sorgente
+	secondo la <a href="file:/usr/doc/copyright/GPL">GPL</a> ed è
+	composto dal <a href="short/short.c">sorgente</a>, un <a
+	href="short/sysdep.h">header</a> per risolvere alcune
+	dipendenze dalla versione del kernel e due script per <a
+	href="short/short_load">caricare</a> e <a
+	href="short/short_unload">scaricare</a> il modulo. Più,
+	ovviamente, il <a
+	href="short/Makefile"><code>Makefile</code></a>.
+<p>
+	La cosa migliore per chi intende provarlo è comunque scaricare
+	il tar completo: <a
+	href="short.tar.gz"><code>short.tar.gz</code></a>.
+
+<h3>Tre esempi</h3>
+
+<p>
+	Vediamo ora tre esempi di uso della porta parallela per il
+	collegamento di circuiti personali.
+<p>
+	Il primo è veramente banale, e consiste nell'applicazione di un
+	LED (o più di uno) per la visualizzazione dello stato del (dei)
+	bit della porta. In figura è rappresentato il monitoraggio del
+	bit 0 della porta dati. Il ponticello tra il piedino 9 (bit 7
+	della porta dati) e il piedino 10 permette di giocare con le
+	interruzioni.
+<hr>
+	<img src="images/parsample1.gif">
+<hr>
+
+<p>
+	Il secondo esempio riguarda il controllo di un relay ("relé").
+	tramite logica TTL. Per l'implementazione di questo circuito
+	occorre un'alimentazione esterna a 5V e l'alimentazione per il
+	relay.
+<p>
+	In questo esempio un '244 (buffer a 8 bit) isola il segnale
+	della parallela dalla circuiteria esterna, dove un '138
+	(multiplexer 3-to-8) abbassa una delle otto linee di output in
+	base ai tre bit di indirizzo A, B, C. I tre segnali di enable
+	del '138 sono collegati in modo da rispondere ai dati compresi
+	tra <code>0x20</code> e <code>0x27</code>.  Il relay mostrato in
+	figura viene attivato scrivendo <code>0x20</code> e disattivato
+	scrivendo <code>0x21</code>.
+<p>
+	Collegare direttamente i bit della porta al relay non permette
+	di preservare lo stato dell'interruttore quando si spegne o
+	riaccende la macchina. L'uso dei codici 0x20-27 permette invece
+	una persistenza dello stato comandato dal calcolatore (se non si
+	toglie l'alimentazione esterna). Ho usato personalmente questo
+	circuito per collegare 8 relé al mio calcolatore, tramite due
+	'138 con i fili di enable collegati diversamente.
+
+<hr>
+	<img src="images/parsample2.gif">
+<hr>
+
+<p>
+	Il terzo esempio è una segreteria telefonica che fa uso di una
+	scheda audio per la ripetizione del proprio messaggio e la
+	registrazione della telefonata.
+<p>
+	Per implementare la segreteria basta riconoscere quando il
+	telefono squilla e quando invece il telefono viene messo giù. La
+	porta parallela può essere usata per generare delle interruzioni
+	quando la tensione sulla linea telefonica oscilla bruscamente, e
+	il riconoscimento dello squillo può poi avvenire via software.
+<p>
+	La trasmissione e la ricezione del segnale audio possono
+	avvenire tramite accoppiamento capacitivo, mentre la cornetta
+	può essere "sollevata" tramite un relé di segnale. Questo
+	permette di mantenere i due circuiti elettricamente separati.
+<p>
+	A differenza dei due esempi precedenti, non ho avuto modo di
+	provare questo circuito in pratica, ed è quindi possibile che
+	contenga delle sviste macroscopiche da parte mia. Prima di
+	toccare i fili del telefono, comunque, conviene reperire le
+	informazioni sui livelli di tensione usati ed accertarsi che i
+	valori dei condensatori e degli zener usati siano corretti per
+	accoppiare la scheda audio, poichè i valori mostrati sono
+	spannometrici, in quanto non conosco i livelli di tensione della
+	scheda audio.
+
+<hr>
+	<img src="images/parsample3.gif">
+

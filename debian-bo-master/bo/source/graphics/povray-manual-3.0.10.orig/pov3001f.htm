@@ -1,0 +1,218 @@
+<html>
+<body text="#000000" bgcolor="#C0C0C0" background="backgrnd.gif">
+<a name="ref 1196 pri 0"><a name="ref 374 pri 0"><center><h3><a name="section 7.5.1">
+Section 7.5.1<br>Empty and Solid Objects</h3></center>
+It is very important that you know the basic concept behind empty and solid objects in POV-Ray to fully understand how features like halos and translucency are used.<p>
+Objects in POV-Ray can either be solid, empty or filled with (small) particles.<p>
+A solid object is made from the material specified by its pigment and finish statements (and to some degree its normal statement). By default all objects are assumed to be solid. If you assign a stone texture to a sphere you'll get a ball made completely of stone. It's like you had cut this ball from a block of stone. A glass ball is a massive sphere made of glass.<p>
+You should be aware that solid objects are conceptual things. If you e. g. clip away parts of the sphere you'll see that the sphere is empty, i. e. you'll clearly see that the interior is empty and it just has a very thin surface.<p>
+This is not contrary to the concept of a solid object used in POV-Ray. It is assumed that all space inside the sphere is covered by the sphere's material. Thus there is no room for any other particles like those used by fog or halos.<p>
+Empty objects are created by adding the <a name="ref 384 pri 7"><strong>hollow</strong> keyword (see <a href="pov30024.htm#ref 384 pri 1">&quot;Hollow&quot;</a>) to the object statement. An empty (or hollow) object is assumed to be made of a very thin surface which is of the material specified by the pigment, finish and normal statements. The object's interior is empty, i. e. it normally contains air molecules.<p>
+An empty object can be filled with particles by adding fog or atmosphere to the scene or by adding a halo to the object. It is very important to understand that in order to fill an object with any kind of particles it first has to be made hollow.<hr>
+<a name="ref 1197 pri 0"><a name="ref 1198 pri 0"><center><h3><a name="section 7.5.1.1">
+Section 7.5.1.1<br>Halo Pitfall</h3></center>
+There is a pitfall in the current empty/solid object implementation that you have to be aware of.<p>
+In order to be able to put solid objects inside a halo (this also holds for fog and atmosphere) a test has to be made for every ray that passes through the halo. If this ray travels through a solid object the halo will not be calculated. This is what anyone will expect.<p>
+The problem arises when the camera ray is inside any non-hollow object. In this case the ray is already traveling through a solid object and even if the halo's container object is hit and it is hollow, the halo will not be calculated. There is no way of telling between these two cases.<p>
+POV-Ray has to determine whether the camera is inside any object prior to tracing a camera ray in order to be able to correctly render halos when the camera is inside the container object. There's no way around doing this.<p>
+The solution to this problem (that will often happen with infinite objects like planes) is to make those objects hollow too. Thus the ray will travel through a hollow object, will hit the container object and the halo will be calculated.<p>
+Note that the above is also true for atmosphere and fog.<hr>
+<a name="ref 1199 pri 0"><a name="ref 1200 pri 0"><center><h3><a name="section 7.5.1.2">
+Section 7.5.1.2<br>Refraction Pitfall</h3></center>
+There is a pitfall in the way refractive (and non-refractive translucent) objects are handled.<p>
+Imagine you want to create an object that's partially made of glass and stone. You'd use something like the following merge because you don't want to see any inside surfaces.<p>
+<listing>
+  merge {
+    sphere { &lt;-1,0,0&gt;, 2 texture { Stone } }
+    sphere { &lt;+1,0,0&gt;, 2 texture { Glass } }
+  }
+</listing>
+<p>
+What's wrong with this, you may ask? The problem is that there is no way of telling what the interior of the actual object will look like. This is not a problem of POV-Ray, it's a general problem. You can't define the interior of any object in a surface based model. You would have to create some (complex) rules to decide what the interior will look like. Is it made of stone? Is it made of glass? Is it made of some bizarre mixture between glass and stone? Is it half stone and half glass? Where is the boundary between the two materials and what does it look like?<p>
+You will not be able to answer any of the above questions by just looking at the above object. You need more information.<p>
+If you wanted to create an object made half of stone and half of glass you would have used the following statements.<p>
+<listing>
+  union {
+    intersection {
+      sphere { &lt;-1,0,0&gt;, 2 }
+      plane { x, 0 }
+      texture { Stone }
+    }
+    intersection {
+      sphere { &lt;+1,0,0&gt;, 2 }
+      plane { x, 0 inverse }
+      texture { Glass }
+    }
+  }
+</listing>
+<p>
+This example is correct because there is one object made only of stone and one made only of glass.<p>
+You should never use objects whose interior is not well defined, i. e. there must not be different textures for the object having different refractive (and translucent) properties. You should be aware that this holds only for the lowest layer if you use layered textures.<p>
+See also <a href="pov3001f.htm#ref 1198 pri 0">&quot;Halo Pitfall&quot;</a> for a similar problem with halos.<hr>
+<a name="ref 1201 pri 0"><a name="ref 1202 pri 0"><center><h3><a name="section 7.5.2">
+Section 7.5.2<br>Finite Solid Primitives</h3></center>
+There are twelve different solid finite primitive shapes: blob, box, cone, cylinder, fractal, height field, lathe, sphere, superellipsoid, surface of revolution, text object and torus. These have a well-defined <strong>inside</strong> and can be used in CSG (see section <a href="pov30022.htm#ref 205 pri 0">&quot;Constructive Solid Geometry&quot;</a>). They are finite and respond to automatic bounding. As with all shapes they can be translated, rotated and scaled.<hr>
+<a name="ref 1203 pri 0"><a name="ref 155 pri 2"><a name="ref 155 pri 2"><a name="ref 155 pri 3"><center><h3><a name="section 7.5.2.1">
+Section 7.5.2.1<br>Blob</h3></center>
+Blobs are an interesting and flexible object type. Mathematically they are iso-surfaces of scalar fields, i. e. their surface is defined by the strength of the field in each point. If this strength is equal to a threshold value you're on the surface otherwise you're not.<p>
+Picture each blob component as an object floating in space. This object is <strong>filled</strong> with a field that has its maximum at the center of the object and drops off to zero at the object's surface. The field strength of all those components are added together to form the field of the blob. Now POV-Ray looks for points where this field has a given value, the <strong>threshold</strong> value. All these points form the surface of the blob object. Points with a greater field value than the threshold value are considered to be inside while points with a smaller field value are outside.<p>
+There's another, simpler way of looking at blobs. They can be seen as a union of <strong>flexible</strong> components that attract or repel each other to form a <strong>blobby</strong> organic looking shape. The components' surfaces actually stretch out smoothly and connect as if they were made of honey or something like that.<p>
+<a name="ref 930 pri 3">A blob is made up of spherical and cylindrical components and is defined as follows:<p>
+<listing>
+  blob {
+    threshold THRESHOLD_VALUE
+    cylinder { &lt;END1&gt;, &lt;END2&gt;, RADIUS, [ strength ] STRENGTH }
+    sphere { &lt;CENTER&gt;, RADIUS, [ strength ] STRENGTH }
+    [ component STRENGTH, RADIUS, &lt;CENTER&gt; ]
+    [ hierarchy FLAG ]
+    [ sturm ]
+  }
+</listing>
+<p>
+<a name="ref 939 pri 3">The <a name="ref 939 pri 4"><strong>threshold</strong> keyword determines the total field strength value that POV-Ray is looking for. By following the ray out into space and looking at how each blob component affects the ray, POV-Ray will find the points in space where the field strength is equal to the threshold value. The following list shows some things you should know about the threshold value.<p>
+<center><table border><tr><td valign=top>1)</td><td valign=top>The threshold value must be positive.</td></tr>
+<tr><td valign=top>2)</td><td valign=top>A component disappears if the threshold value is greater than its strength.</td></tr>
+<tr><td valign=top>3)</td><td valign=top>As the threshold value gets larger the surface you see gets closer to the centers of the components.</td></tr>
+<tr><td valign=top>4)</td><td valign=top>As the threshold value gets smaller, the surface you see gets closer to the surface of the components.</td></tr>
+
+</td></tr></table></center>
+
+<p>
+<a name="ref 871 pri 7"><a name="ref 138 pri 13"><a name="ref 240 pri 14">Cylindrical components are specified by the keyword <a name="ref 138 pri 21"><strong>cylinder</strong> giving a cylinder formed by the base &lt;END1&gt;, the apex &lt;END2&gt; and the radius. The cylinder has hemispherical caps at the base and apex. Spherical components are specified by the keyword <a name="ref 871 pri 25"><strong>sphere</strong> forming a sphere at &lt;CENTER&gt; with the given radius. Each component can be individually translated, rotated, scaled and textured. The complete syntax for the cylindrical and spherical components is:<p>
+<listing>
+  sphere { &lt;CENTER&gt;, RADIUS, [strength] STRENGTH
+    [ translate &lt;VECTOR&gt; ]
+    [ rotate &lt;VECTOR&gt; ]
+    [ scale &lt;VECTOR&gt; ]
+    TEXTURE_MODIFIERS
+  }
+
+  cylinder { &lt;END1&gt;, &lt;END2&gt;, RADIUS, [strength] STRENGTH
+    [ translate &lt;VECTOR&gt; ]
+    [ rotate &lt;VECTOR&gt; ]
+    [ scale &lt;VECTOR&gt; ]
+    TEXTURE_MODIFIERS
+  }
+</listing>
+<p>
+<a name="ref 930 pri 26">By unevenly scaling a spherical component you can create ellipsoidal components. The <a name="ref 930 pri 28"><strong>component</strong> keyword gives a spherical component and is only used for compatibility with earlier POV-Ray versions.<p>
+<a name="ref 894 pri 28">The <a name="ref 894 pri 29"><strong>strength</strong> parameter is a float value specifying the field strength at the center of the object. The strength may be positive or negative. A positive value will make that component attract other components while a negative value will make it repel other components. Components in different, separate blob shapes do not affect each other.<p>
+You should keep the following things in mind.<p>
+<center><table border><tr><td valign=top>1)</td><td valign=top>The strength value may be positive or negative. Zero is a bad value, as the net result is that no field was added --- you might just as well have not used this component.</td></tr>
+<tr><td valign=top>2)</td><td valign=top>If strength is positive, then POV-Ray will add the component's field to the space around the center of the component. If this adds enough field strength to be greater than the &quot;threshold&quot; value you will see a surface.</td></tr>
+<tr><td valign=top>3)</td><td valign=top>If the strength value is negative, then POV-Ray will subtract the component's field from the space around the center of the component. This will only do something if there happen to be positive components nearby. What happens is that the surface around any nearby positive components will be dented away from the center of the negative component.</td></tr>
+
+</td></tr></table></center>
+
+<p>
+<a name="ref 841 pri 29">The components of each blob object are internally bounded by a spherical bounding hierarchy to speed up blob intersection tests and other operations. By using the optional keyword <a name="ref 841 pri 30"><strong>hierarchy</strong> you can switch this hierarchy off.<p>
+An example of a three component blob is:<p>
+<listing>
+  blob {
+    threshold 0.6
+    sphere { &lt;.75, 0, 0&gt;, 1, 1 }
+    sphere { &lt;-.375, .64952, 0&gt;, 1, 1 }
+    sphere { &lt;-.375, -.64952, 0&gt;, 1, 1 }
+    scale 2
+  }
+</listing>
+<p>
+If you have a single blob component then the surface you see will just look like the object used, i. e. a sphere or a cylinder, with the surface being somewhere inside the surface specified for the component. The exact surface location can be determined from the blob equation listed below (you will probably never need to know this, blobs are more for visual appeal than for exact modeling).<p>
+For the more mathematically minded, here's the formula used internally by POV-Ray to create blobs. You don't need to understand this to use blobs. The formula used for a single blob component is:<p>
+<listing>
+  density = strength * (1 - radius^2)^2
+</listing>
+<p>
+This formula has the nice property that it is exactly equal to the strength parameter at the center of the component and drops off to exactly 0 at a distance from the center of the component that is equal to the radius value. The density formula for more than one blob component is just the sum of the individual component densities:<p>
+<listing>
+  density = density1 + density2 + ...
+</listing>
+<p>
+The calculations for blobs must be very accurate. If this shape renders <a name="ref 905 pri 31">improperly you may add the keyword <a name="ref 905 pri 33"><strong>sturm</strong> after the last component to use POV-Ray's slower-yet-more-accurate Sturmian root solver.<hr>
+<a name="ref 1204 pri 0"><a name="ref 131 pri 2"><a name="ref 131 pri 2"><a name="ref 131 pri 3"><center><h3><a name="section 7.5.2.2">
+Section 7.5.2.2<br>Box</h3></center>
+A simple box can be defined by listing two corners of the box like this:<p>
+<listing>
+  box { &lt;CORNER1&gt;, &lt;CORNER2&gt; }
+</listing>
+<p>
+<center><img src="pov3003c.gif" border=0 width=320 height=240><br><cite>The geometry of a box.</cite></center><br> <p>
+Where &lt;CORNER1&gt; and &lt;CORNER2&gt; are vectors defining the x, y, z coordinates of the opposite corners of the box.<p>
+Note that all boxes are defined with their faces parallel to the coordinate axes. They may later be rotated to any orientation using the <a name="ref 216 pri 13"><strong>rotate</strong> keyword.<p>
+Each element of &lt;CORNER1&gt; should always be less than the corresponding element in &lt;CORNER2&gt;. If any elements of &lt;CORNER1&gt; are larger than &lt;CORNER2&gt; the box will not appear in the scene.<p>
+Boxes are calculated efficiently and make good bounding shapes (if manually bounding seems to be necessary).<hr>
+<a name="ref 1205 pri 0"><a name="ref 134 pri 2"><a name="ref 134 pri 2"><a name="ref 134 pri 3"><center><h3><a name="section 7.5.2.3">
+Section 7.5.2.3<br>Cone</h3></center>
+A finite length cone or a <strong>frustum</strong> (a cone with the point cut off) may be defined by.<p>
+<listing>
+  cone {
+    &lt;BASE_POINT&gt;, BASE_RADIUS, &lt;CAP_POINT&gt;, CAP_RADIUS
+    [ open ]
+  }
+</listing>
+<p>
+<center><img src="pov3003d.gif" border=0 width=320 height=240><br><cite>The geometry of a cone.</cite></center><br> <p>
+<a name="ref 240 pri 5">Where &lt;BASE_POINT&gt; and &lt; CAP_POINT&gt; are vectors defining the x, y, z coordinates of the center of the cone's base and cap and BASE_RADIUS and CAP_RADIUS are float values for the corresponding radii.<p>
+<a name="ref 135 pri 6">Normally the ends of a cone are closed by flat planes which are parallel to each other and perpendicular to the length of the cone. Adding the optional keyword <a name="ref 135 pri 8"><strong>open</strong> after CAP_RADIUS will remove the end caps and results in a tapered hollow tube like a megaphone or funnel.<hr>
+<a name="ref 1206 pri 0"><a name="ref 138 pri 2"><a name="ref 138 pri 2"><a name="ref 138 pri 3"><center><h3><a name="section 7.5.2.4">
+Section 7.5.2.4<br>Cylinder</h3></center>
+A finite length cylinder with parallel end caps may be defined by.<p>
+<listing>
+  cylinder {
+    &lt;BASE_POINT&gt;, &lt;CAP_POINT&gt;, RADIUS
+    [ open ]
+  }
+</listing>
+<p>
+<center><img src="pov3003e.gif" border=0 width=320 height=240><br><cite>The geometry of a cylinder.</cite></center><br> <p>
+<a name="ref 240 pri 6">Where &lt;BASE_POINT&gt; and &lt; CAP_POINT&gt; are vectors defining the x, y, z coordinates of the cylinder's base and cap and RADIUS is a float value for the radius.<p>
+<a name="ref 135 pri 9">Normally the ends of a cylinder are closed by flat planes which are parallel to each other and perpendicular to the length of the cylinder. Adding the optional keyword <a name="ref 135 pri 13"><strong>open</strong> after the radius will remove the end caps and results in a hollow tube.<hr>
+<a name="ref 1207 pri 0"><a name="ref 163 pri 1"><a name="ref 163 pri 1"><a name="ref 162 pri 1"><center><h3><a name="section 7.5.2.5">
+Section 7.5.2.5<br>Height Field</h3></center>
+Height fields are fast, efficient objects that are generally used to create mountains or other raised surfaces out of hundreds of triangles in a mesh. The height field syntax is:<p>
+<listing>
+  height_field {
+    FILE_TYPE &quot;FILENAME&quot;
+    [ hierarchy BOOL ]
+    [ smooth BOOL ]
+    [ water_level FLOAT ]
+  }
+</listing>
+<p>
+A height field is essentially a one unit wide by one unit long square with a mountainous surface on top. The height of the mountain at each point is taken from the color number or palette index of the pixels in a graphic image file. The maximum height is one, which corresponds to the maximum possible color or palette index value in the image file.<p>
+ <center><img src="pov3003f.gif" border=0 width=320 height=240><br><cite>The size and orientation of an un-scaled height field.</cite></center><br> <p>
+The mesh of triangles corresponds directly to the pixels in the image file. Each square formed by four neighboring pixels is divided into two triangles. An image with a resolution of N*M pixels has (N-1)*(M-1) squares that are divided into 2*(N-1)*(M-1) triangles.<p>
+<center><img src="pov30040.gif" border=0 width=320 height=240><br><cite>Four pixels of an image and the resulting heights and triangles in the height field.</cite></center><br> <p>
+The resolution of the height field is influenced by two factors: the resolution of the image and the resolution of the color/index values. The size of the image determines the resolution in the x- and z-direction. A larger image uses more triangles and looks smoother. The resolution of the color/index value determines the resolution along the y-axis. A height field made from an 8 bit image can have 256 different height levels while one made from a 16 bit image can have up to 65536 different height levels. Thus the second height field will look much smoother in the y-direction if the height field is created appropriately.<p>
+The size/resolution of the image does not affect the size of the height field. The un-scaled height field size will always be 1* 1. Higher resolution image files will create smaller triangles, not larger height fields.<p>
+There are six or possibly seven types of files which can define a heightfield, as follows:<p>
+<listing>
+  height_field { gif &quot;filename.gif&quot; }
+  height_field { pgm &quot;filename.pgm&quot; }
+  height_field { png &quot;filename.png&quot; }
+  height_field { pot &quot;filename.pot&quot; }
+  height_field { ppm &quot;filename.ppm&quot; }
+  height_field { sys &quot;filename.???&quot; }
+  height_field { tga &quot;filename.tga&quot; }
+</listing>
+<p>
+<a name="ref 978 pri 1">The image file used to create a height field can be a GIF, TGA, POT, PNG, PGM, PPM and possibly a system specific (e. g. Windows BMP or Macintosh Pict) format file. The GIF, PNG, PGM and possibly system format files are the only ones that can be created using a standard paint program. Though there are paint programs for creating TGA image files they won't be of much use for creating the special 16 bit TGA files used by POV-Ray (see below and <a href="pov3002e.htm#ref 164 pri 1">&quot;HF_Gray_16&quot;</a> for more details).<p>
+<a name="ref 824 pri 1">In an image file like GIF that uses a color palette the color number is the palette index at a given pixel. Use a paint program to look at the palette of a GIF image. The first color is palette index zero, the second is index one, the third is index two and so on. The last palette entry is index 255. Portions of the image that use low palette entries will result in lower parts of the height field. Portions of the image that use higher palette entries will result in higher parts of the height field.<p>
+Height fields created from GIF files can only have 256 different height levels because the maximum number of colors in a GIF file is 256.<p>
+The color of the palette entry does not affect the height of the pixel. Color entry 0 could be red, blue, black or orange but the height of any pixel that uses color entry 0 will always be 0. Color entry 255 could be indigo, hot pink, white or sky blue but the height of any pixel that uses color entry 255 will always be 1.<p>
+You can create height field GIF images with a paint program or a fractal program like <b>Fractint</b>. You can usually get <b>Fractint</b> from most of the same sources as POV-Ray.<p>
+<a name="ref 998 pri 1">A POT file is essentially a GIF file with a 16 bit palette. The maximum number of colors in a POT file is 65536. This means a POT height field can have up to 65536 possible height values. This makes it possible to have much smoother height fields. Note that the maximum height of the field is still 1 even though more intermediate values are possible.<p>
+At the time of this writing the only program that created POT files was a freeware IBM-PC program called <b>Fractint</b>. POT files generated with this fractal program create fantastic landscapes.<p>
+<a name="ref 936 pri 1"><a name="ref 1004 pri 1">The TGA and PPM file formats may be used as a storage device for 16 bit numbers rather than an image file. These formats use the red and green bytes of each pixel to store the high and low bytes of a height value. These files are as smooth as POT files but they must be generated with special custom-made programs. Several programs can create TGA heightfields in the format POV uses, such as <b>gforge</b> and <strong>Terrain Maker</strong>.<p>
+<a name="ref 991 pri 1">PNG format heightfields are usually stored in the form of a grayscale image with black corresponding to lower and white to higher parts of the height field. Because PNG files can store up to 16 bits in grayscale images they will be as smooth as TGA and PPM images. Since they are grayscale images you will be able to view them with a regular image viewer. <b>gforge</b> can create 16-bit heightfields in PNG format. Color PNG images will be used in the same way as TGA and PPM images.<p>
+<a name="ref 914 pri 1">SYS format is a platform specific file format. See your platform specific documentation for details.<p>
+An optional <a name="ref 1022 pri 1"><strong>water_level</strong> parameter may be added after the file name. It consists of the keyword <a name="ref 1022 pri 2"><strong>water_level</strong> followed by a float value telling the program to ignore parts of the height field below that value. The default value is zero and legal values are between zero and one. For example <strong>water_level .5</strong> tells POV-Ray to only render the top half of the height field. The other half is <strong>below the water</strong> and couldn't be seen anyway. This term comes from the popular use of height fields to render landscapes. A height field would be used to create islands and another shape would be used to simulate water around the islands. A large portion of the height field would be obscured by the <strong>water</strong> so the <a name="ref 1022 pri 4"><strong>water_level</strong> parameter was introduced to allow the ray-tracer to ignore the unseen parts of the height field. <a name="ref 1022 pri 7"><strong>water_level</strong> is also used to <strong>cut away</strong> unwanted lower values in a height field. For example if you have an image of a fractal on a solid colored background, where the background color is palette entry 0, you can remove the background in the height field by specifying, <strong>water_level .001</strong>.<p>
+<a name="ref 866 pri 7">Normally height fields have a rough, jagged look because they are made of lots of flat triangles. Adding the keyword <a name="ref 866 pri 8"><strong>smooth</strong> causes POV-Ray to modify the surface normal vectors of the triangles in such a way that the lighting and shading of the triangles will give a smooth look. This may allow you to use a lower resolution file for your height field than would otherwise be needed. However, smooth triangles will take longer to render.<p>
+<a name="ref 841 pri 10">In order to speed up the intersection tests an one-level bounding hierarchy is available. By default it is always used but it can be switched off to eventually improve the rendering speed for small height fields (i. e. low resolution images).<hr>
+
+<center>
+<a href="pov30020.htm">Next Section</a><br>
+<a href="povray.htm#Table of Contents">Table Of Contents</a><br>
+</center>
+</body>
+</html>

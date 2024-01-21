@@ -1,0 +1,94 @@
+#! /usr/bin/make -f
+#
+# Last updated: Sat Dec 17 10:52:20 EST 1994 by imurdock.
+#
+# To make the binary distribution package, the ``Debianized'' source package
+# and the context diff to the original package, type `./debian.rules dist'.
+# Make sure that `debian.rules' is executable before the final distribution
+# is made.
+#
+# Invoke each target with `./debian.rules <target>'.  All targets should be
+# invoked with the package root as the current directory.
+#
+# The `binary' target must be run as root, as it needs to install files with
+# specific ownerships.  The `diff' target assumes that you have the original
+# source package available, unpacked, in ../$(p)-$(v).orig, or that you have
+# the previous revision of the ``Debianized'' source package and context diff
+# in the parent directory.
+
+CC = gcc
+CFLAGS = -O2
+LDFLAGS = -s
+
+# The name of the package (for example, `emacs').
+p = netcat
+# The version of the package (for example, `19.28').
+v = 1.10
+# The Debian revision of the package (for example, `2').
+d = 3
+
+build:
+# Builds the binary package.
+	$(MAKE) CC="$(CC)" CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" linux
+	touch stamp-build
+
+clean:
+# Undoes the effect of `make -f debian.rules build'.
+	$(MAKE) distclean
+	rm -f stamp-build
+	rm -rf debian-tmp
+
+binary:
+# Makes a binary package.
+	test -f stamp-build || $(MAKE) -f debian.rules build
+	rm -rf debian-tmp
+	install -d -g root -m 755 -o root debian-tmp
+	chmod g-s debian-tmp
+	install -d -g root -m 755 -o root debian-tmp/DEBIAN
+	install -d -g root -m 755 -o root debian-tmp/usr/bin
+	install -g root -m 755 -o root nc \
+	  debian-tmp/usr/bin/nc
+	install -d -g root -m 755 -o root debian-tmp/usr/doc/copyright
+	install -g root -m 644 -o root debian.README \
+	  debian-tmp/usr/doc/copyright/$(p)
+	install -g root -m 644 -o root README \
+	  debian-tmp/usr/doc/$(p)
+	install -d -g root -m 755 -o root debian-tmp/usr/doc/examples/$(p)
+	cp -a data debian-tmp/usr/doc/examples/$(p)/data
+	cp -a scripts debian-tmp/usr/doc/examples/$(p)/scripts
+	chmod -R g-sw debian-tmp/usr/doc/examples/$(p)
+	chown -R root.root debian-tmp/usr/doc/examples/$(p)
+	#rm -f debian-tmp/usr/info/$(p).info*.gz
+	#gzip -9f debian-tmp/usr/info/$(p).info*
+	sed -e 's/=P/$(p)/' -e 's/=VD/$(v)-$(d)/' \
+	  -e "s/=A/`dpkg --print-architecture`/" \
+	  debian.control > debian-tmp/DEBIAN/control
+	chmod 644 debian-tmp/DEBIAN/control
+	#install -g root -m 644 -o root debian.conffiles \
+	#  debian-tmp/DEBIAN/conffiles
+	#install -g root -m 755 -o root debian.preinst \
+	#  debian-tmp/DEBIAN/preinst
+	#install -g root -m 755 -o root debian.postinst \
+	#  debian-tmp/DEBIAN/postinst
+	#install -g root -m 755 -o root debian.prerm \
+	#  debian-tmp/DEBIAN/prerm
+	#install -g root -m 755 -o root debian.postrm \
+	#  debian-tmp/DEBIAN/postrm
+	dpkg --build debian-tmp
+	dpkg-name -o -s .. debian-tmp.deb
+	rm -rf debian-tmp
+
+source:
+# Makes a source package.
+	cvs export -d $(p)-$(v) -r`echo deb_$(v)_$(d) | tr . _` netcat
+	tar cf - $(p)-$(v) | gzip -9f > ../$(p)_$(v)-$(d).tar.gz
+	rm -rf $(p)-$(v)
+
+diff:
+# Makes a context diff.
+	cvs rdiff -c \
+	  -r`echo $(p)_$(v) | tr . _` -r`echo deb_$(v)_$(d) | tr . _` netcat \
+	  | gzip -9f > ../$(p)_$(v)-$(d).diff.gz
+
+dist: binary source diff
+# Prepares the package for distribution.

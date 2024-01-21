@@ -1,0 +1,1682 @@
+This is Info file mercury_user_guide.info, produced by Makeinfo-1.63
+from the input file user_guide.texi.
+
+   This file documents the Mercury implementation.
+
+   Copyright (C) 1995 University of Melbourne.
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+   Permission is granted to copy and distribute modified versions of
+this manual under the conditions for verbatim copying, provided also
+that the entire resulting derived work is distributed under the terms
+of a permission notice identical to this one.
+
+   Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions.
+
+
+File: mercury_user_guide.info,  Node: Top,  Up: (mercury)
+
+The Mercury User's Guide
+************************
+
+   This guide describes the compilation environment of Mercury -- how
+to build and debug Mercury programs.
+
+* Menu:
+
+* Introduction::    General overview
+* Filenames::       File naming conventions
+* Using mc::        Compiling and linking programs with the Mercury compiler
+* Using Prolog::    Building and debugging Mercury programs with Prolog
+* Using Mmake::     "Mercury Make", a tool for building Mercury programs
+* Profiling::       The Mercury profiler `mprof', a tool for analyzing
+                    program performance
+* Invocation::      List of options for the Mercury compiler
+* Environment::     Environment variables used by the compiler and utilities
+* C compilers::     How to use a C compiler other than GNU C
+
+
+File: mercury_user_guide.info,  Node: Introduction,  Next: Filenames,  Prev: Top,  Up: Top
+
+Introduction
+************
+
+   This document describes the compilation environment of Mercury.  It
+describes how to use `mc', the Mercury compiler; how to use `mmake',
+the "Mercury make" program, a tool built on top of ordinary or GNU make
+to simplify the handling of Mercury programs; and how to use Prolog to
+debug Mercury programs.
+
+   We strongly recommend that programmers use `mmake' rather than
+invoking `mc' directly, because `mmake' is generally easier to use and
+avoids unnecessary recompilation.
+
+   Since the Mercury implementation is essentially a native-code
+compiler which happens to compile via GNU C, not an interpreter,
+debugging of compiled Mercury programs would require a dedicated
+Mercury debugger program - or at least some significant extensions to
+gdb.  It would also require the Mercury compiler to arrange for the
+object code to contain suitable debugging information.  Although it is
+possible to debug the intermediate C code, this is not productive,
+since the intermediate C code is extremely low-level and bears little
+resemblance to the source code.  As an alternative, Mercury programmers
+may wish to use a Prolog system to execute their Mercury programs in
+order to gain access to this facility.  The feasibility of this
+technique is dependent upon the program being written in the
+intersection of the Prolog and Mercury languages, which is possible
+because the two languages have almost the same syntax.  The Mercury
+implementation allows you to run a Mercury program using NU-Prolog or
+SICStus Prolog (*note Using Prolog::.).
+
+
+File: mercury_user_guide.info,  Node: Filenames,  Next: Using mc,  Prev: Introduction,  Up: Top
+
+File naming conventions
+***********************
+
+   Mercury source files should be named `*.m'.  Each Mercury source
+file must contain a single Mercury module whose name should be the same
+as the filename without the `.m' extension.
+
+   Files ending in `.int', `.int2' and `.int3' are interface files;
+these are generated automatically by the compiler, using the
+`--make-interface' and `--make-short-interface' options.  Files ending
+in `.opt' are interface files used in inter-module optimization, and
+are created using the `--make-optimization-interface' option.
+
+   Since the interface of a module changes less often than its
+implementation, the `.int', `.int2', `.int3', and `.opt' files will
+remain unchanged on many compilations.  To avoid unnecessary
+recompilations of the clients of the module, the timestamps on the
+these files are updated only if their contents change.  `.date',
+`.date3' and `.optdate' files associated with the module are used as
+date stamps; they are used when deciding whether the interface files
+need to be regenerated.
+
+   Files ending in `.d' are automatically-generated Makefile fragments
+which contain the dependencies for a module.  Files ending in `.dep'
+are automatically-generated Makefile fragments which contain the rules
+for an entire program.
+
+   In the source code for the Mercury runtime library, we use a few
+files ending in `.mod'; these are preprocessed using the perl script
+`mod2c' to produce C files.  (Originally the Mercury compiler also
+produced `.mod' files, but now we compile directly to C.)
+
+   As usual, `.c' files are C source code, `.h' files are C header
+files, `.o' files are object code, `.no' files are NU-Prolog object
+code, and `.ql' files are SICStus Prolog object code.
+
+
+File: mercury_user_guide.info,  Node: Using mc,  Next: Using Prolog,  Prev: Filenames,  Up: Top
+
+Using the Mercury compiler
+**************************
+
+   Following a long Unix tradition, the Mercury compiler is called `mc'.
+Some of its options (e.g. `-c', `-o', and `-I') have a similar meaning
+to that in other Unix compilers.
+
+   Arguments to `mc' that name Mercury source files may omit the `.m'
+suffix.
+
+   To compile a program which consists of just a single module, use the
+command
+
+     mc MODULE.m
+
+   Unlike traditional Unix compilers, however, `mc' will put the
+executable into a file called `MODULE', not `a.out'.
+
+   For programs that consist of more than one module, we recommend that
+you use Mmake (*note Using Mmake::.).  Mmake will perform all the steps
+listed below, using automatic dependency analysis to ensure that things
+are done in the right order, and that steps are not repeated
+unnecessarily.
+
+   To compile a module to object code without creating an executable,
+use the command
+
+     mc -c MODULE.m
+
+   `mc' will put the object code into a file called `MODULE.o'.  It
+also will leave the intermediate C code in a file called `MODULE.c'.
+
+   Before you can compile a module, you must make the interface files
+for the modules that it imports (directly or indirectly).  You can
+create the interface files for one or more modules using the commands
+
+     mc --make-short-interface MODULE1.m MODULE2.m ...
+     mc --make-interface MODULE1.m MODULE2.m ...
+
+   If you are going to compile with `--intermodule-optimization'
+enabled, then you also need to create the optimization interface files.
+
+     mc --make-optimization-interface MODULE1.m MODULE2.m ...
+
+   Given that you have made all the interface files, one way to create
+an executable for a multi-module program is to compile all the modules
+at the same time using the command
+
+     mc MODULE1.m MODULE2.m ...
+
+   This will by default put the resulting executable in `MODULE1', but
+you can use the `-o FILENAME' option to specify a different name for
+the output file, if you so desire.
+
+   The other way to create an executable for a multi-module program is
+to compile each module separately using `mc -c', and then link the
+resulting object files together.  The linking is a two stage process.
+
+   First, you must create and compile an *initialization file*, which
+is a C source file containing calls to automatically generated
+initialization functions contained in the C code of the modules of the
+program:
+
+     c2init MODULE1.c MODULE2.c ... > MAIN_MODULE_init.c,
+     mgnuc -c MAIN_MODULE_init.c
+
+   The `c2init' command line must contain the name of the C file of
+every module in the program.  The order of the arguments is not
+important.  The `mgnuc' command is the Mercury GNU C compiler; it is a
+shell script that invokes the GNU C compiler `gcc' with the options
+appropriate for compiling the C programs generated by Mercury.
+
+   You then link the object code of each module with the object code of
+the initialization file to yield the executable:
+
+     ml -o MAIN_MODULE MODULE1.o MODULE2.o ... MAIN_MODULE_init.o
+
+   `ml', the Mercury linker, is another shell script that invokes a C
+compiler with options appropriate for Mercury, this time for linking.
+`ml' also pipes any error messages from the linker through `mdemangle',
+the Mercury symbol demangler, so that error messages refer to predicate
+and function names from the Mercury source code rather than to the
+names used in the intermediate C code.
+
+   The above command puts the executable in the file `MAIN_MODULE'.
+The same command line without the `-o' option would put the executable
+into the file `a.out'.
+
+   `mc' and `ml' both accept a `-v' (verbose) option.  You can use that
+option to see what is actually going on.  For the full set of options
+of `mc', see *Note Invocation::.
+
+   Once you have created an executable for a Mercury program, you can
+go ahead and execute it.  You may however wish to specify certain
+options to the Mercury runtime system.  The Mercury runtime accepts
+options via the `MERCURY_OPTIONS' environment variable.  Setting
+`MERCURY_OPTIONS' to `-h' will list the available options.  The most
+useful of these are the options that set the size of the stacks.
+
+   The det stack and the nondet stack are allocated fixed sizes at
+program start-up.  The default size is 512k for the det stack and 128k
+for the nondet stack, but these can be overridden with the `-sd' and
+`-sn' options, whose arguments are the desired sizes of the det and
+nondet stacks respectively, in units of kilobytes.  On operating
+systems that provide the appropriate support, the Mercury runtime will
+ensure that stack overflow is trapped by the virtual memory system.
+
+   With conservative garbage collection (the default), the heap will
+start out with a zero size, and will be dynamically expanded as needed,
+When not using conservative garbage collection, the heap has a fixed
+size like the stacks.  The default size is 4 Mb, but this can be
+overridden with the `-sh' option.
+
+
+File: mercury_user_guide.info,  Node: Using Prolog,  Next: Using Mmake,  Prev: Using mc,  Up: Top
+
+Using Prolog
+************
+
+   Since the current Mercury implementation does not yet provide any
+useful support for debugging, we recommend that you use a Prolog system
+for debugging your Mercury programs.  However, there is no point in
+using a Prolog debugger to track down a bug that can be detected
+statically by the Mercury compiler.  The command
+
+     mc -e MODULE1.m ...
+
+   causes the Mercury compiler to perform all its syntactic and
+semantic checks on the named modules, but not to generate any code.
+
+   In our experience, omitting that step is not wise.  If you do omit
+it, you often waste a lot of time debugging problems that the compiler
+could have detected for you.
+
+* Menu:
+
+* Using NU-Prolog:: Building and debugging Mercury programs with NU-Prolog
+* Using SICStus::   Building and debugging Mercury programs with SICStus Prolog
+* Prolog hazards::  The hazards of executing Mercury programs using Prolog
+
+
+File: mercury_user_guide.info,  Node: Using NU-Prolog,  Next: Using SICStus,  Up: Using Prolog
+
+Using NU-Prolog
+===============
+
+   You can compile a Mercury source module using NU-Prolog via the
+command
+
+     mnc MODULE1.m ...
+
+   `mnc' is the Mercury variant of `nc', the NU-Prolog compiler.  It
+adapts `nc' to compile Mercury programs, e.g. by defining do-nothing
+predicates for the various Mercury declarations (which are executed by
+`nc').
+
+   Some invocations of `mnc' will result in warnings such as
+
+     Warning: main is a system predicate.
+     It shouldn't be used as a non-terminal.
+
+   Such warnings should be ignored.
+
+   `mnc' compiles the modules it is given into NU-Prolog bytecode,
+stored in files with a `.no' suffix.  You can link these together using
+the command
+
+     mnl -o MAIN_MODULE MODULE1.no ...
+
+   Ignore any warnings such as
+
+     Warning: main/2 redefined
+     Warning: solutions/2 redefined
+     Warning: !/0 redefined
+
+   `mnl', the Mercury NU-Prolog linker, will put the executable
+(actually a shell script invoking a save file) into the file
+`MAIN_MODULE.nu'.  This can be executed normally using
+
+     ./MAIN_MODULE.nu ARGUMENTS
+
+   Alternatively, one can execute such programs using `mnp', the
+Mercury version of np, the NU-Prolog interpreter.  The command
+
+     mnp
+
+   will start up the Mercury NU-Prolog interpreter.  Inside the
+interpreter, you can load your source files with a normal consulting
+command such as
+
+     ['MODULE.m'].
+
+   You can also use the `--debug' option to `mnl' when linking.  This
+will produce an executable whose entry point is the NU-Prolog
+interpreter, rather than main/2 in your program.
+
+   In both cases, you can start executing your program by typing
+
+     r("PROGRAM-NAME ARGUMENTS").
+
+   at the prompt of the NU-Prolog interpreter.
+
+   All the NU-Prolog debugging commands work as usual.  The most useful
+ones are the `trace' and `spy' commands at the main prompt to turn on
+complete or selective tracing respectively, and the `l' (leap), `s'
+(skip), and `r' (redo) commands of the tracer.  For more information,
+see the NU-Prolog documentation.
+
+   By default the debugger only displays the top levels of terms; you
+can use the `|' command to enter an interactive term browser.  (Within
+the term browser, type `h.' for help.) Also note that in the debugger,
+we use a version of `error/1' which fails rather than aborting after
+printing the "Software Error:" message.  This makes debugging easier,
+but will of course change the behaviour after an error occurs.
+
+
+File: mercury_user_guide.info,  Node: Using SICStus,  Next: Prolog hazards,  Prev: Using NU-Prolog,  Up: Using Prolog
+
+Using SICStus Prolog
+====================
+
+   Using SICStus Prolog is similar to using NU-Prolog, except that the
+commands to use are `msc', `msl', and `msp' rather than `mnc', `mnl',
+and `mnp'.
+
+   Due to shortcomings in SICStus Prolog (in particular, the lack of
+backslash escapes in character strings), you need to use `sicstus_conv'
+to convert Mercury `.m' files to the `.pl' files that SICStus Prolog
+expects before you can load them into the interpreter.  The command to
+use is just
+
+     sicstus_conv MODULE.m
+
+   By default, `msc' compiles files to machine code using SICStus
+Prolog's `fastcode' mode. If space is more important than speed, you
+can use the `--mode compactcode' option, which instructs `msc' to use
+SICStus Prolog's `compactcode' mode, which compiles files to a bytecode
+format.
+
+
+File: mercury_user_guide.info,  Node: Prolog hazards,  Prev: Using SICStus,  Up: Using Prolog
+
+Hazards of using Prolog
+=======================
+
+   There are some Mercury programs which are not valid Prolog programs.
+In particular, Mercury will always reorder goals to ensure that they
+are mode-correct (or report a mode error if it cannot do so), but
+Prolog systems will not always do so, and will sometimes just silently
+give the wrong result.  For example, in Mercury the following predicate
+will usually succeed, whereas in Prolog it will always fail.
+
+     :- pred p(list(int)::in, list(int)::out) is semidet.
+     p(L0, L) :-
+             L \= [],
+             q(L0, L).
+     
+     :- pred q(list(int)::in, list(int)::out) is det.
+
+   The reason is that in Mercury, the test `L \= []' is reordered to
+after the call to `q/2', but in Prolog, it executes even though `L' is
+not bound, and consequently the test always fails.
+
+   NU-Prolog has logical alternatives to the non-logical Prolog
+operations, and since Mercury supports both syntaxes, you can use
+NU-Prolog's logical alternatives to avoid this problem.  However,
+during the development of the Mercury compiler we had to abandon their
+use for efficiency reasons.
+
+   Another hazard is that NU-Prolog does not have a garbage collector.
+
+
+File: mercury_user_guide.info,  Node: Using Mmake,  Next: Profiling,  Prev: Using Prolog,  Up: Top
+
+Using Mmake
+***********
+
+   Mmake, short for "Mercury Make", is a tool for building Mercury
+programs that is built on top of ordinary or GNU Make (1).  With Mmake,
+building even a complicated Mercury program consisting of a number of
+modules is as simple as
+
+     mmake MAIN-MODULE.depend
+     mmake MAIN-MODULE
+
+   Mmake only recompiles those files that need to be recompiled, based
+on automatically generated dependency information.  Most of the
+dependencies are stored in `.d' files that are automatically recomputed
+every time you recompile, so they are never out-of-date.  A little bit
+of the dependency information is stored in `.dep' files which are more
+expensive to recompute.  The `mmake MAIN-MODULE.depend' command which
+recreates the `MAIN-MODULE.dep' file needs to be repeated only when you
+add or remove a module from your program, and there is no danger of
+getting an inconsistent executable if you forget this step -- instead
+you will get a compile or link error.
+
+   `mmake' allows you to build more than one program in the same
+directory.  Each program must have its own `.dep' file, and therefore
+you must run `mmake PROGRAM.depend' for each program.
+
+   If there is a file called `Mmake' in the current directory, Mmake
+will include that file in its automatically-generated Makefile.  The
+`Mmake' file can override the default values of various variables used
+by Mmake's builtin rules, or it can add additional rules, dependencies,
+and actions.
+
+   Mmake's builtin rules are defined by the file
+`PREFIX/lib/mercury/mmake/Mmake.rules' (where PREFIX is
+`/usr/local/mercury-VERSION' by default, and VERSION is the version
+number, e.g. `0.6'), as well as the rules in the
+automatically-generated `.dep' files.  These rules define the following
+targets:
+
+`MAIN-MODULE.depend'
+     Creates the file `MAIN-MODULE.dep' from `MAIN-MODULE.m' and the
+     modules it imports.  This step must be performed first.
+
+`MAIN-MODULE.ints'
+     Ensure that the interface files for MAIN-MODULE and its imported
+     modules are up-to-date.  (If the underlying `make' program does
+     not handle transitive dependencies, this step may be necessary
+     before attempting to make `MAIN-MODULE' or `MAIN-MODULE.check'; if
+     the underlying `make' is GNU Make, this step should not be
+     necessary.)
+
+`MAIN-MODULE.check'
+     Perform semantic checking on MAIN-MODULE and its imported modules.
+     Error messages are placed in `.err' files.
+
+`MAIN-MODULE'
+     Compiles and links MAIN-MODULE using the Mercury compiler.  Error
+     messages are placed in `.err' files.
+
+`MAIN-MODULE.split'
+     Compiles and links MAIN-MODULE using the Mercury compiler, with
+     the `--split-c-files' option enabled.  *Note Output-level
+     (LLDS->C) optimization options:: for more information about
+     `--split-c-files'.
+
+`MAIN-MODULE.nu'
+     Compiles and links MAIN-MODULE using NU-Prolog.
+
+`MAIN-MODULE.nu.debug'
+     Compiles and links MAIN-MODULE using NU-Prolog.  The resulting
+     executable will start up in the NU-Prolog interpreter rather than
+     calling main/2.
+
+`MAIN-MODULE.sicstus'
+     Compiles and links MAIN-MODULE using SICStus Prolog.
+
+`MAIN-MODULE.sicstus.debug'
+     Compiles and links MAIN-MODULE using SICStus Prolog.  The
+     resulting executable will start up in the SICStus Prolog
+     interpreter rather than calling main/2.
+
+`MAIN-MODULE.clean'
+     Removes the automatically generated files that contain the
+     compiled code of the program and the error messages produced by
+     the compiler.  Specifically, this will remove all the `.c', `.s',
+     `.o', `.no', `.ql', and `.err' files belonging to the named
+     MAIN-MODULE or its imported modules.
+
+`MAIN-MODULE.change_clean'
+     Removes files that need updating if changing garbage collection
+     method or starting to use inter-module optimization.
+     Specifically, this will remove all the `.c', `.s', `.o', `.dep'
+     and executable files belonging to the named MAIN-MODULE or its
+     imported modules.
+
+`MAIN-MODULE.realclean'
+     Removes all the automatically generated files.  In addition to the
+     files removed by MAIN-MODULE.clean, this removes the `.date',
+     `.int', `.int2', `.int3', `.opt', `.d', and `.dep' belonging to
+     one of the modules of the program, and also the various possible
+     executables for the program -- `MAIN-MODULE', `MAIN-MODULE.nu',
+     `MAIN-MODULE.nu.save', `MAIN-MODULE.nu.debug',
+     `MAIN-MODULE.nu.debug.save', `MAIN-MODULE.sicstus', and
+     `MAIN-MODULE.sicstus.debug'.
+
+`clean'
+     This makes `MAIN-MODULE.clean' for every MAIN-MODULE for which
+     there is a `MAIN-MODULE.dep' file in the current directory.
+
+`realclean'
+     This makes `MAIN-MODULE.realclean' for every MAIN-MODULE for which
+     there is a `MAIN-MODULE.dep' file in the current directory.
+
+   The variables used by the builtin rules are defined in
+`PREFIX/lib/mercury/mmake/Mmake.vars'.
+
+   Note that since Mmake is built on top of Make or GNU Make, you can
+make use of the features supported by the underlying Make.  In
+particular, GNU Make has support for running jobs in parallel, which is
+very useful if you have a machine with more than one CPU.
+
+   ---------- Footnotes ----------
+
+   (1) We aim to eventually add support for ordinary "Make" programs,
+but currently only GNU Make is supported.
+
+
+File: mercury_user_guide.info,  Node: Profiling,  Next: Invocation,  Prev: Using Mmake,  Up: Top
+
+Profiling
+*********
+
+* Menu:
+
+* Profiling introduction::          What is profiling useful for?
+* Building profiled applications::  How to enable profiling.
+* Creating the profile::            How to create profile data.
+* Displaying the profile::          How to display the profile data.
+* Analysis of results::             How to interpret the output.
+
+
+File: mercury_user_guide.info,  Node: Profiling introduction,  Next: Building profiled applications,  Up: Profiling
+
+Introduction
+============
+
+   The Mercury profiler `mprof' is a tool which can be used to analyze
+a Mercury program's performance, so that the programmer can determine
+which predicates or functions are taking up a disproportionate amount
+of the execution time.
+
+   To obtain the best trade-off between productivity and efficiency,
+programmers should not spend too much time optimizing their code until
+they know which parts of the code are really taking up most of the
+time.  Only once the code has been profiled should the programmer
+consider making optimizations that would improve efficiency at the
+expense of readability or ease of maintenance.
+
+   A good profiler is a tool that should be part of every software
+engineer's toolkit.
+
+
+File: mercury_user_guide.info,  Node: Building profiled applications,  Next: Creating the profile,  Prev: Profiling introduction,  Up: Profiling
+
+Building profiled applications
+==============================
+
+   To enable profiling, your program must be built in a `.prof' grade.
+For example, if the default grade on your system is `asm_fast.gc', then
+to compile with profiling enabled, use grade `asm_fast.gc.prof'.  You
+can do this by setting the `GRADE' variable in your Mmake file, e.g. by
+adding the line `GRADE=asm_fast.gc.prof'.  *Note Compilation model
+options:: for more information about the different grades.
+
+   Enabling profiling has several effects.  Firstly, it causes the
+compiler to generate slightly modified code which counts the number of
+times each predicate or function is called, and for every call, records
+the caller and callee.  Secondly, your program will be linked with
+versions of the library and runtime that were compiled with profiling
+enabled.  (It also has the effect for each source file the compiler
+generates the static call graph for that file in `MODULE.prof'.)
+
+
+File: mercury_user_guide.info,  Node: Creating the profile,  Next: Displaying the profile,  Prev: Building profiled applications,  Up: Profiling
+
+Creating the profile
+====================
+
+   The next step is to run your program.  The profiling version of your
+program will collect profiling information during execution, and save
+this information in the files `Prof.Counts', `Prof.Decls', and
+`Prof.CallPair'.  (`Prof.Decl' contains the names of the procedures and
+their associated addresses, `Prof.CallPair' records the number of times
+each procedure was called by each different caller, and `Prof.Counts'
+records the number of times that execution was in each procedure when a
+profiling interrupt occurred.)
+
+   It would be nice if there was a way to combine profiling data from
+multiple runs of the same program, but unfortunately there is not yet
+any way to do that.
+
+   Due to a known timing-related bug in our code, you may occasionally
+get segmentation violations when running your program with profiling
+enabled.  If this happens, just run it again -- the problem does not
+occur frequently.  This bug will hopefully be fixed soon.
+
+
+File: mercury_user_guide.info,  Node: Displaying the profile,  Next: Analysis of results,  Prev: Creating the profile,  Up: Profiling
+
+Displaying the profile
+======================
+
+   To display the profile, just type `mprof'.  This will read the
+`Prof.*' files and display the flat profile in a nice human-readable
+format.  If you also want to see the call graph profile, which takes a
+lot longer to generate, type `mprof -c'.
+
+   Note that `mprof' can take quite a while to execute, and will
+usually produce quite a lot of output, so you will usually want to
+redirect the output into a file with a command such as `mprof >
+mprof.out'.
+
+
+File: mercury_user_guide.info,  Node: Analysis of results,  Prev: Displaying the profile,  Up: Profiling
+
+Analysis of results
+===================
+
+   The profile output consists of three major sections.  These are
+named the call graph profile, the flat profile and the alphabetic
+listing.
+
+   The call graph profile presents the local call graph of each
+procedure.  For each procedure it shows the parents (callers) and
+children (callees) of that procedure, and shows the execution time and
+call counts for each parent and child.  It is sorted on the total
+amount of time spent in the procedure and all of its descendents (i.e.
+all of the procedures that it calls, directly or indirectly.)
+
+   The flat profile presents the just execution time spent in each
+procedure.  It does not count the time spent in descendents of a
+procedure.
+
+   The alphabetic listing just lists the procedures in alphabetical
+order, along with their index number in the call graph profile, so that
+you can quickly find the entry for a particular procedure in the call
+graph profile.
+
+   The profiler works by interrupting the program at frequent intervals,
+and each time recording the currently active procedure and its caller.
+It uses these counts to determine the proportion of the total time
+spent in each procedure.  This means that the figures calculated for
+these times are only a statistical approximation to the real values,
+and so they should be treated with some caution.
+
+   The time spent in a procedure and its descendents is calculated by
+propagating the times up the call graph, assuming that each call to a
+procedure from a particular caller takes the same amount of time.  This
+assumption is usually reasonable, but again the results should be
+treated with caution.
+
+   Note that any time spent in a C function (e.g. time spent in
+`GC_malloc()', which does memory allocation and garbage collection) is
+credited to the Mercury procedure that called that C function.
+
+   Here is a small portion of the call graph profile from an example
+program.
+
+                                       called/total       parents
+     index  %time    self descendents  called+self    name           index
+                                       called/total       children
+     
+                                                          <spontaneous>
+     [1]    100.0    0.00        0.75       0         call_engine_label [1]
+                     0.00        0.75       1/1           do_interpreter [3]
+     
+     -----------------------------------------------
+     
+                     0.00        0.75       1/1           do_interpreter [3]
+     [2]    100.0    0.00        0.75       1         io__run/0(0) [2]
+                     0.00        0.00       1/1           io__init_state/2(0) [11]
+                     0.00        0.74       1/1           main/2(0) [4]
+     
+     -----------------------------------------------
+     
+                     0.00        0.75       1/1           call_engine_label [1]
+     [3]    100.0    0.00        0.75       1         do_interpreter [3]
+                     0.00        0.75       1/1           io__run/0(0) [2]
+     
+     -----------------------------------------------
+     
+                     0.00        0.74       1/1           io__run/0(0) [2]
+     [4]     99.9    0.00        0.74       1         main/2(0) [4]
+                     0.00        0.74       1/1           sort/2(0) [5]
+                     0.00        0.00       1/1           print_list/3(0) [16]
+                     0.00        0.00       1/10          io__write_string/3(0) [18]
+     
+     -----------------------------------------------
+     
+                     0.00        0.74       1/1           main/2(0) [4]
+     [5]     99.9    0.00        0.74       1         sort/2(0) [5]
+                     0.05        0.65       1/1           list__perm/2(0) [6]
+                     0.00        0.09   40320/40320       sorted/1(0) [10]
+     
+     -----------------------------------------------
+     
+                                            8             list__perm/2(0) [6]
+                     0.05        0.65       1/1           sort/2(0) [5]
+     [6]     86.6    0.05        0.65       1+8      list__perm/2(0) [6]
+                     0.00        0.60    5914/5914        list__insert/3(2) [7]
+                                            8             list__perm/2(0) [6]
+     
+     -----------------------------------------------
+     
+                     0.00        0.60    5914/5914        list__perm/2(0) [6]
+     [7]     80.0    0.00        0.60    5914         list__insert/3(2) [7]
+                     0.60        0.60    5914/5914        list__delete/3(3) [8]
+     
+     -----------------------------------------------
+     
+                                        40319             list__delete/3(3) [8]
+                     0.60        0.60    5914/5914        list__insert/3(2) [7]
+     [8]     80.0    0.60        0.60    5914+40319  list__delete/3(3) [8]
+                                        40319             list__delete/3(3) [8]
+     
+     -----------------------------------------------
+     
+                     0.00        0.00       3/69283       tree234__set/4(0) [15]
+                     0.09        0.09   69280/69283       sorted/1(0) [10]
+     [9]     13.3    0.10        0.10   69283         compare/3(0) [9]
+                     0.00        0.00       3/3           __Compare___io__stream/0(0) [20]
+                     0.00        0.00   69280/69280       builtin_compare_int/3(0) [27]
+     
+     -----------------------------------------------
+     
+                     0.00        0.09   40320/40320       sort/2(0) [5]
+     [10]    13.3    0.00        0.09   40320         sorted/1(0) [10]
+                     0.09        0.09   69280/69283       compare/3(0) [9]
+     
+     -----------------------------------------------
+
+   The first entry is `call_engine_label' and its parent is
+`<spontaneous>', meaning that it is the root of the call graph.  (The
+first three entries, `call_engine_label', `do_interpreter', and
+`io__run/0' are all part of the Mercury runtime; `main/2' is the entry
+point to the user's program.)
+
+   Each entry of the call graph profile consists of three sections, the
+parent procedures, the current procedure and the children procedures.
+
+   Reading across from the left, for the current procedure the fields
+are:
+
+   * The unique index number for the current procedure.  (The index
+     numbers are used only to make it easier to find a particular entry
+     in the call graph.)
+
+   * The percentage of total execution time spent in the current
+     procedure and all its descendents.  As noted above, this is only a
+     statistical approximation.
+
+   * The "self" time: the time spent executing code that is part of
+     current procedure.  As noted above, this is only a statistical
+     approximation.
+
+   * The descendent time: the time spent in the current procedure and
+     all its descendents.  As noted above, this is only a statistical
+     approximation.
+
+   * The number of times a procedure is called.  If a procedure is
+     (directly) recursive, this column will contain the number of calls
+     from other procedures, a plus sign, and then the number of
+     recursive calls.  These numbers are exact, not approximate.
+
+   * The name of the procedure followed by its index number.
+
+   The predicate or function names are not just followed by their arity
+but also by their mode in brackets.  A mode of zero corresponds to the
+first mode declaration of that predicate in the source code.  For
+example, `list__delete/3(3)' corresponds to the `(out, out, in)' mode
+of `list__delete/3'.
+
+   Now for the parent and child procedures the self and descendent time
+have slightly different meanings.  For the parent procedures the self
+and descendent time represent the proportion of the current procedure's
+self and descendent time due to that parent.  These times are obtained
+using the assumption that each call contributes equally to the total
+time of the current procedure.
+
+
+File: mercury_user_guide.info,  Node: Invocation,  Next: Environment,  Prev: Profiling,  Up: Top
+
+Invocation
+**********
+
+   This section contains a brief description of all the options
+available for `mc', the Mercury compiler.  Sometimes this list is a
+little out-of-date; use `mc --help' to get the most up-to-date list.
+
+* Menu:
+
+* Invocation overview::
+* Verbosity options::
+* Warning options::
+* Output options::
+* Auxiliary output options::
+* Language semantics options::
+* Compilation model options::
+* Code generation options::
+* Optimization options::
+* Link options::
+* Miscellaneous options::
+
+
+File: mercury_user_guide.info,  Node: Invocation overview,  Next: Verbosity options,  Up: Invocation
+
+Invocation overview
+===================
+
+   `mc' is invoked as
+     mc [OPTIONS] MODULES
+
+   For module names, the trailing `.m' is optional.
+
+   Options are either short (single-letter) options preceded by a
+single `-', or long options preceded by `--'.  Options are
+case-sensitive.  We call options that do not take arguments "flags".
+Single-letter flags may be grouped with a single `-', e.g. `-vVc'.
+Single-letter flags may be negated by appending another trailing `-',
+e.g. `-v-'.  Long flags may be negated by preceding them with `no-',
+e.g. `--no-verbose'.
+
+
+File: mercury_user_guide.info,  Node: Warning options,  Next: Output options,  Prev: Verbosity options,  Up: Invocation
+
+Warning options
+===============
+
+`-w'
+`--inhibit-warnings'
+     Disable all warning messages.
+
+`--halt-at-warn.'
+     This option causes the compiler to treat all warnings as if they
+     were errors.  This means that if any warning is issued, the
+     compiler will not generate code -- instead, it will return a
+     non-zero exit status.
+
+`--halt-at-syntax-error.'
+     This option causes the compiler to halt immediately after syntax
+     checking and not do any semantic checking if it finds any syntax
+     errors in the program.
+
+`--no-warn-singleton-variables'
+     Don't warn about variables which only occur once.
+
+`--no-warn-missing-det-decls'
+     For predicates that are local to a module (those that are not
+     exported), don't issue a warning if the `pred' or `mode'
+     declaration does not have a determinism annotation.  Use this
+     option if you want the compiler to perform automatic determinism
+     inference for non-exported predicates.
+
+`--no-warn-det-decls-too-lax'
+     Don't warn about determinism declarations which could have been
+     stricter.
+
+`--no-warn-nothing-exported'
+     Don't warn about modules whose interface sections have no exported
+     predicates, functions, insts, modes or types.
+
+`--warn-unused-args'
+     Warn about predicate or function arguments which are not used.
+
+`--warn-interface-imports'
+     Warn about modules imported in the interface which are not used in
+     the interface.
+
+`--warn-missing-opt-files'
+     Warn about `.opt' files that cannot be opened.
+
+`--warn-non-stratification'
+     Warn about possible non-stratification of the predicates/functions
+     in the module.  Non-stratification occurs when a
+     predicate/function can call itself negatively through some path
+     along its call graph.
+
+
+File: mercury_user_guide.info,  Node: Verbosity options,  Next: Warning options,  Prev: Invocation overview,  Up: Invocation
+
+Verbosity options
+=================
+
+`-v'
+`--verbose'
+     Output progress messages at each stage in the compilation.
+
+`-V'
+`--very_verbose'
+     Output very verbose progress messages.
+
+`-E'
+`--verbose-error-messages'
+     Explain error messages.  Asks the compiler to give you a more
+     detailed explanation of any errors it finds in your program.
+
+`-S'
+`--statistics'
+     Output messages about the compiler's time/space usage.  At the
+     moment this option implies `--no-trad-passes', so you get
+     information at the boundaries between phases of the compiler.
+
+`-T'
+`--debug-types'
+     Output detailed debugging traces of the type checking.
+
+`-N'
+`--debug-modes'
+     Output detailed debugging traces of the mode checking.
+
+`--debug-det, --debug-determinism'
+     Output detailed debugging traces of determinism analysis.
+
+`--debug-opt'
+     Output detailed debugging traces of the optimization process.
+
+`--debug-vn <n>'
+     Output detailed debugging traces of the value numbering
+     optimization pass.  The different bits in the number argument of
+     this option control the printing of different types of tracing
+     messages.
+
+
+File: mercury_user_guide.info,  Node: Output options,  Next: Auxiliary output options,  Prev: Warning options,  Up: Invocation
+
+Output options
+==============
+
+   These options are mutually exclusive.  If more than one of these
+options is specified, only the first in this list will apply.  If none
+of these options are specified, the default action is to compile and
+link the modules named on the command line to produce an executable.
+
+`-M'
+`--generate-dependencies'
+     Output "Make"-style dependencies for the module and all of its
+     dependencies to `MODULE.dep'.
+
+`-i'
+`--make-interface'
+     Write the module interface to `MODULE.int'.  Also write the short
+     interface to `MODULE.int2'.
+
+`--make-short-interface'
+     Write the unqualified version of the short interface to
+     `MODULE.int3'.
+
+`--make-optimization-interface'
+     Write information used for inter-module optimization to
+     `MODULE.opt'.
+
+`-G'
+`--convert-to-goedel'
+     Convert the Mercury code to Goedel. Output to file `MODULE.loc'.
+     The translation is not perfect; some Mercury constructs cannot be
+     easily translated into Goedel.
+
+`-P'
+`--pretty-print'
+`--convert-to-mercury'
+     Convert to Mercury. Output to file `MODULE.ugly'.  This option
+     acts as a Mercury ugly-printer.  (It would be a pretty-printer,
+     except that comments are stripped and nested if-then-elses are
+     indented too much -- so the result is rather ugly.)
+
+`--typecheck-only'
+     Just check the syntax and type-correctness of the code.  Don't
+     invoke the mode analysis and later passes of the compiler.  When
+     converting Prolog code to Mercury, it can sometimes be useful to
+     get the types right first and worry about modes second; this
+     option supports that approach.
+
+`-e'
+`--errorcheck-only'
+     Check the module for errors, but do not generate any code.
+
+`-C'
+`--compile-to-c'
+`--compile-to-C'
+     Generate C code in `MODULE.c', but not object code.
+
+`-c'
+`--compile-only'
+     Generate C code in `MODULE.c' and object code in `MODULE.o' but do
+     not attempt to link the named modules.
+
+
+File: mercury_user_guide.info,  Node: Auxiliary output options,  Next: Language semantics options,  Prev: Output options,  Up: Invocation
+
+Auxiliary output options
+========================
+
+`--no-assume-gmake'
+     When generating `.dep' files, generate Makefile fragments that use
+     only the features of standard make; do not assume the availability
+     of GNU Make extensions.  This makes these files significantly
+     larger.
+
+`--generate-bytecode'
+     Output a bytecode form of the module for use by an experimental
+     debugger.
+
+`--generate-prolog'
+     Convert the program to Prolog. Output to file `MODULE.pl' or
+     `MODULE.nl' (depending the the dialect).
+
+`--prolog-dialect DIALECT'
+     Target the named dialect if generating Prolog code.  The DIALECT
+     should be one of `sicstus', `nu'.
+
+`--auto-comments'
+     Output comments in the `MODULE.c' file.  This is primarily useful
+     for trying to understand how the generated C code relates to the
+     source code, e.g. in order to debug the compiler.  The code may be
+     easier to understand if you also use the `--no-llds-optimize'
+     option.
+
+`-n'
+`--line-numbers'
+     Output source line numbers in the generated code.  Only works with
+     the `--convert-to-goedel' and `--convert-to-mercury' options.
+
+`--show-dependency-graph'
+     Write out the dependency graph to MODULE.dependency_graph.
+
+`-d STAGE'
+`--dump-hlds STAGE'
+     Dump the HLDS (intermediate representation) after the specified
+     stage number or stage name to `MODULE.hlds_dump.NUM-NAME'.  Stage
+     numbers range from 1 to 99; not all stage numbers are valid.  The
+     special stage name `all' causes the dumping of all stages.
+     Multiple dump options accumulate.
+
+`-D'
+`--verbose-dump-hlds'
+     With `--dump-hlds', dumps some additional info.
+
+
+File: mercury_user_guide.info,  Node: Language semantics options,  Next: Compilation model options,  Prev: Auxiliary output options,  Up: Invocation
+
+Language semantics options
+==========================
+
+   See the Mercury language reference manual for detailed explanations
+of these options.
+
+`--no-reorder-conj'
+     Execute conjunctions left-to-right except where the modes imply
+     that reordering is unavoidable.
+
+`--no-reorder-disj'
+     Execute disjunctions strictly left-to-right.
+
+`--fully-strict'
+     Don't optimize away loops or calls to `error/1'.
+
+`--infer-types'
+     If there is no type declaration for a predicate or function, try
+     to infer the type, rather than just reporting an error.
+
+`--infer-modes'
+     If there is no mode declaration for a predicate, try to infer the
+     modes, rather than just reporting an error.
+
+`--no-infer-det, --no-infer-determinism'
+     If there is no determinism declaration for a procedure, don't try
+     to infer the determinism, just report an error.
+
+
+File: mercury_user_guide.info,  Node: Compilation model options,  Next: Code generation options,  Prev: Language semantics options,  Up: Invocation
+
+Compilation model options
+=========================
+
+   The following compilation options affect the generated code in such
+a way that the entire program must be compiled with the same setting of
+these options, and it must be linked to a version of the Mercury
+library which has been compiled with the same setting.  Rather than
+setting them individually, you must specify them all at once by
+selecting a particular compilation model ("grade").
+
+`-s GRADE'
+`--grade GRADE'
+     Select the compilation model. The GRADE should be one of `debug',
+     `none', `reg', `jump', `asm_jump', `fast', `asm_fast', or one of
+     those with `.gc', `.prof' or `.gc.prof' appended.  The default
+     grade is system-dependent; it is chosen at installation time by
+     `configure', the auto-configuration script, but can be overridden
+     with the `MERCURY_DEFAULT_GRADE' environment variable if desired.
+     Depending on your particular installation, only a subset of these
+     possible grades will have been installed.  Attempting to use a
+     grade which has not been installed will result in an error at link
+     time.
+
+     The following table shows the options that are selected by each
+     grade; it is followed by descriptions of those options.
+
+    GRADE
+          OPTIONS IMPLIED.
+
+    `debug'
+          `--debug --no-c-optimize'.
+
+    `none'
+          None.
+
+    `reg'
+          `--gcc-global-registers'.
+
+    `jump'
+          `--gcc-nonlocal-gotos'.
+
+    `fast'
+          `--gcc-global-registers --gcc-nonlocal-gotos'.
+
+    `asm_jump'
+          `--gcc-nonlocal-gotos --asm-labels'.
+
+    `asm_fast'
+          `--gcc-global-registers --gcc-nonlocal_gotos --asm-labels'.
+
+    Any of the above followed by `.gc'
+          As above, plus `--gc conservative'.
+
+    Any of the above followed by `.prof'
+          As above, plus `--profiling'.
+
+     Reminder: the following optimizations should not be set
+     individually.  Instead, you should use the `--grade' option to
+     change the setting of these options.
+
+`--gcc-global-registers' (grades: reg, fast, asm_fast)
+`--no-gcc-global-registers' (grades: debug, none, jump, asm_jump)
+     Specify whether or not to use GNU C's global register variables
+     extension.
+
+`--gcc-non-local-gotos' (grades: jump, fast, asm_jump, asm_fast)
+`--no-gcc-non-local-gotos' (grades: debug, none, reg)
+     Specify whether or not to use GNU C's "labels as values" extension.
+
+`--asm-labels' (grades: asm_jump, asm_fast)
+`--no-asm-labels' (grades: debug, none, reg, jump, fast)
+     Specify whether or not to use GNU C's asm extensions for inline
+     assembler labels.
+
+`--gc {none, conservative, accurate}'
+`--garbage-collection {none, conservative, accurate}'
+     Specify which method of garbage collection to use.  `.gc' grades
+     use `--gc conservative', other grades use `--gc none'.  `accurate'
+     is not yet implemented.
+
+`--tags {none, low, high}'
+     (This option is not intended for general use.) Specify whether to
+     use the low bits or the high bits of each word as tag bits
+     (default: low).
+
+`--num-tag-bits N'
+     (This option is not intended for general use.) Use N tag bits.
+     This option is required if you specify `--tags high'.  With
+     `--tags low', the default number of tag bits to use is determined
+     by the auto-configuration script.
+
+`--have-delay-slot'
+     (This option is not intended for general use.) Assume that branch
+     instructions have a delay slot.
+
+`--num-real-r-regs N'
+     (This option is not intended for general use.) Assume r1 up to rN
+     are real general purpose registers.
+
+`--num-real-f-regs N'
+     (This option is not intended for general use.) Assume f1 up to fN
+     are real floating point registers.
+
+`--num-real-r-temps N'
+     (This option is not intended for general use.) Assume that N
+     non-float temporaries will fit into real machine registers.
+
+`--num-real-f-temps N'
+     (This option is not intended for general use.) Assume that N float
+     temporaries will fit into real machine registers.
+
+`--profiling' (grades: any grade ending in `.prof')
+     Enable profiling.  Insert profiling hooks in the generated code,
+     and also output some profiling information (the static call graph)
+     to the file `MODULE.prof'.  *Note Profiling::.
+
+`--debug' (grades: debug)
+     Enable debugging.  Pass the `-g' flag to the C compiler, instead
+     of `-DSPEED', to enable debugging of the generated C code.  This
+     option also implies `--no-c-optimize'.  Debugging support is
+     currently extremely primitive - this option is probably not useful
+     to anyone except the Mercury implementors.  We recommend that you
+     use instead use `mnp' or `msp'.  *Note Using Prolog:: for details.
+
+`--args {old, compact}'
+`--arg-convention {old, compact}'
+     (This option is not intended for general use.) Use the specified
+     argument passing convention in the generated low-level C code.
+     With the `simple' convention, the Nth argument is passed in or out
+     using register rN.  With the `compact' convention, the Nth input
+     argument is passed using register rN and the Nth output argument
+     is returned using register rN.  The `compact' convention generally
+     leads to more efficient code.  However, currently only the
+     `simple' convention is supported.
+
+`--no-type-layout'
+     (This option is not intended for general use.) Don't output
+     base_type_layout structures or references to them.  This option
+     will generate smaller executables, but will not allow the use of
+     code that uses the layout information (e.g. `functor', `arg').
+     Using such code will result in undefined behaviour at runtime. The
+     C code also needs to be compiled with `-DNO_TYPE_LAYOUT'.
+
+
+File: mercury_user_guide.info,  Node: Code generation options,  Next: Optimization options,  Prev: Compilation model options,  Up: Invocation
+
+Code generation options
+=======================
+
+`--no-trad-passes'
+     The default `--trad-passes' completely processes each predicate
+     before going on to the next predicate.  This option tells the
+     compiler to complete each phase of code generation on all
+     predicates before going on the next phase on all predicates.
+
+`--no-reclaim-heap-on-nondet-failure'
+     Don't reclaim heap on backtracking in nondet code.
+
+`--no-reclaim-heap-on-semidet-failure'
+     Don't reclaim heap on backtracking in semidet code.
+
+`--cc COMPILER-NAME'
+     Specify which C compiler to use.
+
+`--c-include-directory DIR'
+     Specify the directory containing the Mercury C header files.
+
+`--cflags OPTIONS'
+     Specify options to be passed to the C compiler.
+
+
+File: mercury_user_guide.info,  Node: Optimization options,  Next: Link options,  Prev: Code generation options,  Up: Invocation
+
+Optimization options
+====================
+
+* Menu:
+
+* Overall optimization options::
+* High-level (HLDS->HLDS) optimization options::
+* Medium-level (HLDS->LLDS) optimization options::
+* Low-level (LLDS->LLDS) optimization options::
+* Output-level (LLDS->C) optimization options::
+
+
+File: mercury_user_guide.info,  Node: Overall optimization options,  Next: High-level (HLDS->HLDS) optimization options,  Up: Optimization options
+
+Overall optimization options
+----------------------------
+
+`-O N'
+`--opt-level N'
+`--optimization-level N'
+     Set optimization level to N.  Optimization levels range from -1 to
+     6.  Optimization level -1 disables all optimizations, while
+     optimization level 6 enables all optimizations except for the
+     cross-module optimizations listed below.
+
+     In general, there is a trade-off between compilation speed and the
+     speed of the generated code.  When developing, you should normally
+     use optimization level 0, which aims to minimize compilation time.
+     It enables only those optimizations that in fact usually *reduce*
+     compilation time.  The default optimization level is level 2, which
+     delivers reasonably good optimization in reasonable time.
+     Optimization levels higher than that give better optimization, but
+     take longer, and are subject to the law of diminishing returns.
+     The difference in the quality of the generated code between
+     optimization level 5 and optimization level 6 is very small, but
+     using level 6 may increase compiation time and memory requirements
+     dramatically.
+
+     Note that if you want the compiler to perform cross-module
+     optimizations, then you must enable them separately; the
+     cross-module optimizations are not enabled by any `-O' level,
+     because they affect the compilation process in ways that require
+     special treatment by `mmake'.
+
+`--opt-space'
+`--optimize-space'
+     Turn on optimizations that reduce code size and turn off
+     optimizations that significantly increase code size.
+
+`--intermodule-optimization'
+     Perform inlining and higher-order specialization of the code for
+     predicates or functions imported from other modules.
+
+`--split-c-files'
+     Generate each C function in its own C file, so that the linker
+     will optimize away unused code.  This has the same effect as
+     `--optimize-dead-procs', except that it works globally at link
+     time, rather than over a single module, so it does a much better
+     job of eliminating unused procedures.  This option significantly
+     increases compilation time, link time, and intermediate disk space
+     requirements, but in return reduces the size of the final
+     executable, typically by about 10-20%.  This option is only useful
+     with `--procs-per-c-function 1'.
+
+     N.B.  When using `mmake', the `--split-c-files' option should not
+     be placed in the `MCFLAGS' variable.  Instead, use the
+     `MODULE.split' target, i.e. type `mmake foo.split' rather than
+     `mmake foo'.
+
+
+File: mercury_user_guide.info,  Node: High-level (HLDS->HLDS) optimization options,  Next: Medium-level (HLDS->LLDS) optimization options,  Prev: Overall optimization options,  Up: Optimization options
+
+High-level (HLDS->HLDS) optimization options
+--------------------------------------------
+
+   These optimizations are high-level transformations on our HLDS
+(high-level data structure).
+
+`--no-inlining'
+     Disable all forms of inlining.
+
+`--no-inline-simple'
+     Disable the inlining of simple procedures.
+
+`--no-inline-single-use'
+     Disable the inlining of procedures called only once.
+
+`--inline-compound-threshold THRESHOLD'
+     Inline a procedure if its size (measured roughly in terms of the
+     number of connectives in its internal form), multiplied by the
+     number of times it is called, is below the given threshold.
+
+`--inline-simple-threshold THRESHOLD'
+     Inline a procedure if its size is less than the given threshold.
+
+`--intermod-inline-simple-threshold THRESHOLD'
+     Similar to -inline-simple-threshold, except used to determine which
+     predicates should be included in `.opt' files. Note that changing
+     this between writing the `.opt' file and compiling to C may cause
+     link errors, and too high a value may result in reduced
+     performance.
+
+`--no-common-struct'
+     Disable optimization of common term structures.
+
+`--no-common-goal'
+     Disable optimization of common goals.  At the moment this
+     optimization detects only common deconstruction unifications.
+     Disabling this optimization reduces the class of predicates that
+     the compiler considers to be deterministic.
+
+`--no-follow-code'
+     Don't migrate builtin goals into branched goals.
+
+`--no-optimize-unused-args'
+     Don't remove unused predicate arguments. The compiler will
+     generate less efficient code for polymorphic predicates.
+
+`--no-optimize-higher-order'
+     Don't specialize calls to higher-order predicates where the
+     higher-order arguments are known.
+
+`--optimize-constructor-last-call'
+     Enable the optimization of "last" calls that are followed by
+     constructor application.
+
+`--optimize-dead-procs.'
+     Enable dead predicate elimination.
+
+`--excess-assign'
+     Remove excess assignment unifications.
+
+`--optimize-saved-vars'
+     Reorder goals to minimize the number of variables that have to be
+     saved across calls.
+
+
+File: mercury_user_guide.info,  Node: Medium-level (HLDS->LLDS) optimization options,  Next: Low-level (LLDS->LLDS) optimization options,  Prev: High-level (HLDS->HLDS) optimization options,  Up: Optimization options
+
+Medium-level (HLDS->LLDS) optimization options
+----------------------------------------------
+
+   These optimizations are applied during the process of generating
+low-level intermediate code from our high-level data structure.
+
+`--no-static-ground-terms'
+     Disable the optimization of constructing constant ground terms at
+     compile time and storing them as static constants.
+
+`--no-smart-indexing'
+     Generate switches as a simple if-then-else chains; disable string
+     hashing and integer table-lookup indexing.
+
+`--dense-switch-req-density PERCENTAGE'
+     The jump table generated for an atomic switch must have at least
+     this percentage of full slots (default: 25).
+
+`--dense-switch-size SIZE'
+     The jump table generated for an atomic switch must have at least
+     this many entries (default: 4).
+
+`--lookup-switch-req-density PERCENTAGE'
+     The lookup tables generated for an atomic switch in which all the
+     outputs are constant terms must have at least this percentage of
+     full slots (default: 25).
+
+`--lookup-switch-size SIZE'
+     The lookup tables generated for an atomic switch in which all the
+     outputs are constant terms must have at least this many entries
+     (default: 4).
+
+`--string-switch-size SIZE'
+     The hash table generated for a string switch must have at least
+     this many entries (default: 8).
+
+`--tag-switch-size SIZE'
+     The number of alternatives in a tag switch must be at least this
+     number (default: 8).
+
+`--no-middle-rec'
+     Disable the middle recursion optimization.
+
+`--no-simple-neg'
+     Don't generate simplified code for simple negations.
+
+`--no-follow-vars'
+     Don't optimize the assignment of registers in branched goals.
+
+
+File: mercury_user_guide.info,  Node: Low-level (LLDS->LLDS) optimization options,  Next: Output-level (LLDS->C) optimization options,  Prev: Medium-level (HLDS->LLDS) optimization options,  Up: Optimization options
+
+Low-level (LLDS->LLDS) optimization options
+-------------------------------------------
+
+   These optimizations are transformations that are applied to our
+low-level intermediate code before emitting C code.
+
+`--no-llds-optimize'
+     Disable the low-level optimization passes.
+
+`--no-optimize-peep'
+     Disable local peephole optimizations.
+
+`--no-optimize-jumps'
+     Disable elimination of jumps to jumps.
+
+`--no-optimize-fulljumps'
+     Disable elimination of jumps to ordinary code.
+
+`--no-optimize-labels'
+     Disable elimination of dead labels and code.
+
+`--optimize-dups'
+     Enable elimination of duplicate code.
+
+`--optimize-value-number'
+     Perform value numbering on extended basic blocks.
+
+`--no-optimize-frames'
+     Disable stack frame optimizations.
+
+`--no-optimize-delay-slot'
+     Disable branch delay slot optimizations.
+
+`--optimize-repeat N'
+     Iterate most optimizations at most N times (default: 3).
+
+`--optimize-vnrepeat N'
+     Iterate value numbering at most N times (default: 1).
+
+
+File: mercury_user_guide.info,  Node: Output-level (LLDS->C) optimization options,  Prev: Low-level (LLDS->LLDS) optimization options,  Up: Optimization options
+
+Output-level (LLDS->C) optimization options
+-------------------------------------------
+
+   These optimizations are applied during the process of generating C
+intermediate code from our low-level data structure.
+
+`--no-emit-c-loops'
+     Use only gotos - don't emit C loop constructs.
+
+`--use-macro-for-redo-fail'
+     Emit the fail or redo macro instead of a branch to the fail or
+     redo code in the runtime system.
+
+`--procs-per-c-function N'
+     Don't put the code for more than N Mercury procedures in a single
+     C function.  The default value of N is one.  Increasing N can
+     produce slightly more efficient code, but makes compilation slower.
+     Setting N to the special value zero has the effect of putting all
+     the procedures in a single function, which produces the most
+     efficient code but tends to severely stress the C compiler.
+
+`--no-c-optimize'
+     Don't enable the C compiler's optimizations.
+
+
+File: mercury_user_guide.info,  Node: Miscellaneous options,  Prev: Link options,  Up: Invocation
+
+Miscellaneous options
+=====================
+
+`-I DIR'
+`--search-directory DIR'
+     Append DIR to the list of directories to be searched for imported
+     modules.
+
+`-?'
+`-h'
+`--help'
+     Print a usage message.
+
+
+File: mercury_user_guide.info,  Node: Link options,  Next: Miscellaneous options,  Prev: Optimization options,  Up: Invocation
+
+Link options
+============
+
+`-o FILENAME'
+`--output-file FILENAME'
+     Specify the name of the final executable.  (The default executable
+     name is the same as the name of the first module on the command
+     line, but without the `.m' extension.)
+
+`--link-flags OPTIONS'
+     Specify options to be passed to `ml', the Mercury linker.
+
+`-L DIRECTORY'
+`--library-directory DIRECTORY'
+     Append DIR to the list of directories in which to search for
+     libraries.
+
+`-l LIBRARY'
+`--library LIBRARY'
+     Link with the specified library.
+
+`--link-object OBJECT'
+     Link with the specified object file.
+
+
+File: mercury_user_guide.info,  Node: Environment,  Next: C compilers,  Prev: Invocation,  Up: Top
+
+Environment variables
+*********************
+
+   The shell scripts in the Mercury compilation environment will use
+the following environment variables if they are set.  There should be
+little need to use these, because the default values will generally
+work fine.
+
+`MERCURY_DEFAULT_GRADE'
+     The default grade to use if no `--grade' option is specified.
+
+`MERCURY_OPTIONS'
+     A list of options for the Mercury runtime that gets linked into
+     every Mercury program.  Options are available to set the size of
+     the different memory areas, and to enable various debugging traces.
+     Set `MERCURY_OPTIONS' to `-h' for help.
+
+`MERCURY_C_INCL_DIR'
+     Directory for the Mercury C header files (`*.h').
+
+`MERCURY_INT_DIR'
+     Directory for the Mercury library interface files (`*.int',
+     `*.int2', `*.int3' and `*.opt').
+
+`MERCURY_NC_BUILTIN'
+     Filename of the Mercury `nc'-compatibility file (nc_builtin.nl).
+
+`MERCURY_C_LIB_DIR'
+     Base directory containing the Mercury libraries (`libmer.a' and
+     possibly `libmer.so') for each configuration and grade.  The
+     libraries for each configuration and grade should be in the
+     subdirectory CONFIG/GRADE of `$MERCURY_C_LIB_DIR'.
+
+`MERCURY_NONSHARED_LIB_DIR'
+     For IRIX 5, this environment variable can be used to specify a
+     directory containing a version of libgcc.a which has been compiled
+     with `-mno-abicalls'.  See the file `README.IRIX-5' in the Mercury
+     source distribution.
+
+`MERCURY_MOD_LIB_DIR'
+     The directory containing the .init files in the Mercury library.
+     They are used to create the initialization file `*_init.c'.
+
+`MERCURY_MOD_LIB_MODS'
+     The names of the .init files in the Mercury library.
+
+`MERCURY_NU_LIB_DIR'
+     Directory for the NU-Prolog object files (`*.no') for the
+     NU-Prolog Mercury library.
+
+`MERCURY_NU_LIB_OBJS'
+     List of the NU-Prolog object files (`*.no') for the Mercury
+     library.
+
+`MERCURY_COMPILER'
+     Filename of the Mercury Compiler.
+
+`MERCURY_INTERPRETER'
+     Filename of the Mercury Interpreter.
+
+`MERCURY_MKINIT'
+     Filename of the program to create the `*_init.c' file.
+
+
+File: mercury_user_guide.info,  Node: C compilers,  Prev: Environment,  Up: Top
+
+Using a different C compiler
+****************************
+
+   The Mercury compiler takes special advantage of certain extensions
+provided by GNU C to generate much more efficient code.  We therefore
+recommend that you use GNU C for compiling Mercury programs.  However,
+if for some reason you wish to use another compiler, it is possible to
+do so.  Here's what you need to do.
+
+   * You must specify the name of the new compiler.  You can do this
+     either by setting the `MERCURY_C_COMPILER' environment variable,
+     by adding a line `MGNUC=MERCURY_C_COMPILER=... mgnuc' to your
+     `Mmake' file, or by using the `--cc' option to `mc'.  You may need
+     to specify some option(s) to the C compiler to ensure that it uses
+     an ANSI preprocessor (e.g. if you are using the DEC Alpha/OSF 3.2
+     C compiler, you would need to pass `--cc="cc -std"' to `mc' so
+     that it will pass the `-std' option to `cc').
+
+   * You must use the grade `none' or `none.gc'.  You can specify the
+     grade in one of three ways: by setting the `MERCURY_DEFAULT_GRADE'
+     environment variable, by adding a line `GRADE=...' to your `Mmake'
+     file, or by using the `--grade' option to `mc'.  (You will also
+     need to install those grades of the Mercury library, if you have
+     not already done so.)
+
+   * If your compiler is particularly strict in enforcing ANSI
+     compliance, you may also need to compile the Mercury code with
+     `--no-static-ground-terms'.
+
+
+
+Tag Table:
+Node: Top778
+Node: Introduction1621
+Node: Filenames3276
+Node: Using mc5116
+Node: Using Prolog10148
+Node: Using NU-Prolog11170
+Node: Using SICStus13708
+Node: Prolog hazards14633
+Node: Using Mmake15932
+Node: Profiling21351
+Node: Profiling introduction21807
+Node: Building profiled applications22664
+Node: Creating the profile23768
+Node: Displaying the profile24911
+Node: Analysis of results25552
+Node: Invocation33621
+Node: Invocation overview34227
+Node: Warning options34896
+Node: Verbosity options36794
+Node: Output options38070
+Node: Auxiliary output options40162
+Node: Language semantics options41968
+Node: Compilation model options42986
+Node: Code generation options48866
+Node: Optimization options49765
+Node: Overall optimization options50179
+Node: High-level (HLDS->HLDS) optimization options52913
+Node: Medium-level (HLDS->LLDS) optimization options55296
+Node: Low-level (LLDS->LLDS) optimization options57227
+Node: Output-level (LLDS->C) optimization options58461
+Node: Miscellaneous options59556
+Node: Link options59870
+Node: Environment60607
+Node: C compilers62837
+
+End Tag Table

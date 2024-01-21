@@ -1,0 +1,118 @@
+frame .buttons
+button .buttons.quit -text Quit \
+	-activeforeground white -activebackground red -command exit
+button .buttons.apply -text "Try Changes" -activebackground yellow -command {
+	write_page $argv "-X"
+# Reread values.. Thus see what the device actually did (and erase signs and leading 0's
+# that Joe Blow user entered)
+	read_page $argv "-X"
+}
+
+frame .buttons1
+button .buttons1.default -text "Read Defaults" -activebackground green -command {
+	read_page $argv "-M"
+}
+button .buttons1.saved -text "Read Saved" -activebackground green -command {
+	read_page $argv "-S"
+}
+button .buttons1.current -text "Read Current" -activebackground green -command {
+	read_page $argv "-X"
+}
+pack .buttons.apply  .buttons.quit  -side left -padx 10 -pady 3
+pack .buttons1.default .buttons1.saved .buttons1.current -side left -padx 10 -pady 3
+pack .buttons .buttons1
+
+frame .space1
+pack .space1 -pady 10
+
+proc generate_textboxes { } {
+    global text_list
+    global text_descriptions
+    global label_width
+    global text_width
+    set lineno 0
+
+    foreach x $text_list { 
+	frame .$x
+	label .$x.label -text [lindex $text_descriptions $lineno] -width $label_width -anchor w
+	text .$x.text -width $text_width -height 1 \
+		 -relief sunken -borderwidth 2
+	pack .$x.label .$x.text -side left
+	set lineno [expr $lineno+1]
+    }
+
+}
+
+proc read_page { device option } {
+    global button_list
+    global text_list
+    global switch
+    set line {}
+    exec /usr/bin/scsiinfo -X $switch $option $device > /tmp/cachepage 2> /dev/null
+    if {[catch {set file [open /tmp/cachepage r]}] == 1} return;
+    gets $file line
+    close $file
+    exec rm /tmp/cachepage
+    set first [lindex $line 0]
+    set second [lindex $line 1]
+    set lineno 0
+    foreach x $button_list { 
+	.$x deselect
+        if { [ string compare [lindex $line $lineno] "0" ] != 0} then { .$x select }
+	set lineno [expr $lineno+1]
+    }
+    foreach x $text_list { 
+      .$x.text delete 1.0 end
+      .$x.text insert end [lindex $line $lineno]
+      set lineno [expr $lineno+1]
+    }
+}
+
+proc read_modifiable { device } {
+    global button_list
+    global text_list
+    global switch
+    set line {}
+    exec /usr/bin/scsiinfo -X -m $switch $device > /tmp/cachepage
+    if {[catch {set file [open /tmp/cachepage r]}] == 1} return;
+    gets $file line
+    close $file
+    exec rm /tmp/cachepage
+    set lineno 0
+    foreach x $button_list { 
+        if { [ string compare [lindex $line $lineno] "0" ] == 0} then { .$x configure -state disabled }
+	set lineno [expr $lineno+1]
+    }
+
+    foreach x $text_list { 
+	if { [ string compare [lindex $line $lineno] "0" ] == 0} \
+	  then { .$x.text configure -state disabled } \
+	  else { .$x.text configure -background white }
+      set lineno [expr $lineno+1]
+    }
+}
+
+proc write_page { device option } {
+    global button_list
+    global text_list
+    global switch
+    set lineno 0
+    set r3  [concat -X $switch -R $device]
+    foreach x $button_list { 
+	global $x
+	set r1 [eval set $x]
+        if { $r1 == 1 } then { set r3 [concat $r3 1] } \
+          else { set r3 [concat $r3 0] }
+	set lineno [expr $lineno+1]
+    }
+    foreach x $text_list { 
+	set r3 [concat $r3 [.$x.text get 1.0 end]]
+        set lineno [expr $lineno+1]
+    }
+    set file [open /tmp/wrscsi w]
+    puts $file "/usr/bin/scsiinfo $r3"
+    close $file
+    exec sh < /tmp/wrscsi
+    exec rm /tmp/wrscsi
+}
+

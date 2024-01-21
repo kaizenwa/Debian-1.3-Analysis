@@ -1,0 +1,254 @@
+<HTML>
+<HEAD>
+<TITLE>Using DND in your Xt programs</TITLE>
+</HEAD>
+<BODY>
+<H1>2. <A NAME="s2"></A>Using DND in your Xt programs</H1>
+<P>
+<A HREF="DragDropHOWTO.html#toc2">Contents of this section</A></P>
+
+<H2>2.1 <A NAME="ss2.1"></A> Introduction</H2>
+
+<P>When a drag or a drop action occur within your program certain functions will
+be called. These functions are called <EM>event handlers</EM>, because they are
+only called when certain <EM>event</EM> occurs. The format of an Xt event handler
+function is
+<BLOCKQUOTE><CODE>
+<PRE>
+void EventHandler(Widget,XtPointer,Event*,Boolean*);
+</PRE>
+</CODE></BLOCKQUOTE>
+
+Thanks to DND, that is all you have to know about events and event handlers. I
+will assume only that you know what a widget is (since you are programming with
+the Xt interface this is very fair). Your program may have a lot of event
+handlers, since you may want to handle drop events in different ways for
+different areas of your application. The same thing applies to drag actions.</P>
+<P></P>
+
+<H2>2.2 <A NAME="ss2.2"></A> Initializing DND</H2>
+
+<P>For each module of your program that uses DND you must include the header file
+<CODE>OffiX/DragAndDrop.h</CODE>. The next thing to do is to initialize DND.
+This is done with the function
+<BLOCKQUOTE><CODE>
+<PRE>
+void DndInitialize(Widget toplevel);
+</PRE>
+</CODE></BLOCKQUOTE>
+
+where <CODE>toplevel</CODE> is the top level widget of your application. You must call
+the function after the creation of the widget (e.g. after
+<CODE>XtAppInitialize</CODE>). The next thing to do is to register the widgets you want
+to be able to receive drops and/or to send drag events (note that a widget can
+be able to receive drops but nothing can be dragged from it - e.g. a waste
+basket). You can do this with the functions
+<BLOCKQUOTE><CODE>
+<PRE>
+void DndRegisterDropWidget(Widget widget,XtEventHandler handler,XtPointer d);
+void DndRegisterDragWidget(Widget widget,XtEventHandler handler,XtPointer d);
+</PRE>
+</CODE></BLOCKQUOTE>
+
+where <CODE>widget</CODE> is the widget in consideration, <CODE>handler</CODE> is the function
+to be called when the drop or drag actions take place, and <CODE>d</CODE> is something
+you should not care about, just replace with NULL.</P>
+<P>If you want to handle drops on non-registered widgets, use the function
+<BLOCKQUOTE><CODE>
+<PRE>
+void DndRegisterOtherDrop(XtEventHandler handler);
+</PRE>
+</CODE></BLOCKQUOTE>
+
+for drops on icons,
+<BLOCKQUOTE><CODE>
+<PRE>
+void DndRegisterIconDrop(XtEventHandler handler);
+</PRE>
+</CODE></BLOCKQUOTE>
+
+and, if something can be dragged from your program, you may want to handle
+drops on the root window (e.g. the ``files'' program open a new file window
+each time a directory is dropped on the root window),
+<BLOCKQUOTE><CODE>
+<PRE>
+void DndRegisterRootDrop(XtEventHandler handler);
+</PRE>
+</CODE></BLOCKQUOTE>
+</P>
+<P>Now your DND protocol is initialized. Now you must define the handlers and
+link your program with the option -lDnd and everything should work. The next
+sections are devoted to the handler functions definition. Before going on, just
+a note about the icon drops:</P>
+<P>Icon drops will not work with the vast majority of window managers. This
+happens because the managers do not pass the client message events that are
+sent to the icons to the client windows. If the window manager does that, then
+icon drops will work.</P>
+<P></P>
+
+<A NAME="DataTypes"></A> <H2>2.3 <A NAME="ss2.3"></A> The DND data types</H2>
+
+<P>The current data type supported by DND are the following:</P>
+<P>
+<BLOCKQUOTE><CODE>
+<PRE>
+DndRawData      Any kind of data.
+DndFile         A file name.
+DndFiles        List of file names.
+DndText         Text block.
+DndDir          Directory name.
+DndLink         Name of a stale link.
+DndExe          Name of a program.
+DndUnknown      Undefined data.
+</PRE>
+</CODE></BLOCKQUOTE>
+</P>
+<P>When you initialize the data (with the <CODE>DndSetData</CODE> function) you must
+furnish the correct structure for DND. The structure for the various types is
+the following:</P>
+<P>
+<DL>
+<DT><B>DndRawData</B><DD><P>Any kind of data. If the data you want to send does not fall
+into any category, use this one. <EM>Do not use DndUnknown</EM>. See the
+<CODE>DndUnknown</CODE> description to see why.</P>
+<DT><B>DndFile</B><DD><P>A null-terminated string containing the name (with the complete
+path) of a file.</P>
+<DT><B>DndFiles</B><DD><P>A sequence of null-terminated strings, each one containing a
+complete file name. The end of the list is determined by a zero-lenght
+file name.</P>
+<DT><B>DndText</B><DD><P>A null-terminated text block containing valid text characters.</P>
+<DT><B>DndDir</B><DD><P>A null-terminated string containing the name (with the complete
+path) of a directory.</P>
+<DT><B>DndLink</B><DD><P>A null-terminated string containing the name (with the complete
+path) of a link that points to nowhere (a stale link).</P>
+<DT><B>DndExe</B><DD><P>A null-terminated string containing the name (with the complete
+path) of an executable file (a program).</P>
+<DT><B>DndUnknown</B><DD><P>You must not set this type to any kind of data. Use
+<CODE>DndRawData</CODE> instead. You can only <EM>receive</EM> unknown data.
+This can happen when a program compiled with a newer version of DND
+send a data that your version of DND does not understand. Your program
+must handle this kind of data as if it were a <CODE>DndRawData</CODE>.</P>
+</DL>
+</P>
+<P></P>
+
+<H2>2.4 <A NAME="ss2.4"></A> Retreiving data: the drop event handler</H2>
+
+<P>Ok, so you received a drop, and the event handler for this drop was called. The
+first think you need to know, as a programmer, is that your drop event handler
+can be called even if a drop did not occur (it's a rare thing, but can happen).
+The next thing you need to know is the data type of the drop event. Both needs
+can be satisfied by the function
+<BLOCKQUOTE><CODE>
+<PRE>
+int DndDataType(XEvent *event)
+</PRE>
+</CODE></BLOCKQUOTE>
+
+where <CODE>event</CODE> is the event that the drop handler received. If the event was
+not a DND drop event, then the function returns <CODE>DndNotDnd</CODE>. If it was, then
+the function will return the data type.</P>
+<P>Ok, it's a drop event, and you want to process the specific data type. To
+retreive the drop data, use the function
+<BLOCKQUOTE><CODE>
+<PRE>
+void DndGetData(unsigned char **Data,unsigned long *Size)
+</PRE>
+</CODE></BLOCKQUOTE>
+
+where <CODE>Data</CODE> is the data recipient and <CODE>Size</CODE> a unsigned long that will
+contain the data lenght (including NULL characters at the end of strings).</P>
+<P>Here is an example of how to use these two functions in a drop event handler:
+<BLOCKQUOTE><CODE>
+<HR>
+<PRE>
+void MyDropEventHandler(Widget w,XtPointer pnt,XEvent *event,Boolean* b)
+{
+        int DataType;
+        unsigned long DataSize;
+        char *Data;
+        
+        if(DndDataType(event)==DndNotDnd) return;
+        DndGetData(&amp; Data,&amp; DataSize);
+        
+        ... data processing ...
+        
+}
+</PRE>
+<HR>
+</CODE></BLOCKQUOTE>
+</P>
+<P>Now, just a note about memory management: the actual version of DND does not
+reserve any space for the data. Therefore, if your data processing takes too
+long and the user make another drag and drop action the data will be corrupted.
+So, if you want to keep the data for a long time, the best thing to do is to
+alloc space for it and copy the returned contents.</P>
+<P></P>
+
+<H2>2.5 <A NAME="ss2.5"></A> Sending data: the drag event handler</H2>
+
+<P>Hey - the user said - I want to send data from you to another program right
+now! So here you are, on the drag event handler. So you, as the programmer,
+wants to set the data and let DND take care of the rest. For the first task you
+can use the function
+<BLOCKQUOTE><CODE>
+<PRE>
+void DndSetData(int Type,unsigned char *Data,unsigned long Size);
+</PRE>
+</CODE></BLOCKQUOTE>
+
+The <CODE>Size</CODE> field must be the total size of the data, including the NULL
+character of strings. The <CODE>Data</CODE> must be formatted according to the
+data <CODE>Type</CODE>. For a description of the data structures refer to section
+<A HREF="#DataTypes">The DND data types</A>
+.</P>
+<P>Now all you need to do is to call DND and let it handle the drag action by
+calling the function <CODE>DndHandleDragging</CODE>. Here is an example of a drag
+handler:
+<BLOCKQUOTE><CODE>
+<HR>
+<PRE>
+void MyDragEventHandler(Widget w,XtPointer pnt,XEvent *event,Boolean* b)
+{
+        int DataType;
+        unsigned long DataSize;
+        char *Data;
+        
+        ... data initialization ...
+        
+        DndSetData(DataType,Data,DataSize);
+        DndHandleDragging(w,event);
+}
+</PRE>
+<HR>
+</CODE></BLOCKQUOTE>
+</P>
+<P>Once a drag action takes place, <CODE>DndHandleDragging</CODE> will take control and
+will return only after the corresponding drop. Now, two things worth reading:
+<UL>
+<LI>You don't need to allocate space for the Data, DND will do that for you.
+In fact, when you call <CODE>DndSetData</CODE>, the old data stored on the DND
+global buffer will be destroyed.</LI>
+<LI>The drag event handler can be called many times before a drag actually
+take place. The <CODE>DndSetData</CODE> function will return automatically if
+the data is already set. But the handler will perform the data
+initialization anyway, be careful. The function <CODE>DndHandleDragging</CODE>
+will return non-zero only if a drag really took place, otherwise it
+will return zero. This can be useful if you want to keep track of
+the current drag state.</LI>
+</UL>
+</P>
+<P></P>
+
+<HR>
+<P>
+<A HREF="DragDropHOWTO-3.html">Next</A> Chapter,
+<A HREF="DragDropHOWTO-1.html">Previous</A> Chapter
+<P>
+Table of contents of <A HREF="DragDropHOWTO.html#toc2">this chapter</A>,
+ General <A HREF="DragDropHOWTO.html#toc">table of contents</A></P>
+<P>
+<A HREF="DragDropHOWTO.html">Top</A> of the document,
+ <A HREF="#0"> Beginning of this Chapter</A></P>
+</BODY>
+</HTML>

@@ -1,0 +1,340 @@
+#!/bin/sh
+#
+# dwww-convert -- convert docs to HTML
+#
+# Simple usage: $0 <type> <location>
+# 	<type> is document type: text, man, html, ps, and so on
+#	<location> is full pathname to original document
+#
+# In future versions, the converted HTML will be stored into a cache.
+#
+# Part of the Debian dwww package.  Written by Lars Wirzenius.
+# "@(#)dwww:$Id: dwww-convert,v 1.15 1997/02/25 01:30:10 jim Exp $"
+
+
+#
+# Setup defaults and read in the configuration file.
+#
+
+DWWW_DOCPATH="/usr/doc:/usr/info:/usr/man:/usr/X11R6/man:/usr/local/man:/usr/local/doc:/usr/share/man:/usr/share/doc"
+DWWW_HTMLDIR="/var/lib/dwww"
+DWWW_MAN2HTML=builtin_man2html
+DWWW_DIR2HTML=builtin_dir2html
+DWWW_TEXT2HTML=builtin_text2html
+
+if [ -f /etc/dwww/dwww.conf ]
+then
+	. /etc/dwww/dwww.conf
+fi
+
+if [ -z "$DWWW_SERVERNAME" ]
+then
+	DWWW_SERVERNAME=localhost
+fi
+
+#
+# Setup other variables.
+#
+
+PATH="/usr/sbin:/usr/bin:/bin"
+
+#######################################################################
+#
+# Utility function
+#
+
+
+#
+# Deduce the type of a file based on its name.
+#
+guess_type() {
+	case "$1" in
+	*.htm*)		echo "html" ;;
+	*.gif)		echo "gif"  ;;
+	*.jpg)		echo "jpeg"  ;;
+	*.jpeg)		echo "jpeg"  ;;
+	*)		echo "text" ;;
+	esac
+}
+
+
+#
+# Are we allowed to show this file?
+#
+# Note: getting this check wrong compromises security.
+#
+badfile() {
+	d="$1"
+	for i in `echo $DWWW_DOCPATH | tr : ' '`
+	do
+	  if [ -d "$i" ]; then
+		j="`cd $i; /bin/pwd`"
+		case "$d/" in
+		"$j"/*) return 1 ;;
+		esac
+	  fi
+	done
+	return 0
+}
+
+
+#
+# Convert a manual page reference ("name/section") to a path.
+#
+manref2path() {
+	name="`echo \"$1\" | sed 's/\/.*//'`"
+	section="`echo \"$1\" | sed 's/.*\///'`"
+	file="`man --location \"$section\" \"$name\" | sed 's/ .*//'`"
+	echo "`realpath $file`"
+}
+
+
+#######################################################################
+#
+# Builtin converters
+#
+
+
+#
+# Create a directory listing in HTML.
+#
+builtin_dir2html() {
+	echo "<html><head><title>Files in $1</title></head><body>"
+	echo "<h1>Files in $1</h1>"
+
+	find "$1" -type f -follow -maxdepth 1 | 
+	sed "s#^$1/##" | sort |
+	awk -v dir="$1" -v usefileurl="$DWWW_USEFILEURL" '
+	/.\.htm.*$/ {
+		if (usefileurl == "") {
+			printf "<a href=\"/cgi-bin/dwww?type=file&location=%s/%s\">%s</a>\n", dir, $1, $1
+		}
+		else {
+			printf "<a href=\"file://localhost%s/%s\">%s</a>\n", dir, $1, $1
+		}
+		next
+	}
+	{
+		printf "<a href=\"/cgi-bin/dwww?type=file&location=%s/%s\">%s</a>\n",
+			dir, $1, $1
+	}'
+
+	if  find "$1/." -type d -maxdepth 1 ! -name . ! -name .. | grep . > /dev/null
+	then
+		echo "<p><h2>Subdirectories:</h2>"
+		find "$1/." -type d -maxdepth 1 ! -name . ! -name .. -printf "%f\n" | sort |
+		while read i
+		do
+			if [ -n "$DWWW_USEFILEURL" ] && [ -f "$1/$i/index.html" ]; then
+				echo "<a href=\"file://localhost$1/$i/index.html\">$i</a>"
+			elif [ -n "$DWWW_USEFILEURL" ] && [ -f "$1/$i/index.html.gz" ]; then
+				echo "<a href=\"file://localhost$1/$i/index.html.gz\">$i</a>"
+			elif [ -n "$DWWW_USEFILEURL" ] && [ -f "$1/$i/index.htm" ]; then
+				echo "<a href=\"file://localhost$1/$i/index.htm\">$i</a>"
+			elif [ -n "$DWWW_USEFILEURL" ] && [ -f "$1/$i/index.htm.gz" ]; then
+				echo "<a href=\"file://localhost$1/$i/index.htm.gz\">$i</a>"
+			else
+				echo "<a href=\"/cgi-bin/dwww?type=file&location=$1/$i\">$i</a>"
+			fi
+		done
+	fi
+	
+	echo "<hr>Created automatically: `date`</body></html>"
+}
+
+
+#
+# Convert a manual page source code file to HTML.
+#
+builtin_man2html() {
+	echo "<html><head><title>$1</title></head><body>"
+	(cd "`dirname \"$1\"`"/..; man -P/bin/cat -l "$1") | 
+		dwww-txt2html --man
+	echo "</body></html>"
+}
+
+
+#
+# Convert plain text to HTML.  This is really trivial, and buggy.
+# Input from stdin.
+#
+builtin_text2html() {
+	echo "<html><head><title>$1</title></head><body>"
+	zcat -f "$1" | dwww-txt2html
+	echo "</body></html>"
+}
+
+
+################################################################
+#
+# Main program
+#
+
+
+if [ "$1" = "" -o "$2" = "" ]
+then
+	echo "Error: invalid arguments" 1>&2
+	echo "Usage: $0 <type> <location>" 1>&2
+	exit 1
+fi
+
+type="$1"
+file="$2"
+# anchor=$(echo $file | sed -e "s/^*\(#.*$\)/$1/")
+file=$(echo $file | sed -e "s/#.*$//")
+
+if test "$type" = file
+then
+	# First, check if file is a directory
+	if [ -d "$file" ] ; then
+		# File is a directory, so search for HTML indexes
+		if [ -f "$file/index.html" ]; then
+			file="$file/index.html"
+			type="html"
+		elif [ -f "$file/index.htm" ]; then
+			file="$file/index.htm"
+			type="html"
+		elif [ -f "$file/index.html.gz" ]; then
+			file="$file/index.html.gz"
+			type="html"
+		elif [ -f "$file/index.htm.gz" ]; then
+			file="$file/index.htm.gz"
+			type="html"
+	 	else		
+			type="dir"
+		fi
+	else
+		type="`guess_type $file`"
+	fi
+fi
+
+case "$type" in
+	man)	converter=$DWWW_MAN2HTML
+		;;
+	runman)	converter=$DWWW_MAN2HTML
+		type=man
+		file="`manref2path \"$2\"`" 
+		;;
+	dir)	converter=$DWWW_DIR2HTML
+		;;
+	*)	converter=$DWWW_TEXT2HTML
+		;;
+esac
+
+# Check to see if file exists
+if [ ! -e "$file" ]; then
+  # File doesn't exist
+  if [ "$type" = html ]; then
+    # A link may have referred to a .html file 
+    # when only a .html.gz file exists.  So check
+    # to see if alternate file exists, and use
+    # that one if it does
+    basefile=$(echo $file | sed -e "s/\.htm.*$//")
+    if [ -f "$basefile.html" ]; then
+      file="$basefile.html"
+    elif [ -f "$basefile.htm" ]; then
+      file="$basefile.htm"
+    elif [ -f "$basefile.html.gz" ]; then
+      file="$basefile.html.gz"
+    elif [ -f "$basefile.htm.gz" ]; then
+      file="$basefile.htm.gz"
+    fi
+  fi
+fi
+
+# Check to see if file exists
+if [ ! -e "$file" ]; then
+  # File doesn't exist
+  echo "Content-type: text/html"
+  echo ""
+  echo "<html><head><title>File not found</title></head><body>"
+  echo "<h1>File not found.</h1>dwww could not file the"
+  echo "file $file</body></html>"
+  exit 1
+fi
+
+file="`realpath $file`"
+
+if badfile "$file"
+then
+	echo "Content-type: text/html"
+	echo ""
+	echo "<html><head><title>Access denied</title></head><body>"
+	echo "<h1>Access denied.</h1>dwww will not allow you to read"
+	echo "file $2</body></html>"
+	exit 1
+fi
+
+if test "$type" = gif
+then
+	echo "Content-type: image/gif"
+	echo ""
+	cat $file
+	exit 0
+fi
+
+if test "$type" = jpeg
+then
+	echo "Content-type: image/jpeg"
+	echo ""
+	cat $file
+	exit 0 
+fi
+
+if dwww-cache --list "$type" "$file" > /dev/null
+then
+	echo "Content-type: text/html"
+	echo ""
+	dwww-cache --lookup "$type" "$file"
+	exit 0
+fi
+
+if test "$type" = html
+then
+
+	# First, check to see if user wants to access files directly
+	if [ -n "$DWWW_USEFILEURL" ] 
+	then
+		echo "Content-type: text/html"
+		echo ""
+		zcat -f $file
+		exit 0
+	fi
+
+# Use the following hairy perl script to convert links in the html
+# document to links to the cgi script
+
+# Note that this isn't very sophisticated, and can be fooled by text
+# inside <pre></pre> blocks, and probably other ways too
+
+	echo "Content-type: text/html"
+	echo ""
+	zcat -f "$file" | perl -0777ne '
+
+$directory = '\'$file\'';
+$directory =~ s/^[^\/]*(\/.*\/)[^\/]*$/$1/;
+$cgi = "http://'"$DWWW_SERVERNAME"'/cgi-bin/dwww?type=file&location="; 
+
+# Modify A HREF="" tags that dont refer to strings with a colon in them
+#  First case - relative links (ie. doesnt start with \)
+s/<(A[^>]*)(\s*HREF\s*=\s*)(["'\'']?)(\s*[^\/\n>:"'\''])([^>:"'\'']*)(\3[^>]*)>/<$1$2$3$cgi$directory$4$5$6>/ig;
+#  Second case - absolute links (ie. starts with \) - we shouldnt really have these
+s/<(A[^>]*)(\s*HREF\s*=\s*)(["'\'']?)(\s*\/)([^>:"'\'']*)(\3[^>]*)>/<$1$2$3$cgi$4$5$6>/ig;
+
+# Modify IMG SRC="" tags that dont refer to strings with a colon in them
+#  First case - relative links (ie. doesnt start with \)
+s/<(IMG[^>]*)(\s*SRC\s*=\s*)(["'\'']?)(\s*[^\/\n>:"'\''])([^>:"'\'']*)(\3[^>]*)>/<$1$2$3$cgi$directory$4$5$6>/ig;
+#  Second case - absolute links (ie. starts with \) - we shouldnt really have these
+s/<(IMG[^>]*)(\s*SRC\s*=\s*)(["'\'']?)(\s*\/)([^>:"'\'']*)(\3[^>]*)>/<$1$2$3$cgi$4$5$6>/ig;
+
+print $_;
+
+	' 
+	exit 0
+fi
+
+$converter "$file" | dwww-cache --store "$type" "$file"
+
+echo "Content-type: text/html"
+echo ""
+dwww-cache --lookup "$type" "$file"

@@ -1,0 +1,153 @@
+.TH SNNTP 1 redistributable
+.DA "4 December 1992"
+.SH NAME
+snntp \- transmit netnews articles to a remote NNTP server
+.SH SYNOPSIS
+.B snntp
+[
+.B \-a
+]
+[
+.B \-d
+]
+[
+.B \-s
+]
+[
+.B \-F
+]
+.RB [network ! ]host[ ! service]
+.SH DESCRIPTION
+.I Snntp
+offers netnews articles [RFC 1036],
+named in a batch file
+(a file of filenames,
+in either C News
+.B n
+or
+.B F
+format;
+.B n
+is considerably faster)
+on standard input,
+to a remote NNTP
+(Network News Transfer Protocol [RFC 977])
+server,
+transmitting those articles that the remote server
+indicates that it does not already have.
+The names of files that could not
+be sent are copied to standard output.
+The server is
+.I host
+on
+.I network
+(default
+.BR tcp )
+at
+.I service
+(default
+.BR nntp ).
+If exactly one
+.B !
+is present,
+it is assumed to be
+.IB network ! host,
+with the default
+.IR service .
+.I Network
+must provide
+a reliable, flow-controlled, full-duplex byte stream.
+The options are:
+.TP 4
+.B \-s
+Turns off reporting of transfer statistics
+(how many articles we
+offered them, how many they accepted, etc).
+.TP
+.B \-d
+Turns on DEBUG output on stderr.
+This can be used to see exactly what the two systems are saying to
+each other, except for the actual article text.
+.TP
+.B \-a
+The next queue file on the command line isn't
+a queue file, but is a single netnews
+article to be transmitted to the remote in a single operation.
+.IP
+.B NOTE:
+this option causes
+.I snntp
+to exit immediately after this transfer is done (regardless of
+whatever else is on the command line), and to exit with a code
+indicating whether the articles was successfully accepted by the
+remote server (zero exit for success, non-zero for failure).
+.TP
+.B \-F
+.I host
+is the number of an already-open,
+readable and writable
+file descriptor
+(with some reliable protocol underneath)
+that was passed to
+.I snntp
+through a
+.IR fork (2).
+.SH "THEORY OF OPERATION"
+.I Snntp
+implements an interactive ihave/sendme transmission system.
+Roughly, the protocol is
+.IP 1. 3
+open the article,
+fetch out the message-id (required on all netnews articles),
+and send the command IHAVE <message-id> to the remote.
+.IP 2.
+The remote will then say either
+``I've seen it already''
+or
+``please send that article to me.''
+.IP 3.
+If the response was negative,
+.I snntp
+loops back to step 1 and offers the next article (until queue file EOF).
+Otherwise,
+.I snntp
+will send the article, using SMTP [RFC 821] text transmission conventions
+(i.e. silly CRLF line terminators, and dot escaping).
+.IP 4.
+.I Snntp
+waits for the remote to say whether the article was successfully
+accepted or not.
+If the answer is negative,
+.I snntp
+will write this article's filename to standard output.
+.PP
+If the communication link should fail (and
+.I snntp
+detects it through a system call error return),
+.I snntp
+will copy to standard output the article filenames of the
+articles that it did not transmit (that is, we don't retransmit
+stuff we've already successfully sent and gotten back an positive
+confirmation that they got it).
+.SH HISTORY
+Based on
+.I nntpxmit
+by
+Erik E. Fair.
+.SH "SEE ALSO"
+.IR ipc (3),
+.IR news (5),
+.IR newssys (5),
+.IR relaynews (8),
+.IR sendnntp (8)
+.br
+.nf
+Internet RFC 977 \- Network News Transfer Protocol (NNTP)
+Internet RFC 1036 \- USENET Article Format standard
+Internet RFC 821 \- Simple Mail Transfer Protocol (SMTP)
+.fi
+.SH BUGS
+.I Snntp
+performs no locking of batch files;
+see
+.IR sendnntp .

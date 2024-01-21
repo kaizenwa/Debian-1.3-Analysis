@@ -1,0 +1,278 @@
+  ____                      _ _       _   _             
+ / ___|___  _ __ ___  _ __ (_) | __ _| |_(_) ___  _ __  
+| |   / _ \| '_ ` _ \| '_ \| | |/ _` | __| |/ _ \| '_ \ 
+| |__| (_) | | | | | | |_) | | | (_| | |_| | (_) | | | |
+ \____\___/|_| |_| |_| .__/|_|_|\__,_|\__|_|\___/|_| |_|
+                     |_|                                
+ ____            _     _                    
+|  _ \ _ __ ___ | |__ | | ___ _ __ ___  ___ 
+| |_) | '__/ _ \| '_ \| |/ _ \ '_ ` _ \/ __|
+|  __/| | | (_) | |_) | |  __/ | | | | \__ \
+|_|   |_|  \___/|_.__/|_|\___|_| |_| |_|___/
+                                            
+
+
+/*****************************************************************************\
+* 				   CONTENTS                                   *
+\*****************************************************************************/
+
+[1] Errors while compiling parsers
+[2] Compiling on DEC alphas
+[3] Compiling on GWM and XPM on HP9000 series 300/400/800 computers
+[4] Undefined function: strcasecmp when linking
+[5] Error message when loading gwm ld: unrecognized option: -p
+[6] Errors on SPARCS (sun4) bus error in (color-make value)
+[7] Error in loading: gwm not linked with Xlib
+[8] On HP machines: /bin/ld: Unsatisfied symbols:   XError (data)
+[9] Error in wl_event.c after line 80
+[10] Type errors in malloc.c
+[11] GWM crashes on a HP/Apollo 68040:
+[12] Compiling on a NeXT with c-Xist:
+[13] Compiling with FLEX instead of LEX
+[14] makdepend complains: includes EXTERN.h more than once!
+[15] runtime WOOL ERROR: Internal error: bus error: (color-make value)
+[16] Undefined function XmbTextPropertyToTextList at link time
+
+
+/*****************************************************************************\
+* 				   DETAILS                                    *
+\*****************************************************************************/
+
+[1] Errors while compiling parsers
+==================================
+
+Gwm can ONLY run with standard lex and yacc, it cannot work with flex, bison,
+byacc or others. If you dont have them (linux, FreeBSD, NetBSD...) do a:
+
+      cp gwm-parsers/lex.yy.c . ; cp gwm-parsers/y.tab.c
+
+and all should work OK.
+
+[2] Compiling on DEC alphas
+===========================
+
+GWM does not run on 64-bit machines where integers are not the same size as
+pointers (DEC alphas, but runs ok on SGI R4000s). Use the -taso flag, or
+compile it on a DEC 5000 and translate the 32-bit binary with the "mx" utility
+
+[3] Compiling on GWM and XPM on HP9000 series 300/400/800 computers
+===================================================================
+
+Makefile for hp300:
+
+XLIBDIR   =
+C_COMPILER= gcc -pipe -traditional
+DEFINES = -DSYSV -DX11R4 -DSECURE -DSTATS -DUSER_DEBUG
+
+Makefile for hp800:
+
+XLIBDIR   =
+LIBS = -lX11R3 hpXError.o
+DEFINES = -DSYSV -DX11R3 -DSECURE -DSTATS -DUSER_DEBUG
+
+------------------------------------------------------------------------------
+
+[4] Undefined function: strcasecmp when linking
+===============================================
+
+add the flag -DNEED_STRCASECMP to the makefile (needed only in the
+subdirectory xpm, actually).
+
+------------------------------------------------------------------------------
+
+[5] Error message when loading gwm ld: unrecognized option: -p
+==============================================================
+ld: unrecognized option: -p
+ld: unrecognized option: -m
+
+in Makefile, change -Lxpm by -L xpm
+
+------------------------------------------------------------------------------
+
+[6] Errors on SPARCS (sun4) bus error in (color-make value)
+===========================================================
+
+* GWM seemed to crash when compiled with -O with SUN's cc
+
+* do NOT compile with the cc flags "-dalign", or use the define -DDOUBLE_ALIGN
+  Symptom: at runtime gwm crashes with message:
+
+      WOOL ERROR: Internal error: bus error
+      [5] (color-make value)
+
+
+------------------------------------------------------------------------------
+
+[7] Error in loading: gwm not linked with Xlib
+==============================================
+
+(a lot of _X... undefined references)
+Might happen, just do a 
+
+      rm -f gwm;make
+
+------------------------------------------------------------------------------
+
+[8] On HP machines: /bin/ld: Unsatisfied symbols:   XError (data)
+=================================================================
+
+change in gwm.c line 34:
+
+extern XErrorHandler XError;
+
+to:
+
+extern int XError();
+
+------------------------------------------------------------------------------
+
+[9] Error in wl_event.c after line 80
+=====================================
+
+add -DNO_STRUCTURE_OFFSETS to DEFINES
+
+------------------------------------------------------------------------------
+
+[10] Type errors in malloc.c
+============================
+malloc.c:286: conflicting types for `malloc'
+wool.h:200: previous declaration of `malloc'
+malloc.c:490: conflicting types for `realloc'
+wool.h:200: previous declaration of `realloc'
+malloc.c:536: conflicting types for `calloc'
+wool.h:200: previous declaration of `calloc'
+
+===> add -DVOID_MALLOC to compile options.
+
+Any other errors: use -DUSE_STANDARD_MALLOC. This bypasses the gwm-provided
+malloc which provided debugging (stats) info, and was much faster than old
+SYSV mallocs, but is no more faster than most modern mallocs. Bypassing GWM
+malloc will get rid of any compiling errors anyways.
+
+------------------------------------------------------------------------------
+
+[11] GWM crashes on a HP/Apollo 68040:
+======================================
+with:
+C source file "malloc.c" line 415
+WOOL ERROR: assertion failed: op -> ov_magic == MAGIC
+GWM: -- cannot decorate windows, aborting
+
+apply this patch:
+
+% diff -c gwm.c.orig gwm.c
+*** gwm.c.orig	Sun Oct 13 14:37:02 1991
+--- gwm.c	Sun Oct 13 14:37:45 1991
+***************
+*** 720,727 ****
+  		}
+  	    }
+  	    GWM_ProcessingExistingWindows = 0;
+! 	    if (children)
+! 		Free((char *) children);
+  	}
+      }END_OF_ALL_SCREENS;
+  }
+--- 720,727 ----
+  		}
+  	    }
+  	    GWM_ProcessingExistingWindows = 0;
+! /*	    if (children)			*/
+! /*		Free((char *) children);	*/
+  	}
+      }END_OF_ALL_SCREENS;
+  }
+
+------------------------------------------------------------------------------
+
+[12] Compiling on a NeXT with c-Xist:
+=====================================
+
+To: colas@mirsa.inria.fr
+Subject: GWM1.7n on NeXT
+Date: Mon, 12 Oct 92 13:33:29 -0400
+From: anderson@sapir.cog.jhu.edu
+
+Colas,
+
+I used to use gwm regularly when I used a Sun - a year ago, though, I
+got rid of my Sun and switched to a NeXT. Until recently, I didn't use
+X of any sort on my NeXT, but I've installed co-Xist and its
+associated development environment now, so I thought I'd bring up gwm
+again. You asked that if people bring up gwm on a new machine, they
+let you know what had to be done to get it to work, so here's a data
+point for you.
+
+I started from the file gwm-1.7n.tar.Z which I found on export. I
+tried using imake to build it but found it too hard to make the
+necessary modifications. The other procedure, with plain make, worked
+fine (after I figured out how to do it).
+
+The version of c-Xist I'm using is 3.0 beta - not yet released, but
+coming out soon and presently in beta test. This is a full
+implementation of X11R5 (the current release version is 2.1.2, based
+on X11R4). I'm running version 3.0 of NeXTstep on a NeXTdimension
+(full color) system. The system software (cc, etc.) is based on gcc
+1.9x: i.e., a pre-release version of gcc2 with lots of
+(undocumented...) NeXT-specific stuff.
+
+I managed to get gwm to compile under this setup with the following
+set of defines:
+
+DEFINES = -DX11R5 -DSECURE -DUSER_DEBUG -DHAS_STRCHR -DDO_NOT_REDEFINE_MALLOC -DNO_STRUCTURE_OFFSETS
+
+Each of the changes from your proposed "vanilla bsd" defines was
+necessary to get some part of gwm to compile. I didn't try
+"-DUSE_STANDARD_MALLOC" instead of "-DDO_NOT_REDEFINE_MALLOC", but at
+least the latter works.
+
+I used plain cc (no "-traditional": that breaks the rather wierd new
+setup of include files under NS3.0, and isn't necesary anyway). The
+only other changes I made in the Make.NeXT file were to put stuff in
+/usr/bin/X11 and /usr/lib/X11 (instead of /usr/local/...) because
+that's where all the co-Xist stuff lives anyway.
+
+I haven't tested it at all extensively, but I do know that it runs and
+seems to behave as it should. Thanks a lot for your efforts. I should
+mention also that once I stopped trying to be clever and just did what
+your directions told me to do, building gwm from this distribution
+turned out to be very straightforward.
+
+Best regards,
+--Steve Anderson
+Dept. of Cognitive Science
+The Johns Hopkins University
+<anderson@sapir.cog.jhu.edu>
+
+------------------------------------------------------------------------------
+
+[13] Compiling with FLEX instead of LEX
+=======================================
+
+use wool.flex intead of wool.lex
+(Code donated by Olaf Kirch <okir@mathematik.th-darmstadt.de>)
+
+------------------------------------------------------------------------------
+
+[14] makdepend complains: includes EXTERN.h more than once!
+===========================================================
+
+That's normal. Gwm uses EXTERN.h and INTERN.h to better manage public/private
+info in .h, which was not intended by makedepend. ignore these messages.
+
+------------------------------------------------------------------------------
+
+[15] runtime WOOL ERROR: Internal error: bus error: (color-make value)
+======================================================================
+
+seems to happen on some SUNs, notably Solaris ones. define:
+      -DUSE_STANDARD_MALLOC
+and recompile EVERYTHING (do a make clean before make)
+
+------------------------------------------------------------------------------
+
+[16] Undefined function XmbTextPropertyToTextList at link time
+==============================================================
+
+You have X11R5 X11 libraries. Upgrade to X11R6, or add the compile flag -DX11R5
+:

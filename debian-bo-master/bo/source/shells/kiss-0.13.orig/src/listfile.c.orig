@@ -1,0 +1,75 @@
+#include "kiss.h"
+
+int listfile (char *name, LsFlags fl)
+{
+    struct stat
+	statbuf;
+    char
+	buf [FILENAMELEN] = { '\0' },
+	tmp [FILENAMELEN];
+    struct passwd
+	*pwd;
+    struct group
+	*grp;
+    struct tm
+	*loctime;
+
+    if (lstat (name, &statbuf) && stat (name, &statbuf))
+	return (warning ("can't stat \"%s\"", name));
+
+    if (fl.longoutput)
+    {
+	sprintf (buf, "%c%c%c%c%c%c%c%c%c %2d",
+		 S_IRUSR & statbuf.st_mode ? 'r' : '-',
+		 S_IWUSR & statbuf.st_mode ? 'w' : '-',
+		 S_IXUSR & statbuf.st_mode ? 'x' : '-',
+		 S_IRGRP & statbuf.st_mode ? 'r' : '-',
+		 S_IWGRP & statbuf.st_mode ? 'w' : '-',
+		 S_IXGRP & statbuf.st_mode ? 'x' : '-',
+		 S_IROTH & statbuf.st_mode ? 'r' : '-',
+		 S_IWOTH & statbuf.st_mode ? 'w' : '-',
+		 S_IXOTH & statbuf.st_mode ? 'x' : '-',
+		 (int) statbuf.st_nlink);
+
+	if ( (pwd = getpwuid (statbuf.st_uid)) )
+	    sprintf (tmp, " %9s", pwd->pw_name);
+	else
+	    sprintf (tmp, " %9d", statbuf.st_uid);
+	strcat (buf, tmp);
+
+	if ( (grp = getgrgid (statbuf.st_gid)) )
+	    sprintf (tmp, " %9s", grp->gr_name);
+	else
+	    sprintf (tmp, " %9d",statbuf.st_gid);
+	strcat (buf, tmp);
+
+	sprintf (tmp, " %9ld", (long) statbuf.st_size);
+	strcat (buf, tmp);
+
+	loctime = localtime (&statbuf.st_mtime);
+	sprintf (tmp, " %2.2d/%2.2d/%2.2d %2.2d:%2.2d ",
+		 loctime->tm_mon, loctime->tm_mday, loctime->tm_year,
+		 loctime->tm_hour, loctime->tm_min);
+	
+	strcat (buf, tmp);
+    }
+
+    strcat (buf, name);
+
+    if (fl.listtype)
+    {
+	if (S_ISDIR (statbuf.st_mode))
+	    strcat (buf, "/");
+	else if (S_ISFIFO (statbuf.st_mode))
+	    strcat (buf, "=");
+	else if (S_ISLNK (statbuf.st_mode))
+	    strcat (buf, "@");
+    }
+
+    if (fl.oneperline)
+	puts (buf);
+    else
+	listoutput (buf);
+
+    return (0);
+}

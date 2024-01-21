@@ -1,0 +1,195 @@
+<!--
+	qts.html
+	Last modification: Tue, 19 Nov 1996 22:58:04 +0200
+	qts.		Quanto tempo stanno	PJ 7: Quanto tempo stanno	Articoli
+  -->
+<br>
+<font size=+2 color="#0000ff">Statistiche degli accessi degli utenti</font>
+<address>
+<p align=right>
+<font size=+0>
+di
+<a href="mailto:luicat@edu-gw.dia.unisa.it">
+Luigi Catuogno</a>
+</p>
+</address>
+
+<multicol cols=2>
+Tempo fa, il gestore di un provider internet, mi chiese di procurargli 
+un programma che gli permettesse di controllare, per intervalli di tempo, il
+numero di connessioni, e i tempi di permanenza "on line" dei clienti.
+<p>
+Iniziai, quasi per istinto, a disegnare un programma in C, e consultavo
+quindi i manuali delle funzioni che mi sarebbero servite: utmp, getutent,  
+etc. rendendomi mano mano conto, che avrei dovuto sudare parecchio, per realizzare
+qualcosa che appariva davvero molto semplice. In definitiva, tutto quello
+che il mio programma doveva fare, viene gia' fatto da un comando di UNIX: last,
+e quindi, tutto quello che dovevo fare era rielaborare l'output di tale comando
+per trarne i dati di cui avevo bisogno.
+<p>
+Per piccole elaborazioni testuali, specie sull'output di altri programmi,
+non conviene l'approccio in C (e lavorare con le farraginose funzioni di
+operazioni su stringa in dotazione a tale linguaggio), e' meglio, e piu'
+divertente, utilizzare la grande quantita' di filtri che fornisce il sistema.
+Da queste considerazioni e' nato questo programmino, che non e', ripeto, nulla
+di formidabile, ma che mostra il sistema migliore, secondo me, di affrontare e
+risolvere questo tipo di problemi.
+<p>
+Il qts (acronimo: Quanto Tempo Stanno), consta di poche righe in awk,
+un geniale filtro programmabile, stranamente pochissimo usato, inglobate in uno
+script bash che non fa altro che interpretare la semplicissima riga di comando.
+
+<p>
+Argomenti di qts sono la coppia Mese (abbreviazione in inglese) Giorno
+di inizio  dell'intervallo temporale che si vuole "analizzare", e
+la coppia Mese/Giorno analoga, che indicano la data di termine dell'intervallo. 
+Entrambi gli estremi sono inclusi. Il programma conserva in un file la coppia
+Mese/Giorno dell'ultima esecuzione. 
+
+<p>
+	Se viene omessa la seconda coppia, si assume come terminale la data 
+corrente, se il comando viene lanciato senza parametri, va a cercare l'ultima
+data di esecuzione, se la trova la usa come iniziale , e utilizza la
+data corrente come finale. Se non e' possibile stabilire una data iniziale, il
+programma segnala un errore.
+
+<p>
+	L'output, organizzato su quattro colonne, rispettivamente: utente,
+numero di connessioni, numero di ore, numero di minuti, e' volutamente scarno,
+in modo da rendere piu' comoda una ulteriore elaborazione. 
+
+<p>
+	Un'ultima cosa va detta sul comando last. Facendo un po' di prove, ho
+appurato che non ce ne sono due versioni che danno lo stesso output. Per qts
+mi sono basato sulla versione di miquels@cistron.nl che c'e' nella distribuzione
+1.1 Debian di Linux, chi dispone di altre versioni, potrebbe avere la
+necessita' di modificare leggermente lo script awk (nella localizzazione dei 
+campi).
+
+</multicol>
+<p>
+Per essere messo in opera, bisogna editare il programma e inserire la
+configurazione nello spazio apposito.
+<p>
+<b>AWKCOM</b> indica l'interprete awk che si sta usando (def. gawk)<br>
+<b>LSTCOM</b> indica il comando last (def. last)<br>
+<b>QTSDIR</b> indica la directory in cui salvare la data dell'ultima esecuzione.. (def. ./  )<br>
+<b>DATEFL</b> indica il nome del file in cui salvare la data dell'ultima esecuzione (def. qts.last)<br>
+<p>
+Detto questo, ecco il codice e buon lavoro.
+<code>
+<pre>
+#!/bin/bash
+# qts v0.2 user's connections statistics               
+# by Luigi Catuogno [luicat@mikonos.dia.unisa.it]  1996
+
+# Config ------------------------------------------------
+
+AWKCOM=gawk
+LSTCOM=last
+QTSDIR=.
+DATEFL=$QTSDIR/qts.last
+
+# --------------------------------------------------------
+   
+if [ $1 ]
+then
+	LM=$1;
+	LN=$2;
+else
+	if [ -e $DATEFL ]
+	then
+		LM=`$AWKCOM '{print $1}' $DATEFL`
+		LN=`$AWKCOM '{print $2}' $DATEFL`
+	else
+		echo "qts: Cannot work without start date" >&2
+		exit;
+	fi
+fi
+
+
+if [ $3 ]
+then
+	CM=$3;
+	CN=$4;
+else
+	CM=`/bin/date +"%b"` 
+	CN=`/bin/date +"%d"` 
+fi
+
+
+$LSTCOM | $AWKCOM -v LSTM=$LM -v LSTN=$LN -v CRTM=$CM -v CRTN=$CN '
+BEGIN	{
+	 v["Jan"]=1;v["Feb"]=2;v["Mar"]=3;
+	 v["Apr"]=4;v["May"]=5;v["Jun"]=6;
+	 v["Jul"]=7;v["Aug"]=8;v["Sep"]=9;
+	 v["Oct"]=10;v["Nov"]=11;v["Dec"]=12;
+	}
+
+	{ 
+	 if (NF==9) 
+	    {
+		flm=4;
+		fln=5;
+	        fts=9;
+	    }
+	 if (NF==10)
+	    {
+		flm=5;
+		fln=6;
+		fts=10;
+	    }
+	if ((v[$flm]<v[CRTM])||((v[$flm]==v[CRTM])&&($fln<=CRTN)))
+	{
+	if ((v[$flm]>v[LSTM])||((v[$flm]==v[LSTM])&&($fln>=LSTN)))
+             	{ 
+		 if (($fts!="in")&&($1!="reboot"))
+			{
+			 unoc[$1]+=1;
+			 unom[$1]+=qmes($fts);
+			 while (unom[$1]>=60)
+				{
+				 unom[$1]-=60;
+				 unoh[$1]++;
+					}
+			 unoh[$1]+=qhes($fts);
+			}
+		}
+	 else exit;
+	}
+	}
+
+END	{
+	 		for (chi in unoc)
+				printf("%-30s\t%d\t%d\t%d\n",chi,unoc[chi],unoh[chi],unom[chi]);
+		
+	}
+
+function qhes(tstr)
+	{
+	 split(tstr,x,":");
+	 split(x[1],y,"(");
+	 if (index(y[2],"+")!=0)
+		{
+	 	 split(y[2],z,"+");
+		 hou=(z[1]*24);
+		 hou+=z[2];
+		}
+	 else
+		{
+		 hou=y[2];
+		}
+	 return hou;
+	}
+
+function qmes(tstr)
+	{
+	 split(tstr,x,":");
+	 split(x[2],y,")");
+	 return y[1];
+	}
+' | sort 
+
+echo	$CM $CN > $DATEFL
+</pre>
+</code>

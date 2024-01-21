@@ -1,0 +1,254 @@
+#
+# Makefile.in for GIST graphics package
+#
+# $Id$
+#
+# @configure_input@
+
+# This flag should be set to whatever your compiler needs to tell it
+# to optimize (-O usually) or debug (-g usually).
+# C_OPTIMIZE = -g
+C_OPTIMIZE = -O
+
+SHELL = /bin/sh
+
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+
+Y_SITE = @Y_SITE@
+Y_HOME = @Y_HOME@
+Y_LIBDIR = $(Y_HOME)/lib
+Y_INCDIR = $(Y_HOME)/h
+
+CC = @CC@
+# HP compiler complains that XImage * can't be cast to struct _XImage *
+# This is either a compiler problem or a problem with Xlib.h
+# Complaint about select arguments is Gist's fault, but hard to fix.
+RANLIB = @RANLIB@
+RM = rm -f
+CP = cp
+
+DEFS = @DEFS@
+CFLAGS = $(C_OPTIMIZE) $(DEFS) -I$(srcdir)
+
+LD_OPTIMIZE = $(C_OPTIMIZE)
+LDOPTS = @LDOPTS@
+LDFLAGS = $(LD_OPTIMIZE) $(LDOPTS)
+
+# The lowest level (last) libraries required on the load line go here.
+# LOWLIBS = -lm -lc            (if Y_LD is not your C compiler)
+LOWLIBS = @LOWLIBS@
+
+# Usage:   $(Y_LD) $(OBJS) $(LIBS)
+Y_LD = $(CC) $(LDFLAGS) -o $@
+
+# See D_NO_XLIB below for how to omit X engines entirely
+XINCLUDE = @XINCLUDE@
+XLOAD = @XLOAD@
+
+# Gist will search for style (.gs) and palette (.gp) files on a
+# directory path consisting of the GISTPATH environment variable
+# (if any), prepended to the following string.  (The value shown here
+# is the default if -UGISTPATH.)  Directory names should be colon
+# delimited, and a leading ~/ will be expanded to the value of the
+# HOME environment variable at runtime.  The current working directory
+# is always searched first, and should not be included in GISTPATH.
+# (The GISTPATH macro is used as a string literal in gread.c, so
+# double quotes are required.)
+D_GISTPATH = '-DGISTPATH="~/Gist:$(Y_SITE)/gist"'
+
+# Use nil version if libm.a does not contain exp10 (for tick.c, draw.c).
+# D_HAS_EXP10 =
+# D_HAS_EXP10 = -DHAS_EXP10
+D_HAS_EXP10 = @D_HAS_EXP10@
+
+# If sizeof(short)==2 and the most significant byte of a short is the
+# first byte (i.e- the machine is a big-endian), use the nil version
+# of D_NOT_CGM_ORDER, else the non-nil version.  Crays and DECs need
+# the non-nil version.  Suns, HPs, and most others, the nil version.
+# D_NOT_CGM_ORDER = -DNOT_CGM_ORDER
+# D_NOT_CGM_ORDER =
+D_NOT_CGM_ORDER = @D_NOT_CGM_ORDER@
+
+# If select is broken (SGI), you will need this to handle X events properly
+# D_USE_POLL =
+# D_USE_POLL = -DUSE_POLL
+D_USE_POLL = @D_USE_POLL@
+
+# If <stdio.h> does not declare cuserid(), you will need this
+# D_CUSERID =
+# D_CUSERID = -DNEED_CUSERID
+D_CUSERID = @D_CUSERID@
+# cuserid may not exist at all
+D_HAS_CUSERID = @D_HAS_CUSERID@
+
+# The bench.c program needs timing routines which differ from os to os.
+# You might have to recode this by hand, or just remove the timer by
+# using the NO_TIMER line.
+# BSD-like machines may need BSD_TIMER; the nil version is suitable
+# for System V and POSIX-compliant OSs.
+# D_TIMER =
+# D_TIMER = -DBSD_TIMER
+# D_TIMER = -DNO_TIMER
+D_TIMER = @D_TIMER@
+
+# See dispas.c - tcgetpgrp function is used to determine whether a
+# process is running in background.  The select function used to dispatch
+# events will wake up and cause a blocking read on input not directed to
+# the process.  (If you can't get this to work, just put in a dummy
+# function and live with the misfeature that backgrounded processes
+# may not work properly.)
+# D_NEED_TCGETPGRP =
+# D_NEED_TCGETPGRP = -DNEED_TCGETPGRP
+D_NEED_TCGETPGRP = @D_NEED_TCGETPGRP@
+D_HAVE_SYS_TERMIOS_H = @D_HAVE_SYS_TERMIOS_H@
+
+# If your compiler complains about memcpy or strncpy prototypes in draw.c
+# you might try the commented version.  Or just ignore the warning.
+# D_SIZE_T = -DSIZE_T_TYPE=int
+D_SIZE_T =
+
+# GIST kernel routines
+GISTOBJS = gist.o tick.o engine.o gtext.o draw.o draw0.o \
+           clip.o gread.o hlevel.o tick60.o gcntr.o
+
+# Use the non-nil version to make a gist which doesn't reference Xlib
+# If you do this, you MUST also (A) remove $(XOBJS) from the line
+# defining ENGINEOBJS and (B) remove dispax.o from the line defining
+# DISPOBJS.  Optionally, instead of (B), you may remove $(DISPOBJS)
+# from the libgist.a target altogether (you probably will have no
+# interest in the Gist event handling machinery if you aren't trying
+# to manage its X windows).
+# D_NO_XLIB = -DNO_XLIB
+# D_NO_XLIB =
+D_NO_XLIB = @D_NO_XLIB@
+
+# Dispatcher routines
+# DISPOBJS = dispat.o dispas.o dispax.o
+# DISPOBJS = dispat.o dispas.o
+# DISPOBJS =
+DISPOBJS = @DISPOBJS@
+
+# simple X windows toolkit required by X engines
+# SKITOBJS = xicky.o xfont.o
+
+# specific GIST engines
+# XOBJS = xfancy.o xbasic.o $(SKITOBJS)
+XOBJS = @XOBJS@
+PSOBJS = ps.o osys.o
+CGMOBJS = cgm.o
+
+# GIST engines to be included in libgist.a
+ENGINEOBJS = $(XOBJS) $(PSOBJS) $(CGMOBJS)
+# ENGINEOBJS = $(PSOBJS) $(CGMOBJS)
+
+HDRS = cgm.h clip.h dispas.h dispat.h dispax.h draw.h engine.h gist.h \
+       gtext.h hlevel.h osys.h ps.h xbasic.h xfancy.h xfont.h xicky.h
+
+
+all:: libgist.a
+
+libgist.a: $(GISTOBJS) $(ENGINEOBJS) $(DISPOBJS) startup
+	ar rc libgist.a $(GISTOBJS) $(ENGINEOBJS) $(DISPOBJS)
+	$(RANLIB) libgist.a
+
+check: bench
+	./bench -check
+
+bench: libgist.a bench.o
+	$(Y_LD) bench.o -L$(srcdir) -lgist $(XLOAD) $(LOWLIBS)
+
+startup:
+	../install-sh 0 ../Yorick/gist
+	$(CP) *.gs *.gp ps.ps ../Yorick/gist
+
+DESTDIR =
+
+install: all installdirs
+	$(CP) *.gs *.gp ps.ps $(DESTDIR)$(Y_SITE)/gist
+	$(CP) $(HDRS) $(DESTDIR)$(Y_INCDIR)
+	$(CP) libgist.a $(DESTDIR)$(Y_LIBDIR)
+	$(RANLIB) $(DESTDIR)$(Y_LIBDIR)/libgist.a
+
+uninstall:
+	$(RM) -r $(DESTDIR)$(Y_SITE)/gist
+	cd $(DESTDIR)$(Y_INCDIR); $(RM) $(HDRS);
+	cd $(DESTDIR)$(Y_LIBDIR); $(RM) libgist.a;
+
+installdirs:
+	../install-sh 0 $(DESTDIR)$(Y_SITE)/gist
+	../install-sh 0 $(DESTDIR)$(Y_LIBDIR)
+
+# TAGS table for Emacs
+tags:
+	etags -tw *.h *.c
+
+# index for vgrind (a pretty C printing routine)
+index:
+	etags -twv *.h *.c >index
+
+clean: tidy
+	$(RM) *.a bench
+
+tidy:
+	$(RM) *.o *~ *.cgm core
+
+distclean: clean
+	$(RM) Makefile
+
+
+
+# Remove TARGET_ARCH nonsense on Suns
+.c.o:
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $<
+
+
+
+# header dependencies, also special compiles for tick.o, draw.o
+
+# draw.h -> gist.h
+# engine.h -> gist.h
+# gtext.h -> gist.h
+# hlevel.h -> gist.h
+# xbasic.h -> xicky.h engine.h (gist.h)
+# xfancy.h -> xbasic.h (xicky.h engine.h gist.h)
+# xfont.h -> gist.h xicky.h
+
+gist.o: gist.h engine.h clip.h
+tick.o: gist.h tick.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(D_HAS_EXP10) -c tick.c
+engine.o: gist.h engine.h draw.h
+gtext.o: gist.h gtext.h
+draw.o: gist.h draw.h gtext.h draw.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(D_HAS_EXP10) $(D_SIZE_T) -c draw.c
+clip.o: clip.h
+gread.o: gist.h gread.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(D_GISTPATH) -c gread.c
+hlevel.o: hlevel.h gist.h xbasic.h xicky.h engine.h hlevel.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(XINCLUDE) $(D_NO_XLIB) -c hlevel.c
+dispat.o: dispat.h osys.h
+DISPAS_DEFS = $(D_NEED_TCGETPGRP) $(D_HAVE_SYS_TERMIOS_H)
+dispas.o: dispat.h dispas.h dispas.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(DISPAS_DEFS) -c dispas.c
+dispax.o: dispat.h dispax.h dispax.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(XINCLUDE) -c dispax.c
+xicky.o: xicky.h xfont.h xicky.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(XINCLUDE) -c xicky.c
+xfont.o: gist.h xicky.h xfont.h xfont.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(XINCLUDE) -c xfont.c
+xbasic.o: gist.h engine.h dispax.h xicky.h xbasic.h gtext.h xbasic.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(XINCLUDE) -c xbasic.c
+xfancy.o: gist.h engine.h xicky.h xbasic.h xfont.h draw.h xfancy.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(XINCLUDE) $(D_HAS_EXP10) -c xfancy.c
+ps.o: gist.h engine.h ps.h gtext.h osys.h
+OSYS_DEFS = $(D_CUSERID) $(D_HAS_CUSERID) $(D_USE_POLL)
+osys.o: osys.h osys.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(OSYS_DEFS) -c osys.c
+cgm.o: gist.h engine.h cgm.h gtext.h osys.h cgm.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(D_NOT_CGM_ORDER) -c cgm.c
+
+bench.o: gist.h engine.h xicky.h xbasic.h xfancy.h dispas.h bench.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(XINCLUDE) $(D_TIMER) $(D_NO_XLIB) -c bench.c

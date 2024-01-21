@@ -1,0 +1,150 @@
+.\" Hey Emacs! This file is -*- nroff -*- source.
+.\"
+.\" This manpage is Copyright (C) 1992 Drew Eckhardt;
+.\"                               1993 Michael Haardt, Ian Jackson.
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\"
+.\" Modified Wed Jul 21 19:36:29 1993, Rik Faith (faith@cs.unc.edu)
+.\" Modified 21 Aug 1994 by Michael Chastain (mec@shell.portal.com):
+.\"   Removed note about old kernel (pre-1.1.44) using wrong id on path.
+.\"
+.\" Traduction 9/10/1996 par Christophe Blaess (ccb@club-internet.fr)
+.\"
+.TH ACCESS 2 "9 Octobre 1996" "Linux 1.2.13" "Manuel du programmeur Linux"
+.SH NOM 
+access \- Verifier les permissions d'acces a un fichier.
+.SH SYNOPSIS
+.nf
+.B #include <unistd.h>
+.sp
+.BI "int access(const char *" pathname ", int " mode );
+.fi
+.SH DESCRIPTION
+.B access
+verifie si le processus serait autorise a lire, ecrire,
+executer, ou tester l'existence d'un fichier (ou d'un autre objet
+appartenant au systeme de fichiers), dont le nom est
+.IR pathname .
+
+Si
+.I pathname
+est un lien symbolique, ce sont les permissions du fichier pointe
+par celui\-ci qui sont testees.
+
+.I mode
+est un masque constitue d'un ou plusieurs arguments lies par un
+OU binaire ( | )
+.BR R_OK ", " W_OK ", " X_OK " et  " F_OK .
+
+Les requetes
+.BR R_OK ", " W_OK " et " X_OK
+servent respectivement a tester la lecture, l'ecriture, et
+l'execution du fichier.
+La requete
+.B F_OK
+teste si la verification d'existence du fichier serait autorisee (ceci
+dependant des permissions des repertoires apparaissant dans le chemin
+.I pathname
+et eventuellement des liens symboliques rencontres sur ce chemin).
+
+Le test est effectue avec les User-ID et Group-ID
+.I reels
+du processus, plutot qu'avec les IDs effectifs qui sont
+utilises lorsque l'on tente l'operation. Ceci permet aux
+programmes Set-UID de determiner les autorisations de l'utilisateur
+ayant invoque le programme.
+
+Seuls les bits d'acces sont verifies, et non pas le contenu du fichier.
+Ainsi si l'ecriture est autorisee dans un repertoire, ceci signifie que
+l'on peut creer des fichiers dans ce repertoire, et non pas que
+l'on puisse y ecrire comme dans un fichier.
+Egalement, un fichier DOS peut etre considere comme executable, alors
+que l'appel systeme
+.BR execve (2)
+echouera evidemment.
+
+.SH "VALEUR RENVOYEE"
+.BR access
+renvoie 0 s'il reussit, ou \-1 s'il echoue, auquel cas
+.I errno
+contient le code d'erreur.
+
+.BR access
+renvoie une erreur si l'un quelconque des types d'acces est refuse,
+meme si les autres sont acceptes.
+.SH ERREURS
+.TP 0.8i
+.B EACCES
+L'acces serait refuse, soit au fichier lui-meme, soit a l'un des 
+repertoires dans
+.IR pathname .
+.TP
+.B EFAULT
+.IR pathname " pointe en dehors de l'espace d'adressage accessible."
+.TP
+.B EINVAL
+.IR mode " etait mal specifie."
+.TP
+.B ENAMETOOLONG
+.IR pathname " est trop long."
+.TP
+.B ENOENT
+Un repertoire contenu dans le
+.I pathname
+aurait ete accessible mais n'existe pas ou est un lien symbolique
+pointant dans le vide.
+.TP
+.B ENOTDIR
+Un element contenu dans le chemin
+.I pathname
+n'est pas un repertoire.
+.TP
+.B ENOMEM
+Pas assez de memoire pour le noyau.
+.TP
+.B ELOOP
+.I pathname
+contient une reference circulaire (a travers un lien
+symbolique).
+.SH EXEMPLE
+.nf
+        #include <stdio.h>
+        #include <unistd.h>
+
+int
+main (void)
+{
+        char * nom_fichier = "/etc/passwd";
+        if (access (nom_fichier, W_OK) == 0) {
+                fprintf (stdout, "Ecriture Ok !");
+                if (getuid() != 0) { /* 0 <=> Super-User */
+                        fprintf (stdout, "Danger !");
+                }
+        }
+        return (0);
+}
+.fi
+.SH "CONFORME A"   
+SVID, AT&T, POSIX, X/OPEN, BSD 4.3
+.SH "VOIR AUSSI"
+.BR stat "(2), " open "(2), " chmod "(2), " chown "(2), "
+.BR setuid "(2), " setgid (2).

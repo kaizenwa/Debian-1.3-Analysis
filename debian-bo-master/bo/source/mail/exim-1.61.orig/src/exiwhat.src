@@ -1,0 +1,71 @@
+#! /bin/sh
+
+# Copyright (c) 1996 University of Cambridge.
+# See the file NOTICE for conditions of use and distribution.
+
+
+# Shell script for seeing what the exim processes are doing. It gets rid
+# of the old process log, then sends SIGUSR1 to all exim processes to get
+# them to write their state to the log. Then it displays the contents of
+# the log.
+
+# The following lines are generated from Exim's configuration file when
+# this source is built into a script, but you can subsequently edit them
+# without rebuilding things, as long are you are careful not to overwrite
+# the script in the next Exim rebuild/install. However, it's best to
+# arrange your build-time configuration file to get the correct values.
+# The variable ps_arg is the argument for the ps command, kill_arg is the
+# argument for the kill command to send SIGUSR1 (at least one OS requires a
+# numeric value), and egrep_arg is the argument for egrep to find the instances
+# of exim in the ps output.
+
+ps_arg=EXIWHAT_PS_ARG
+kill_arg=EXIWHAT_KILL_ARG
+egrep_arg='EXIWHAT_EGREP_ARG'
+
+# Determine where the spool directory is. The strings CONFIGURE_FILE and
+# BIN_DIRECTORY below are replaced by their compile-time settings when
+# this source is build into a script. Search for an exim_path setting
+# in the configure file; otherwise use the bin directory. Call that version
+# of Exim to find the spool directory.
+
+config=CONFIGURE_FILE
+
+# Add code here to redefine "config" if an alternative configuration file
+# should be used in some circumstances.
+
+exim_path=`grep '^[      ]*exim_path' $config | sed 's/.*=[       ]*//'`
+if test "$exim_path" = ""; then exim_path=BIN_DIRECTORY/exim; fi
+spool_directory=`$exim_path -C CONFIGURE_FILE -bP spool_directory | sed 's/.*=[  ]*//'`
+
+# Determine if the log file path is set.
+
+log_file_path=`$exim_path -C CONFIGURE_FILE -bP log_file_path | sed 's/.*=[  ]*//'`
+
+# If log_file_path is empty, then the log that Exim writes when sent the
+# SIGUSR1 signal is called "processlog" in the directory called "log" in the
+# spool directory. Otherwise we fish out the directory from the given path,
+# and also the name of the log.
+
+if [ "$log_file_path" = "" ]; then
+  log=$spool_directory/log/processlog
+else
+  log=`echo $log_file_path | sed 's/%s/process/'`
+fi
+
+# Now do the job.
+
+/bin/rm -f ${log}
+if [ -f ${log} ]; then
+  echo "** Failed to remove ${log}"
+  exit 1
+fi
+
+ps $ps_arg | egrep "$egrep_arg" | cut -c1-6 | sed -e "s/^/kill $kill_arg /" | sh
+
+sleep 1
+
+if [ ! -s ${log} ] ; then echo "No exim process data" ;
+  else cut -c20-999 ${log} ; fi
+
+# End of exiwhat

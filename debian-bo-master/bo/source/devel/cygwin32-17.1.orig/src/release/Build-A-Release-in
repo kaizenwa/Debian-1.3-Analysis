@@ -1,0 +1,167 @@
+#!/usr/latest/bin/make -f
+## 
+## Build a release
+##
+
+### the variable 'host' MUST be set to use this makefile
+
+ifndef host
+error:	
+	@echo "you must set 'host' to use this makefile"
+else
+
+###
+### the rest of this makefile goes here...
+
+## This directory should already exist -- ideally it is where we store
+## all of our releases....
+
+RELEASE_VAULT	:= @@RELEASE_VAULT@@
+
+tree		:= @@TREE@@
+bundle		:= @@BUNDLE@@
+release-date	:= @@RELEASE_DATE@@
+
+cvs-module	:= @@CVS_MODULE@@
+release-tag	:= @@RELEASE_TAG@@
+cvs-tag		:= @@CVS_TAG@@
+
+rooting		:= /usr/cygnus
+
+CVS		:= cvs
+
+ifdef target
+conftarget 	:= -target $(target)
+else
+target		:= $(host)
+endif # target
+
+reldir		:= $(RELEASE_VAULT)/$(release-tag)/$(bundle)
+
+
+hostdir 	:= $(reldir)/$(host)
+archdir 	:= $(hostdir)/$(target)
+gendir		:= $(hostdir)/gen
+
+strsub		:= $(reldir)/src/etc/subst-strings
+
+CLEAN := find $(reldir)/src -name CVS -depth -exec rm -rf {} \;
+
+
+### prefixes is used as an argument to configure
+###
+### install-prefixes is used as an argument to make, and should NOT
+### have the leading dashed to the option name
+
+prefixes 	:= -prefix=$(rooting)/$(release-tag) \
+		   -exec_prefix=$(rooting)/$(release-tag)/H-$(host)
+install-prefixes:= prefix=$(archdir) exec_prefix=$(archdir)/H-$(host)
+
+
+##############
+###
+### these rules apply to the object tree, which is VERY dependent on
+### the host and target of the build.  
+
+### $RELEASE_VAULT/$tag/$bundle/src
+###	                    $host/
+###                               $target
+###                               gen  	  # for the machine generated files
+###					  # in the release					  
+###
+###
+
+### NOTE NOTE NOTE
+###
+###                  This layout requires use of GNU tar to create the
+###                  tapes.  We need to check and see that all of the
+###                  native tar's that we care about can read the tapes we
+###                  generate..... where's the roving tape drive today?
+###
+### NOTE NOTE NOTE
+
+ifeq ($(target),native)
+targetstr=$(host)
+else 
+targetstr=$(target)
+endif
+
+all: build-toolchain
+
+source-vault: $(reldir)/.$(tree)-packed
+
+tagged-tree: $(reldir)/.$(tree)-tagged
+
+build-toolchain: source-vault generated-files
+	tar cvhf - \
+		-C $(reldir)/src CYGNUS COPYING COPYING.LIB \
+		-C $(archdir) . | compress -vV > $(archdir).tar.Z
+	@echo
+	@echo "the $(bundle) bundle is built for $(host) $(target)"
+	@echo
+
+generated-files: $(archdir)/Install
+	
+
+$(archdir)/Install : $(reldir)/src/etc/Install.in $(strsub)
+	$(strsub) $(host) $(targetstr) \
+	  $(release-date) $(bundle) \
+	  $(archdir) \
+          $(reldir)/src \
+          $< $@
+	chmod a+x $@
+
+$(hostdir)/.$(target)-installed: $(hostdir)/.$(target)-dir-exists
+	cd $(archdir)/objdir; make $(MF) install-no-fixedincludes install-info $(install-prefixes)
+	touch $@
+
+$(hostdir)/.$(target)-built: $(hostdir)/.$(target)-configured
+	cd $(archdir)/objdir; make $(MF) all info
+	touch $@
+
+$(hostdir)/.$(target)-configured: $(hostdir)/.$(target)-dir-exists $(reldir)/.$(tree)-clean
+	[ -d $(archdir)/objdir ] || mkdir $(archdir)/objdir
+	cd $(archdir)/objdir; $(reldir)/src/configure $(host) $(conftarget) $(prefixes) -srcdir=$(reldir)/src
+	touch $@
+
+$(hostdir)/.$(target)-dir-exists: 
+	[ -d $(RELEASE_VAULT) ] || mkdir $(RELEASE_VAULT)
+	[ -d $(RELEASE_VAULT)/$(release-tag) ] || mkdir $(RELEASE_VAULT)/$(release-tag)
+	[ -d $(reldir) ] || mkdir $(reldir)
+	[ -d $(reldir)/$(host) ] || mkdir $(reldir)/$(host)
+	[ -d $(reldir)/$(host)/gen ] || mkdir $(reldir)/$(host)/gen
+	[ -d $(reldir)/$(host)/$(target) ] || mkdir $(reldir)/$(host)/$(target)
+	touch $@
+
+
+##############
+###
+### these rules apply to the source tree, which is common to all versions
+### of any given release
+###
+### there should be no host-dependent code in this section, only that
+### a working cvs be available in $(CVS).  Perhaps a shell script
+### could be made available that worked via rsh to cirdan or cygint or
+### some such machine known to have cvs available.  Or just make CVS work
+### everywhere.
+###
+
+$(reldir)/.$(tree)-packed : $(reldir)/.$(tree)-clean
+	tar cvhf - -C $(reldir) src | compress -vV > $(reldir)/src.tar.Z
+	touch $@
+
+$(reldir)/.$(tree)-clean : $(reldir)/.$(tree)-co 
+	$(CLEAN)
+	chmod -R go=u,u+w,go-w $(reldir)/src
+	touch $@
+
+$(reldir)/.$(tree)-co: 
+	[ -d $(reldir) ] || mkdir -p $(reldir)
+	if [ -n "$(cvs-tag)" ] ; then \
+	  cd $(reldir); $(CVS) co -P -r $(cvs-tag) $(cvs-module) > $(reldir)/.$(tree)-files && mv $(tree) src ; \
+	else \
+	  exit 1 ; \
+	fi
+	touch $@
+
+endif  # host

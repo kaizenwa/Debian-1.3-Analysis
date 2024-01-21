@@ -1,0 +1,99 @@
+/*							__polevll.c
+ *							__p1evll.c
+ *
+ *	Evaluate polynomial
+ *
+ *
+ *
+ * SYNOPSIS:
+ *
+ * int N;
+ * long double x, y, coef[N+1], __polevl[];
+ *
+ * y = __polevll( x, coef, N );
+ *
+ *
+ *
+ * DESCRIPTION:
+ *
+ * Evaluates polynomial of degree N:
+ *
+ *                     2          N
+ * y  =  C  + C x + C x  +...+ C x
+ *        0    1     2          N
+ *
+ * Coefficients are stored in reverse order:
+ *
+ * coef[0] = C  , ..., coef[N] = C  .
+ *            N                   0
+ *
+ *  The function __p1evll() assumes that coef[N] = 1.0 and is
+ * omitted from the array.  Its calling arguments are
+ * otherwise the same as polevll().
+ *
+ * SPEED:
+ *
+ * In the interest of speed, there are no checks for out
+ * of bounds arithmetic.  This routine is used by most of
+ * the functions in the library.  Depending on available
+ * equipment features, the user may wish to rewrite the
+ * program in microcode or assembly language.
+ *
+ */
+
+#ifdef __STDC__
+long double __polevll( long double, long double *, int );
+long double __p1evll( long double, long double *, int );
+#else
+long double __polevll();
+long double __p1evll();
+#endif
+
+/* Polynomial evaluator:
+ *  P[0] x^n  +  P[1] x^(n-1)  +  ...  +  P[n]
+ */
+#ifdef __STDC__
+long double __polevll( long double x, long double *P, int n)
+#else
+long double __polevll( x, P, n )
+long double x;
+long double *P;
+int n;
+#endif
+{
+register long double y;
+
+y = *P++;
+do
+	{
+	y = y * x + *P++;
+	}
+while( --n );
+return(y);
+}
+
+
+
+/* Polynomial evaluator:
+ *  x^n  +  P[0] x^(n-1)  +  P[1] x^(n-2)  +  ...  +  P[n]
+ */
+#ifdef __STDC__
+long double __p1evll( long double x, long double *P, int n)
+#else
+long double __p1evll( x, P, n )
+long double x;
+long double *P;
+int n;
+#endif
+{
+register long double y;
+
+n -= 1;
+y = x + *P++;
+do
+	{
+	y = y * x + *P++;
+	}
+while( --n );
+return( y );
+}

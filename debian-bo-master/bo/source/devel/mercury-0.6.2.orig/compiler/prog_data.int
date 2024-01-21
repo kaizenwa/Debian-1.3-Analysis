@@ -1,0 +1,177 @@
+:- module prog_data.
+:- interface.
+:- import_module hlds_pred.
+:- import_module list, varset, term, std_util.
+:- type (prog_data:message_list) == (mercury_builtin:list((std_util:pair(string, (mercury_builtin:term))))).
+:- type (prog_data:program)
+	--->	module((prog_data:module_name), (prog_data:item_list)).
+:- type (prog_data:item_list) == (mercury_builtin:list((prog_data:item_and_context))).
+:- type (prog_data:item_and_context) == (std_util:pair((prog_data:item), (mercury_builtin:term__context))).
+:- type (prog_data:item)
+	--->	pred_clause((varset:varset), (prog_data:sym_name), (mercury_builtin:list((mercury_builtin:term))), (prog_data:goal))
+	;	func_clause((varset:varset), (prog_data:sym_name), (mercury_builtin:list((mercury_builtin:term))), (mercury_builtin:term), (prog_data:goal))
+	;	type_defn((varset:varset), (prog_data:type_defn), (prog_data:condition))
+	;	inst_defn((varset:varset), (prog_data:inst_defn), (prog_data:condition))
+	;	mode_defn((varset:varset), (prog_data:mode_defn), (prog_data:condition))
+	;	module_defn((varset:varset), (prog_data:module_defn))
+	;	pred((varset:varset), (prog_data:sym_name), (mercury_builtin:list((prog_data:type_and_mode))), (std_util:maybe((hlds_data:determinism))), (prog_data:condition))
+	;	func((varset:varset), (prog_data:sym_name), (mercury_builtin:list((prog_data:type_and_mode))), (prog_data:type_and_mode), (std_util:maybe((hlds_data:determinism))), (prog_data:condition))
+	;	pred_mode((varset:varset), (prog_data:sym_name), (mercury_builtin:list((prog_data:(mode)))), (std_util:maybe((hlds_data:determinism))), (prog_data:condition))
+	;	func_mode((varset:varset), (prog_data:sym_name), (mercury_builtin:list((prog_data:(mode)))), (prog_data:(mode)), (std_util:maybe((hlds_data:determinism))), (prog_data:condition))
+	;	pragma((prog_data:pragma_type))
+	;	nothing.
+:- type (prog_data:type_and_mode)
+	--->	type_only((prog_data:(type)))
+	;	type_and_mode((prog_data:(type)), (prog_data:(mode))).
+:- type (prog_data:pragma_type)
+	--->	c_header_code(string)
+	;	c_code(string)
+	;	c_code((prog_data:c_is_recursive), (prog_data:sym_name), (hlds_pred:pred_or_func), (mercury_builtin:list((prog_data:pragma_var))), (varset:varset), string)
+	;	memo((prog_data:sym_name), int)
+	;	inline((prog_data:sym_name), int)
+	;	obsolete((prog_data:sym_name), int)
+	;	export((prog_data:sym_name), (mercury_builtin:list((prog_data:(mode)))), string)
+	;	source_file(string)
+	;	fact_table((prog_data:sym_name), (prog_data:arity), string).
+:- type (prog_data:c_is_recursive)
+	--->	recursive
+	;	non_recursive.
+:- type (prog_data:pragma_var)
+	--->	pragma_var((mercury_builtin:var), string, (prog_data:(mode))).
+:- type (prog_data:goal) == (std_util:pair((prog_data:goal_expr), (mercury_builtin:term__context))).
+:- type (prog_data:goal_expr)
+	--->	','((prog_data:goal), (prog_data:goal))
+	;	true
+	;	{ ';'((prog_data:goal), (prog_data:goal)) }
+	;	fail
+	;	not((prog_data:goal))
+	;	some((prog_data:vars), (prog_data:goal))
+	;	all((prog_data:vars), (prog_data:goal))
+	;	implies((prog_data:goal), (prog_data:goal))
+	;	equivalent((prog_data:goal), (prog_data:goal))
+	;	if_then((prog_data:vars), (prog_data:goal), (prog_data:goal))
+	;	if_then_else((prog_data:vars), (prog_data:goal), (prog_data:goal), (prog_data:goal))
+	;	call((prog_data:sym_name), (mercury_builtin:list((mercury_builtin:term))))
+	;	unify((mercury_builtin:term), (mercury_builtin:term)).
+:- type (prog_data:goals) == (mercury_builtin:list((prog_data:goal))).
+:- type (prog_data:vars) == (mercury_builtin:list((mercury_builtin:var))).
+:- type (prog_data:type_defn)
+	--->	du_type((prog_data:sym_name), (mercury_builtin:list((prog_data:type_param))), (mercury_builtin:list((prog_data:constructor))))
+	;	uu_type((prog_data:sym_name), (mercury_builtin:list((prog_data:type_param))), (mercury_builtin:list((prog_data:(type)))))
+	;	eqv_type((prog_data:sym_name), (mercury_builtin:list((prog_data:type_param))), (prog_data:(type)))
+	;	abstract_type((prog_data:sym_name), (mercury_builtin:list((prog_data:type_param)))).
+:- type (prog_data:constructor) == (std_util:pair((prog_data:sym_name), (mercury_builtin:list((prog_data:constructor_arg))))).
+:- type (prog_data:constructor_arg) == (std_util:pair(string, (prog_data:(type)))).
+:- type (prog_data:type_param) == (mercury_builtin:term).
+:- type (prog_data:(type)) == (mercury_builtin:term).
+:- type (prog_data:tvar) == (mercury_builtin:var).
+:- type (prog_data:tvarset) == (varset:varset).
+:- type (prog_data:tsubst) == (map:map((prog_data:tvar), (prog_data:(type)))).
+:- type (prog_data:condition)
+	--->	true
+	;	where((mercury_builtin:term)).
+:- type (prog_data:inst_defn)
+	--->	eqv_inst((prog_data:sym_name), (mercury_builtin:list((prog_data:inst_param))), (prog_data:(inst)))
+	;	abstract_inst((prog_data:sym_name), (mercury_builtin:list((prog_data:inst_param)))).
+:- type (prog_data:inst_param) == (mercury_builtin:term).
+:- type (prog_data:(inst))
+	--->	any((prog_data:uniqueness))
+	;	free
+	;	free((prog_data:(type)))
+	;	bound((prog_data:uniqueness), (mercury_builtin:list((prog_data:bound_inst))))
+	;	ground((prog_data:uniqueness), (std_util:maybe((prog_data:pred_inst_info))))
+	;	not_reached
+	;	inst_var((mercury_builtin:var))
+	;	defined_inst((prog_data:inst_name))
+	;	abstract_inst((prog_data:sym_name), (mercury_builtin:list((prog_data:(inst))))).
+:- type (prog_data:uniqueness)
+	--->	shared
+	;	unique
+	;	mostly_unique
+	;	clobbered
+	;	mostly_clobbered.
+:- type (prog_data:pred_inst_info)
+	--->	pred_inst_info((hlds_pred:pred_or_func), (mercury_builtin:list((prog_data:(mode)))), (hlds_data:determinism)).
+:- type (prog_data:bound_inst)
+	--->	functor((hlds_data:cons_id), (mercury_builtin:list((prog_data:(inst))))).
+:- type (prog_data:inst_name)
+	--->	user_inst((prog_data:sym_name), (mercury_builtin:list((prog_data:(inst)))))
+	;	merge_inst((prog_data:(inst)), (prog_data:(inst)))
+	;	unify_inst((prog_data:is_live), (prog_data:(inst)), (prog_data:(inst)), (prog_data:unify_is_real))
+	;	ground_inst((prog_data:inst_name), (prog_data:is_live), (prog_data:uniqueness), (prog_data:unify_is_real))
+	;	shared_inst((prog_data:inst_name))
+	;	mostly_uniq_inst((prog_data:inst_name))
+	;	typed_ground((prog_data:uniqueness), (prog_data:(type)))
+	;	typed_inst((prog_data:(type)), (prog_data:inst_name)).
+:- type (prog_data:is_live)
+	--->	live
+	;	dead.
+:- type (prog_data:unify_is_real)
+	--->	real_unify
+	;	fake_unify.
+:- type (prog_data:mode_defn)
+	--->	eqv_mode((prog_data:sym_name), (mercury_builtin:list((prog_data:inst_param))), (prog_data:(mode))).
+:- type (prog_data:(mode))
+	--->	'->'((prog_data:(inst)), (prog_data:(inst)))
+	;	user_defined_mode((prog_data:sym_name), (mercury_builtin:list((prog_data:(inst))))).
+:- type (prog_data:module_defn)
+	--->	module((prog_data:module_name))
+	;	interface
+	;	implementation
+	;	imported
+	;	external((prog_data:sym_name_specifier))
+	;	opt_imported
+	;	end_module((prog_data:module_name))
+	;	export((prog_data:sym_list))
+	;	import((prog_data:sym_list))
+	;	use((prog_data:sym_list)).
+:- type (prog_data:sym_list)
+	--->	sym((mercury_builtin:list((prog_data:sym_specifier))))
+	;	pred((mercury_builtin:list((prog_data:pred_specifier))))
+	;	func((mercury_builtin:list((prog_data:func_specifier))))
+	;	cons((mercury_builtin:list((prog_data:cons_specifier))))
+	;	op((mercury_builtin:list((prog_data:op_specifier))))
+	;	adt((mercury_builtin:list((prog_data:adt_specifier))))
+	;	type((mercury_builtin:list((prog_data:type_specifier))))
+	;	module((mercury_builtin:list((prog_data:module_specifier)))).
+:- type (prog_data:sym_specifier)
+	--->	sym((prog_data:sym_name_specifier))
+	;	typed_sym((prog_data:typed_cons_specifier))
+	;	pred((prog_data:pred_specifier))
+	;	func((prog_data:func_specifier))
+	;	cons((prog_data:cons_specifier))
+	;	op((prog_data:op_specifier))
+	;	adt((prog_data:adt_specifier))
+	;	type((prog_data:type_specifier))
+	;	module((prog_data:module_specifier)).
+:- type (prog_data:pred_specifier)
+	--->	sym((prog_data:sym_name_specifier))
+	;	name_args((prog_data:sym_name), (mercury_builtin:list((prog_data:(type))))).
+:- type (prog_data:func_specifier) == (prog_data:cons_specifier).
+:- type (prog_data:cons_specifier)
+	--->	sym((prog_data:sym_name_specifier))
+	;	typed((prog_data:typed_cons_specifier)).
+:- type (prog_data:typed_cons_specifier)
+	--->	name_args((prog_data:sym_name), (mercury_builtin:list((prog_data:(type)))))
+	;	name_res((prog_data:sym_name_specifier), (prog_data:(type)))
+	;	name_args_res((prog_data:sym_name), (mercury_builtin:list((prog_data:(type)))), (prog_data:(type))).
+:- type (prog_data:adt_specifier) == (prog_data:sym_name_specifier).
+:- type (prog_data:type_specifier) == (prog_data:sym_name_specifier).
+:- type (prog_data:op_specifier)
+	--->	sym((prog_data:sym_name_specifier))
+	;	fixity((prog_data:sym_name_specifier), (prog_data:fixity)).
+:- type (prog_data:fixity)
+	--->	infix
+	;	prefix
+	;	postfix
+	;	binary_prefix
+	;	binary_postfix.
+:- type (prog_data:sym_name_specifier)
+	--->	name((prog_data:sym_name))
+	;	name_arity((prog_data:sym_name), (prog_data:arity)).
+:- type (prog_data:sym_name)
+	--->	unqualified(string)
+	;	qualified((prog_data:module_specifier), string).
+:- type (prog_data:module_specifier) == string.
+:- type (prog_data:module_name) == string.
+:- type (prog_data:arity) == int.

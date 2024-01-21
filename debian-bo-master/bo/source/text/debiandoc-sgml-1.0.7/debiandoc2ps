@@ -1,0 +1,111 @@
+#!/bin/sh
+set -e
+
+usageversion () {
+	echo >&2 \
+'debiandoc2ps Copyright (C)1996 Ian Jackson
+This is free software; see the GNU General Public Licence
+version 2 or later for copying conditions.  There is NO warranty.
+
+usage: debiandoc2ps [options] <filename>.sgml
+options:  -k              keep intermediate files
+          -p<papersize>   generate output for named paper size
+          -O              send output to stdout instead of <filename>.ps
+          -1              do not do 2-up printing'
+}
+
+usageerror () { echo >&2 "debiandoc2lout: $@"; usageversion; exit 2; }
+
+nup=true
+stdout=false
+keep=false
+keepopt=''
+
+while [ $# != 0 ]
+do
+	case "$1" in
+	-k)	keep=true; keepopt="-k"	;;
+	-O)	stdout=true		;;
+	-1)	nup=false		;;
+	-p*)	PAPERCONF="`echo \"x$1\" | sed -e 's/^x-p//'`"; export PAPERCONF ;;
+	-?*)	usageerror "unknown option \`$1'" ;;
+	--)	shift; break		;;
+	*)	break			;;
+	esac
+	shift
+done
+
+usageerror () { echo >&2 "debiandoc2@@@type@@@: $@"; usageversion; exit 2; }
+
+[ $# = 1 ] || usageerror "need exactly one input filename"
+
+case "$1" in
+-)	louti="-"
+	stdout=true
+	if $keep; then usageerror "-k not allowed with input from stdin"; fi
+	;;
+-?*)	louti="./$1"
+	bn="`basename \"$1\" .sgml`"
+	;;
+*)	louti="$1"
+	bn="`basename \"$1\" .sgml`"
+	;;
+esac
+
+case "$bn" in -*) bn="./$bn" ;; esac
+
+rc=2
+if $keep
+then
+	tf="$bn"
+	lp="$bn"
+else
+	tfd=/tmp/$$
+	trap 'rm -r $tfd; exit $rc' 0
+	mkdir "$tfd"
+	tf="$tfd/y"
+	lp="y"
+fi
+
+debiandoc2lout $keepopt -O "$louti" >"$tf.lout"
+
+(
+	if $nup
+	then
+		exec >"$tf.ps1"
+	else
+		$stdout || exec >"$bn.ps"
+	fi
+	set -e
+	$keep || cd $tfd
+	set +e
+	lout "$lp.lout" >/dev/null 2>&1
+	lout "$lp.lout" >/dev/null 2>&1
+	set -e
+	lout "$lp.lout"
+)
+
+if ! $nup; then rc=0; exit 0; fi
+
+perl -e '
+	while (<>) {
+		if (m/^\%\%Page: /) {
+			print(<<END) || die $!;
+%%Page: 0 0
+%%BeginPageSetup
+%%PageResources:
+%%EndPageSetup
+END
+			last;
+		}
+		print || die $!;
+	}
+	do { print || die $!; } while (<>);
+	close(STDOUT) || die $!;
+' <"$tf.ps1" >"$tf.ps1x"
+
+$stdout || exec >"$bn.ps"
+
+psnup -p"`paperconf -n`" -2 <"$tf.ps1x"
+
+rc=0

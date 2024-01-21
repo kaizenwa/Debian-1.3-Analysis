@@ -1,0 +1,92 @@
+dnl -*- sh -*-
+AC_INIT(src/slrn.c)
+JD_INIT
+JD_ANSI_CC
+
+dnl the next macro requires a pathname relative to the src dir
+AC_CONFIG_AUX_DIR(autoconf)
+AC_PROG_MAKE_SET
+AC_PROG_INSTALL
+
+# determine X include and needed libs
+AC_PATH_XTRA
+
+#Check these header since they cause trouble
+AC_CHECK_HEADERS( \
+stdlib.h \
+unistd.h \
+memory.h \
+fcntl.h \
+malloc.h \
+termios.h \
+sys/socket.h \
+sys/wait.h \
+netinet/in.h \
+arpa/inet.h \
+)
+
+AC_HEADER_DIRENT
+
+AC_TYPE_MODE_T
+AC_TYPE_PID_T
+AC_TYPE_UID_T
+
+AC_CHECK_FUNCS(\
+memset \
+memcpy \
+putenv \
+getcwd \
+getdomainname \
+sigaction \
+sigemptyset \
+sigprocmask \
+sigaddset \
+siglongjmp
+)
+
+AC_CACHE_CHECK(for domain in /etc/resolv.conf, slrn_cv_domain,
+[if test -f /etc/resolv.conf; then
+	slrn_cv_domain=`(grep "^domain" /etc/resolv.conf ||
+	                 grep "^search" /etc/resolv.conf) |
+			awk '{ print [$]2 }' | head -1`
+ fi
+ if test -z "$slrn_cv_domain"; then
+	slrn_cv_domain=no
+ fi
+])
+
+if test "$slrn_cv_domain" != no; then
+	AC_DEFINE(USE_DOMAIN_NAME)
+	AC_DEFINE_UNQUOTED(MY_DOMAIN_NAME, "${slrn_cv_domain}")
+fi
+
+
+JD_SET_OBJ_SRC_DIR
+JD_TERMCAP
+JD_FIND_SLANG
+JD_GCC_WARNINGS
+JD_GET_MODULES(src/modules.lis)
+JD_CREATE_MODULE_ORULES
+
+AC_CONFIG_HEADER(src/sysconf.h:src/config.hin)
+AC_OUTPUT(Makefile:autoconf/Makefile.in src/Makefile)
+
+JD_CREATE_ORULE(chkslang)
+
+JD_CREATE_ORULE(sltcp)
+JD_CREATE_ORULE(nntplib)
+JD_CREATE_EXEC_RULE(slrnpull)
+
+JD_APPEND_RULES(src/Makefile)
+
+if test "$slrn_cv_domain" != no; then
+  echo ""
+  echo "Your DOMAIN appears to be: $slrn_cv_domain"
+  echo "If this is not correct, edit src/sysconf.h!!!"
+fi
+
+echo ""
+echo "For some INSTALLATION options,  edit src/Makefile."
+echo "For INEWS, LOCAL SPOOL, GROUPLENS, SLANG, ... support, edit src/slrnfeat.h"
+echo ""
+

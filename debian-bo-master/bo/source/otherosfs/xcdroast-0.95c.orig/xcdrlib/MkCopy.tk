@@ -1,0 +1,3786 @@
+# Module: MkCopy.tk
+# 4.3.96 T.Niederreiter
+# 
+# External called functions:
+# - mkcopy { w }: creates the copy-menu 
+#
+
+# Creates the Copy-CD-Menu
+
+proc mkcopy { w } {
+global XCDR_SOURCE_CDROM	
+global XCDR_IMAGE_MNTPNT
+global XCDR_DEST_WRITER_DEV
+
+	log $w "entering Copy CD"
+
+	# Draw header-bar
+	label $w.l -text "COPY CD" -relief sunken -borderwidth 2 -anchor c
+	pack $w.l -fill x -expand 1 -ipady 10 -pady 5
+
+	# Create Devices-Setup
+	tixLabelFrame $w.devs -label Devices-Setup 
+	set w1 [$w.devs subwidget frame]
+	pack $w.devs -expand 1 -fill x
+
+	frame $w1.1
+	tixLabelWidget $w1.1.readl -label "Read-Device : " \
+		-options {label.width 25 label.anchor e}
+	message $w1.1.readt -anchor w -width 250 -relief groove
+	$w1.1.readt configure -text $XCDR_SOURCE_CDROM
+	pack $w1.1.readl -side left
+	pack $w1.1.readt -side left -expand 1 -fill x
+
+	frame $w1.2
+	tixLabelWidget $w1.2.imgl -label "Image-Device : " \
+		-options {label.width 25 label.anchor e}
+	message $w1.2.imgt -anchor w -width 250 -relief groove  
+	
+	global TMP_imgprt_id
+	set TMP_imgprt_id $w1.2.imgt
+	updateselimagetextbox
+
+	# get the text from the messagebox and append the mountpoint
+	set tmptxt [$w1.2.imgt cget -text]
+ 	append tmptxt "\nMountpoint: $XCDR_IMAGE_MNTPNT"
+	$w1.2.imgt configure -text $tmptxt
+	
+	pack $w1.2.imgl -side left
+	pack $w1.2.imgt -side left -expand 1 -fill x
+
+	frame $w1.3
+	tixLabelWidget $w1.3.writel -label "Write-Device : " \
+		-options {label.width 25 label.anchor e}
+	message $w1.3.writet -anchor w -width 250 -relief groove
+	$w1.3.writet configure -text $XCDR_DEST_WRITER_DEV
+	pack $w1.3.writel -side left
+	pack $w1.3.writet -side left -fill x -expand 1 
+	
+	pack $w1.1 $w1.2 $w1.3 -side top -expand 1 -fill x
+
+	# Tile the window, create a left and a right frame
+	frame $w.m
+	frame $w.m.l
+	frame $w.m.r
+	pack $w.m.l $w.m.r -side left
+	pack $w.m
+
+	# Create notebook and set background to gray
+	tixNoteBook $w.m.l.nb -ipadx 6 -ipady 6
+	$w.m.l config -bg gray
+	$w.m.l.nb subwidget nbframe config -backpagecolor gray
+
+	# Add pages in notebook
+	$w.m.l.nb add data-mode -label "Data"
+	$w.m.l.nb add audio-mode -label "Audio/Mixed"
+	pack $w.m.l.nb -expand 1 -fill both -padx 5 -pady 5 -side top
+
+	# Create first page
+	set f [$w.m.l.nb subwidget data-mode]
+	mkdata-menu $f
+
+	# Create second page
+	set f [$w.m.l.nb subwidget audio-mode]
+	mkaudio-menu $f 
+
+	# Create the Information-Windows
+	tixLabelFrame $w.m.r.cdinfo -label CD-Information 
+	set w2 [$w.m.r.cdinfo subwidget frame]
+	pack $w.m.r.cdinfo -expand 1 -fill both
+	tixScrolledListBox $w2.b -scrollbar auto -options {
+		listbox.font 8x13 
+		listbox.width 25 
+		listbox.height 6
+	}		
+	# Set scrollbar-width
+	$w2.b.vsb configure -width 10
+	$w2.b.hsb configure -width 10
+	pack $w2.b -expand 1 -fill both
+
+	tixLabelFrame $w.m.r.imginfo -label Image-Information 
+	set w3 [$w.m.r.imginfo subwidget frame]
+	pack $w.m.r.imginfo -expand 1 -fill both
+	tixScrolledListBox $w3.b -scrollbar auto -options {
+		listbox.font 8x13 
+		listbox.width 25 
+		listbox.height 6 
+	}		
+	# Set scrollbar-width
+	$w3.b.vsb configure -width 10
+	$w3.b.hsb configure -width 10
+	pack $w3.b -expand 1 -fill both
+
+	updatelistboxes $w2.b $w3.b $w
+
+	# Create button box
+	tixButtonBox $w.box -orientation horizontal
+	$w.box add rescan -text "Rescan" -command "copy:rescan_cmd $w $w2.b $w3.b" 
+	$w.box add exit -text "Cancel" -command "copy:exit_cmd $w" 
+	pack $w.box -fill x -expand 1
+ 
+}
+
+proc copy:rescan_cmd { w w1 w2 } {
+
+	updatelistboxes $w1 $w2 $w
+}
+
+proc copy:exit_cmd { w } {
+
+	destroy $w
+}
+
+# Update the information-listboxes
+# w1 is the name of the cd-infobox, w2 the name of the image-infobox
+
+proc updatelistboxes { w1 w2 w } {
+
+	# Delete old contents of boxes
+	$w1 subwidget listbox delete 0 end
+	$w2 subwidget listbox delete 0 end
+	
+	updatecdinfobox $w1 $w
+	updateimginfobox $w2 $w
+}
+
+
+# Creates the entries in the cd-infobox
+
+proc updatecdinfobox { w1 w } {
+	
+
+	if { [checkcd] } {
+		# CD in drive
+		set cdtoclist [getcdinfo]
+
+		set type [lindex $cdtoclist 0]
+		set label [lindex $cdtoclist 1]
+		set nrtracks [lindex $cdtoclist 3]
+
+		# pre-select correct notebook-page in menu
+		if { $type == "Audio" } {
+			$w.m.l.nb raise audio-mode
+		} \
+		elseif { $type == "ISO-Mixed-Mode" } {
+#			$w.m.l.nb raise mixed-mode
+			$w.m.l.nb raise audio-mode
+		} else {
+			$w.m.l.nb raise data-mode
+		}	 
+		  
+		$w1 subwidget listbox insert 0 \
+			"Type: $type" "Label: $label" "Tracks:"
+	
+		for { set i 1 } { $i <= $nrtracks } { incr i } {
+			set trktype [lindex $cdtoclist [expr 5*$i+2]]
+			set trksize [lindex $cdtoclist [expr 5*$i+3]]
+
+			if { $trktype == "Data" } {
+				$w1 subwidget listbox insert end \
+					"$i: $trktype  ($trksize MB)"
+			} else {
+				$w1 subwidget listbox insert end \
+					"$i: $trktype ($trksize)"
+			}
+		}
+	} else {
+		# CD not in drive
+		$w1 subwidget listbox insert 0 \
+			"" "" "     No CD in drive!"  
+	}
+}
+
+
+# Creates the entries in the image-infobox
+
+proc updateimginfobox { w2 w } {
+global XCDR_IMAGE_PART
+global XCDR_IMAGE_MNTPNT
+
+
+	# Update mount-table
+	# (perhaps the user unmounted or mounted directories manually)
+	updatemountinfo
+
+	set imgstatus [CheckImagePartition $w]
+	switch $imgstatus {
+		0 {
+			# Unknown Partition, not mounted
+			$w2 subwidget listbox insert 0 \
+			"Type: Unknown" "Label: N/A" "Tracks:"
+		}
+
+		1 {
+			# ISO9660-Image on Partition, not mounted
+			set label [getisolabel $XCDR_IMAGE_PART]
+			set size [getisosize $XCDR_IMAGE_PART]
+			set size [expr $size/1024/1024]
+
+			$w2 subwidget listbox insert 0 \
+			"Type: ISO9660-Data" "Label: $label" "Tracks:" \
+			"1: Data  ($size MB)"
+
+		}
+
+		2 {
+			# Ext2-Partition, mounted on mountpoint
+			$w2 subwidget listbox insert 0 \
+			"Type: Ext2-Partition" "Files:"
+
+			# analyse directory-contents
+			set rawlst ""
+			catch { set rawlst [glob $XCDR_IMAGE_MNTPNT/*.raw] }
+			set rawlist [split $rawlst]
+
+			set cddalst ""
+			catch { set cddalst [glob $XCDR_IMAGE_MNTPNT/*.cdda] }
+			set cddalist [split $cddalst]
+
+			set infolst ""
+			catch { set infolst [glob $XCDR_IMAGE_MNTPNT/*.info] }
+			set infolist [split $infolst]			
+
+			set runnr 1
+			foreach i $rawlist {
+				set name [file tail $i]
+				set size [file size $i]
+				set size [expr $size/1024/1024]
+
+				$w2 subwidget listbox insert end \
+				"$runnr: $name ($size MB)"
+				incr runnr
+			}
+			foreach i $cddalist {
+				set name [file tail $i]
+				set size [getaudiosize $i]
+
+				$w2 subwidget listbox insert end \
+				"$runnr: $name ($size)"
+				incr runnr
+			}
+		}
+	}
+}
+
+# Draws the Data-Menu-page
+
+proc mkdata-menu { f } {
+
+	button $f.b1 -text "Read Image" -command { spawnsubwindow readimagedialog .readimg .copy }
+	button $f.b2 -text "Verify Image" -command { spawnsubwindow verifyimagedialog .verifyimg .copy }
+	button $f.b3 -text "Write Image" -command { spawnsubwindow writeimagedialog .writeimg .copy }
+	button $f.b4 -text "Verify Burned Image" -command { verify2imagedialog .verifyimg .copy }
+
+	pack $f.b1 $f.b2 $f.b3 $f.b4 -fill x
+}
+
+# Draws the Audio-Menu-page
+ 
+proc mkaudio-menu { f } {
+
+	button $f.b1 -text "Read Tracks (Data/Audio)" -command { spawnsubwindow readaudiodialog .readaudio .copy }
+	button $f.b2 -text "Verify Data-Track" -command { spawnsubwindow verifydatatrackdialog .verifydata .copy }
+	button $f.b3 -text "Delete Tracks" -command { spawnsubwindow delaudiodialog .delaudio .copy }
+	button $f.b4 -text "Play Audio-Tracks" -command { spawnsubwindow playaudiodialog .playaudio .copy }
+	button $f.b5 -text "Write Tracks" -command { spawnsubwindow writeaudiodialog .writeaudio .copy }
+	button $f.b6 -text "Verify Burned Data-Track" -command { verify2datadialog .verifydata .copy }
+
+	pack $f.b1 $f.b2 $f.b4 $f.b3 $f.b5 $f.b6 -fill x
+}
+
+# Read-Image-Dialog
+
+proc readimagedialog { w } {
+global XCDR_SOURCE_CDROM
+global XCDR_IMAGE_PART
+global TMP_DESTNAME
+global TMP_DEST
+global NONISO
+global remount_active
+
+	# This is needed for the "file"-radiobutton. If you press this
+	# button, and its needed to format the partition, this value
+	# is used to find out if the programm itself triggered the 
+	# button or the user. The programm invokes the button to 
+	# ensure mounting after formatting.
+	set remount_active 0
+
+	set blkname [ convertnametoblkdevice $XCDR_SOURCE_CDROM ]
+
+	lower $w
+	if {[checkifready $w] == 1} {
+		destroy $w
+		return
+	}
+	
+	if {[checkifaudio] == 1 } {
+		Msg_NoDataCD .ndcd $w
+		destroy $w
+		return
+	}
+
+	if {[checkifiso $blkname] == 0 } {
+		Msg_NoISOCD .nisocd $w
+		set NONISO 1
+	} else {
+		set NONISO 0
+	}
+
+	raise $w
+
+        # Draw header-bar
+        label $w.l -text "READ IMAGE" -relief sunken -borderwidth 2 -anchor c
+        pack $w.l -fill x -expand 1 -ipady 10 -pady 5
+
+
+	if { $NONISO == 0 } {
+		set imgspace [expr [ getisosize $blkname ]/1024/1024]
+	} else {
+		set imgspace [expr [ getnonisosize ]/1024/1024] 
+		if { $imgspace == 0 } {
+			Msg_ImpossibleNonIso .iniso $w
+			destroy $w
+			return
+		}
+	}
+	set imgfree [ getfreeimgspace ]
+
+	frame $w.1
+	tixLabelWidget $w.1.imgsize -label "Image Size : " \
+		-options { label.width 15 label.anchor e }
+	message $w.1.imgsizeval -width 150 -relief sunken -borderwidth 1 \
+		-text "$imgspace MB"
+	tixLabelWidget $w.1.imgfree -label "Free Space : " \
+		-options { label.width 15 label.anchor e }
+	message $w.1.imgfreeval -width 150 -relief sunken -borderwidth 1 \
+		-text "$imgfree MB"
+
+	pack $w.1 -fill x -expand 1 -padx 10 -pady 10
+	pack $w.1.imgsize -side left 
+	pack $w.1.imgsizeval -expand 1 -fill x -side left
+	pack $w.1.imgfree -side left
+	pack $w.1.imgfreeval -expand 1 -fill x -side left
+
+	frame $w.2
+	tixLabelWidget $w.2.l -label "Write Image to: " \
+		-options { label.width 20 label.anchor e }
+	radiobutton $w.2.b1 -text "Partition" -variable TMP_DEST \
+		-value "part" -command "selectedpart $w"
+	radiobutton $w.2.b2 -text "File" -variable TMP_DEST \
+		-value "file" -command "selectedfile $w"
+	pack $w.2 -expand 1 -fill x -padx 10
+	pack $w.2.l $w.2.b1 $w.2.b2 -side left
+
+	frame $w.3
+
+	tixLabelEntry $w.3.imgfname -disabledforeground gray \
+		-options {
+			label.width 20 label.anchor e
+			entry.width 15 entry.textVariable TMP_DESTNAME 
+		}
+	pack $w.3 -fill x -expand 1 -padx 10 -pady 10
+	pack $w.3.imgfname -side left -fill x -expand 1
+
+	# set default-image-name
+	if { $TMP_DESTNAME == "" } {
+		set TMP_DESTNAME "image1.raw"
+	}
+	# Bind to Return in entry-widget the action to update the free-size
+	bind $w.3.imgfname.frame.entry <Return> \
+		"updatefreesize $w.1.imgfreeval"
+
+	# Trigger default button "partition" if image is not mounted,
+	# else trigger "file" 
+	if { [getmountpnt $XCDR_IMAGE_PART] == "" } {
+		$w.2.b1 invoke
+	} else {
+		$w.2.b2 invoke
+	}
+
+
+	tixButtonBox $w.box -orientation horizontal
+	$w.box add start -text "Start" -command "spawnsubwindow readimagedoit .read_doit .readimg" 
+	$w.box add cancel -text "Cancel" -command ".copy.box.rescan invoke; destroy $w"
+
+	pack $w.box -fill x -expand 1
+
+	# If non-iso-cd, don't allow writing to partition
+	if { $NONISO == 1 } {
+		$w.2.b1 configure -state disabled
+		$w.2.b2 invoke
+	}
+
+}
+
+
+# Update the freesize-display...called by <Return> in image-name-entry
+# Also looks if the new image-file will overwrite an old one.
+
+proc updatefreesize { w } {
+global TMP_DESTNAME
+global TMP_DEST
+global XCDR_IMAGE_PART
+global XCDR_IMAGE_MNTPNT
+global TMP_freespace 
+
+	# If a file with the same name already exist on the image-partition,
+	# then add its size with free space, because it will be
+	# overwritten
+
+	if { $TMP_DEST == "file" } {
+		set imgfree [ getfreeimgspace ]
+
+		if { [ file exists $XCDR_IMAGE_MNTPNT/$TMP_DESTNAME ] } {
+			set filesize [ file size $XCDR_IMAGE_MNTPNT/$TMP_DESTNAME ]
+		} else {
+			set filesize 0
+		}
+		set filesize [expr $filesize/1024/1024]
+		set newsize [expr $imgfree+$filesize]
+
+		$w configure -text "$newsize MB"
+		set TMP_freespace $newsize
+	} else {
+		set imgfree [ getfreeimgspace ]
+		$w configure -text "$imgfree MB"
+		set TMP_freespace $imgfree
+	}
+}	
+
+
+# This procedure is called when the user presses the "Partition"-Button
+# in the Read-Image-Menu
+
+proc selectedpart { w } {
+global XCDR_IMAGE_PART
+global TMP_DEST 
+
+	$w.3.imgfname configure -state disabled 
+
+	# Is the image-partition mounted? If yes umount it...
+	if { [getmountpnt $XCDR_IMAGE_PART] != "" } {
+		set stat [Msg_MustUmountImage .selpart $w]
+		if { $stat == 0 } { ;# Ok 
+			set mstat [doumount $XCDR_IMAGE_PART]
+			if { $mstat == 0 } { ; # umount failed
+				Msg_UmountImageFail .selpartfail $w 
+				# Invoke file-button
+				$w.2.b2 invoke
+			} else {
+				Msg_Umounted .umnt $w $XCDR_IMAGE_PART 
+			}
+		} else { ;# Cancel
+			$w.2.b2 invoke
+		}
+	}	
+	# Update free-space display
+	updatefreesize $w.1.imgfreeval
+}
+
+
+# This procedure is called when the user presses the "File"-Button
+# in the Read-Image-Menu
+
+proc selectedfile { w } {
+global XCDR_IMAGE_PART
+global XCDR_IMAGE_MNTPNT
+global NONISO
+global remount_active
+
+	$w.3.imgfname configure -state normal 
+
+	# Is the image-partition mounted? If not mount it...
+	if { [getmountpnt $XCDR_IMAGE_PART] == "" } {
+
+		# Is this a remount? If yes, don't ask the user for
+		# confirmation 
+		if { $remount_active == 0 } {
+			set stat [Msg_MustMountImage .selfile $w]
+		} else {
+			set stat 0 	;# Simulate Ok
+		}
+
+		if { $stat == 0 } { 	;# Ok 
+			set mstat [domountext2 $XCDR_IMAGE_PART $XCDR_IMAGE_MNTPNT]
+			if { $mstat == 0 } { ; # mount failed
+				set fstat [Msg_MountImageFail .selfilefail $w]
+				if { $fstat == 0 } { ;# Format
+					set fout [makeformat $XCDR_IMAGE_PART $w]
+					if { $fout == 0 } {
+						Msg_FormatFailed .frmtfail $w $XCDR_IMAGE_PART
+						exit
+					} else {
+						# remount (or try to)
+						set remount_active 1
+						$w.2.b2 invoke
+					}
+				} else { ;# Cancel
+					# Don't allow noniso-images on partition
+					if { $NONISO == 1 } {
+						destroy $w
+						return 
+					} else {
+					# Invoke partition-button
+						$w.2.b1 invoke
+					}
+				}
+			} else { 	;# Mount ok
+				Msg_Mounted .dmnt $w $XCDR_IMAGE_PART $XCDR_IMAGE_MNTPNT
+			}
+		} else { ;# Cancel
+			# Don't allow noniso-images on partition
+			if { $NONISO == 1 } {
+				destroy $w
+				return 
+			} else {
+				$w.2.b1 invoke
+			}
+		}
+	}	
+	set remount_active 0
+	# Update free-space display
+	updatefreesize $w.1.imgfreeval
+}
+
+
+# Format image-partition and show a please-wait-window
+
+proc makeformat { dev old } {
+global XCDR_IMAGE_PART
+global CDRICO
+
+	set new .format
+
+	$old configure -cursor watch
+	catch { destroy $new }
+	toplevel $new
+	wm title $new "X-CD-Roast"
+	wm iconbitmap $new @$CDRICO
+	grab $new 
+	set oldFocus [focus]
+	focus $new
+
+	.format configure -cursor watch
+	label $new.l -text "Formatting Image-Partition"
+	label $new.l2 -text "Please wait"
+	pack $new.l $new.l2 -padx 10 -pady 10
+	update
+	doformat $dev 
+	destroy $new
+
+	catch { focus $oldFocus }
+	$old configure -cursor ""
+
+	log $old "formatted Image-Partition $XCDR_IMAGE_PART"
+}
+
+
+# Update the process bar $canv to $percent
+# If clean is set to 1 then the canvas is cleaned first
+# If clean is set to 2 then the canvas-bar is fully redrawn.
+
+proc drawbar { canv percent clean } {
+
+	if { $percent == "" } return
+
+	if { $clean == 1 } {
+		$canv create rectangle 0 0 305 22 -fill gray95 -outline gray95
+	}
+
+	if { $clean != 2 } {
+		$canv create rectangle [expr 3*($percent)+1] 4 \
+				[expr 3*($percent+1)+1] 21 -fill black
+	} else {
+		$canv create rectangle 1 4 \
+				[expr 3*($percent+1)+1] 21 -fill black
+	}
+
+	# raise the percent-text, so it won't be overwritten by the bar
+	$canv raise pertext
+	$canv itemconfigure pertext -text "$percent%"
+}
+
+
+# Do the reading of the image, display a process bar
+
+proc readimagedoit { w } {
+global MYDD
+global XCDR_SOURCE_CDROM
+global XCDR_IMAGE_PART
+global XCDR_IMAGE_MNTPNT
+global TMP_DEST TMP_DESTNAME
+global TMP_freespace 
+global NONISO
+global pipe tmpw waitforready outval
+
+	# This variables must be global, because the fileevent-command
+	# can't handle local-variables
+
+	# Sets the image-destination
+	if { $TMP_DEST == "file" } {
+		# Image to file
+		set imgfile [ file tail $TMP_DESTNAME]
+		set imagedest "$XCDR_IMAGE_MNTPNT/$imgfile"
+	} else {
+		# Image to partition
+		set imagedest $XCDR_IMAGE_PART
+	}
+
+	set waitforready 0
+
+	set blkname [ convertnametoblkdevice $XCDR_SOURCE_CDROM ]
+        if { $NONISO == 0 } {
+		set nrblocks [expr [ getisosize $blkname ]/2048]
+        } else {
+                set nrblocks [expr [ getnonisosize ]/2048] 
+        }
+
+
+	# Check if enough space
+	set spaceneeded [expr $nrblocks/512]
+	if { $spaceneeded > $TMP_freespace } {
+		lower $w
+		set stat [Msg_NotEnoughSpace .nospace $w]
+		if { $stat == 0 } { 	;# Cancel
+			destroy $w
+			return
+		}
+		raise $w
+	}
+
+	log $w "Read-Image to $imagedest, $nrblocks blocks"
+
+	set cmd "$MYDD $blkname $imagedest $nrblocks"
+
+	log $w "Executing: $cmd"
+
+	set pipe [open "|$cmd" r+]
+	
+	label $w.l -text "Reading Image... Please wait"
+	canvas $w.c -height 20 -width 303 -borderwidth 1 -relief sunken \
+		-background gray95
+	pack $w.l $w.c -padx 10 -pady 10
+
+	$w.c create text 160 14 -text "0%" -fill gray50 -tag pertext
+
+        tixButtonBox $w.box -orientation horizontal
+        $w.box add cancel -text "Cancel" -command {
+		set waitforready 2 
+		catch { close $pipe }
+	}
+	pack $w.box -fill x -expand 1
+
+	set tmpw $w.c
+	fileevent $pipe readable {
+		global pipe tmpw waitforready outval
+		set outval [gets $pipe] 
+
+		if { $outval == "" } { 
+			set waitforready 1; catch { close $pipe }
+		}
+                if { [string index $outval 0] == "R" || 
+		     [string index $outval 0] == "E" } {
+                        set outval ""
+                        set waitforready 3; catch { close $pipe }
+		}
+                if { [string index $outval 0] == "W" } {
+                        set outval ""
+                        set waitforready 4; catch { close $pipe }
+		}
+		if { $outval == "end" } { 
+			set outval 100
+			set waitforready 1; catch { close $pipe }
+		}
+		drawbar $tmpw $outval 0
+	}	
+
+	tkwait variable waitforready
+
+	#we are done with reading now...
+	if { $waitforready == 1 } {
+		if { $outval == 100 } {
+			$w.l configure -text "Image successfully read."
+			log $w "Read-Image: OK"
+		} else {
+			$w.l configure -text "Some error occured!!!"
+			log $w "Read-Image: Some error occured"
+		}
+	} elseif { $waitforready == 2 } {
+		$w.l configure -text "Read Image aborted!"	
+		log $w "Read-Image: aborted"
+	} elseif { $waitforready == 3 } {
+		$w.l configure -text "Read-Error!!"	
+		log $w "Read-Image: read-error"
+	} elseif { $waitforready == 4 } {
+		$w.l configure -text "Write-Error!!"	
+		log $w "Read-Image: write-error"
+	}
+
+	$w.box.cancel configure -text "Ok" -command "destroy $w" -width 5
+	sound 1
+
+	# Clear the global variables
+	unset pipe tmpw waitforready
+}
+
+
+# Verify-Image-Dialog
+
+proc verifyimagedialog { w } {
+global XCDR_SOURCE_CDROM
+global XCDR_IMAGE_PART
+global XCDR_IMAGE_MNTPNT
+global TMP_DESTNAME
+global TMP_DEST
+global NONISO
+
+	set blkname [ convertnametoblkdevice $XCDR_SOURCE_CDROM ]
+
+	lower $w
+	if {[checkifready $w] == 1} {
+		destroy $w
+		return
+	}
+	
+	if {[checkifaudio] == 1 } {
+		Msg_NoDataCD .ndcd $w
+		destroy $w
+		return
+	}
+        if {[checkifiso $blkname] == 0 } {
+                set NONISO 1
+        } else {
+                set NONISO 0
+        }
+
+
+	raise $w
+
+        # Draw header-bar
+        label $w.l -text "VERIFY IMAGE" -relief sunken -borderwidth 2 -anchor c
+        pack $w.l -fill x -expand 1 -ipady 10 -pady 5
+
+        if { $NONISO == 0 } {
+                set imgspace [expr [ getisosize $blkname ]/1024/1024]
+        } else {
+                set imgspace [expr [ getnonisosize ]/1024/1024] 
+		if { $imgspace == 0 } {
+			Msg_ImpossibleNonIso .iniso $w
+			destroy $w
+			return
+		}
+        }
+
+	frame $w.1
+	tixLabelWidget $w.1.imgsize -label "Image Size : " \
+		-options { label.width 20 label.anchor e }
+	message $w.1.imgsizeval -width 150 -relief sunken -borderwidth 1 \
+		-text "$imgspace MB"
+
+	pack $w.1 -fill x -expand 1 -padx 10 -pady 10
+	pack $w.1.imgsize -side left 
+	pack $w.1.imgsizeval -expand 1 -fill x -side left
+
+	frame $w.2
+	tixLabelWidget $w.2.l -label "Verify Image on: " \
+		-options { label.width 20 label.anchor e }
+	radiobutton $w.2.b1 -text "Partition" -variable TMP_DEST \
+		-value "part" -command "selectedverifypart $w"
+	radiobutton $w.2.b2 -text "File" -variable TMP_DEST \
+		-value "file" -command "selectedverifyfile $w"
+	pack $w.2 -expand 1 -fill x -padx 10
+	pack $w.2.l $w.2.b1 $w.2.b2 -side left
+
+	frame $w.3
+
+	tixComboBox $w.3.imgfname -disabledforeground gray \
+		-editable true -dropdown true -variable TMP_DESTNAME \
+		-selectmode immediate \
+		-options {
+			label.width 20 
+			label.anchor e
+			listbox.height 5
+			entry.width 15 
+		}
+
+	pack $w.3 -fill x -expand 1 -padx 10 -pady 10
+	pack $w.3.imgfname -side left -fill x -expand 1
+
+	# analyse directory-contents
+	set rawlst ""
+	catch { set rawlst [glob $XCDR_IMAGE_MNTPNT/*.raw] }
+	set rawlist [split $rawlst]
+	foreach i $rawlist {
+		set name [file tail $i]
+		$w.3.imgfname insert end "$name"
+
+		# If this filename was selected in the read-image-box
+		# also select it now.
+		if { $name == $TMP_DESTNAME } {
+			tixSetSilent $w.3.imgfname $name
+		}
+	}
+	# If there is only one image-file in the directory, select it
+	if { [llength $rawlist] == 1 } {
+		tixSetSilent $w.3.imgfname [file tail $rawlist]
+	}
+
+
+	# Trigger default button "partition" if image is not mounted,
+	# else trigger "file" 
+	if { [getmountpnt $XCDR_IMAGE_PART] == "" } {
+		$w.2.b1 invoke
+	} else {
+		$w.2.b2 invoke
+	}
+
+	tixButtonBox $w.box -orientation horizontal
+	$w.box add start -text "Start" -command "spawnsubwindow verifyimagedoit .verify_doit .verifyimg" 
+	$w.box add cancel -text "Cancel" -command "destroy $w"
+
+	pack $w.box -fill x -expand 1
+}
+
+
+# This procedure is called when the user presses the "Partition"-Button
+# in the Verify-Image-Menu
+
+proc selectedverifypart { w } {
+global XCDR_IMAGE_PART
+
+	$w.3.imgfname configure -state disabled 
+
+	# Is the image-partition mounted? 
+	if { [getmountpnt $XCDR_IMAGE_PART] != "" } {
+		Msg_CantVerifyPartition .selverifypart .verifyimg
+
+		# Press File-Button
+		$w.2.b2 invoke
+	}
+}
+
+		
+# This procedure is called when the user presses the "File"-Button
+# in the Verify-Image-Menu
+
+proc selectedverifyfile { w } {
+global XCDR_IMAGE_PART
+
+	$w.3.imgfname configure -state normal 
+
+	# Is the image-partition mounted? 
+	if { [getmountpnt $XCDR_IMAGE_PART] == "" } {
+		Msg_CantVerifyFile .selverifyfile .verifyimg
+
+		# Press Partition-Button
+		$w.2.b1 invoke
+		
+	}	
+}
+
+
+# Do the verify of the image
+
+proc verifyimagedoit { w } {
+global MYCMP
+global XCDR_SOURCE_CDROM
+global XCDR_IMAGE_PART
+global XCDR_IMAGE_MNTPNT
+global XCDR_DEST_WRITER_DEV
+global TMP_DEST TMP_DESTNAME
+global NONISO
+global pipe tmpw waitforready
+
+	# This variables must be global, because the fileevent-command
+	# can't handle local-variables
+
+	# Sets the image-destination
+	if { $TMP_DEST == "file" } {
+		# Image to file
+		set imgfile [ file tail $TMP_DESTNAME]
+		set imagedest "$XCDR_IMAGE_MNTPNT/$imgfile"
+	} elseif { $TMP_DEST == "part" } {
+		# Image to partition
+		set imagedest $XCDR_IMAGE_PART
+	} elseif { $TMP_DEST == "quick" } {
+		# Image on CD-R
+		set imagedest [ convertnametoblkdevice $XCDR_DEST_WRITER_DEV ]
+	} else {
+                puts "This should never happen!"
+                exit;
+	}
+
+	set waitforready 0
+
+	set blkname [ convertnametoblkdevice $XCDR_SOURCE_CDROM ]
+        if { $NONISO == 0 } {
+                set nrblocks [expr [ getisosize $blkname ]/2048]
+        } else {
+                set nrblocks [expr [ getnonisosize ]/2048] 
+        }
+
+	log $w "Verify-Image to $imagedest, $nrblocks blocks"
+
+	set cmd "$MYCMP $blkname $imagedest $nrblocks"
+
+	log $w "Executing: $cmd"
+
+	set pipe [open "|$cmd" r+]
+	
+	label $w.l -text "Verifing Image... Please wait"
+	canvas $w.c -height 20 -width 303 -borderwidth 1 -relief sunken \
+		-background gray95
+	pack $w.l $w.c -padx 10 -pady 10
+
+	$w.c create text 160 14 -text "0%" -fill gray50 -tag pertext
+
+        tixButtonBox $w.box -orientation horizontal
+        $w.box add cancel -text "Cancel" -command {
+		set waitforready 2 
+		catch { close $pipe }
+	}
+	pack $w.box -fill x -expand 1
+
+	set tmpw $w.c
+	fileevent $pipe readable {
+		global pipe tmpw waitforready out
+		set out [gets $pipe] 
+
+		if { $out == "" } { 
+			set waitforready 3; catch { close $pipe }
+		}
+		if { [string index $out 0] == "F" } {
+			set out ""
+			set waitforready 3; close $pipe	
+		}
+		if { $out == "end" } { 
+			set out 100
+			set waitforready 1; close $pipe 
+		}
+		drawbar $tmpw $out 0
+	}	
+
+	tkwait variable waitforready
+
+	#we are done with reading now...
+	if { $waitforready == 1 } {
+		$w.l configure -text "Verify ok, no errors found!"
+		log $w "Verify-Image: OK"
+	} elseif { $waitforready == 2 } {
+		$w.l configure -text "Verify Image aborted!"	
+		log $w "Verify-Image: aborted"
+	} else {
+		$w.l configure -text "Verify failed!"	
+		log $w "Verify-Image: failed"
+	}
+
+	$w.box.cancel configure -text "Ok" -command "destroy $w" -width 5
+	sound 1
+
+	# Clear the global variables
+	unset pipe tmpw waitforready
+}
+
+
+# Write-Image-Dialog
+
+proc writeimagedialog { w } {
+global XCDR_IMAGE_PART
+global XCDR_IMAGE_MNTPNT
+global TMP_DESTNAME
+global TMP_DEST
+global cd_type
+global DUMMY EJECT PADDATA
+
+	if { [ info exists cd_type ] == 0  } {
+		set cd_type 74
+	}
+
+        # Draw header-bar
+        label $w.l -text "WRITE IMAGE" -relief sunken -borderwidth 2 -anchor c
+        pack $w.l -fill x -expand 1 -ipady 10 -pady 5
+
+	frame $w.6
+	tixLabelWidget $w.6.type -label "CD-Recordable-Type: " \
+		-options { label.width 20 label.anchor e }
+	radiobutton $w.6.b1 -text "74 min ( 650 MB )" -variable cd_type -value 74
+
+	pack $w.6 -fill x -expand 1 -padx 10 
+	pack $w.6.type $w.6.b1 -side left
+
+	frame $w.5
+	tixLabelWidget $w.5.type \
+		-options { label.width 20 label.anchor e }
+	radiobutton $w.5.b2 -text "63 min ( 553 MB )" -variable cd_type -value 63
+
+	pack $w.5 -fill x -expand 1 -padx 10 
+	pack $w.5.type $w.5.b2 -side left
+
+	frame $w.1
+	tixLabelWidget $w.1.imgsize -label "Image Size : " \
+		-options { label.width 20 label.anchor e }
+	message $w.1.imgsizeval -width 150 -relief sunken -borderwidth 1 \
+		-text "0 MB"
+
+	pack $w.1 -fill x -expand 1 -padx 10 -pady 10
+	pack $w.1.imgsize -side left 
+	pack $w.1.imgsizeval -expand 1 -fill x -side left
+
+	frame $w.2
+	tixLabelWidget $w.2.l -label "Write from: " \
+		-options { label.width 20 label.anchor e }
+	radiobutton $w.2.b1 -text "Partition" -variable TMP_DEST \
+		-value "part" -command "selectedwritepart $w"
+	radiobutton $w.2.b2 -text "File" -variable TMP_DEST \
+		-value "file" -command "selectedwritefile $w 0"
+	pack $w.2 -expand 1 -fill x -padx 10
+	pack $w.2.l $w.2.b1 $w.2.b2 -side left
+
+	frame $w.3
+
+	tixComboBox $w.3.imgfname -disabledforeground gray \
+		-editable true -dropdown true -variable TMP_DESTNAME \
+		-selectmode immediate \
+		-command "selectedwritefile $w" \
+		-options {
+			label.width 20 
+			label.anchor e
+			listbox.height 5
+			entry.width 15 
+		}
+
+	pack $w.3 -fill x -expand 1 -padx 10 -pady 10
+	pack $w.3.imgfname -side left -fill x -expand 1
+
+	# analyse directory-contents
+	set rawlst ""
+	catch { set rawlst [glob $XCDR_IMAGE_MNTPNT/*.raw] }
+	set rawlist [split $rawlst]
+
+	set match 0
+	foreach i $rawlist {
+		set name [file tail $i]
+		$w.3.imgfname insert end "$name"
+
+		# If this filename was selected in the read-image-box
+		# also select it now.
+		if { $name == $TMP_DESTNAME } {
+			tixSetSilent $w.3.imgfname $name
+		 	set match 1	
+		}
+	}
+	# No match in list, so delete the TMP_DESTNAME
+	if { $match == 0 } {
+		$w.3.imgfname configure -disablecallback 1
+		set TMP_DESTNAME ""
+		$w.3.imgfname configure -disablecallback 0
+	}
+
+	# If there is still no image-file selected, select the first 
+	if { $TMP_DESTNAME == "" && [llength $rawlist] >= 1 } {
+		tixSetSilent $w.3.imgfname [file tail [lindex $rawlist 0]]
+	}
+
+	# Trigger default button "partition" if image is not mounted,
+	# else trigger "file" 
+	if { [getmountpnt $XCDR_IMAGE_PART] == "" } {
+		$w.2.b1 invoke
+	} else {
+		$w.2.b2 invoke
+	}
+	
+
+	tixLabelFrame $w.4 -label "Additional Options"
+	set w1 [$w.4 subwidget frame]
+	pack $w.4 -expand 1 -fill x -padx 10 -pady 10
+
+	frame $w1.4
+	tixLabelWidget $w1.4.l -label "Simulation-Write: " \
+		-options {label.width 20 label.anchor e}
+	checkbutton $w1.4.b -variable DUMMY -anchor w
+	pack $w1.4 -expand 1 -fill x -padx 10 
+	pack $w1.4.l $w1.4.b -side left 
+
+	# if yamaha then we must ALWAYS eject
+	if ![checkifyamaha] {
+		frame $w1.5
+		tixLabelWidget $w1.5.l -label "Eject after write: " \
+			-options {label.width 20 label.anchor e}
+		checkbutton $w1.5.b -variable EJECT -anchor w
+		pack $w1.5 -expand 1 -fill x -padx 10 
+		pack $w1.5.l $w1.5.b -side left 
+	} else {
+		set EJECT 1
+	}
+
+	frame $w1.6
+	tixLabelWidget $w1.6.l -label "Pad Data-Track: " \
+		-options {label.width 20 label.anchor e}
+	checkbutton $w1.6.b -variable PADDATA -anchor w
+	pack $w1.6 -expand 1 -fill x -padx 10 
+	pack $w1.6.l $w1.6.b -side left 
+
+	tixButtonBox $w.box -orientation horizontal
+	$w.box add start -text "Start" -command "spawnsubwindow writeimagedoit .write_doit $w" 
+	$w.box add cancel -text "Cancel" -command "destroy $w"
+
+	pack $w.box -fill x -expand 1
+}
+
+# This procedure is called when the user presses the "Partition"-Button
+# in the Write-Image-Menu
+
+proc selectedwritepart { w } {
+global XCDR_IMAGE_PART
+
+	$w.3.imgfname configure -state disabled 
+
+	# Update Image-size-display for image on partition
+	set isosize [expr [ getisosize $XCDR_IMAGE_PART ]/1024/1024]
+	$w.1.imgsizeval configure -text "$isosize MB"
+
+	# Is the image-partition mounted? 
+	if { [getmountpnt $XCDR_IMAGE_PART] != "" } {
+		Msg_CantWritePartition .selwritepart $w 
+
+		# Press File-Button
+		$w.2.b2 invoke
+	}
+}
+
+		
+# This procedure is called when the user presses the "File"-Button
+# in the Write-Image-Menu
+
+proc selectedwritefile { w tmp } {
+global XCDR_IMAGE_PART
+global XCDR_IMAGE_MNTPNT
+global TMP_DESTNAME 
+
+	$w.3.imgfname configure -state normal 
+
+	# Update Image-size-display for image on file
+	set isosize [expr [ file size $XCDR_IMAGE_MNTPNT/$TMP_DESTNAME ]/1024/1024]
+	$w.1.imgsizeval configure -text "$isosize MB"
+
+	# Is the image-partition mounted? 
+	if { [getmountpnt $XCDR_IMAGE_PART] == "" } {
+		Msg_CantWriteFile .selwritefile $w 
+
+		# Press Partition-Button
+		$w.2.b1 invoke
+		
+	}	
+}
+
+
+# Do the writing of the image
+
+proc writeimagedoit { w } {
+global CDWRITE 
+global XCDR_DEST_WRITER_DEV
+global XCDR_DEST_WRITER_MODE
+global XCDR_DEST_WRITER_SPEED
+global XCDR_SOURCE_CDROM
+global XCDR_IMAGE_PART
+global XCDR_IMAGE_MNTPNT
+global TMP_DEST TMP_DESTNAME
+global EJECT DUMMY PADDATA
+global cd_type
+global pipe tmpw waitforready
+
+	# This variables must be global, because the fileevent-command
+	# can't handle local-variables
+
+	# Sets the image-destination
+	if { $TMP_DEST == "file" } {
+		# Image on file
+		set imgfile [ file tail $TMP_DESTNAME]
+		set imagedest "$XCDR_IMAGE_MNTPNT/$imgfile"
+		set out [ catch { set filesize [ file size $imagedest] }]
+		# File not found?
+		if { $out == 1 || [file type $imagedest] == "directory" } { 
+			Msg_ImageNotFound .inf $w
+			destroy $w
+			return
+		}
+		set isosize $filesize
+	} elseif { $TMP_DEST == "part" } {
+		# Image on partition
+		set imagedest $XCDR_IMAGE_PART
+		set filesize -1 
+		set isosize [ getisosize $imagedest ]
+	} elseif { $TMP_DEST == "quick" } {
+		set imagedest [ convertnametoblkdevice $XCDR_SOURCE_CDROM ]
+		set filesize -1
+		set isosize [ getisosize $imagedest ]
+	} else {
+		puts "This should never happen!"
+		exit;
+	}
+
+	set waitforready 0
+
+	set cdwdev [ convertnametogendevice $XCDR_DEST_WRITER_DEV ]
+
+	# Check if CD runs out of space
+	set isomb [expr $isosize/1024/1024] 
+	if { $cd_type == 74 } {
+		set cdfree 650 
+	} else {
+		set cdfree 553
+	}
+	if { $isomb > $cdfree } {
+		lower $w
+		set stat [Msg_CDoverrun .cdor $w]
+		if { $stat == 0 } {	;# Abort
+			destroy $w
+			return
+		}
+		raise $w
+	}
+
+	# Check if Image is truncated (only works with image on file)
+	if { $filesize != -1 } {
+		set sizeofiso [ getisosize $imagedest ]
+
+		# check if getisosize delivered a sane size, if not
+		# then it is perhaps a noniso-image, so don't check
+		# any further.
+		if { $sizeofiso > 0 && $sizeofiso < 734003200 &&
+		     $sizeofiso > $filesize } {
+			lower $w
+			set stat [Msg_TruncatedImage .trimg $w]
+			if { $stat == 0 } {	;# Abort
+				destroy $w
+				return
+			}
+			raise $w
+		}	
+	}					
+
+	# Check if the isosize is not zero. This would mean that
+	# there is not image to burn. 
+	if { $isosize == 0 } {
+		Msg_ImageNotFound .inf $w
+		destroy $w
+		return
+	}
+
+	# Prompt user for inserting CDR
+	lower $w
+	set stat [Msg_InsertCDR .inscdr $w]
+	if { $stat == 1 } {	;# Cancel
+		destroy $w
+		return
+	}
+	raise $w	
+
+	# Construct command-line for cdwrite
+	set cmd "$CDWRITE -t -s $XCDR_DEST_WRITER_SPEED -D $cdwdev"
+	if { $EJECT == 1 } {
+		set cmd "$cmd -e"
+	} 
+	if { $DUMMY == 1 } {
+		set cmd "$cmd -y"
+	} 
+	if { $XCDR_DEST_WRITER_MODE != "Autodetect" } {
+		if { $XCDR_DEST_WRITER_MODE == "Philips/Kodak/IMS" } {
+			set cmd "$cmd --philips"
+		}
+		if { $XCDR_DEST_WRITER_MODE == "HP" } {
+			set cmd "$cmd --hp"
+		}
+		if { $XCDR_DEST_WRITER_MODE == "Yamaha" } {
+			set cmd "$cmd --yamaha"
+		}
+		if { $XCDR_DEST_WRITER_MODE == "Sony" } {
+			set cmd "$cmd --sony"
+		}
+	}
+	if { $PADDATA == 1 } {
+		set cmd "$cmd -P"
+	} 
+
+	log $w "Write-Image from $imagedest, $isosize bytes, dummy=$DUMMY"
+	set cmd "$cmd -b $isosize --data $imagedest"
+
+	log $w "Executing: $cmd"
+
+	set pipe [open "|$cmd" r+]
+	
+	label $w.l -text "Writing Image... Please wait"
+	label $w.l2 -text ""
+	canvas $w.c -height 20 -width 303 -borderwidth 1 -relief sunken \
+		-background gray95
+	pack $w.l $w.l2 $w.c -padx 10 -pady 10
+
+	$w.c create text 160 14 -text "0%" -fill gray50 -tag pertext
+
+        tixButtonBox $w.box -orientation horizontal
+        $w.box add cancel -text "Cancel" -command {
+		set waitforready 2 
+		catch { close $pipe }
+	}
+	pack $w.box -fill x -expand 1
+
+	set tmpw $w
+	fileevent $pipe readable {
+		global pipe tmpw waitforready out percent
+		set out [gets $pipe] 
+
+		if { $out == "" } { 
+			set waitforready 1; close $pipe 
+		}
+		# track-info-output
+		if { [string index $out 0] == "D" } {
+			set track [string range $out 7 8]
+			set total [string range $out 10 end]
+			set percent 0
+			# Clean process-bar
+			drawbar $tmpw.c $percent 1 
+			# Update track-display
+			$tmpw.l2 configure -text "Track $track: $total MB"
+		}
+		# percent-output
+		if { [string index $out 0] == "Z" } {
+			set track [string range $out 1 2]
+			set percent [string range $out 4 end]
+		}
+		# Fixation-output
+		if { [string index $out 0] == "F" } {
+			$tmpw.l2 configure -text "Fixating..."
+		}
+		drawbar $tmpw.c $percent 0
+	}	
+
+	tkwait variable waitforready
+
+	#we are done with reading now...
+	if { $waitforready == 1 } {
+		$w.l configure -text "Write Image completed!"
+		$w.l2 configure -text ""
+		drawbar $tmpw.c 100 0
+		log $w "Write-Image: OK"
+	} else {
+		$w.l configure -text "Write Image aborted!"	
+		$w.l2 configure -text ""
+		log $w "Write-Image: aborted"
+	}
+
+	$w.box.cancel configure -text "Ok" -command "destroy $w" -width 5
+	sound 1
+
+	# Clear the global variables
+	unset pipe tmpw waitforready
+}
+
+
+# Read-Audio-Dialog
+
+proc readaudiodialog { w } {
+global XCDR_SOURCE_CDROM
+global XCDR_IMAGE_PART
+global XCDR_DSP_DEV
+global TMP_AUDIOPREFIX
+global TMP_SCRWINDOWPATH
+global PLAYICO
+global YESOPTICO
+global NOOPTICO
+global BAREMPTY
+global audiosel
+global audiomerge
+global audioglobaloffset
+global audioskip2sec
+global audio_units
+global audio_old_units
+global audionrtracks
+global TMP_cd_title
+global TMP_freespace
+
+	lower $w
+	if {[checkifready $w] == 1} {
+		destroy $w
+		return
+	}
+
+	# Check if the CD is a non-iso-cd
+	if {[checkifaudio] == 0} {
+       		set blkname [ convertnametoblkdevice $XCDR_SOURCE_CDROM ]
+		if {[checkifiso $blkname] == 0} {
+			Msg_NoNonIso .nniso $w
+			destroy $w
+			return
+		}
+	}
+
+	raise $w
+	
+        # Draw header-bar
+        label $w.l -text "READ TRACKS" -relief sunken -borderwidth 2 -anchor c
+        pack $w.l -fill x -expand 1 -ipady 10 -pady 5
+
+	set cdtoclist [getcdinfo]
+	set totaltime [lindex $cdtoclist 2]
+	set totalsize [expr [ converttime2frames $totaltime]*2352/1024/1024]
+  	set nrtracks [lindex $cdtoclist 3]
+	set audionrtracks $nrtracks
+	set imgfreemb [ getfreeimgspace ]
+	set imgfreetime [ convertMB2time $imgfreemb ]
+	set TMP_freespace $imgfreemb
+
+	frame $w.4 
+	tixLabelWidget $w.4.nrtracks -label "Tracks total: " \
+		-options { label.width 25 label.anchor e }
+	label $w.4.nrtracksval -width 18 -relief sunken -borderwidth 1 \
+		-text $nrtracks -anchor c \
+		-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+	tixLabelWidget $w.4.length -label "Total length: " \
+		-options { label.width 15 label.anchor e }
+	label $w.4.lengthval -width 18 -relief sunken -borderwidth 1 \
+		-text "$totaltime ( $totalsize MB )" -anchor c \
+		-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+	pack $w.4 -fill x -expand 1 -padx 10 
+	pack $w.4.nrtracks -side left 
+	pack $w.4.nrtracksval -expand 1 -fill x -side left
+	pack $w.4.length -side left
+	pack $w.4.lengthval -expand 1 -fill x -side left
+
+	frame $w.1
+	tixLabelWidget $w.1.imgsize -label "Size of selected tracks: " \
+		-options { label.width 25 label.anchor e }
+	label $w.1.imgsizeval -width 18 -relief sunken -borderwidth 1 \
+		-text " 0:00.00 ( 0 MB )" -anchor c \
+		-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+	tixLabelWidget $w.1.imgfree -label "Free Space: " \
+		-options { label.width 15 label.anchor e }
+	label $w.1.imgfreeval -width 18 -relief sunken -borderwidth 1 \
+		-text "$imgfreetime ( $imgfreemb MB )" -anchor c \
+		-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+	pack $w.1 -fill x -expand 1 -padx 10 -pady 10
+	pack $w.1.imgsize -side left 
+	pack $w.1.imgsizeval -expand 1 -fill x -side left
+	pack $w.1.imgfree -side left
+	pack $w.1.imgfreeval -expand 1 -fill x -side left
+
+
+	frame $w.2
+
+	tixLabelEntry $w.2.imgfname -disabledforeground gray \
+		-label "Filename-prefix: " \
+		-options {
+			label.width 25 label.anchor e
+			entry.width 18 entry.textVariable TMP_AUDIOPREFIX 
+		}
+	pack $w.2 -fill x -expand 1 -padx 10 
+	pack $w.2.imgfname -side left 
+
+	frame $w.3
+
+	set TMP_cd_title ""
+	tixLabelEntry $w.3.cdtitle -disabledforeground gray \
+		-label "CD-Title (optional): " \
+		-options {
+			label.width 25 label.anchor e
+			entry.width 20 entry.textVariable TMP_cd_title 
+		}
+	pack $w.3 -fill x -expand 1 -padx 10 
+	pack $w.3.cdtitle -side left -fill x -expand 1
+
+
+	# set default-image-name
+	if { $TMP_AUDIOPREFIX == "" } {
+		set TMP_AUDIOPREFIX "audio"
+	}
+
+	# Defined here to have access to variable "f"   
+	tixScrolledWindow $w.5 -height 300 -scrollbar auto
+	set f [$w.5 subwidget window]
+        set TMP_SCRWINDOWPATH $f
+
+	frame $w.7
+	tixLabelWidget $w.7.l -label "Global Offsets: " \
+		-options {label.width 25 label.anchor e}
+
+	set audioglobaloffset 0
+	checkbutton $w.7.b -variable audioglobaloffset -anchor w \
+		-command "check_globaloffset $f $nrtracks"  
+
+	tixLabelWidget $w.7.l2 -label "Skip last 2 sec. of track: " \
+		-options {label.width 30 label.anchor e}
+
+	set audioskip2sec 1
+	checkbutton $w.7.b2 -variable audioskip2sec -anchor w 
+
+	pack $w.7 -expand 1 -fill x -padx 10 
+	pack $w.7.l $w.7.b -side left 
+	pack $w.7.l2 $w.7.b2 -side left
+
+	frame $w.6
+	tixLabelWidget $w.6.l -label "Time-Offset Units: " \
+		-options {label.width 25 label.anchor e}
+	set audio_units "sec"
+	set audio_old_units "sec"
+	radiobutton $w.6.b1 -text "Seconds" -variable audio_units -value "sec" \
+		-command "check_units $f $nrtracks"
+
+	radiobutton $w.6.b2 -text "Frames (1/75 sec)" -variable audio_units -value "frame" \
+		-command "check_units $f $nrtracks"
+
+	pack $w.6 -expand 1 -fill x -padx 10 
+	pack $w.6.l $w.6.b1 $w.6.b2 -side left	
+	
+	pack $w.5 -expand 1 -fill x -padx 10 -pady 10
+
+	label $f.label -font "-misc-fixed-medium-r-normal-*-*-120-*-*-*-*-*-*" \
+	-text "\
+\ \ Track-   Track-title (optional)   Pre- Copy-  Start-    Track-     End-\n\
+\ \ \ \ Nr.                             emph. perm.  offset    length    offset"
+
+	pack $f.label -fill x 
+
+	for { set i 1 } { $i <= $nrtracks } {incr i } {
+		set trktype [lindex $cdtoclist [expr 5*$i+2]]
+		set trksize [lindex $cdtoclist [expr 5*$i+3]]
+		if { $trktype == "Data" } {
+			set trksize "$trksize MB"
+		}
+		frame $f.$i
+		checkbutton $f.$i.sel -variable audiosel($i) \
+			-command "check_merge $w $f $i $nrtracks {$cdtoclist} audiosel audiomerge"
+
+		# This label carries also the track-type-information,
+		# this way we can get the track-type via a getc -text 
+		# command.
+		label $f.$i.flg -bitmap @$BAREMPTY -text $trktype
+		set audiosel($i) 0
+		set audiomerge($i) 0
+
+		label $f.$i.nrtr -text $i -width 3 -anchor c
+		if { $trktype == "Data" } {
+			entry $f.$i.name -width 25 
+			set cddatalabel [getisolabel [convertnametoblkdevice $XCDR_SOURCE_CDROM]]
+			$f.$i.name insert 0 "DATA: $cddatalabel"
+			$f.$i.name configure -state disabled
+		} else {
+			entry $f.$i.name -width 25 
+		}
+		set tmpval [lindex $cdtoclist [expr 5*$i+0]]
+		if { $tmpval == "1" } {
+			set tmpbit $YESOPTICO 
+		} else {
+			set tmpbit $NOOPTICO 
+		}
+		label $f.$i.preemp -bitmap @$tmpbit -text $tmpval
+
+		set tmpval [lindex $cdtoclist [expr 5*$i+1]]
+		if { $tmpval == "1" } {
+			set tmpbit $YESOPTICO 
+		} else {
+			set tmpbit $NOOPTICO 
+		}
+		label $f.$i.cpperm -bitmap @$tmpbit -text $tmpval
+
+		label $f.$i.tmp1 -width 1 
+		label $f.$i.tmp3 -width 1 
+		label $f.$i.tmp4 -width 1 
+
+		tixControl $f.$i.off1 -integer true \
+			-variable audiooff1($i) -min -9999 -max 9999 \
+			-options { entry.width 4 } \
+			-command "check_off1 $f $nrtracks" 
+
+		message $f.$i.time -text $trksize -width 100 -anchor c \
+			-relief sunken -borderwidth 1
+
+		tixControl $f.$i.off2 -integer true \
+			-variable audiooff2($i) -min -9999 -max 9999 \
+			-options { entry.width 4 } \
+			-command "check_off2 $f $nrtracks" 
+
+		label $f.$i.tmp2 -width 3 
+		button $f.$i.play -bitmap @$PLAYICO \
+			-command "preplay_track $f $i" 
+		if { $trktype == "Data" || $XCDR_DSP_DEV == "None" } {
+			$f.$i.play configure -state disabled	
+		}
+
+		pack $f.$i.sel $f.$i.flg $f.$i.nrtr $f.$i.name $f.$i.tmp1 \
+			$f.$i.preemp $f.$i.tmp3 $f.$i.cpperm $f.$i.tmp4 \
+			$f.$i.off1 -side left 
+		pack $f.$i.time -side left -expand 1 -fill x
+		pack $f.$i.off2 $f.$i.tmp2 $f.$i.play -side left 
+		pack $f.$i -fill x 
+	}
+
+	tixButtonBox $w.ctrl -orientation horizontal -relief flat
+	$w.ctrl add sel_all -text "Select All" -command "sel_all_tracks $w $f $nrtracks {$cdtoclist}"
+	$w.ctrl add sel_none -text "Select None" -command "sel_no_tracks $w $f $nrtracks audiomerge"
+	$w.ctrl add merge -text "Merge Selected Tracks" -command "merge_tracks $f $nrtracks audiosel audiomerge"
+	$w.ctrl add unmerge -text "Un-Merge All Tracks" -command "unmerge_tracks $f $nrtracks audiomerge"
+	pack $w.ctrl -fill x -expand 1
+
+	tixButtonBox $w.box -orientation horizontal
+	$w.box add start -text "Start" -command "spawnsubwindow readaudiodoit .readaudiodoit .readaudio; audio_updatefreesize $w" 
+	$w.box add cancel -text "Cancel" -command ".copy.box.rescan invoke; destroy $w"
+
+	pack $w.box -fill x -expand 1
+
+ 	if { [readaudiocheckpart $w ] == 1 } {
+		# The user doesn't wanted to format the partition,
+		# quit the whole menu in this case
+		destroy $w
+	}
+}
+
+
+# Action when button "Select All Tracks" is pressed 
+
+proc sel_all_tracks { w f nrtracks cdtoclist } {
+
+	set tracksum 0
+	for { set i 1 } { $i <= $nrtracks } {incr i } {
+		$f.$i.sel select
+		set trksize [lindex $cdtoclist [expr 5*$i+3]]
+		set trkframes [converttime2frames $trksize]
+		incr tracksum $trkframes
+	}
+	set time [convertframes2time $tracksum]
+ 	set mb [expr ($tracksum*2352/1024/1024)]
+	$w.1.imgsizeval configure -text "$time ( $mb MB )" 
+}
+
+
+# Action when button "Select None" is pressed
+
+proc sel_no_tracks { w f nrtracks merge } {
+global BAREMPTY
+
+upvar $merge audiomerge
+
+	for { set i 1 } { $i <= $nrtracks } {incr i } {
+		$f.$i.sel deselect
+        	set audiomerge($i) 0
+		$f.$i.flg configure -bitmap @$BAREMPTY
+	}
+	$w.1.imgsizeval configure -text " 0:00.00 ( 0 MB )" 
+}
+
+
+# Action when button "Merge Selected Tracks" is pressed 
+
+proc merge_tracks { f nrtracks sel merge } {
+global BARTOP
+global BARDOWN
+global BAREMPTY
+global BARMID
+
+upvar $sel audiosel 
+upvar $merge audiomerge
+
+	set cont 0 	;# position in current track-range 
+	set range 0	;# number of range
+
+	for { set i 1 } { $i <= $nrtracks } {incr i } {
+
+		set trktype [$f.$i.flg cget -text]
+
+		# Ignore existing ranges and data-tracks
+		if { $audiomerge($i) != 0 || $trktype == "Data" } {
+			set cont 0
+			continue
+		}
+
+		# Is the track and the track before selected?
+		if { $audiosel($i) == 1 && $cont != 0 } {
+
+			# First position in range?
+			if { $cont == 1 } {
+				$f.[expr $i-1].flg configure -bitmap @$BARTOP
+			} else {
+				$f.[expr $i-1].flg configure -bitmap @$BARMID
+			}
+			$f.$i.flg configure -bitmap @$BARDOWN
+
+			set audiomerge([expr $i-1]) $range 
+			set audiomerge($i) $range 
+		 	incr cont	
+		}
+
+		# Is the track selected and the track before is not selected?
+		if { $audiosel($i) == 1 && $cont == 0 } {
+			# Start new track-range
+			set cont 1 
+			set range [request_range_nr $nrtracks audiomerge]
+		}
+
+		# Track not selected? Set cont-flag to zero   
+		if { $audiosel($i) == 0 } {
+			# Stop any track-range
+			set cont 0
+
+			# Init the mergevalue
+			set audiomerge($i) 0
+			$f.$i.flg configure -bitmap @$BAREMPTY
+		}
+	}
+}
+
+
+# Returns the next available range-number in audio-merge array 
+
+proc request_range_nr { nrtracks merge } {
+upvar $merge audiomerge
+
+	set highest 0
+	for { set i 1 } { $i <= $nrtracks } {incr i } {
+		if { $audiomerge($i) > $highest } {
+			set highest $audiomerge($i)
+		}
+	}
+	return [expr $highest+1]
+}
+
+
+# Action when button "Un-Merge All Tracks" is pressed 
+
+proc unmerge_tracks { f nrtracks merge } {
+global BAREMPTY
+
+upvar $merge audiomerge
+
+	for { set i 1 } { $i <= $nrtracks } {incr i } {
+        	set audiomerge($i) 0
+		$f.$i.flg configure -bitmap @$BAREMPTY
+	}
+}
+
+
+# Called when a checkbutton is pressed. 
+# Checks if the button belongs to a selected range and does 
+# delete the whole range.
+# Also updates the selected-track-size display
+
+proc check_merge { w f nr nrtracks cdtoclist sel merge } {
+global BAREMPTY
+
+upvar $sel audiosel 
+upvar $merge audiomerge
+
+	# We deselected a button belonging to a track-range?
+	if { $audiosel($nr) == 0 && $audiomerge($nr) != 0 } {
+		set range $audiomerge($nr)
+		for { set i 1 } { $i <= $nrtracks } {incr i } {
+			if { $audiomerge($i) == $range } {
+				set audiomerge($i) 0
+				$f.$i.flg configure -bitmap @$BAREMPTY
+			}
+		}	
+	}
+
+	# Calculate how big all selected tracks are until now 
+	set tracksum 0
+	for { set i 1 } { $i <= $nrtracks } {incr i } {
+		if { $audiosel($i) != 0 } {
+			set trksize [lindex $cdtoclist [expr 5*$i+3]]
+			set trkframes [converttime2frames $trksize]
+			incr tracksum $trkframes
+		}
+	}
+	set time [convertframes2time $tracksum]
+ 	set mb [expr ($tracksum*2352/1024/1024)]
+	$w.1.imgsizeval configure -text "$time ( $mb MB )" 
+}
+
+
+# Called when user toggles the "global offset"-checkbutton.
+# Assures that all entry-fields have the same value if switched on
+
+proc check_globaloffset { f nrtracks } {
+global audioglobaloffset
+
+	if { $audioglobaloffset == 1 } {
+		set value1 [$f.1.off1 cget -value]
+		set value2 [$f.1.off2 cget -value]
+
+		for { set i 1 } { $i <= $nrtracks } {incr i } {
+			$f.$i.off1 configure -disablecallback 1
+			$f.$i.off1 configure -value $value1
+			$f.$i.off1 configure -disablecallback 0
+			$f.$i.off2 configure -disablecallback 1
+			$f.$i.off2 configure -value $value2
+			$f.$i.off2 configure -disablecallback 0
+		}
+	}
+}
+
+
+# Called when a offset1 entry-field is modified.
+# Used to sync all fields if global-offsets is on
+
+proc check_off1 { f nrtracks value } {
+global audioglobaloffset
+
+	if { $audioglobaloffset == 1 } {
+		for { set i 1 } { $i <= $nrtracks } {incr i } {
+			$f.$i.off1 configure -disablecallback 1
+			$f.$i.off1 configure -value $value
+			$f.$i.off1 configure -disablecallback 0
+		}
+	}
+}
+
+
+# Called when a offset2 entry-field is modified.
+# Used to sync all fields if global-offsets is on
+
+proc check_off2 { f nrtracks value } {
+global audioglobaloffset
+
+	if { $audioglobaloffset == 1 } {
+		for { set i 1 } { $i <= $nrtracks } {incr i } {
+			$f.$i.off2 configure -disablecallback 1
+			$f.$i.off2 configure -value $value
+			$f.$i.off2 configure -disablecallback 0
+		}
+	}
+} 
+
+
+# Called when the user changes the type of offset-unit.
+# Checks if value really changes and adjusts all values 
+# in the entry fields.
+
+proc check_units { f nrtracks } {
+global audio_units
+global audio_old_units
+
+	# Changed the button-value really?
+	if { $audio_units != $audio_old_units } {
+		if { $audio_units == "frame" } {
+			set audio_old_units "frame"
+			for { set i 1 } { $i <= $nrtracks } {incr i } {
+				set value1 [$f.$i.off1 cget -value]
+				$f.$i.off1 configure -disablecallback 1
+				$f.$i.off1 configure -value [expr $value1*75]
+				$f.$i.off1 configure -disablecallback 0
+	
+				set value2 [$f.$i.off2 cget -value]
+				$f.$i.off2 configure -disablecallback 1
+				$f.$i.off2 configure -value [expr $value2*75]
+				$f.$i.off2 configure -disablecallback 0
+			}
+		} else {
+			set audio_old_units "sec"
+			for { set i 1 } { $i <= $nrtracks } {incr i } {
+				set value1 [$f.$i.off1 cget -value]
+				$f.$i.off1 configure -disablecallback 1
+				$f.$i.off1 configure -value [expr $value1/75]
+				$f.$i.off1 configure -disablecallback 0
+
+				set value2 [$f.$i.off2 cget -value]
+				$f.$i.off2 configure -disablecallback 1
+				$f.$i.off2 configure -value [expr $value2/75]
+				$f.$i.off2 configure -disablecallback 0
+			}
+		}	
+	}
+}
+
+
+# Called when play-button is pressed
+
+proc preplay_track { f nr } {
+global audio_units
+global audioskip2sec
+global preplay_track
+global preplay_off1
+global preplay_off2
+
+	set preplay_track $nr
+	set preplay_off1 [$f.$nr.off1 cget -value]
+	set preplay_off2 [$f.$nr.off2 cget -value]
+
+	# We need unit "frames" at this point
+	if { $audio_units == "sec" } {
+		set preplay_off1 [expr $preplay_off1*75]
+		set preplay_off2 [expr $preplay_off2*75]
+	}
+
+	# If skip-2-sec button is pressed, substract 150 frames (2 sec)
+	# from offset2
+	if { $audioskip2sec == 1 } {
+		incr preplay_off2 -150
+	}
+
+	# Change color of playbutton  
+	$f.$nr.play configure -bg red -relief sunken
+
+	spawnsubwindow preplay_doit .preplayaudio .readaudio
+
+	$f.$nr.play configure -bg lightgray -relief raised 
+}
+
+
+# Called after read-audio-tracks-dialog is build up.
+# Checks if the image-partition is formatted.
+# Returns 1 if the user canceled, used to cancel the whole menu
+
+proc readaudiocheckpart { w } {
+global XCDR_IMAGE_PART
+global XCDR_IMAGE_MNTPNT
+
+	# Is the image-partition mounted? If not mount it...
+	if { [getmountpnt $XCDR_IMAGE_PART] == "" } {
+
+		set mstat [domountext2 $XCDR_IMAGE_PART $XCDR_IMAGE_MNTPNT]
+		if { $mstat == 0 } { ; # mount failed
+			set fstat [Msg_AudioMustFormatImage .audioformat .readaudio]
+			if { $fstat == 0 } { ;# Format
+				set fout [makeformat $XCDR_IMAGE_PART .readaudio]
+				if { $fout == 0 } {
+					Msg_FormatFailed .frmtfail .readaudio $XCDR_IMAGE_PART
+					exit
+				} else {
+					# Silently try to mount again
+					readaudiocheckpart $w	
+				}
+			} else { ;# Cancel, not format
+				return 1
+			}
+		} else {
+			Msg_Mounted .dmnt $w $XCDR_IMAGE_PART $XCDR_IMAGE_MNTPNT
+		}
+	}	
+
+	# update free-size-display
+	audio_updatefreesize $w
+	return 0
+}
+
+
+# Update the free-size-display in the read-audio-tracks-dialog
+
+proc audio_updatefreesize { w } {
+global TMP_freespace
+
+	set imgfreemb [ getfreeimgspace ]
+	set imgfreetime [ convertMB2time $imgfreemb ]
+	$w.1.imgfreeval configure -text "$imgfreetime ( $imgfreemb MB )" 
+	set TMP_freespace $imgfreemb
+}
+
+
+# Do the reading of the audio-tracks, called by the Start-button
+# in the Read-Audio-Tracks-Dialog
+
+proc readaudiodoit { w } {
+global READCDDA 
+global MYDD
+global XCDR_SOURCE_CDROM
+global XCDR_IMAGE_MNTPNT
+global XCDR_AUDIOREAD_SPEED
+global audio_units
+global audioskip2sec
+global audiosel
+global audiomerge
+global audionrtracks
+global TMP_AUDIOPREFIX
+global TMP_SCRWINDOWPATH
+global TMP_DESTNAME
+global TMP_cd_title
+global TMP_freespace
+global ENDIANSWAP
+global pipe tmpw waitforready outval
+
+	# This variables must be global, because the fileevent-command
+	# can't handle local-variables
+
+        # Calculate how big all selected tracks are until now 
+	set cdtoclist [getcdinfo]
+        set tracksum 0
+        for { set i 1 } { $i <= $audionrtracks } {incr i } {
+                if { $audiosel($i) != 0 } {
+                        set trksize [lindex $cdtoclist [expr 5*$i+3]]
+                        set trkframes [converttime2frames $trksize]
+                        incr tracksum $trkframes
+                }
+        }
+
+	# Any tracks selected?
+	if { $tracksum == 0 } {
+		lower $w
+		Msg_NoTracksSel .notrk $w
+		destroy $w
+		return
+	}
+
+        set spaceneeded [expr ($tracksum*2352/1024/1024)]
+
+	# Check if enough space
+        if { $spaceneeded > $TMP_freespace } {
+                lower $w
+                set stat [Msg_NotEnoughSpace .nospace $w]
+                if { $stat == 0 } {     ;# Cancel
+                        destroy $w
+                        return
+                }
+                raise $w
+        }
+
+	# Set endian-order
+        if { $ENDIANSWAP == 1 } {
+                set swapstr "-x"
+		set bigendian 0
+        } else {
+                set swapstr ""
+		set bigendian 1
+        } 
+
+	# Sets the track-filename-prefix 
+	set trkfile [ file tail $TMP_AUDIOPREFIX]
+	set audiodest "$XCDR_IMAGE_MNTPNT/$trkfile"
+	set cd_title $TMP_cd_title
+
+	set blkname [ convertnametoblkdevice $XCDR_SOURCE_CDROM ]
+	set genname [ convertnametogendevice $XCDR_SOURCE_CDROM ]
+
+	# Here we convert the two arrays audiosel and audiomerge to a
+	# single list containing the start and end track to record
+	set trklist ""
+        for { set i 1 } { $i <= $audionrtracks } {incr i } {
+	
+		if { $audiosel($i) != 0 && $audiomerge($i) == 0 } { 
+			# Single Track 
+			lappend trklist $i $i 
+		}
+		if { $audiosel($i) == 1 && $audiomerge($i) != 0 } {
+			# Start of merged-tracks
+			lappend trklist $i
+			set comp $audiomerge($i)
+			# Find end of merged-tracks
+			for { set j $i } { $j <= $audionrtracks } {incr j} {
+				if { $audiomerge($j) == $comp } {
+					set end $j
+				}
+			}
+			lappend trklist $end
+			set i $end
+		}
+	}
+
+	label $w.l -text "Reading Track 0/0... Please wait"
+	canvas $w.c -height 20 -width 303 -borderwidth 1 -relief sunken \
+		-background gray95
+	pack $w.l $w.c -padx 10 -pady 10
+
+	$w.c create text 160 14 -text "0%" -fill gray50 -tag pertext
+
+        tixButtonBox $w.box -orientation horizontal
+        $w.box add cancel -text "Cancel" 
+	pack $w.box -fill x -expand 1
+
+	# Nr of tracks to read (merged tracks count as 1)
+	set nrtracks [expr [llength $trklist]/2]
+
+	if { $nrtracks == 0 } {
+		destroy $w
+		return
+	}
+
+        for { set i 1 } { $i <= $nrtracks } {incr i } {
+
+		# Find out all track parameters
+		set start [ lindex $trklist [expr ($i-1)*2]]
+		set end [ lindex $trklist [expr ($i-1)*2+1]]
+		set off1 [$TMP_SCRWINDOWPATH.$start.off1 cget -value]
+		set off2 [$TMP_SCRWINDOWPATH.$end.off2 cget -value]
+		set name [$TMP_SCRWINDOWPATH.$start.name get]
+		set cpperm [$TMP_SCRWINDOWPATH.$start.cpperm cget -text]
+		set preemp [$TMP_SCRWINDOWPATH.$start.preemp cget -text]
+		set type [$TMP_SCRWINDOWPATH.$start.flg cget -text]
+
+                set newnr [find_nextaudionr $audiodest] 
+		set filename "$audiodest.$newnr.cdda"
+		set dataname "$audiodest.$newnr.raw"
+		set infoname "$audiodest.$newnr.info"
+
+		# Write info-file
+		set fileid [open $infoname w]
+		puts $fileid "# Audio-Track-Description-File"
+		puts $fileid "CD-Name     : $cd_title"
+		puts $fileid "Track-Name  : $name"
+		puts $fileid "Track-Nr.   : $start - $end"
+
+		if { $type != "Data" } {
+			puts $fileid "Offsets     : $off1 $off2"
+			puts $fileid "Preemphasis : $preemp"
+			puts $fileid "Copy-Perm.  : $cpperm"
+			puts $fileid "Skip 2 Sec. : $audioskip2sec"
+			puts $fileid "Big-Endian  : $bigendian"
+		}
+		close $fileid 
+
+		# We need unit "frames" at this point
+	        if { $audio_units == "sec" } {
+	                set off1 [expr $off1*75]
+	                set off2 [expr $off2*75]
+	        }
+	
+	        # If skip-2-sec button is pressed, substract 150 frames (2 sec)
+	        # from offset2
+	        if { $audioskip2sec == 1 } {
+	                incr off2 -150
+	        }
+
+		set waitforready 0
+
+		# Set the right command for Data or Audio-Mode
+		if { $type == "Data" } {
+   			set nrblocks [expr [ getisosize $blkname ]/2048]
+			set cmd "$MYDD $blkname $dataname $nrblocks"
+
+			log $w "Read-Track: Data-Track $dataname, $nrblocks blocks"
+			# set TMP_DESTNAME to the actual filename, this
+			# is used in the verify-data-track to display
+			# a most reasonable default-name
+			set TMP_DESTNAME [file tail $dataname] 
+		} else {
+ 			set cmd "$READCDDA -D $genname -B $blkname -t $start -z $end -o $off1 -s $off2 -q -p -S $XCDR_AUDIOREAD_SPEED $swapstr $filename"
+			log $w "Read-Track: Audio-Track $filename, tracks $start-$end"
+		}
+		log $w "Executing: $cmd"
+
+		set pipe [open "|$cmd" r+]
+	
+		$w.l configure -text "Reading Track $i/$nrtracks... Please wait" 
+		# Clean process-bar
+		drawbar $w.c 0 1 
+		$w.box subwidget cancel configure -command { 
+			set waitforready 2 
+			catch { close $pipe }
+		}
+
+
+		set tmpw $w.c
+		fileevent $pipe readable {
+			global pipe tmpw waitforready outval
+			set outval [gets $pipe] 
+
+			if { $outval == "" } { 
+				set waitforready 1; close $pipe 
+			}
+ 			if { [string index $outval 0] == "R" || 
+ 			     [string index $outval 0] == "E" } {
+                 	        set outval ""
+                	        set waitforready 3; close $pipe 
+                	}
+                	if { [string index $outval 0] == "W" } {
+                	        set outval ""
+                	        set waitforready 4; close $pipe 
+                	}
+			if { $outval == "end" } { 
+				set outval 100
+				set waitforready 1; close $pipe 
+			}
+			drawbar $tmpw $outval 0
+		}	
+
+		tkwait variable waitforready
+	
+		#we are done with reading now...
+		if { $waitforready == 1 } {
+			if { $outval == 100 } {	
+				$w.l configure -text "Track successfully read."
+				log $w "Read-Track: Track OK"
+          		} else {
+                        	$w.l configure -text "Some error occured!!!"
+				log $w "Read-Track: Some error occured"
+				break
+                	}
+        	} elseif { $waitforready == 2 } {
+			$w.l configure -text "Read Track aborted!"	
+			log $w "Read-Track: aborted"
+			break
+        	} elseif { $waitforready == 3 } {
+        	        $w.l configure -text "Read-Error!!"     
+			log $w "Read-Track: read-error"
+			break
+        	} elseif { $waitforready == 4 } {
+        	        $w.l configure -text "Write-Error!!"    
+			log $w "Read-Track: write-error"
+			break
+        	}
+	}
+
+	$w.box.cancel configure -text "Ok" -command "destroy $w" -width 5
+	sound 1
+
+	# Clear the global variables
+	unset pipe tmpw waitforready
+}
+
+
+# Looks into the image-partition-directory, where the audio-files
+# are stored, and seeks the next available number for an audio-track.
+# Tracks are named: $prefix.$nr.cdda, so we extract the $nr, look for
+# the highest and return the next.
+
+proc find_nextaudionr { prefix } {
+
+	set filelist ""
+	catch {set filelist [glob $prefix*]}
+
+	if { $filelist == "" } {
+		# No files with such a name, start with number 1
+		return 1
+	}
+
+	# Search the file with the highest number
+	set topnr 0
+	set length [ string length $prefix ]
+	foreach i $filelist {
+		set tmpstr [string range $i $length end]
+		set hits [scan $tmpstr ".%d.cdda" nr]
+		if { $hits == 1 && $nr > $topnr }  {	
+			set topnr $nr
+		}
+	}
+	incr topnr
+	return $topnr
+}
+
+proc delaudiodialog { w } {
+global XCDR_IMAGE_PART
+global XCDR_IMAGE_MNTPNT
+global MINIINFO
+global delaudiosel
+global deltrksizes
+global cddalst 
+global infoarray
+
+	# Is the image-partition mounted? If not mount it...
+	if { [getmountpnt $XCDR_IMAGE_PART] == "" } {
+
+		set mstat [domountext2 $XCDR_IMAGE_PART $XCDR_IMAGE_MNTPNT]
+		if { $mstat == 0 } { ; # mount failed
+			Msg_NoAudioImage .audiodelwarn .delaudio
+			destroy $w
+			return
+		} else {
+			Msg_Mounted .dmnt $w $XCDR_IMAGE_PART $XCDR_IMAGE_MNTPNT
+		}
+	}	
+
+        # Draw header-bar
+        label $w.l -text "DELETE TRACKS" -relief sunken -borderwidth 2 -anchor c
+        pack $w.l -fill x -expand 1 -ipady 10 -pady 5
+
+	set cddalst ""
+      	catch { set cddalst [glob $XCDR_IMAGE_MNTPNT/*.raw $XCDR_IMAGE_MNTPNT/*.cdda] }
+	set nrtracks [llength $cddalst]
+
+	# Calc the total-time of all tracks
+	set totalsize 0
+	foreach i $cddalst {
+		set filesize [ file size $i ]
+		incr totalsize $filesize
+	}
+	set totaltime [convertframes2time [expr $totalsize/2352]]
+	set totalmb [expr $totalsize/1024/1024]
+	set imgfreemb [ getfreeimgspace ]
+	set imgfreetime [ convertMB2time $imgfreemb ]
+
+	frame $w.4 
+	tixLabelWidget $w.4.nrtracks -label "Tracks on HD: " \
+		-options { label.width 25 label.anchor e }
+	label $w.4.nrtracksval -width 18 -relief sunken -borderwidth 1 \
+		-text $nrtracks -anchor c \
+		-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+	tixLabelWidget $w.4.length -label "Total length: " \
+		-options { label.width 15 label.anchor e }
+	label $w.4.lengthval -width 18 -relief sunken -borderwidth 1 \
+		-text "$totaltime ( $totalmb MB )" -anchor c \
+		-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+	pack $w.4 -fill x -expand 1 -padx 10 
+	pack $w.4.nrtracks -side left 
+	pack $w.4.nrtracksval -expand 1 -fill x -side left
+	pack $w.4.length -side left
+	pack $w.4.lengthval -expand 1 -fill x -side left
+
+	frame $w.1
+	tixLabelWidget $w.1.imgsize -label "Size of selected tracks: " \
+		-options { label.width 25 label.anchor e }
+	label $w.1.imgsizeval -width 18 -relief sunken -borderwidth 1 \
+		-text " 0:00.00 ( 0 MB )" -anchor c \
+		-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+	tixLabelWidget $w.1.imgfree -label "Free Space: " \
+		-options { label.width 15 label.anchor e }
+	label $w.1.imgfreeval -width 18 -relief sunken -borderwidth 1 \
+		-text "$imgfreetime ( $imgfreemb MB )" -anchor c \
+		-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+	pack $w.1 -fill x -expand 1 -padx 10 -pady 10
+	pack $w.1.imgsize -side left 
+	pack $w.1.imgsizeval -expand 1 -fill x -side left
+	pack $w.1.imgfree -side left
+	pack $w.1.imgfreeval -expand 1 -fill x -side left
+
+
+	# Defined here to have access to variable "f"   
+	tixScrolledWindow $w.5 -height 300 -scrollbar auto
+	set f [$w.5 subwidget window]
+	pack $w.5 -expand 1 -fill x -padx 10 -pady 10
+
+	label $f.label -font "-misc-fixed-medium-r-normal-*-*-120-*-*-*-*-*-*" \
+	-text "\
+\ \ Track-          Track-title            Track-         File-name on HD \n\
+\ \ \ \ Nr.                                  length                         "
+
+	pack $f.label -fill x 
+
+	for { set i 1 } { $i <= $nrtracks } {incr i } {
+		set fname [lindex $cddalst [expr $i-1]]
+		set f_name [file tail $fname]
+		set basename [string range $fname 0 [expr [string last . $fname]-1]]
+		set exten [string range $fname [expr [string last . $fname]+1] end]
+		if { $exten == "raw" } {
+			set type "Data" 
+			set trksize "[expr [file size $fname]/1024/1024] MB"
+		} else {
+			set type "Audio"
+			set trksize [getaudiosize $fname]
+		}
+		# Info-file-name
+		set i_name "$basename.info"
+		set deltrksizes($i) [file size $fname]
+		# Load the info-file into an array
+		set infoarray($i) [loadfile2list $i_name]
+
+		set delaudiosel($i) 0
+		frame $f.$i
+		checkbutton $f.$i.sel -variable delaudiosel($i) \
+			-command "del_seltrack $w $nrtracks delaudiosel deltrksizes"
+
+		label $f.$i.nrtr -text $i -width 3 -anchor c
+
+		# Extract Track-name 
+		set trkname [extractcolonstr [lindex $infoarray($i) 2]]
+		label $f.$i.name -width 25 -text $trkname \
+			-relief sunken -borderwidth 1 \
+			-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+		label $f.$i.tmp1 -width 1 
+		label $f.$i.tmp2 -width 1 
+
+		label $f.$i.time -text $trksize -width 10 -anchor c \
+			-relief sunken -borderwidth 1 \
+			-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+		label $f.$i.fname -text $f_name -width 20 -anchor c \
+			-relief sunken -borderwidth 1 \
+			-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+		button $f.$i.info -bitmap @$MINIINFO \
+			-command "showtrackinfo $w $f $i $i infoarray" 
+
+		pack $f.$i.sel $f.$i.nrtr $f.$i.name $f.$i.tmp1 $f.$i.time \
+			$f.$i.tmp2 $f.$i.fname -side left 
+		pack $f.$i.info -side right
+		pack $f.$i -fill x 
+	}
+
+	tixButtonBox $w.ctrl -orientation horizontal -relief flat
+	$w.ctrl add sel_all -text "Select All" -command "del_sel_all_tracks $w $f $nrtracks delaudiosel deltrksizes"
+	$w.ctrl add sel_none -text "Select None" -command "del_sel_no_tracks $w $f $nrtracks"
+	pack $w.ctrl -fill x -expand 1
+
+	tixButtonBox $w.box -orientation horizontal
+	$w.box add start -text "Delete" -command "delaudiodoit $w $nrtracks delaudiosel cddalst" 
+	$w.box add cancel -text "Cancel" -command ".copy.box.rescan invoke; destroy $w"
+
+	pack $w.box -fill x -expand 1
+}
+
+
+# Action when button "Select All Tracks" is pressed 
+
+proc del_sel_all_tracks { w f nrtracks sel sizes } {
+upvar $sel audiosel 
+upvar $sizes trksizes
+
+	set tracksum 0
+	for { set i 1 } { $i <= $nrtracks } {incr i } {
+		$f.$i.sel select
+		incr tracksum $trksizes($i)
+	}
+	set time [convertframes2time [expr $tracksum/2352]]
+ 	set mb [expr ($tracksum/1024/1024)]
+	$w.1.imgsizeval configure -text "$time ( $mb MB )" 
+}
+
+
+# Action when button "Select None" is pressed
+
+proc del_sel_no_tracks { w f nrtracks }  {
+
+	for { set i 1 } { $i <= $nrtracks } {incr i } {
+		$f.$i.sel deselect
+	}
+	$w.1.imgsizeval configure -text " 0:00.00 ( 0 MB )" 
+}
+
+
+# Called when you select a track in the delete-track-menu
+# or in the write-track-menu
+
+proc del_seltrack { w nrtracks sel sizes} {
+upvar $sel audiosel 
+upvar $sizes trksizes
+
+	# Calculate how big all selected tracks are until now 
+	set tracksum 0
+	for { set i 1 } { $i <= $nrtracks } {incr i } {
+		if { $audiosel($i) != 0 } {
+			incr tracksum $trksizes($i)
+		}
+	}
+	set time [convertframes2time [expr $tracksum/2352]]
+ 	set mb [expr ($tracksum/1024/1024)]
+	$w.1.imgsizeval configure -text "$time ( $mb MB )" 
+}
+
+
+# Called when the "delete" button in the delete-menu is pressed.
+# Deletes any selected audio-files and its info-files.
+
+proc delaudiodoit { w nrtracks sel cddalst } {
+upvar $sel audiosel 
+upvar $cddalst filenames
+
+global RM CDRICO
+
+	set old .delaudio
+	set new .delaudiododel
+
+        $old configure -cursor watch
+        catch { destroy $new }
+        toplevel $new
+	wm title $new "X-CD-Roast"
+	wm iconbitmap $new @$CDRICO
+        grab $new 
+        set oldFocus [focus]
+        focus $new
+
+	$new configure -cursor watch
+	label $new.l -text "Deleting Audio-Tracks"
+	label $new.l2 -text "Please wait"
+
+ 	pack $new.l $new.l2 -padx 10 -pady 10
+        update
+
+	# Here is the action
+	set count 0 
+	for { set i 1 } { $i <= $nrtracks } {incr i } {
+		if { $audiosel($i) != 0 } {
+			set fname [lindex $filenames [expr $i-1]]
+ 			set basename [string range $fname 0 [expr [string last . $fname]-1]]
+		        set i_name "$basename.info"
+			catch { exec $RM $fname $i_name }
+			incr count
+			log $w "Delete-Track: deleted track $fname"
+		}
+	}
+
+        destroy $new
+        catch { focus $oldFocus }
+        $old configure -cursor ""
+
+	# If there were any files deleted, update window
+	if { $count != 0 } {
+		# recreate the whole delete-window
+		eval "destroy [winfo children $w]"
+		delaudiodialog .delaudio 
+	} else {
+		Msg_NoTracksSel .notrk $w
+	}
+}
+
+
+# Called when info-button in delete, play or write-menu is pressed.
+
+proc showtrackinfo { w f i j info } {
+upvar $info infoarray
+
+global audiotrackinfo
+
+	set audiotrackinfo $infoarray($i)
+
+	$f.$j.info configure -bg red -relief sunken
+
+	spawnsubwindow showtrackinfo_doit .showtrackinfo $w 
+
+	$f.$j.info configure -bg lightgray -relief raised 
+
+	unset audiotrackinfo
+}
+
+
+# Displays all information in an audio-info-file
+
+proc showtrackinfo_doit { w } {
+global audiotrackinfo 
+
+	label $w.l -text "TRACK INFORMATION" -relief sunken -borderwidth 2 -anchor c
+	pack $w.l -fill x -expand 1 -ipady 10 -pady 5
+
+	if { $audiotrackinfo == {} } {
+		label $w.l2 -text "No Audio-Description-file found."
+		pack $w.l2 -padx 10 -pady 10
+	} else {
+	
+		set cdname [extractcolonstr [lindex $audiotrackinfo 1]]
+		set trkname [extractcolonstr [lindex $audiotrackinfo 2]]
+		set trknr [extractcolonstr [lindex $audiotrackinfo 3]]
+		set offsets [extractcolonstr [lindex $audiotrackinfo 4]]
+		set preemp [extractcolonstr [lindex $audiotrackinfo 5]]
+		set cpyprm [extractcolonstr [lindex $audiotrackinfo 6]]
+		set skip2 [extractcolonstr [lindex $audiotrackinfo 7]]
+		set bigend [extractcolonstr [lindex $audiotrackinfo 8]]
+	
+		frame $w.1
+		tixLabelWidget $w.1.l -label "CD-Name : " \
+			-options {label.width 16 label.anchor e}
+		message $w.1.v -anchor w -width 300 -text $cdname
+		pack $w.1 -expand 1 -fill x  
+		pack $w.1.l -side left
+		pack $w.1.v -side left -expand 1 -fill x
+	
+		frame $w.2
+		tixLabelWidget $w.2.l -label "Track-Name : " \
+			-options {label.width 16 label.anchor e}
+		message $w.2.v -anchor w -width 300 -text $trkname
+		pack $w.2 -expand 1 -fill x
+		pack $w.2.l -side left
+		pack $w.2.v -side left -expand 1 -fill x
+	
+		frame $w.3
+		tixLabelWidget $w.3.l -label "Track-Number : " \
+			-options {label.width 16 label.anchor e}
+		message $w.3.v -anchor w -width 300 -text $trknr
+		pack $w.3 -expand 1 -fill x 
+		pack $w.3.l -side left
+		pack $w.3.v -side left -expand 1 -fill x
+	
+		frame $w.4
+		tixLabelWidget $w.4.l -label "Offsets : " \
+			-options {label.width 16 label.anchor e}
+		message $w.4.v -anchor w -width 300 -text $offsets
+		pack $w.4 -expand 1 -fill x
+		pack $w.4.l -side left
+		pack $w.4.v -side left -expand 1 -fill x
+	
+		frame $w.5
+		tixLabelWidget $w.5.l -label "Preemphasis : " \
+			-options {label.width 16 label.anchor e}
+		message $w.5.v -anchor w -width 300 -text $preemp
+		pack $w.5 -expand 1 -fill x 
+		pack $w.5.l -side left
+		pack $w.5.v -side left -expand 1 -fill x
+	
+		frame $w.6
+		tixLabelWidget $w.6.l -label "Copy-permitted : " \
+			-options {label.width 16 label.anchor e}
+		message $w.6.v -anchor w -width 300 -text $cpyprm
+		pack $w.6 -expand 1 -fill x
+		pack $w.6.l -side left
+		pack $w.6.v -side left -expand 1 -fill x
+	
+		frame $w.7
+		tixLabelWidget $w.7.l -label "Skip last 2 sec. : " \
+			-options {label.width 16 label.anchor e}
+		message $w.7.v -anchor w -width 300 -text $skip2
+		pack $w.7 -expand 1 -fill x
+		pack $w.7.l -side left
+		pack $w.7.v -side left -expand 1 -fill x
+	
+		frame $w.8
+		tixLabelWidget $w.8.l -label "Big-Endian : " \
+			-options {label.width 16 label.anchor e}
+		message $w.8.v -anchor w -width 300 -text $bigend
+		pack $w.8 -expand 1 -fill x
+		pack $w.8.l -side left
+		pack $w.8.v -side left -expand 1 -fill x
+	}
+
+  	tixButtonBox $w.box -orientation horizontal
+        $w.box add ok -text "Ok"  -command "destroy $w"
+        pack $w.box -fill x -expand 1
+}
+
+
+# Play-audio-track dialog: Plays audio-tracks from HD
+
+proc playaudiodialog { w } {
+global XCDR_IMAGE_PART
+global XCDR_IMAGE_MNTPNT
+global XCDR_DSP_DEV
+global MINIINFO
+global PLAYICO
+global deltrksizes
+global cddalst 
+global infoarray
+
+	# Is the image-partition mounted? If not mount it...
+	if { [getmountpnt $XCDR_IMAGE_PART] == "" } {
+
+		set mstat [domountext2 $XCDR_IMAGE_PART $XCDR_IMAGE_MNTPNT]
+		if { $mstat == 0 } { ; # mount failed
+			Msg_NoAudioImage .audioplaywarn .playaudio
+			destroy $w
+			return
+		} else {
+			Msg_Mounted .mntd $w $XCDR_IMAGE_PART $XCDR_IMAGE_MNTPNT
+		}
+	}	
+
+        # Draw header-bar
+        label $w.l -text "PLAY AUDIO TRACKS" -relief sunken -borderwidth 2 -anchor c
+        pack $w.l -fill x -expand 1 -ipady 10 -pady 5
+
+	set cddalst ""
+      	catch { set cddalst [glob $XCDR_IMAGE_MNTPNT/*.cdda] }
+	set nrtracks [llength $cddalst]
+
+	# Calc the total-time of all tracks
+	set totalsize 0
+	foreach i $cddalst {
+		set filesize [ file size $i ]
+		incr totalsize $filesize
+	}
+	set totaltime [convertframes2time [expr $totalsize/2352]]
+	set totalmb [expr $totalsize/1024/1024]
+
+	frame $w.4 
+	tixLabelWidget $w.4.nrtracks -label "Audio-Tracks on HD: " \
+		-options { label.width 25 label.anchor e }
+	label $w.4.nrtracksval -width 18 -relief sunken -borderwidth 1 \
+		-text $nrtracks -anchor c \
+		-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+	tixLabelWidget $w.4.length -label "Total length: " \
+		-options { label.width 15 label.anchor e }
+	label $w.4.lengthval -width 18 -relief sunken -borderwidth 1 \
+		-text "$totaltime ( $totalmb MB )" -anchor c \
+		-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+	pack $w.4 -fill x -expand 1 -padx 10 
+	pack $w.4.nrtracks -side left 
+	pack $w.4.nrtracksval -expand 1 -fill x -side left
+	pack $w.4.length -side left
+	pack $w.4.lengthval -expand 1 -fill x -side left
+
+
+	# Defined here to have access to variable "f"   
+	tixScrolledWindow $w.5 -height 300 -scrollbar auto
+	set f [$w.5 subwidget window]
+	pack $w.5 -expand 1 -fill x -padx 10 -pady 10
+
+	label $f.label -font "-misc-fixed-medium-r-normal-*-*-120-*-*-*-*-*-*" \
+	-text "\
+\ \ Track-          Track-title            Track-         File-name on HD \n\
+\ \ \ \ Nr.                                  length                         "
+
+	pack $f.label -fill x 
+
+	for { set i 1 } { $i <= $nrtracks } {incr i } {
+		set fname [lindex $cddalst [expr $i-1]]
+		set f_name [file tail $fname]
+		# Info-file-name
+		set i_name "[string range $fname 0 [expr [string length $fname]-5]]info"
+		set trksize [getaudiosize $fname]
+		set deltrksizes($i) [file size $fname]
+
+		# Load the info-file into a array
+		set infoarray($i) [loadfile2list $i_name]
+
+		frame $f.$i
+
+		label $f.$i.nrtr -text $i -width 3 -anchor c
+
+		# Extract Track-name 
+		set trkname [extractcolonstr [lindex $infoarray($i) 2]]
+		label $f.$i.name -width 25 -text $trkname \
+			-relief sunken -borderwidth 1 \
+			-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+		label $f.$i.tmp1 -width 1 
+		label $f.$i.tmp2 -width 1 
+		label $f.$i.tmp3 -width 1 
+		label $f.$i.tmp4 -width 3 
+
+		label $f.$i.time -text $trksize -width 10 -anchor c \
+			-relief sunken -borderwidth 1 \
+			-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+		label $f.$i.fname -text $f_name -width 20 -anchor c \
+			-relief sunken -borderwidth 1 \
+			-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+		button $f.$i.info -bitmap @$MINIINFO \
+			-command "showtrackinfo $w $f $i $i infoarray" 
+		button $f.$i.play -bitmap @$PLAYICO \
+			-command "playaudiotrack $f $i $fname"
+		if { $XCDR_DSP_DEV == "None" } {
+			$f.$i.play configure -state disabled	
+		}
+
+		pack $f.$i.tmp4 $f.$i.nrtr $f.$i.tmp3 $f.$i.name $f.$i.tmp1 $f.$i.time \
+			$f.$i.tmp2 $f.$i.fname -side left 
+		pack $f.$i.play $f.$i.info -side right
+		pack $f.$i -fill x 
+	}
+
+	tixButtonBox $w.box -orientation horizontal
+	$w.box add ok -text "Ok" -command "destroy $w"
+
+	pack $w.box -fill x -expand 1
+}
+
+
+# Called when play-button in play-menu is pressed.
+
+proc playaudiotrack { f i name } {
+global audioplayfname 
+
+	set audioplayfname $name
+
+	$f.$i.play configure -bg red -relief sunken
+
+	spawnsubwindow audioplay_doit .doplayaudio .playaudio
+
+	$f.$i.play configure -bg lightgray -relief raised 
+
+}
+
+
+# Verify-Data-Track-Dialog
+
+proc verifydatatrackdialog { w } {
+global XCDR_SOURCE_CDROM
+global XCDR_IMAGE_PART
+global XCDR_IMAGE_MNTPNT
+global TMP_DESTNAME
+global TMP_DEST
+
+	set blkname [ convertnametoblkdevice $XCDR_SOURCE_CDROM ]
+	lower $w
+	if {[checkifready $w] == 1} {
+		destroy $w
+		return
+	}
+	
+	if {[checkifaudio] == 1 } {
+		Msg_NoDataCD .ndcd $w
+		destroy $w
+		return
+	}
+
+        if {[checkifiso $blkname] == 0 } {
+                set NONISO 1
+        } else {
+                set NONISO 0
+        }
+
+	raise $w
+
+	# Is the image-partition mounted? If not mount it...
+	if { [getmountpnt $XCDR_IMAGE_PART] == "" } {
+
+		set mstat [domountext2 $XCDR_IMAGE_PART $XCDR_IMAGE_MNTPNT]
+		if { $mstat == 0 } { ; # mount failed
+			Msg_NoAudioImage .verifydatawarn .verifydata
+			destroy $w
+			return
+		} else {
+			Msg_Mounted .mntd $w $XCDR_IMAGE_PART $XCDR_IMAGE_MNTPNT
+		}
+	}	
+
+        # Draw header-bar
+        label $w.l -text "VERIFY DATA-TRACK" -relief sunken -borderwidth 2 -anchor c
+        pack $w.l -fill x -expand 1 -ipady 10 -pady 5
+
+	set TMP_DEST "file"
+
+        if { $NONISO == 0 } {
+                set imgspace [expr [ getisosize $blkname ]/1024/1024]
+        } else {
+                set imgspace [expr [ getnonisosize ]/1024/1024] 
+		if { $imgspace == 0 } {
+			Msg_ImpossibleNonIso .iniso $w
+			destroy $w
+			return
+		}
+        }
+
+
+	frame $w.1
+	tixLabelWidget $w.1.imgsize -label "Image Size : " \
+		-options { label.width 20 label.anchor e }
+	message $w.1.imgsizeval -width 150 -relief sunken -borderwidth 1 \
+		-text "$imgspace MB"
+
+	pack $w.1 -fill x -expand 1 -padx 10 -pady 10
+	pack $w.1.imgsize -side left 
+	pack $w.1.imgsizeval -expand 1 -fill x -side left
+
+	frame $w.3
+
+	tixComboBox $w.3.imgfname -disabledforeground gray \
+		-editable true -dropdown true -variable TMP_DESTNAME \
+		-selectmode immediate \
+		-label "Verify Data-Track : " \
+		-options {
+			label.width 20 
+			label.anchor e
+			listbox.height 5
+			entry.width 15 
+		}
+
+	pack $w.3 -fill x -expand 1 -padx 10 -pady 10
+	pack $w.3.imgfname -side left -fill x -expand 1
+
+	# analyse directory-contents
+	set rawlst ""
+	catch { set rawlst [glob $XCDR_IMAGE_MNTPNT/*.raw] }
+	set rawlist [split $rawlst]
+	foreach i $rawlist {
+		set name [file tail $i]
+		$w.3.imgfname insert end "$name"
+
+		# If this filename was selected in the read-image-box
+		# also select it now.
+		if { $name == $TMP_DESTNAME } {
+			tixSetSilent $w.3.imgfname $name
+		}
+	}
+	# If there is only one image-file in the directory, select it
+	if { [llength $rawlist] == 1 } {
+		tixSetSilent $w.3.imgfname [file tail $rawlist]
+	}
+	# If there is still no file selected, select the last in the list
+	if { $TMP_DESTNAME == "" } {
+		set last [lindex $rawlist [expr [llength $rawlist]-1]]
+		if { $last != "" } {
+			set name [file tail $last]
+			tixSetSilent $w.3.imgfname $name
+		}
+	}
+	tixButtonBox $w.box -orientation horizontal
+	$w.box add start -text "Start" -command "spawnsubwindow verifyimagedoit .verify_doit .verifydata" 
+	$w.box add cancel -text "Cancel" -command "destroy $w"
+
+	pack $w.box -fill x -expand 1
+}
+
+
+# Write-Audio-Dialog
+
+proc writeaudiodialog { w } {
+global XCDR_IMAGE_PART
+global XCDR_IMAGE_MNTPNT
+global MINIINFO
+global ADDARROW
+global DELARROW
+global cddalst 
+global infoarray
+global wrtaudiosel
+global wrttrksizes
+global towritesel
+global nrtowrite
+global towrtaudio
+
+	# Is the image-partition mounted? If not mount it...
+	if { [getmountpnt $XCDR_IMAGE_PART] == "" } {
+
+		set mstat [domountext2 $XCDR_IMAGE_PART $XCDR_IMAGE_MNTPNT]
+		if { $mstat == 0 } { ; # mount failed
+			Msg_NoAudioImage .audiowritewarn .writeaudio
+			destroy $w
+			return
+		} else {
+			Msg_Mounted .mntd $w $XCDR_IMAGE_PART $XCDR_IMAGE_MNTPNT
+		}
+	}	
+
+        # Draw header-bar
+        label $w.l -text "WRITE TRACKS" -relief sunken -borderwidth 2 -anchor c
+        pack $w.l -fill x -expand 1 -ipady 10 -pady 5
+
+	set cddalst ""
+      	catch { set cddalst [glob $XCDR_IMAGE_MNTPNT/*.raw $XCDR_IMAGE_MNTPNT/*.cdda] }
+	set nrtracks [llength $cddalst]
+
+	# Calc the total-time of all tracks
+	set totalsize 0
+	foreach i $cddalst {
+		set filesize [ file size $i ]
+		incr totalsize $filesize
+	}
+	set totaltime [convertframes2time [expr $totalsize/2352]]
+	set totalmb [expr $totalsize/1024/1024]
+	set nrtowrite 0
+
+	frame $w.4 
+	tixLabelWidget $w.4.nrtracks -label "Tracks on HD: " \
+		-options { label.width 25 label.anchor e }
+	label $w.4.nrtracksval -width 18 -relief sunken -borderwidth 1 \
+		-text $nrtracks -anchor c \
+		-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+	tixLabelWidget $w.4.length -label "Total length: " \
+		-options { label.width 25 label.anchor e }
+	label $w.4.lengthval -width 18 -relief sunken -borderwidth 1 \
+		-text "$totaltime ( $totalmb MB )" -anchor c \
+		-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+	pack $w.4 -fill x -expand 1 -padx 10 
+	pack $w.4.nrtracks -side left 
+	pack $w.4.nrtracksval -side left
+	pack $w.4.length -side left
+	pack $w.4.lengthval -side left
+
+	frame $w.1
+	tixLabelWidget $w.1.imgsize -label "Size of sel. tracks on HD: " \
+		-options { label.width 25 label.anchor e }
+	label $w.1.imgsizeval -width 18 -relief sunken -borderwidth 1 \
+		-text " 0:00.00 ( 0 MB )" -anchor c \
+		-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+	tixLabelWidget $w.1.wrtsize -label "Total size of tracks on CD: " \
+		-options { label.width 25 label.anchor e }
+	label $w.1.wrtsizeval -width 18 -relief sunken -borderwidth 1 \
+		-text " 0:00.00 ( 0 MB )" -anchor c \
+		-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+	pack $w.1 -fill x -expand 1 -padx 10 -pady 10
+	pack $w.1.imgsize -side left 
+	pack $w.1.imgsizeval -side left
+	pack $w.1.wrtsize -side left 
+	pack $w.1.wrtsizeval -side left
+
+	# Frame for main-windows
+	frame $w.3
+	frame $w.3.left
+	frame $w.3.middle
+	frame $w.3.right
+
+	pack $w.3 -expand 1 -fill x -padx 10 -pady 10
+	pack $w.3.left $w.3.middle $w.3.right -side left
+
+	tixScrolledWindow $w.3.left.w -height 300 -width 370 -scrollbar auto
+	set f1 [$w.3.left.w subwidget window]
+	tixScrolledWindow $w.3.right.w -height 300 -width 370 -scrollbar auto
+	set f2 [$w.3.right.w subwidget window]
+
+	label $w.3.left.l -text "Tracks on HD" -relief groove -borderwidth 2 -anchor c
+	label $w.3.right.l -text "Tracks to write on CD" -relief groove -borderwidth 2 -anchor c
+
+	tixButtonBox $w.3.left.box -orientation horizontal -relief flat
+	$w.3.left.box add sel_all -text "Select All" -command "del_sel_all_tracks $w $f1 $nrtracks wrtaudiosel wrttrksizes"
+	$w.3.left.box add sel_none -text "Select None" -command "del_sel_no_tracks $w $f1 $nrtracks"
+	tixButtonBox $w.3.right.box -orientation horizontal -relief flat
+	$w.3.right.box add sel_all -text "Select All" -command "wrt_sel_all_tracks $f2"
+	$w.3.right.box add sel_none -text "Select None" -command "wrt_sel_no_tracks $f2"
+
+	button $w.3.middle.add -bitmap @$ADDARROW -width 16 -height 100 \
+		-command "write_addtracks $w $f1 $f2 $nrtracks wrtaudiosel" 
+	button $w.3.middle.del -bitmap @$DELARROW -width 16 -height 100 \
+		-command "write_deltracks $w $f1 $f2 $nrtracks towrtaudiosel" 
+
+	pack $w.3.left.l -expand 1 -fill x -pady 6 -ipady 6
+	pack $w.3.left.w $w.3.left.box 
+	pack $w.3.right.l -expand 1 -fill x -pady 6 -ipady 6
+	pack $w.3.right.w $w.3.right.box 
+	pack $w.3.middle.add $w.3.middle.del 
+	
+	set labelstr "\
+\ \ Track-          Track-title            Track-         File-name on HD \n\
+\ \ \ \ Nr.                                  length                         "
+	label $f1.label -font "-misc-fixed-medium-r-normal-*-*-120-*-*-*-*-*-*" \
+	-text $labelstr
+
+	pack $f1.label -fill x 
+	label $f2.label -font "-misc-fixed-medium-r-normal-*-*-120-*-*-*-*-*-*" \
+	-text $labelstr
+
+	pack $f2.label -fill x 
+
+
+	# Scan Tracks on HD and add to left list
+	for { set i 1 } { $i <= $nrtracks } {incr i } {
+		set fname [lindex $cddalst [expr $i-1]]
+		set f_name [file tail $fname]
+		set basename [string range $fname 0 [expr [string last . $fname]-1]]
+		set exten [string range $fname [expr [string last . $fname]+1] end]
+		if { $exten == "raw" } {
+			set type "Data" 
+			set trksize "[expr [file size $fname]/1024/1024] MB"
+		} else {
+			set type "Audio"
+			set trksize [getaudiosize $fname]
+		}
+		# Info-file-name
+		set i_name "$basename.info"
+		set wrttrksizes($i) [file size $fname]
+		# Load the info-file into an array
+		set infoarray($i) [loadfile2list $i_name]
+
+		set wrtaudiosel($i) 0
+		frame $f1.$i
+		checkbutton $f1.$i.sel -variable wrtaudiosel($i) \
+			-command "del_seltrack $w $nrtracks wrtaudiosel wrttrksizes"
+
+		label $f1.$i.nrtr -text $i -width 3 -anchor c
+
+		# Extract Track-name 
+		set trkname [extractcolonstr [lindex $infoarray($i) 2]]
+		label $f1.$i.name -width 25 -text $trkname \
+			-relief sunken -borderwidth 1 \
+			-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+		label $f1.$i.tmp1 -width 1 
+		label $f1.$i.tmp2 -width 1 
+		label $f1.$i.tmp3 -width 1 
+
+		label $f1.$i.time -text $trksize -width 10 -anchor c \
+			-relief sunken -borderwidth 1 \
+			-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+		label $f1.$i.fname -text $f_name -width 20 -anchor c \
+			-relief sunken -borderwidth 1 \
+			-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+		button $f1.$i.info -bitmap @$MINIINFO \
+			-command "showtrackinfo $w $f1 $i $i infoarray" 
+
+		pack $f1.$i.sel $f1.$i.nrtr $f1.$i.name $f1.$i.tmp1 $f1.$i.time \
+			$f1.$i.tmp2 $f1.$i.fname -side left 
+		pack $f1.$i.info $f1.$i.tmp3 -side right
+		pack $f1.$i -fill x 
+	}
+
+	tixButtonBox $w.box -orientation horizontal
+	$w.box add start -text "Continue" -command "spawnsubwindow writeaudio2dialog .writeaudio2 .writeaudio" 
+	$w.box add cancel -text "Cancel" -command "destroy $w"
+
+	pack $w.box -fill x -expand 1
+}
+
+
+# Called by the Add-button in the write-audio-menu
+
+proc write_addtracks { w f1 f2 nrtracks audiosel } {
+global nrtowrite
+global towritesel
+
+upvar $audiosel sel 
+
+	# Add all selected tracks to the towrite-array
+	for { set i 1 } { $i <= $nrtracks } {incr i } {
+		if { $sel($i) != 0 } {
+			incr nrtowrite
+			set towritesel($nrtowrite) $i
+
+			# Mark tracks to be copied
+			$f1.$i.name configure -fg gray50
+			$f1.$i.time configure -fg gray50
+			$f1.$i.fname configure -fg gray50
+			$f1.$i.sel deselect
+		}
+	}
+
+	update_towrite $w $f2
+}
+
+
+# Called by the Del-button in the write-audio-menu
+
+proc write_deltracks { w f1 f2 nrtracks towrtaudiosel } {
+global nrtowrite
+global towritesel
+
+upvar $towrtaudiosel sel 
+
+	set didremove 0
+
+	# Mark all selected tracks from the towrite-array to -1
+	for { set i 1 } { $i <= $nrtowrite } {incr i } {
+		if { $sel($i) != 0 } {
+		 	incr didremove
+
+			# Set dest to real tracknumber (the one in the
+			# left window)
+			set dest $towritesel($i)
+			# Mark as deleted
+			set towritesel($i) -1 
+
+			# Find out if there are more tracks with that
+			# number left, set notlast accordingly
+			set notlast 0
+			for { set k 1 } { $k <= $nrtowrite } { incr k } {
+				if { $towritesel($k) == $dest } {
+					set notlast 1
+				}
+			}
+			
+			# If we removed all tracks with that number $dest,
+			# unmark the fitting source-track.
+			if { $notlast == 0 } {
+				$f1.$dest.name configure -fg black 
+				$f1.$dest.time configure -fg black 
+				$f1.$dest.fname configure -fg black
+			}
+		}
+	}
+
+	set j 1
+	# Search the array for tracks marked -1 and remove them
+	for { set i 1 } { $i <= $nrtowrite } {incr i } {
+		if { $towritesel($i) != -1 } {
+			set towritesel($j) $towritesel($i)
+			incr j
+		}
+	}
+
+	set nrtowrite [expr $nrtowrite-$didremove]
+
+	update_towrite $w $f2
+}
+
+
+# Redraws the to-write-window, called by the add or delete-button
+# in the Write-Tracks-Menu
+
+proc update_towrite { w f2 } {
+global MINIINFO
+global nrtowrite
+global towritesel
+global cddalst
+global infoarray
+global towrtaudiosel
+
+	# First clean out the contents of to-write-window
+	eval "destroy [winfo children $f2]"
+
+	# Then draw the contents
+	set labelstr "\
+\ \ Track-          Track-title            Track-         File-name on HD \n\
+\ \ \ \ Nr.                                  length                         "
+	label $f2.label -font "-misc-fixed-medium-r-normal-*-*-120-*-*-*-*-*-*" \
+	-text $labelstr
+	pack $f2.label -fill x 
+
+	set tracksum 0
+
+	for { set i 1 } { $i <= $nrtowrite } {incr i } {
+
+		# Get Index of track in audiosel-array
+		set j $towritesel($i)
+
+		set fname [lindex $cddalst [expr $j-1]]
+		set f_name [file tail $fname]
+		set basename [string range $fname 0 [expr [string last . $fname]-1]]
+		set exten [string range $fname [expr [string last . $fname]+1] end]
+		if { $exten == "raw" } {
+			set type "Data" 
+			set trksize "[expr [file size $fname]/1024/1024] MB"
+		} else {
+			set type "Audio"
+			set trksize [getaudiosize $fname]
+		}
+
+		# Accumulate all file-sizes
+		incr tracksum [file size $fname]
+
+		set towrtaudiosel($i) 0
+		frame $f2.$i
+		checkbutton $f2.$i.sel -variable towrtaudiosel($i) 
+
+		label $f2.$i.nrtr -text $i -width 3 -anchor c
+
+		# Extract Track-name 
+		set trkname [extractcolonstr [lindex $infoarray($j) 2]]
+		label $f2.$i.name -width 25 -text $trkname \
+			-relief sunken -borderwidth 1 \
+			-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+		label $f2.$i.tmp1 -width 1 
+		label $f2.$i.tmp2 -width 1 
+		label $f2.$i.tmp3 -width 1 
+
+		label $f2.$i.time -text $trksize -width 10 -anchor c \
+			-relief sunken -borderwidth 1 \
+			-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+		label $f2.$i.fname -text $f_name -width 20 -anchor c \
+			-relief sunken -borderwidth 1 \
+			-font "-*-helvetica-medium-r-normal-*-14-*-*-*-*-*-*-*"
+
+		button $f2.$i.info -bitmap @$MINIINFO \
+			-command "showtrackinfo $w $f2 $j $i infoarray" 
+
+		pack $f2.$i.sel $f2.$i.nrtr $f2.$i.name $f2.$i.tmp1 $f2.$i.time \
+			$f2.$i.tmp2 $f2.$i.fname -side left 
+		pack $f2.$i.info $f2.$i.tmp3 -side right
+		pack $f2.$i -fill x 
+	}
+
+	# Update total-size display. Take in account the 2 sec pause between
+	# each track!!!
+
+	# Pausetime, between each track 2 sec (created by the cdwriter
+	# itself due the Track-At-Once-Mode of cdwrite.
+	if { $nrtowrite == 1 || $nrtowrite == 0 } { 	
+		set pausetime 0 
+	} else {
+		set pausetime [expr ($nrtowrite-1)*2*75*2352]
+	}
+
+	set time [convertframes2time [expr ($tracksum+$pausetime)/2352]]
+ 	set mb [expr (($tracksum+$pausetime)/1024/1024)]
+	$w.1.wrtsizeval configure -text "$time ( $mb MB )" 
+}
+
+
+# Called by the right Select-All-Button in the Write-Tracks-Menu 
+
+proc wrt_sel_all_tracks { f } {
+global towrtaudiosel
+global nrtowrite
+
+	for { set i 1 } { $i <= $nrtowrite } { incr i } {
+		$f.$i.sel select
+	} 
+}
+
+
+# Called by the right Select-None-Button in the Write-Tracks-Menu 
+
+proc wrt_sel_no_tracks { f } {
+global towrtaudiosel
+global nrtowrite
+
+	for { set i 1 } { $i <= $nrtowrite } { incr i } {
+		$f.$i.sel deselect
+	}
+}
+
+
+# Write-Tracks-Dialog Part II
+
+proc writeaudio2dialog { w } {
+global XCDR_SOURCE_CDROM
+global XCDR_IMAGE_PART
+global XCDR_IMAGE_MNTPNT
+global TMP_DESTNAME
+global TMP_DEST
+global cd_type
+global nrtowrite
+global towritesel
+global TMP_needspace
+global cddalst
+
+	if { [ info exists cd_type ] == 0  } {
+		set cd_type 74
+	}
+
+	set tracksum 0
+	for { set i 1 } { $i <= $nrtowrite } {incr i } {
+
+		# Get Index of track in audiosel-array
+		set j $towritesel($i)
+		set fname [lindex $cddalst [expr $j-1]]
+		# Accumulate all file-sizes
+		incr tracksum [file size $fname]
+	}
+
+	# Any tracks selected?
+        if { $tracksum == 0 } {
+                lower $w
+                Msg_NoTracksSel .notrk $w
+                destroy $w
+                return
+        }
+
+        # Draw header-bar
+        label $w.l -text "WRITE TRACKS" -relief sunken -borderwidth 2 -anchor c
+        pack $w.l -fill x -expand 1 -ipady 10 -pady 5
+
+	# Update total-size display. Take in account the 2 sec pause between
+	# each track!!!
+
+	# Pausetime, between each track 2 sec (created by the cdwriter
+	# itself due the Track-At-Once-Mode of cdwrite.
+	if { $nrtowrite == 1 || $nrtowrite == 0 } { 	
+		set pausetime 0 
+	} else {
+		set pausetime [expr ($nrtowrite-1)*2*75*2352]
+	}
+
+	set time [convertframes2time [expr ($tracksum+$pausetime)/2352]]
+ 	set mb [expr (($tracksum+$pausetime)/1024/1024)]
+	set trkspace "$time ( $mb MB )" 
+	set TMP_needspace $mb
+
+	frame $w.6
+	tixLabelWidget $w.6.type -label "CD-Recordable-Type: " \
+		-options { label.width 20 label.anchor e }
+	radiobutton $w.6.b1 -text "74 min ( 650 MB )" -variable cd_type -value 74
+
+	pack $w.6 -fill x -expand 1 -padx 10 
+	pack $w.6.type $w.6.b1 -side left
+
+	frame $w.5
+	tixLabelWidget $w.5.type \
+		-options { label.width 20 label.anchor e }
+	radiobutton $w.5.b2 -text "63 min ( 553 MB )" -variable cd_type -value 63
+
+	pack $w.5 -fill x -expand 1 -padx 10 
+	pack $w.5.type $w.5.b2 -side left
+
+	frame $w.1
+	tixLabelWidget $w.1.imgsize -label "Total CD-Size : " \
+		-options { label.width 20 label.anchor e }
+	message $w.1.imgsizeval -width 150 -relief sunken -borderwidth 1 \
+		-text "$trkspace"
+
+	pack $w.1 -fill x -expand 1 -padx 10 -pady 10
+	pack $w.1.imgsize -side left 
+	pack $w.1.imgsizeval -expand 1 -fill x -side left
+
+	frame $w.2
+	tixLabelWidget $w.2.l -label "Number of Tracks : " \
+		-options { label.width 20 label.anchor e }
+	message $w.2.nrt -width 150 -relief sunken -borderwidth 1 \
+		-text "$nrtowrite"
+	pack $w.2 -expand 1 -fill x -padx 10
+	pack $w.2.l -side left
+	pack $w.2.nrt -expand 1 -fill x -side left
+
+	tixLabelFrame $w.4 -label "Additional Options"
+	set w1 [$w.4 subwidget frame]
+	pack $w.4 -expand 1 -fill x -padx 10 -pady 10
+
+	frame $w1.4
+	tixLabelWidget $w1.4.l -label "Simulation-Write: " \
+		-options {label.width 20 label.anchor e}
+	checkbutton $w1.4.b -variable DUMMY -anchor w
+	pack $w1.4 -expand 1 -fill x -padx 10 
+	pack $w1.4.l $w1.4.b -side left 
+
+	if ![checkifyamaha] {
+		frame $w1.5
+		tixLabelWidget $w1.5.l -label "Eject after write: " \
+			-options {label.width 20 label.anchor e}
+		checkbutton $w1.5.b -variable EJECT -anchor w
+		pack $w1.5 -expand 1 -fill x -padx 10 
+		pack $w1.5.l $w1.5.b -side left 
+	} else {
+		set EJECT 1
+	}
+	frame $w1.6
+	tixLabelWidget $w1.6.l -label "Pad Data-Track: " \
+		-options {label.width 20 label.anchor e}
+	checkbutton $w1.6.b -variable PADDATA -anchor w
+	pack $w1.6 -expand 1 -fill x -padx 10 
+	pack $w1.6.l $w1.6.b -side left 
+
+	tixButtonBox $w.box -orientation horizontal
+	$w.box add start -text "Start" -command "spawnsubwindow writeaudiodoit .writeaudio_doit .writeaudio2" 
+	$w.box add cancel -text "Cancel" -command "destroy $w"
+
+	pack $w.box -fill x -expand 1
+}
+
+
+# Do the writing of the tracks
+
+proc writeaudiodoit { w } {
+global CDWRITE 
+global XCDR_DEST_WRITER_DEV
+global XCDR_DEST_WRITER_MODE
+global XCDR_DEST_WRITER_SPEED
+global XCDR_IMAGE_PART
+global XCDR_IMAGE_MNTPNT
+global EJECT DUMMY PADDATA
+global nrtowrite
+global towritesel
+global cddalst
+global cd_type
+global TMP_needspace
+global pipe tmpw waitforready
+
+	# This variables must be global, because the fileevent-command
+	# can't handle local-variables
+
+	set waitforready 0
+
+	# Convert space from MB to minutes
+	set needframes [expr $TMP_needspace*1024*1024/2352]
+	set needmin [expr $needframes/(60*75)]
+
+	# Check if enough space on CDR is free
+        if { $needmin >= $cd_type } {
+                lower $w
+                set stat [Msg_CDoverrun .cdor $w]
+                if { $stat == 0 } {     ;# Abort
+                        destroy $w
+                        return
+                }
+                raise $w
+        }
+
+	set cdwdev [ convertnametogendevice $XCDR_DEST_WRITER_DEV ]
+
+	# Construct command-line for cdwrite
+	set cmd "$CDWRITE -t -s $XCDR_DEST_WRITER_SPEED -D $cdwdev"
+	if { $EJECT == 1 } {
+		set cmd "$cmd -e"
+	} 
+	if { $DUMMY == 1 } {
+		set cmd "$cmd -y"
+	} 
+	if { $XCDR_DEST_WRITER_MODE != "Autodetect" } {
+		if { $XCDR_DEST_WRITER_MODE == "Philips/Kodak/IMS" } {
+			set cmd "$cmd --philips"
+		}
+		if { $XCDR_DEST_WRITER_MODE == "HP" } {
+			set cmd "$cmd --hp"
+		}
+		if { $XCDR_DEST_WRITER_MODE == "Yamaha" } {
+			set cmd "$cmd --yamaha"
+		}
+		if { $XCDR_DEST_WRITER_MODE == "Sony" } {
+			set cmd "$cmd --sony"
+		}
+	}
+	if { $PADDATA == 1 } {
+		set cmd "$cmd -P"
+	} 
+
+	set cmd "$cmd --audio"
+
+	set datafirst 1
+	# Loop through all tracks
+	for { set i 1 } { $i <= $nrtowrite } {incr i } {
+
+		# Get Index of track in audiosel-array
+		set j $towritesel($i)
+		set fname [lindex $cddalst [expr $j-1]]
+		set f_name [file tail $fname]
+		set basename [string range $fname 0 [expr [string last . $fname]-1]]
+		set exten [string range $fname [expr [string last . $fname]+1] end]
+		if { $exten == "raw" } {
+			set type "-d" 
+			set datafirst $i
+
+			# check if image is truncated
+			set filesize [ file size $fname]
+			set isosize [ getisosize $fname]
+			if { $filesize < $isosize } {
+				lower $w
+				set stat [Msg_TruncatedImage .trimg $w]
+ 				if { $stat == 0 } {     ;# Abort
+ 		                       destroy $w
+ 		                       return
+ 		               	}
+			}	
+		} else {
+			set type "-a"
+		}
+		# Info-file-name
+		set i_name "$basename.info"
+		# Get Preemphasis from describtion-file
+		set nfoarray [loadfile2list $i_name]
+		set preemp [extractcolonstr [lindex $nfoarray 5]]
+		if { $preemp == "1" } {
+			set pre "-p"
+		} else {
+			set pre "-n"
+		}
+
+		set cmd "$cmd $type $pre $fname"
+	}
+
+	# Check if there is the data-track (if any) on the right position
+	if { $datafirst != 1 } {
+		lower $w
+		set stat [Msg_DataNotFirst .dnf $w]
+        	if { $stat == 0 } {     ;# Abort
+        	        destroy $w
+        	        return
+        	}
+	}
+
+        # Prompt user for inserting CDR
+        lower $w
+        set stat [Msg_InsertCDR .inscdr $w]
+        if { $stat == 1 } {     ;# Cancel
+                destroy $w
+                return
+        }
+        raise $w        
+
+	log $w "Write-Tracks: writing $nrtowrite tracks, dummy=$DUMMY" 
+
+	log $w "Executing: $cmd"
+
+	set pipe [open "|$cmd" r+]
+	
+	label $w.l -text "Writing Tracks... Please wait"
+	label $w.l2 -text ""
+	canvas $w.c -height 20 -width 303 -borderwidth 1 -relief sunken \
+		-background gray95
+	pack $w.l $w.l2 $w.c -padx 10 -pady 10
+
+	$w.c create text 160 14 -text "0%" -fill gray50 -tag pertext
+
+        tixButtonBox $w.box -orientation horizontal
+        $w.box add cancel -text "Cancel" -command {
+		set waitforready 2 
+		catch { close $pipe }
+	}
+	pack $w.box -fill x -expand 1
+
+	set tmpw $w
+	fileevent $pipe readable {
+		global pipe tmpw waitforready out percent
+		set out [gets $pipe] 
+
+		if { $out == "" } { 
+			set waitforready 1; close $pipe 
+		}
+		# track-info-output
+		if { [string index $out 0] == "D" } {
+			set track [string range $out 7 8]
+			set total [string range $out 10 end]
+			set percent 0
+			# Clean process-bar
+			drawbar $tmpw.c $percent 1 
+			# Update track-display
+			$tmpw.l2 configure -text "Track $track: $total MB"
+		}
+		# percent-output
+		if { [string index $out 0] == "Z" } {
+			set track [string range $out 1 2]
+			set percent [string range $out 4 end]
+		}
+		# Fixation-output
+		if { [string index $out 0] == "F" } {
+			$tmpw.l2 configure -text "Fixating..."
+		}
+		drawbar $tmpw.c $percent 0
+	}	
+
+	tkwait variable waitforready
+
+	#we are done with reading now...
+	if { $waitforready == 1 } {
+		$w.l configure -text "Write Tracks completed!"
+		$w.l2 configure -text ""
+		log $w "Write-Tracks: OK"
+	} else {
+		$w.l configure -text "Write Tracks aborted!"	
+		$w.l2 configure -text ""
+		log $w "Write-Tracks: aborted"
+	}
+
+	$w.box.cancel configure -text "Ok" -command "destroy $w" -width 5
+	sound 1
+
+	# Clear the global variables
+	unset pipe tmpw waitforready
+}
+
+
+# Dialog for verify burned Data-CD 
+
+proc verify2imagedialog { new old } {
+
+	if { [Msg_InsertBurnedCDR .dlg $old] == 1 } {
+		return
+	}
+	spawnsubwindow verifyimagedialog $new $old 
+
+}
+
+
+# Dialog for verify burned Mixed-Mode-CD
+
+proc verify2datadialog { new old } {
+
+	if { [Msg_InsertBurnedCDR .dlg $old] == 1 } {
+		return
+	}
+	spawnsubwindow verifydatatrackdialog $new $old 
+
+}
+
+
+# Quick CD->CD dump. Works only for pure ISO9660-Data CDs.
+# Use only at own risk
+ 
+proc quickcopydialog { w } {
+global XCDR_DEST_WRITER_DEV
+global XCDR_SOURCE_CDROM
+global XCDR_DEST_WRITER_SPEED
+global TMP_DEST
+global cd_type
+global DUMMY EJECT PADDATA
+
+	log $w "entering Quick CD-Copy"
+        lower $w
+	
+	set stat [Msg_QuickCopyWarning .qwarn $w]
+	if { $stat == 1 } {	;# Cancel
+		destroy $w
+		return
+	}
+
+	if { [ info exists cd_type ] == 0  } {
+		set cd_type 74
+	}
+
+      	set blkname [ convertnametoblkdevice $XCDR_SOURCE_CDROM ]
+      	set blkname2 [ convertnametoblkdevice $XCDR_DEST_WRITER_DEV ]
+
+	# Do we have 2 different CD-Devices?
+	if { $blkname == $blkname2 } {
+		Msg_Need2CDRoms .ntwocd $w
+		destroy $w
+		return
+	}
+
+        if {[checkifready $w] == 1} {
+                destroy $w
+                return
+        }
+        
+        if {[checkifaudio] == 1 || [checkifmixedmode] == 1 ||
+	    [checkifiso $blkname] == 0 } {
+                Msg_NotPureIso .ndcd $w
+                destroy $w
+                return
+        }
+
+        raise $w
+
+        # Draw header-bar
+        label $w.l -text "QUICK CD->CD" -relief sunken -borderwidth 2 -anchor c
+        pack $w.l -fill x -expand 1 -ipady 10 -pady 5
+
+	tixLabelFrame $w.3 -label "Devices-Setup"
+	set w0 [$w.3 subwidget frame]
+	pack $w.3 -expand 1 -fill x -padx 10 -pady 10
+
+        frame $w0.1
+        tixLabelWidget $w0.1.readl -label "Read from : " \
+                -options {label.width 15 label.anchor e}
+        message $w0.1.readt -anchor w -width 250 -relief groove
+        $w0.1.readt configure -text $XCDR_SOURCE_CDROM
+        pack $w0.1.readl -side left
+        pack $w0.1.readt -side left -expand 1 -fill x
+
+        frame $w0.3
+        tixLabelWidget $w0.3.writel -label "Write to : " \
+                -options {label.width 15 label.anchor e}
+        message $w0.3.writet -anchor w -width 250 -relief groove
+        $w0.3.writet configure -text $XCDR_DEST_WRITER_DEV
+        pack $w0.3.writel -side left
+        pack $w0.3.writet -side left -fill x -expand 1 
+        
+        frame $w0.2
+        tixLabelWidget $w0.2.writel -label "Write Speed : " \
+                -options {label.width 15 label.anchor e}
+        message $w0.2.writet -anchor w -width 250 
+        $w0.2.writet configure -text "$XCDR_DEST_WRITER_SPEED x"
+        pack $w0.2.writel -side left
+        pack $w0.2.writet -side left -fill x -expand 1 
+
+        pack $w0.1 $w0.3 $w0.2 -side top -expand 1 -fill x
+
+	frame $w.6
+	tixLabelWidget $w.6.type -label "CD-Recordable-Type: " \
+		-options { label.width 20 label.anchor e }
+	radiobutton $w.6.b1 -text "74 min ( 650 MB )" -variable cd_type -value 74
+
+	pack $w.6 -fill x -expand 1 -padx 10 
+	pack $w.6.type $w.6.b1 -side left
+
+	frame $w.5
+	tixLabelWidget $w.5.type \
+		-options { label.width 20 label.anchor e }
+	radiobutton $w.5.b2 -text "63 min ( 553 MB )" -variable cd_type -value 63
+
+	pack $w.5 -fill x -expand 1 -padx 10 
+	pack $w.5.type $w.5.b2 -side left
+
+	set imgspace [expr [ getisosize $blkname ]/1024/1024]
+	set TMP_DEST "quick"
+
+	frame $w.1
+	tixLabelWidget $w.1.imgsize -label "CD Size : " \
+		-options { label.width 20 label.anchor e }
+	message $w.1.imgsizeval -width 150 -relief sunken -borderwidth 1 \
+		-text "$imgspace MB"
+
+	pack $w.1 -fill x -expand 1 -padx 10 -pady 10
+	pack $w.1.imgsize -side left 
+	pack $w.1.imgsizeval -expand 1 -fill x -side left
+
+
+	tixLabelFrame $w.4 -label "Write Options"
+	set w1 [$w.4 subwidget frame]
+	pack $w.4 -expand 1 -fill x -padx 10 -pady 10
+
+	frame $w1.4
+	tixLabelWidget $w1.4.l -label "Simulation-Write: " \
+		-options {label.width 20 label.anchor e}
+	checkbutton $w1.4.b -variable DUMMY -anchor w
+	pack $w1.4 -expand 1 -fill x -padx 10 
+	pack $w1.4.l $w1.4.b -side left 
+
+	if ![checkifyamaha] {
+		frame $w1.5
+		tixLabelWidget $w1.5.l -label "Eject after write: " \
+			-options {label.width 20 label.anchor e}
+		checkbutton $w1.5.b -variable EJECT -anchor w
+		pack $w1.5 -expand 1 -fill x -padx 10 
+		pack $w1.5.l $w1.5.b -side left 
+	} else {
+		set EJECT 1
+	}
+
+	frame $w1.6
+	tixLabelWidget $w1.6.l -label "Pad Data-Track: " \
+		-options {label.width 20 label.anchor e}
+	checkbutton $w1.6.b -variable PADDATA -anchor w
+	pack $w1.6 -expand 1 -fill x -padx 10 
+	pack $w1.6.l $w1.6.b -side left 
+
+	tixButtonBox $w.box -orientation horizontal
+	$w.box add write -text "Write" -command "spawnsubwindow writeimagedoit .write_doit $w" 
+	$w.box add verify -text "Verify" -command "spawnsubwindow verifyimagedoit .verify_doit $w" 
+	$w.box add cancel -text "Cancel" -command "destroy $w"
+
+	pack $w.box -fill x -expand 1
+}
+		
+

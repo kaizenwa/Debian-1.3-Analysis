@@ -1,0 +1,198 @@
+#! /bin/sh
+# Update 3rd field (minimum art. #) of a 4-field active file.
+
+
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+
+
+PATH=$NEWSCTL/bin:$NEWSBIN/maint:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+maxlen=200			# max length for shell cmd; 200 is pretty safe
+replace=yes
+what=normal			# update min, make sure max has a 0 on front
+lserr=/dev/null
+interpose=
+for dummy
+do
+	case "$1" in
+	-b)	what=both	;;	# update both max and min
+	-p)	what=plain	;;	# don't do ANYTHING to max
+	-s)	maxlen=0	;;	# ls is funny, do slow way
+	'-#')	replace=no ; lserr=$NEWSCTL/active.errs	;;	# debugging
+	-I)	interpose="$2" ; shift ;;	# interpose pgm for testing
+	--)	shift ; break	;;
+	-*)	echo "$0: unknown option \`$1'" >&2 ; exit 2	;;
+	*)	break		;;
+	esac
+	shift
+done
+
+cd $NEWSCTL
+
+# lock news system momentarily and grab a copy of the active file
+lock LOCK $$ || exit 1
+status=1
+trap 'unlock LOCK ; trap 0 ; exit $status' 0 1 2 15
+sort active >active.upact || exit	# sort brings related dirs together
+trap 0 1 2 15
+unlock LOCK
+
+# check out the active file
+checkactive -n -q active.upact >active.eek
+if test -s active.eek
+then
+	echo "$0: problems in active file -- aborting" >&2
+	cat active.eek >&2
+	rm -f active.eek active.upact
+	exit 1
+fi
+
+# Bernd Felsche of MetaPro Systems came up with this general approach,
+# which minimizes the number of processes spawned, although this code is
+# rather different from his.  Thanks, Bernd!
+
+# first, find minima, efficiently
+# translate names to dirs, turn dirs into "ls -f" commands, run them, pick
+# the desired data out of the output, turn dirs back into names, sort again,
+# and merge in old-max values
+tr '.' '/' <active.upact |
+	awk 'BEGIN {
+		maxlen = '"$maxlen"'
+		dirs = ""
+		ndirs = 0
+		print "cd '"$NEWSARTS"'"
+	}
+	length($1) + length(dirs) > maxlen && ndirs > 0 {
+		if (ndirs == 1)
+			print "echo " substr(dirs, 2) ":"
+		print "ls -f" dirs
+		dirs = ""
+		ndirs = 0
+	}
+	# the /. on the end eliminates problems with names including ":"
+	{ dirs = dirs " " $1 "/." ; ndirs++ }
+	END {
+		if (ndirs == 1)
+			print "echo " substr(dirs, 2) ":"
+		print "ls -f" dirs
+		print "echo /.:"		# simplifies later logic
+	}' | sh 2>$lserr |
+	awk -F' ' 'BEGIN {
+		OFMT = "%.12g"
+		big = 99999999999
+		lowest = big
+		small = 0
+		highest = small
+		dir = ""
+	}
+	$0 ~ /^[0-9]+$/ {
+		# some old awks do not think $0 is numeric, so use $1
+		if ($1 < lowest)
+			lowest = $1
+		if ($1 > highest)
+			highest = $1
+		next
+	}
+	$0 ~ /\/\.:$/ {
+		if (dir != "") {
+			if (highest != small)
+				print dir, highest, lowest
+			else
+				print dir, "-", "-"
+		}
+		dir = substr($0, 1, length($0)-3)	# trim off /.:
+		lowest = big
+		highest = small
+	}' | tr '/' '.' | sort |
+	join -o 1.1 2.2 1.2 1.3 - active.upact >active.hilow
+# active.hilow now is newsgroup, old max, high file, low file
+
+# testing hook
+if test " $interpose" != " "
+then
+	$interpose
+fi
+
+# lock news system again
+lock LOCK $$ || exit 1
+status=1
+trap 'unlock LOCK ; trap 0 ; exit $status' 0 1 2 15
+
+# decide on any extra processing needed
+extra=
+case "$what" in
+both)	extra='$7 != "-" && $7 > $3 {
+		# update max from high file
+		s = "000000000000000" $7
+		len = length($3)
+		if (length($7) > len)
+			len = length($7) + 1
+		s = substr(s, length(s)-len+1)
+		if (s !~ /^0/)
+			s = "0" s
+		$3 = s
+	}'
+	;;
+normal)	extra='$3 !~ /^0/ { $3 = "0" $3 }'	;;
+esac
+
+# build new active file, cautiously
+# The result of the join is line number (for the sort -n that restores the
+# old order of the active file), newsgroup, active max, active min, active
+# flags, old max, high file, low file.
+awk '{ print $1, $2, $3, $4, NR }' active | sort |
+	join -a1 -e - -o 1.5 1.1 1.2 1.3 1.4 2.2 2.3 2.4 - active.hilow |
+	sort -n |
+	awk 'BEGIN { OFMT = "%.12g" }
+	$1 == "-" { next }		# no longer in active file
+	'"$extra"'
+	{
+		# find a new value for min
+		if ($8 != "-" && $8 != "")	# there was a low file
+			s = $8			# use it
+		else if ($6+0 != $3+0)		# oldmax != newmax, race cond!
+			s = $4			# use old value to be safe
+		else				# no files and no race
+			s = $3 + 1		# use max+1
+
+		if (length(s) < 5) {
+			s = "00000" s
+			s = substr(s, length(s)-5+1)
+		}
+		print $2, ($3 ""), s, $5	# the "" forces string version
+	}' >active.tmp
+
+# check that everything looks okay
+checkactive -q active.tmp >active.eek
+if test -s active.eek
+then
+	echo "$0: errors in active.tmp -- aborting" >&2
+	cat active.eek >&2
+	exit			# with status=1
+fi
+if test `wc -l <active.tmp` -lt `wc -l <active`
+then
+	echo "$0: active.tmp is bad (short) -- aborting" >&2
+	exit			# with status=1
+fi
+rm -f active.eek active.hilow active.upact	# clean up temporaries
+
+# if we weren't asked to install it, don't
+case "$replace" in
+no)	status=0 ; exit	;;
+esac
+
+# replace active, carefully
+rm -f active.old
+mv active active.old && mv active.tmp active
+if test -f active.tmp
+then
+	echo "$0: replacing active didn't work" >&2
+	exit			# with status=1
+fi
+
+status=0			# trap 0 does the actual exit

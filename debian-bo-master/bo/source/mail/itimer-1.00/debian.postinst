@@ -1,0 +1,75 @@
+#!/usr/bin/perl
+#
+# This is the postinst script for the Debian itimer package
+#
+# 1995-08-10 Richard Kettlewell <richard@elmail.co.uk>
+#
+
+$sitestart = &followlink("/usr/lib/emacs/site-lisp/site-start.el");
+$backup = "$sitestart.tmp";
+
+open(BACKUP, ">$backup") || do {
+    print STDERR "Cannot create file \"$backup\": $!\n";
+    exit 1;
+};
+
+open(SITESTART, "<$sitestart") && do {
+    $! = 0;
+    while(<SITESTART>)
+    {
+	/\(require \'itimer\)/ || print BACKUP || do {
+	    print STDERR "Cannot write to file \"$backup\": $!\n";
+	    unlink($backup);
+	    exit 1;
+	};
+    }
+    $! && do {
+	print "Cannot read from $sitestart: $!\n";
+	close BACKUP;
+	unlink $backup;
+	exit 1;
+    };
+    close SITESTART;
+};
+
+print BACKUP "(require 'itimer)\n";
+
+close BACKUP || do {
+    unlink($backup);
+    print STDERR "Cannot write to file \"$backup\": $!\n";
+    exit 1;
+};
+
+rename($backup, $sitestart) || do {
+    unlink($backup);
+    print STDERR "Cannot move \"$backup\" to \"$sitestart\": $!\n";
+    exit 1;
+};
+
+# derefence a link
+
+sub followlink
+{
+    local($_) = @_;
+    my $deref;
+    while(-l $_)
+    {
+	defined($deref = readlink($_)) || do {
+	    print STDERR "readlink $_: $!\n";
+	    exit 1;
+	};
+	# We have a -> b
+	# if b starts with a /, we just look at b
+	# if a contains no slash, we just replace it with b always
+	# otherwise we replace everything after a's last slash with b
+	if($deref =~ /^\// || !/\/[^\/]*$/)
+	{
+	    $_ = $deref;
+	}
+	else
+	{
+	    $_ = $` . "/" . $deref;
+	}
+    }
+    return $_;
+}

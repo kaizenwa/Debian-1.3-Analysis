@@ -1,0 +1,242 @@
+#! /bin/sh
+# Master batching control.
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/batch:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+origpath="$PATH"
+
+args="$*"
+
+parms=$NEWSCTL/batchparms
+log=$NEWSCTL/batchlog
+parallel=n
+debug=n
+classpat=.
+for dummy
+do
+	case "$1" in
+	-p)	parallel=y		;;
+	-d)	debug=y			;;
+	-f)	parms="$2" ; shift	;;
+	-c)	classpat="$2" ; shift	;;
+	--)	shift ; break		;;
+	-*)	echo "$0: unknown option \`$1'" >&2 ; exit 2	;;
+	*)	break			;;
+	esac
+	shift
+done
+case "$parms" in
+/*)	;;
+*)	echo "$0: \`$parms' is not a full pathname" >&2 ; exit 2	;;
+esac
+
+# set up unlocker
+glock=
+llock=
+exitst=1
+tmp=/tmp/sb$$
+trap "unlock \$glock \$llock ; rm -f $tmp ; trap 0 ; exit \$exitst" 0 1 2 15
+
+# lock against multiple simultaneous execution, unless suppressed by -p
+if test " $parallel" = " n"
+then
+	lock -o LOCKbatch $$ || exit
+	glock=LOCKbatch
+fi
+
+# let's be paranoid...
+if test ! -d $NEWSARTS/out.going
+then
+	echo "no $NEWSARTS/out.going directory!" |
+					report -u "sendbatches cannot run"
+	exit
+fi
+cd $NEWSARTS/out.going
+
+# Determine what systems are being requested, in what order.
+case "$#" in
+0)	awk "\$2 ~ /$classpat/" $parms >$tmp
+	# real classpat filter is done by bpfind; the question here is whether
+	#	this class is the default
+	if egrep '^/default/[ 	]' $tmp >/dev/null	# default line found
+	then
+		syses=`ls -tr | egrep -v '^[@.]'`	# oldest first
+	else
+		syses="`egrep '^[^/#]' $parms | awk '{ print $1 }'`"
+	fi
+	;;
+*)	syses="$*"	;;
+esac
+case $debug in
+y)	for sys in $syses
+	do
+		echo $sys
+	done
+	exitst=0
+	exit
+	;;
+esac
+
+# Start up logging.
+echo "`date`, sendbatches $$ $args" >>$log
+
+# Run through them.
+for sys in $syses
+do
+	# Move into his directory, include it in search path.
+	here=$NEWSARTS/out.going/$sys
+	if test ! -d $here
+	then
+		echo "cannot find batch directory for \`$sys'" |
+					report -u 'missing batch directory'
+		continue
+	fi
+	cd $here
+	PATH=$here:$origpath ; export PATH
+	NEWSSITE=$sys ; export NEWSSITE		# For site-specific programs.
+	NEWSSITEDIR=$here ; export NEWSSITEDIR	# ditto
+
+	# Is there anything to do?
+	tdfiles=`ls | egrep '^togo\.([0-9]|more|next)'`
+	if test " $tdfiles" = " " -a ! -s togo
+	then
+		continue			# no
+	fi
+
+	# Pick up the batchparms line.
+	eval `bpfind "$classpat" "$sys" $parms`	# sets the bpxxx variables
+	if test " $bpokay" = " x"
+	then
+		continue	# wrong class
+	elif test " $bpokay" = " !"
+	then
+		echo "$sys	backlog ? (disabled in $parms)" >>$log
+		continue
+	elif test " $bpokay" != " y"
+	then
+		(
+			echo "bad or missing batchparms line for \`$sys':"
+			echo "	$bpgrump"
+		) | report -u 'batchparms file error'
+		continue
+	fi
+
+	# lock against multiple simultaneous batchers for this site
+	if lock -o ./LOCKb $$
+	then
+		llock="$here/LOCKb"
+	else
+		continue	# try the next site
+	fi
+
+	# How many to send?
+	roomfor=`spacefor $bpsize outbound $sys`
+	if test " $bpqueue" != " -"
+	then
+		outstand="`queuelen $sys`"
+		allowed=`expr $bpqueue - $outstand`
+	else
+		allowed=$roomfor
+	fi
+	if test " $roomfor" -gt " $allowed"
+	then
+		nbatch=$allowed
+	else
+		nbatch=$roomfor
+	fi
+
+	# If not allowed to send, remember reason.
+	status='batching stalled'
+	if test " $nbatch" -le 0
+	then
+		if test " $roomfor" -le 0
+		then
+			status='disk too full for batching'
+		else
+			status='queue full, no recent movement'
+		fi
+	fi
+
+	# Try sending some.
+	rm -f togo.leftover
+	while test " $nbatch" -gt 0
+	do
+		# Does he have batches prepared already?
+		if test "`echo togo.[0-9]`" = 'togo.[0-9]'
+		then
+			# No -- need some more batches.
+			if test ! -s togo && test ! -s togo.more &&
+							test ! -s togo.next
+			then
+				break		# Nothing left to do.
+			fi
+			batchsplit $bpsize $bpmax $nbatch >/tmp/bs$$ 2>&1
+			if test -s /tmp/bs$$
+			then
+				report -u "batch-splitting problems for $sys" </tmp/bs$$
+			fi
+			rm -f /tmp/bs$$
+		fi
+
+		# Send some batches.
+		them=`ls | egrep '^togo\.[0-9]' | sed "${nbatch}q"`
+		cd $NEWSARTS
+		for f in $them
+		do
+			sh -c "$bpcmd" <$here/$f >/tmp/nb$$ 2>&1
+			if test -s $here/togo.leftover
+			then
+				leftis=$f
+				break		# NOTE BREAK OUT
+			elif test ! -s /tmp/nb$$
+			then
+				# okay
+				status='batches flowing'
+				rm -f $here/$f /tmp/nb$$
+			else
+				(
+					echo "batching $f for \`$sys' failed"
+					cat /tmp/nb$$
+					echo "aborting"
+				) | report -u 'sendbatches failure'
+				rm -f /tmp/nb$$
+				exit
+			fi
+		done
+		cd $here
+		if test -s togo.leftover
+		then
+			mv togo.leftover $leftis
+			status='batching slow or stalled'
+			break				# NOTE BREAK OUT
+		fi
+		ndone=`echo $them | wc -w`
+		nbatch=`expr $nbatch - $ndone`
+
+		# Recheck the space -- it can fall for other reasons.
+		roomfor=`spacefor $bpsize outbound $sys`
+		if test " $nbatch" -gt " $roomfor"
+		then
+			nbatch=$roomfor
+		fi
+	done
+
+	# Report status, if appropriate.
+	nart=`cat togo* | wc -l | awk '{print $1}'`
+	if test " $nart" -gt 0
+	then
+		echo "$sys	backlog $nart ($status)" >>$log
+	fi
+
+	# unlock this site
+	llock=
+	unlock ./LOCKb
+done
+
+echo "`date`, sendbatches $$ $args" >>$log
+echo >>$log
+exitst=0

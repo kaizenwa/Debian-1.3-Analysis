@@ -1,0 +1,134 @@
+# Makefile for GNU `time' command.
+# Copyright (C) 1990, 1993 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+#### Start of system configuration section. ####
+
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+CC = @CC@
+
+# If you don't have a BSD or GNU install program, use cp.
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
+
+MAKEINFO = makeinfo
+
+# Things you might add to DEFS:
+# -Dpid_t=int		If you lack pid_t.
+# -Dsize_t=unsigned	If you lack size_t.
+# -Dconst=		If you lack const.
+# -DSTDC_HEADERS	If you have ANSI C headers and libraries.
+# -DHAVE_UNISTD_H	If you have unistd.h.
+# -DHAVE_STRING_H	If you don't have ANSI C headers but have string.h.
+# -DHAVE_SYS_WAIT_H	If you have sys/wait.h.
+# -DHAVE_SYS_RUSAGE_H	If you have sys/rusage.h (Solaris).
+# -DHAVE_UNION_WAIT	If wait3 or wait fills in a union wait *, not an int *.
+# -DHAVE_WAIT3		If you have a wait3 that fills in the struct rusage
+#			and have gettimeofday.
+# -DHAVE_TIMEVAL	If you have struct timeval in sys/time.h.
+# -DHAVE_GETPAGESIZE	If you have getpagesize system call.
+# -DHAVE_STRERROR	If you have strerror function.
+# -DHAVE_VPRINTF	If you have vprintf function.
+# -DHAVE_DOPRNT		If you have _doprnt function (but lack vprintf).
+
+DEFS = @DEFS@
+LIBS = @LIBS@
+
+CFLAGS = -g
+LDFLAGS = -g
+
+prefix = /usr/local
+exec_prefix = $(prefix)
+
+# Prefix for each installed program, normally empty or `g'.
+binprefix = 
+
+# Where to install time.
+bindir = $(exec_prefix)/bin
+
+# Where to install the info file.
+infodir = $(prefix)/info
+
+#### End of system configuration section. ####
+
+SHELL = /bin/sh
+
+HDRS = getopt.h getpagesize.h resuse.h port.h
+SRCS = time.c getopt.c getopt1.c error.c resuse.c
+OBJS = time.o getopt.o getopt1.o error.o resuse.o
+DISTFILES = COPYING ChangeLog Makefile.in README INSTALL NEWS \
+configure configure.in mkinstalldirs \
+time.texi time.info* texinfo.tex $(HDRS) $(SRCS)
+
+all: time time.info
+
+.c.o:
+	$(CC) -c $(CFLAGS) $(CPPFLAGS) $(DEFS) -I$(srcdir) $<
+
+time: $(OBJS)
+	$(CC) -o $@ $(LDFLAGS) $(OBJS) $(LIBS)
+
+time.o getopt1.o: getopt.h
+time.o: getpagesize.h
+time.o resuse.o: resuse.h port.h
+
+time.info: time.texi
+	$(MAKEINFO) $(srcdir)/time.texi
+
+install:	time installdirs
+	$(INSTALL_PROGRAM) time $(bindir)/$(binprefix)time
+	cd $(srcdir); $(INSTALL_DATA) time.info* $(infodir)
+
+uninstall:
+	rm -f $(bindir)/$(binprefix)time $(infodir)/time.info*
+
+installdirs:
+	$(SHELL) ${srcdir}/mkinstalldirs $(bindir) $(infodir)
+
+Makefile: Makefile.in config.status
+	$(SHELL) config.status
+config.status: configure
+	$(SHELL) config.status --recheck
+configure: configure.in
+	cd $(srcdir); autoconf
+
+TAGS:	$(SRCS)
+	etags $(SRCS)
+
+clean:
+	rm -f *.o time core
+
+mostlyclean: clean
+
+distclean: clean
+	rm -f Makefile config.status
+
+realclean: distclean
+	rm -f TAGS *.info*
+
+dist: $(DISTFILES)
+	echo time-`sed -e '/version_string/!d' -e 's/[^0-9.]*\([0-9.]*\).*/\1/' -e q time.c` > .fname
+	rm -rf `cat .fname`
+	mkdir `cat .fname`
+	ln $(DISTFILES) `cat .fname`
+	tar czhf `cat .fname`.tar.gz `cat .fname`
+	rm -rf `cat .fname` .fname
+
+# Prevent GNU make v3 from overflowing arg limit on SysV.
+.NOEXPORT:

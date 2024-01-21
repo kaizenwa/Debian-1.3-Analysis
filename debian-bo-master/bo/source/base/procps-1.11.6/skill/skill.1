@@ -1,0 +1,162 @@
+.\"
+.\" $Header: /home/geyer/cvs/procps/skill/skill.1,v 1.1.1.1 1996/06/27 10:56:56 geyer Exp $
+.\"
+.\" skill - send signals to processes by tty, user name, command or proc id.
+.\" skill - change process priorities by tty, user name, command or proc id.
+.\"
+.\" This program may be freely redistributed for noncommercial purposes.
+.\" This entire comment MUST remain intact.
+.\"
+.\" Copyright 1994 by Jeff Forys (jeff@forys.cranbury.nj.us)
+.\"
+.TH SKILL 1 "July 15, 1994" "" "Local UNIX Programmer's Manual"
+.UC 4
+.SH NAME
+skill, snice \- signal or reprioritize specified processes
+.SH SYNOPSIS
+.B skill
+[\-signal] [\-ivfwn] {tty user command pid}
+.br
+.B snice
+[(\-\||\|+)priority] [\-ivfwn] {tty user command pid}
+.br
+.B skill
+\-l
+.SH DESCRIPTION
+.I Skill
+sends the 
+.I terminate
+signal to a set of processes.
+If a signal name (or number) preceded by a `-' is given,
+that signal will be substituted for terminate.  The command
+.I `skill -l'
+displays a list of available signals.
+.PP
+.I Snice
+alters the scheduling priority of selected processes.  By default,
+the new priority is
+.I +4,
+but an argument of the form `+n' (or `-n') can be used to specify
+different values.
+An invalid priority is quietly rounded down (or up) to the first
+acceptable value.
+.PP
+Options accepted by both commands are as follows:
+.IP \-i
+In interactive mode, the user is prompted with each process
+that is a candidate for action.  Responding `y' will carry out
+the stated action.  Also, a ^D at this prompt causes
+.I skill
+or
+.I snice
+to exit immediately.
+.IP \-v
+In verbose mode, the id of each process successfully acted
+upon is displayed.
+.IP \-f
+In fast mode, the machine-dependent code responsible for reading
+processes is allowed to make decisions to improve speed at the
+expense of error reporting (e.g. commands may not be displayed).
+This option mainly exists to aid in killing runaway processes
+on operating systems with complicated VM designs.
+.IP \-w
+Display warning messages for unreachable processes.
+.IP \-n
+Display process id's but do
+.I not
+act on them.
+.PP
+All command line arguments are order independent.
+.I Skill
+and
+.I snice
+allow processes to be specified using any combination of
+ttys, user names, and commands (as well as process id's).
+Only processes that match something in
+each category are acted upon.  An empty category
+guarantees a match.  For example, `skill -HUP vi ex tty00' will
+send the
+.I hangup
+signal to all
+.I vi(1)
+and
+.I ex(1)
+processes associated with
+.I tty00.
+Similarly, `snice +10 find root' will change the priority of
+all
+.I find(1)
+processes owned by
+.I root
+to
+.I +10.
+.PP
+Unprivileged users can only change their own processes so they need
+.B not
+specify their user name as part of the argument list.
+On the other hand, the super-user should be more careful
+(e.g. the command `snice -5 vi' will change the priority of 
+.B every
+vi(1) process on the system).
+.PP
+Since
+.I skill
+and
+.I snice
+categorize their arguments, there is a chance that they
+will do so incorrectly (e.g. a system command is also a user
+name).  Both programs try to match an argument with a
+.I tty,
+a
+.I user name,
+and a
+.I process id,
+before classifying it as a
+.I command.
+To override this, an argument can be
+.B forced
+to a particular type by preceding it with "-c" (command), "-u"
+(user), "-t" (tty), or "-p" (process id).
+.PP
+Process id's are not known beforehand, so both kernel memory and the
+swap device must be searched for the required information.  Alternately,
+on some systems, the "/proc" file system is examined.  When
+a process fitting each category is discovered, it is immediately
+acted upon (unless running in interactive mode).  Processes must
+belong to the current user unless s/he is the super-user.  Neither
+program will ever act on itself, but everything else is fair game.
+.PP
+Exit status is normally 0; if the user makes a mistake, 1 is returned.
+If a system error occurs, exit status is 2.
+.SH "FILES"
+/vmunix		system name list
+.br
+/dev/mem		physical memory
+.br
+/dev/kmem		kernel virtual memory
+.br
+/dev/drum		swap device
+.br
+/proc		process file system
+.br
+/dev			searched to map ttys into device numbers
+.SH "SEE ALSO"
+kill(1), nice(1), priocntl(1), renice(1), ps(1),
+.br
+kill(2), setpriority(2), signal(2), proc(4)
+.SH "AUTHOR"
+Jeff Forys
+.SH "CONTRIBUTORS"
+David Sharnoff		Greg Earle		Christos Zoulas
+.br
+Gorodecki Tom		Mike Hibler		Ric Anderson
+.SH "BUGS"
+Things change while these programs execute, occasionally
+processes will be missed (the `-w' flag displays these).
+.sp
+Command names may be truncated to a machine-dependent size.
+.sp
+On some operating systems, these programs are unable to investigate
+processes belonging to other users.  While not a problem, this fact is
+reflected in the "(but N could not be checked)" notice, which follows
+the "no matching processes" message.

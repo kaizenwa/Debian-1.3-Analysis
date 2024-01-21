@@ -1,0 +1,112 @@
+I've been away for two weeks to china, and have been rather busy after
+that, so the new release of the menu package that I've been promising
+for some time has been delayed considerably. But this weekend I'll try
+to release it.
+
+First I'd like to describe some features that people have asked for, or
+other changes that I would like to add, and after that a way I'd like
+to handle them. If I'm leaving out something you would like to see in,
+(or even discussed with me), please tell me so.
+
+Suggested new features:
+ (1) There should be a way to generate hotkeys (Joey Hess),
+ (2) There should be a way to suggest a (non-alphabetic) order in the
+    menuentries in one submenu (Kenneth MacDonald).
+ (3) More flexibility in the /etc/menu-method/* "scripts" (those that
+    use /usr/bin/install-fvwmgen). For example, things like "if some
+    variable is defined, use that variable, otherwise, use this default
+    string". (me)
+ (4) Remove the need for those ugly double \\'s in /etc/menu-methods/* scripts
+    (sometimes one needs one, sometimes two, still, nobody complained!). (me)
+ (5) Support some new "variables", like a long description, and maybe
+    local sysadm/user defined ones. (Michel LESPINASS and others)
+    Together with (3), this should allow "use long description if available,
+    otherwise default to short one". (This should probably not be the
+    default setup for the window managers).
+
+
+Suggested implementation:
+
+-----------
+
+For (1), (3), (4), I would like to add a new "compat" mode in the
+/etc/menu-method/* scripts (the old "compat=gen" mode will of cource continue
+to work). So, an old "compat=gen" excerpt:
+
+   compat: gen
+   supported 
+     text=      "  Exec    \"${title}\"  exec   /usr/bin/X11/xterm  -title ${title} -e  ${command}& \\n"
+   end
+
+Will in the new format look like:
+
+   compat: menu-1
+   supported 
+     text="  Exec " print($title) " exec /usr/bin/X11/xterm  -title " \
+           print($title) " -e "  print(command) " & \n"
+   end
+
+The difficult to remember expantions like $%{icon} (expands to nothing if
+icon is empty, otherwise %iconfile%), etc can be replaced by general
+commands as
+
+old("gen")          new(menu-1)
+-----------------------------------
+  $%(icon)           cond_surr($icon,"%","%")
+  $d(var)            esc($var,"\"")
+  $s(var)	     esc($var,"\'")
+  $b(var)	     esc($var,"\"\'")
+  impossible	     hotkey($var)
+  impossible         ifempty($var,"empyt")
+                             #print "empyt" if $var=="", else print nothing
+  impossible         ifnempty($var,"notempty")
+  impossible         ifelse($var,"full", "empty")
+  impossible         iffile($var)        #if file $var exist, $var
+  impossible         print($var)
+                             #print $var, issue error message if $var
+			     #undifined/empty.
+  impossible	     sort($var)
+                            #Don't print anything, but sort on $var.
+
+And of cource it's easy to invent other stuff for this list.
+
+
+-----------
+
+For (2), (5) (and somewhat (1)), we _need_ an expandable format
+for the menuentry files (those in /usr/lib/menu/* etc). The current
+format is not expandable (the last column contains the command to be
+executed, and that may have command line arguments).
+
+For example, for the vi package, I'd suggest something like:
+
+? package(vi): needs=text command=/usr/bin/vi section=Apps/Editors title=Vi \
+               longdesc="The editor that people complain even \
+               more about than the aboutweather, vi." \
+	       id=vi sort=aa myfunkyvar=lichtbewolkt
+
+- The question mark indicates the new format and:
+- stuff before the ":" will be a test for update-menus whether to
+  install this menuentry (the above would say: if package vi is installed,
+  then install this menuentry). This will allow the addition of
+  menuentries depending on whether a file exists ( package(vi)&file(myfile) ).
+- The remainder define variables. These variables can be used in
+  the /etc/menu-method/* files as $var, i.e., print($myfunkyvar)
+  would print "lichtbewolkt".
+
+
+I would like to stress that menu-method files using the
+old "compat=gen" mode will continue to work, as will menuentries that
+use the old format.
+
+(the really old menu versions used "compat=fvwm2" etc. I do plan
+to remove the support for that).
+
+
+
+-----------
+
+Thanks, joost witteveen joostje@debian.org
+
+NOTE:
+New ctwm maintainer: Vadim Vygonets <vadik@cs.huji.ac.il>

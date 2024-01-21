@@ -1,0 +1,208 @@
+### -------------------------------------------------------------------------
+###
+###  Popups (TkDesk Configuration File)
+###
+###  This file defines the file-specific popup-menus that are accessed
+###  by pressing the right mouse button in any of TkDesk's file lists.
+###
+###  *** Press F5 to save changes and reload this file into TkDesk, 
+###  *** F6 to do the same plus to close this window.
+###
+### -------------------------------------------------------------------------
+
+### In this file three Tcl lists are defined: One for directories, one for
+### executables and one for all other files.
+
+### Definition of Popup-Menus:
+### The Popup-Menus are defined by the elements of a Tcl list.
+### (In the following I try to explain its structure, although it will
+### probably best to just have a look at the example definition below.)
+### Each element of the list is again a Tcl list, whose first element
+### contains a list of "glob" patterns. If a file matches any of these
+### patterns, this entry will be used for its popup menu. The second
+### element defines the entries of the popup menu, by a set of (usually)
+### 2-element lists. The first element is the entry's label, while the
+### second contains a Tcl script to execute when this menu entry is
+### invoked. Cascaded menus are currently not possible.
+### The first menu entry of each popup menu defines the default action,
+### which will be invoked when a matching file is double-clicked.
+###
+### TkDesk commands that can be used in the list definition:
+### (Only the most common ones are listed here. For a complete overview
+### and a detailed explanation refer to the User's Guide.)
+###
+### dsk_exec cmd ...   : Executes shell command cmd in background.
+### dsk_path_exec path cmd ... : Execute cmd in path.
+### dsk_view cmd ...   : Executes cmd, displays output in Editor window.
+### dsk_open_dir path  : Opens a new file list for directory path.
+### dsk_open_browser path    : Opens a new file browser for directory path.
+### dsk_edit file      : Edits file.
+### dsk_print file     : Prints file.
+### dsk_cd path        : Changes directory of browser to path.
+### dsk_du path        : Displays disk usage of directory path.
+### dsk_periodic cmd seconds : Executes cmd every x seconds.
+### dsk_confirm text script  : Executes script when confirmation was positive.
+### dsk_read_string label script  : Executes script when entered string is
+###                      not empty. "label" will be displayed in the dialog.
+### dsk_sound id       : Plays sound id (defined in config-file Sounds). 
+### dsk_cbhelp file regexp   : Invokes TkDesk's help system on file.
+### dsk_ask_exec       : Asks for a command to execute.
+### dsk_ask_dir        : Asks for a directory to open.
+### dsk_save_config    : Saves window layout, history, bookmarks etc.
+### dsk_exit ?ask?     : Quits TkDesk. "ask" may be one 1 or 0.
+###
+### Abbreviations that will be replaced with file names etc.:
+###
+### %s : Full pathname of the first selected file.
+### %f : Its filename only.
+### %b : "Basename": just the filename without extension.
+### %d : Its directory only.
+### %B : Same as %A, but will be replaced with "" if no files are selected.
+### %A : List containing full pathnames of all selected resp. dropped files.
+### %D : Directory of last "active" viewer.
+### %x : Current X selection.
+###
+### The very first Button provides access to a few functions of TkDesk,
+### like history menus, configuration menu etc. Its labels are mostly
+### "internally reserved" keywords.
+### The second button is only defined by the magic word "date" which inserts
+### TkDesk's date display at that place into the AB.
+###
+
+### Definition of Popup-Menus for Directories:
+### (You should better not change the first, i.e. default entry...!)
+
+set tkdesk(popup,directories) {
+    {{*} {
+	{{Open} {dsk_cd %s}}
+	{{New Window} {dsk_open_dir %s}}
+	{{New Browser} {dsk_open_browser %s}}
+	-
+	{{Disk Usage} {dsk_du %s}}
+	{{Start XTerm here} {
+	    cd %s
+	    exec xterm &
+	    cd ~  ;# this is the standard workdir of TkDesk
+	}}
+	{{Make tar.gz} {dsk_exec tar cf - -C %d %f | gzip >%s.tar.gz}}	
+    }}
+}
+
+### Definition of Popup-Menus for Executables:
+### (If the label of one of the entries is "Edit" it will only be added to the
+### menu if the executable is script, ie. the first two characters are #!. 
+### If you want an "Edit" entry for all executables just change "Edit" to 
+### anything else, e.g. "Do Edit" or "Edit the file!".)
+
+set tkdesk(popup,executables) {
+    {{*} {
+	{{Execute} {dsk_exec %s}}
+	{{Execute in Xterm} {dsk_exec xterm -sb -T %f -n %f -e pauseme %s}}
+	{{View Output} {dsk_view %s}}
+	-
+	{{Strip} {dsk_exec strip %s}}
+	{{Libraries} {dsk_view ldd %s}}
+	{{Edit} {dsk_edit %s}}
+    }}
+}
+
+###
+### Definition of Popup-Menus for "Regular" (and other) Files:
+
+set tkdesk(popup,regulars) {
+    {{*-HOWTO} {
+    	{{View (cbhelp)} {dsk_cbhelp %s howto}}
+    	{{Edit} {dsk_edit %s}}
+    }}
+    {{*.dvi} {
+    	{{View} {dsk_exec xdvi -paper a4 -s 3 %s}}
+    	{{Print} {dsk_print %s}}
+    	{{-> Postscript } {dsk_exec dvips %s}}
+    }}
+    {{{*.gif} {*.jpg} {*.jpeg} {*.pcx} {*.p?m} {*.rle}} {
+	{{View (xv)} {dsk_exec xv %s}}
+      	{{Background (xv)} {dsk_exec xv -root -quit %s}}
+    }}
+    {{{*.html} {*.htm}} {
+	{{Netscape ("smart")} {dsk_netscape file %s}}
+    	{{Netscape (new window)} {dsk_netscape file %s window}}
+    	{{Lynx} {dsk_exec xterm -e lynx %s}}
+	{-}
+    	{{Edit} {dsk_edit %s}}
+	{{XEmacs} {xemacs_load %s}}
+	{{Other Window} {xemacs_load %s other}}
+	{{Other Frame} {xemacs_load %s frame}}
+    }}
+    {{{*.man} {*.[1-8n]}} {
+      	{{View} {dsk_view groff -Tascii -mandoc %s | col -b}}
+      	{{Edit} {dsk_edit %s}}
+    }} 
+    {{{*.mpg} {*.mpeg}} {
+	{{View} {dsk_exec mpeg_play %s 2>/dev/null}}
+	{{View (big)} {dsk_exec mpeg_play -dither 2x2 %s 2>/dev/null}}
+	{{View (gray)} {dsk_exec mpeg_play -dither gray %s 2>/dev/null}}
+    }}
+    {{{*.ps} {*.eps}} {
+    	{{View (ghostview)} {dsk_exec ghostview -a4 -magstep 1 %s}}
+    	{{Print} {dsk_print %s}}
+      	{{Edit} {dsk_edit %s}}
+    }}
+    {{{*.ps.gz} {*.ps.Z}} {
+    	{{View (ghostview)} {
+	     dsk_exec gzip -cd %s | ghostview -a4 -magstep 1 -
+	}}
+    	{{Print} {dsk_exec gzip -cd %s | $tkdesk(cmd,print)}}
+	-
+	{{Uncompress} {dsk_exec gzip -d %s}}
+    }}
+    {{*.tar} {
+      	{{List Contents} {dsk_view tar tvf %s}}
+      	{{Short Listing} {dsk_view tar tf %s}}
+	-
+      	{{Extract} {dsk_exec tar xf %s}}
+      	{{Extract to /} {dsk_exec tar xf %s -C /}}
+      	{{Extract to /usr/tmp} {dsk_exec tar xf %s -C /usr/tmp}}
+    }}
+    {{{*.tar.z} {*.tar.gz} {*.tgz} {*.tar.Z} {*.taz} {*.t.Z}} {
+      	{{List Contents} {dsk_view gzip -cd %s | tar tvf -}}
+      	{{Short Listing} {dsk_view gzip -cd %s | tar tf -}}
+	-
+      	{{Extract} {dsk_exec gzip -cd %s | tar xf -}}
+      	{{Extract to /} {dsk_exec gzip -cd %s | tar xf - -C /}}
+      	{{Extract to /usr/tmp} {dsk_exec gzip -cd %s | tar xf - -C /usr/tmp}}
+    }}
+    {{*.url} {
+	{{Netscape ("smart")} {dsk_netscape url [exec cat %s]}}
+    	{{Netscape (new window)} {dsk_netscape url [exec cat %s] window}}
+    	{{Lynx} {dsk_exec xterm -e lynx [string trimleft [exec cat %s] file:]}}
+	{-}
+    	{{Edit} {dsk_edit %s}}
+    }}
+    {{{*.voc} {*.wav} {*.au}} {
+    	{{Play } {exec play %s &}}
+    	{{Stop!} {catch {exec killall play}}}
+    }}
+    {{*.xbm} {
+	{{View (xv)} {dsk_exec xv %s}}
+	{{Edit (bitmap)} {dsk_exec bitmap %s}}
+	{{Edit ASCII} {dsk_edit %s}}
+    }}
+    {{*.xpm} {
+	{{View (sxpm)} {dsk_exec sxpm %s}}
+	{{View (xv)} {dsk_exec xv %s}}
+	{{Edit (pixmap)} {dsk_exec pixmap -filename %s}}
+	{{Edit ASCII} {dsk_edit %s}}
+    }}
+    {{{*.gz} {*.z} {*.Z}} {
+	{{Edit} {dsk_edit %s}}
+	{{Uncompress} {dsk_exec gzip -d %s}}
+    }}
+    {{*} {
+	{{Edit} {dsk_edit %s}}
+	{{XEmacs} {xemacs_load %s}}
+	{{Other Window} {xemacs_load %s other}}
+	{{Other Frame} {xemacs_load %s frame}}
+	-
+	{{Print} {dsk_print %s}}
+    }}
+}

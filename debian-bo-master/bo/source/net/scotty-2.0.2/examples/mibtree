@@ -1,0 +1,1090 @@
+#!/bin/sh
+## -*- tcl -*-
+##
+## Simple (?) SNMP MIB browser based on scwish.
+##
+## Copyright (c) 1995
+##
+## J. Schoenwaelder
+## TU Braunschweig, Germany
+## Institute for Operating Systems and Computer Networks
+##
+## Permission to use, copy, modify, and distribute this
+## software and its documentation for any purpose and without
+## fee is hereby granted, provided that this copyright
+## notice appears in all copies.  The University of Braunschweig
+## makes no representations about the suitability of this
+## software for any purpose.  It is provided "as is" without
+## express or implied warranty.
+##
+
+set kludge { $*
+    shift
+    shift
+    if test -f ../scwish ; then
+      exec ../scwish -f $0 ${1+"$@"}
+    else
+      exec scwish -f $0 ${1+"$@"}
+    fi
+}
+
+##
+## Create a new toplevel with all widgets inside.
+##
+
+proc NewView {} {
+
+    global default option tkined counter tk_strictMotif
+
+    if {[catch {incr counter}]} { set counter 0 }
+    set w ".top$counter"
+    toplevel $w
+    wm geometry $w 600x400
+    wm minsize $w 600 400
+
+    frame $w.menu -borderwidth 1 -relief raised -highlightthickness 0
+    canvas $w.c -width 400 -height 200 -borderwidth 1 -relief raised \
+	-scrollregion "0 0 8000 8000" -highlightthickness 0 \
+	-xscrollcommand "$w.xscroll set" -yscrollcommand "$w.yscroll set"
+    scrollbar $w.xscroll -relief sunken \
+	    -orient horizontal -command "$w.c xview"
+    scrollbar $w.yscroll -relief sunken \
+	    -orient vertical   -command "$w.c yview"
+    pack $w.menu -side top -fill x
+    pack $w.xscroll -side bottom -fill x
+    pack $w.yscroll -side right -fill y
+    pack $w.c -side left -fill both -expand true
+
+    menubutton $w.menu.file -text "File" -menu $w.menu.file.m
+    menu $w.menu.file.m
+    $w.menu.file.m add command -label "Find..." \
+	    -accelerator "  Alt+F" \
+	    -command "FindNode $w"
+    bind $w <Alt-f>  "$w.menu.file.m invoke Find..."
+    bind $w <Alt-F>  "$w.menu.file.m invoke Find..."
+    bind $w <Meta-f> "$w.menu.file.m invoke Find..."
+    bind $w <Meta-F> "$w.menu.file.m invoke Find..."
+    $w.menu.file.m add separator
+    $w.menu.file.m add command -label "Walk..." \
+	    -accelerator "  Alt+G" \
+	    -command "WalkTree $w.c"
+    bind $w <Alt-g>  "$w.menu.file.m invoke Walk..."
+    bind $w <Alt-G>  "$w.menu.file.m invoke Walk..."
+    bind $w <Meta-g> "$w.menu.file.m invoke Walk..."
+    bind $w <Meta-G> "$w.menu.file.m invoke Walk..."
+    $w.menu.file.m add separator
+    $w.menu.file.m add command -label "PostScript..." \
+	    -accelerator "  Alt+P" \
+	    -command "PostScript $w.c"
+    bind $w <Alt-p>  "$w.menu.file.m invoke PostScript..."
+    bind $w <Alt-P>  "$w.menu.file.m invoke PostScript..."
+    bind $w <Meta-p> "$w.menu.file.m invoke PostScript..."
+    bind $w <Meta-P> "$w.menu.file.m invoke PostScript..."
+    $w.menu.file.m add separator
+    $w.menu.file.m add command -label "New View" \
+	    -accelerator "  Alt+N" \
+	    -command {DrawTree [NewView] [mib oid system]}
+    bind $w <Alt-n>  "$w.menu.file.m invoke {New View}"
+    bind $w <Alt-N>  "$w.menu.file.m invoke {New View}"
+    bind $w <Meta-n> "$w.menu.file.m invoke {New View}"
+    bind $w <Meta-N> "$w.menu.file.m invoke {New View}"
+    $w.menu.file.m add command -label "Close View" \
+	    -accelerator "  Alt+W" \
+	    -command "CloseView $w"
+    bind $w <Alt-w>  "$w.menu.file.m invoke {Close View}"
+    bind $w <Alt-W>  "$w.menu.file.m invoke {Close View}"
+    bind $w <Meta-w> "$w.menu.file.m invoke {Close View}"
+    bind $w <Meta-W> "$w.menu.file.m invoke {Close View}"
+    pack $w.menu.file -side left
+
+    menubutton $w.menu.mibII -text "Mib-2" -menu $w.menu.mibII.m
+    menu $w.menu.mibII.m
+    foreach name [mib successor mib-2] {
+	$w.menu.mibII.m add command -label $name \
+		-command "DrawTree $w.c $name"
+    }
+    pack $w.menu.mibII -side left
+
+    menubutton $w.menu.snmpV2 -text "SNMPv2" -menu $w.menu.snmpV2.m
+    menu $w.menu.snmpV2.m
+    foreach name [mib successor snmpModules] {
+	$w.menu.snmpV2.m add command -label $name \
+		-command "DrawTree $w.c $name"
+    }
+    pack $w.menu.snmpV2 -side left
+
+    menubutton $w.menu.private -text "Enterprises" -menu $w.menu.private.m
+    menu $w.menu.private.m
+    foreach name [mib successor enterprises] {
+	$w.menu.private.m add command -label $name \
+		-command "DrawTree $w.c $name"
+    }
+    pack $w.menu.private -side left
+
+    menubutton $w.menu.book -text "Bookmarks" -menu $w.menu.book.m
+    menu $w.menu.book.m
+    $w.menu.book.m add command -label "Add Bookmark" \
+                -accelerator "  Alt+B" \
+                -command "AddBookmark $w"
+    bind $w <Alt-b>  "$w.menu.book.m invoke {Add Bookmark}"
+    bind $w <Alt-B>  "$w.menu.book.m invoke {Add Bookmark}"
+    bind $w <Meta-b> "$w.menu.book.m invoke {Add Bookmark}"
+    bind $w <Meta-B> "$w.menu.book.m invoke {Add Bookmark}"
+        $w.menu.book.m add command -label "Delete Bookmark" \
+                -accelerator "  Alt+Z" \
+                -command "DeleteBookmark $w"
+    bind $w <Alt-z>  "$w.menu.book.m invoke {Delete Bookmark}"
+    bind $w <Alt-Z>  "$w.menu.book.m invoke {Delete Bookmark}"
+    bind $w <Meta-z> "$w.menu.book.m invoke {Delete Bookmark}"
+    bind $w <Meta-Z> "$w.menu.book.m invoke {Delete Bookmark}"
+    UpdateBookmarks $w
+    pack $w.menu.book -side left
+
+    if {! $tkined} {
+	menubutton $w.menu.agent -text "Agents" -menu $w.menu.agent.m
+	menu $w.menu.agent.m
+	$w.menu.agent.m add command -label "Add Agent" \
+		-accelerator "  Alt+A" \
+		-command "AddAgent $w"
+	bind $w <Alt-a>  "$w.menu.agent.m invoke {Add Agent}"
+	bind $w <Alt-A>  "$w.menu.agent.m invoke {Add Agent}"
+	bind $w <Meta-a> "$w.menu.agent.m invoke {Add Agent}"
+	bind $w <Meta-A> "$w.menu.agent.m invoke {Add Agent}"
+	$w.menu.agent.m add command -label "Delete Agent" \
+		-accelerator "  Alt+D" \
+		-command "DeleteAgent $w"
+	bind $w <Alt-d>  "$w.menu.agent.m invoke {Delete Agent}"
+	bind $w <Alt-D>  "$w.menu.agent.m invoke {Delete Agent}"
+	bind $w <Meta-d> "$w.menu.agent.m invoke {Delete Agent}"
+	bind $w <Meta-D> "$w.menu.agent.m invoke {Delete Agent}"
+	$w.menu.agent.m add separator
+	$w.menu.agent.m add separator
+	UpdateAgent $w localhost
+        pack $w.menu.agent -side left
+
+	label $w.menu.a -textvariable option(agent,$w)
+	pack $w.menu.a -side right -fill x
+    }
+
+    menubutton $w.menu.options -text "Options" -menu $w.menu.options.m
+    menu $w.menu.options.m
+    $w.menu.options.m add checkbutton -label "Show Access" \
+	    -offvalue 0 -onvalue 1 -variable option(showAccess,$w) \
+	    -command "ShowAccess $w.c"
+    set option(showAccess,$w) $default(showAccess)
+    $w.menu.options.m add checkbutton -label "Show Messages" \
+	    -offvalue 0 -onvalue 1 -variable option(showMessages,$w) \
+	    -command "ShowMessages $w.c"
+    set option(showMessages,$w) $default(showMessages)
+    $w.menu.options.m add checkbutton -label "Show Traps" \
+	    -offvalue 0 -onvalue 1 -variable option(showTraps)
+    set option(showTraps) $default(showTraps)
+    $w.menu.options.m add separator
+    $w.menu.options.m add checkbutton -label "Strict Motif" \
+	    -offvalue 0 -onvalue 1 -variable tk_strictMotif
+    set tk_strictMotif $default(strictMotif)
+    $w.menu.options.m add separator
+    $w.menu.options.m add checkbutton -label "X Scroll" \
+	    -offvalue 0 -onvalue 1 -variable option(xscroll,$w) \
+	    -accelerator "  Alt+X" -command "XScroll $w"
+    set option(xscroll,$w) $default(xscroll)
+    XScroll $w
+    bind $w <Alt-x>  "$w.menu.options.m invoke {X Scroll}"
+    bind $w <Alt-X>  "$w.menu.options.m invoke {X Scroll}"
+    bind $w <Meta-x> "$w.menu.options.m invoke {X Scroll}"
+    bind $w <Meta-X> "$w.menu.options.m invoke {X Scroll}"
+    $w.menu.options.m add checkbutton -label "Y Scroll" \
+	    -offvalue 0 -onvalue 1 -variable option(yscroll,$w) \
+	    -accelerator "  Alt+Y" -command "YScroll $w"
+    set option(yscroll,$w) $default(yscroll)
+    YScroll $w
+    bind $w <Alt-y>  "$w.menu.options.m invoke {Y Scroll}"
+    bind $w <Alt-Y>  "$w.menu.options.m invoke {Y Scroll}"
+    bind $w <Meta-y> "$w.menu.options.m invoke {Y Scroll}"
+    bind $w <Meta-Y> "$w.menu.options.m invoke {Y Scroll}"
+    pack $w.menu.options -side left
+    
+    button $w.menu.up   -image up   -relief flat \
+	    -command "ScaleTree $w.c 0.8"
+    button $w.menu.down -image down -relief flat \
+	    -command "ScaleTree $w.c 1.25"
+    pack $w.menu.up $w.menu.down -side left
+
+    bind $w <Destroy> {
+	if {"%W" == [winfo toplevel %W]} { CloseView %W }
+	break
+    }
+
+    bind $w.c <Button-2> {
+	%W scan mark %x %y
+    }
+    bind $w.c <B2-Motion> {
+	%W scan dragto %x %y
+	%W scan mark %x %y
+    }
+
+    return $w.c
+}
+
+##
+## Toggle the horizontal scrollbar.
+##
+
+proc XScroll w {
+    global option
+    if {$option(xscroll,$w)} {
+	pack $w.xscroll -before $w.c -side bottom -fill x
+    } else {
+	pack forget $w.xscroll
+    }
+}
+
+
+##
+## Toggle the vertical scrollbar.
+##
+
+proc YScroll w {
+    global option
+    if {$option(yscroll,$w)} {
+	pack $w.yscroll -after $w.c -side right -fill y
+    } else {
+	pack forget $w.yscroll
+    }
+}
+
+##
+## Close the view given by w and destory the whole application
+## if there are no more views left. Save the agent and bookmark
+## information to the file ~/.mibtreerc.
+##
+
+proc CloseView {w} {
+    global agent book option tk_strictMotif
+    catch {destroy .watch}
+    catch {destroy .traps}
+    if {[winfo children .] == "$w"} {
+	catch {
+	    set f [open ~/.mibtreerc w+]
+	    puts $f "##"
+	    puts $f "## configuration created by mibtree(1)"
+	    puts $f "##\n"
+	    foreach name [array names agent] {
+		puts $f [list set agent($name) $agent($name)]
+	    }
+	    puts $f ""
+	    foreach name [array names book] {
+                puts $f [list set book($name) $book($name)]
+            }
+	    puts $f ""
+	    set name $option(root,$w)
+	    puts $f [list set default(root) $name]
+	    set name $option(agent,$w)
+	    puts $f [list set default(agent) $name]
+	    set name $option(showAccess,$w)
+	    puts $f [list set default(showAccess) $name]
+	    set name $option(showTraps)
+	    puts $f [list set default(showTraps) $name]
+	    set name $option(xscroll,$w)
+	    puts $f [list set default(xscroll) $name]
+	    set name $option(yscroll,$w)
+            puts $f [list set default(yscroll) $name]
+	    set name $tk_strictMotif
+            puts $f [list set default(strictMotif) $name]
+	    close $f
+	} msg
+	destroy .
+    } else {
+	destroy $w
+    }
+}
+
+##
+## Add an agent to the global array of known agents.
+##
+
+proc AddAgent {w} {
+    global agent
+    set res [Dialog_Request $w.r questhead \
+	    "Enter agent alias name:" "" "ok cancel"]
+    if {[lindex $res 0] == "ok"} {
+	set name [lindex $res 1]
+	set res [Dialog_Request $w.r questhead \
+		"Enter SNMP session options for $name:" "" "ok cancel"]
+	if {[lindex $res 0] == "ok"} {
+	    set s [eval snmp session [lindex $res 1]]
+	    set agent($name) [$s configure]
+	    UpdateAgent $w $name
+	    $s destroy
+	}
+    }
+}
+
+##
+## Delete an agent from the global array of known agents. Make
+## sure that localhost is always there.
+##
+
+proc DeleteAgent {w} {
+    global agent
+    set res [Dialog_Select $w.r questhead \
+	    "Select an agent to delete:" [lsort [array names agent]] \
+            "delete cancel"]	
+    if {[lindex $res 0] == "delete"} {
+	set name [lindex $res 1]
+	if {$name != "localhost"} {
+	    catch {unset agent($name)}
+	    UpdateAgent $w
+	}
+    }
+}
+
+##
+## Update the agent menu.
+##
+
+proc UpdateAgent {w {name localhost}} {
+    global agent
+    set m $w.menu.agent.m
+    if {[$m index end] > 3} {
+	$m delete 4 end
+    }
+    foreach n [lsort [array names agent]] {
+	$m add radiobutton -label $n \
+	    -variable option(agent,$w) -value $n
+    }	
+    catch {$m invoke $name}
+}
+
+##
+## Add the current MIB node to the bookmark list.
+##
+
+proc AddBookmark {w} {
+    global option book
+    set name [mib name $option(root,$w)]
+    set book($name) [mib oid $name]
+    UpdateBookmarks $w
+}
+
+##
+## Delete an element from the bookmark list.
+##
+
+proc DeleteBookmark {w} {
+    global book
+    set res [Dialog_Select $w.r questhead \
+	    "Select a bookmark to delete:" [lsort [array names book]] \
+	    "delete cancel"]
+    if {[lindex $res 0] == "delete"} {
+	set name [lindex $res 1]
+	catch {unset book($name)}
+	UpdateBookmarks $w
+    }
+}
+
+##
+## Update the bookmark menu.
+##
+
+proc UpdateBookmarks {w} {
+    global book
+    set m $w.menu.book.m
+    if {[$m index end] > 2} {
+	$m delete 3 end
+    }
+    if [info exist book] {
+	$w.menu.book.m add separator
+	foreach n [lsort [array names book]] {
+	    $m add command -label $n -command "DrawTree $w.c $book($n)"
+	}
+    }
+}
+
+##
+## Create a PostScript dump of the canvas.
+##
+
+proc PostScript {c} {
+    global option
+
+    set name [mib name $option(root,[winfo toplevel $c])]
+    set name "/tmp/$name.ps"
+    set res [Dialog_Request $c.r questhead \
+	    "Enter a file name for the PostScript dump:" $name "ok cancel"]
+
+    if {[lindex $res 0] == "ok"} {
+	set region [$c cget -scrollregion]
+	set width  [lindex $region 2]
+	set height [lindex $region 3]
+	$c postscript -file [lindex $res 1] -colormode color \
+	    -x 0 -y 0 -height $height -width $width
+    }
+}
+
+##
+## Find a MIB node and adjust the shown tree to start at the
+## give MIB node if found.
+##
+
+proc FindNode {w} {
+    set res [Dialog_Request $w.r questhead \
+	    "Enter label of a MIB node:" "" "search cancel"]
+    if {[lindex $res 0] != "search"} return
+    set node [lindex $res 1]
+    while {[catch "mib oid $node"]} {
+	set res [Dialog_Request $w.r questhead \
+		"Enter label of a MIB node:" $node "search cancel"]
+	if {[lindex $res 0] != "search"} return
+	set node [lindex $res 1]
+    }
+    DrawTree $w.c $node
+}
+
+##
+## Walk a MIB subtree after prompting the user for the MIB root node.
+##
+
+proc WalkTree {c} {
+    set w [winfo toplevel $c]
+    set res [Dialog_Request $w.r questhead \
+            "Enter label of a MIB node:" "" "search cancel"]
+    if {[lindex $res 0] != "search"} return
+    set node [lindex $res 1] 
+    while {[catch "mib oid $node"]} {
+	set res [Dialog_Request $w.r questhead \
+		"Enter label of a MIB node:" $node "search cancel"]
+	if {[lindex $res 0] != "search"} return
+	set node [lindex $res 1]
+    }
+    WalkNode $c $node
+}
+
+##
+## The following code is actually taken from the tricket mib browser.
+## (Thanks Richard Kooijman. I really like the simple solution.)
+##
+
+proc DrawTree {c {root iso}} {
+    global option zoom font
+    Busy $c
+    set scroll 20    
+    set xpos 0
+    set xprevpos 0
+    set xmaxpos 0
+    set ypos 10
+    set index 0
+    $c delete all
+    set root [mib oid $root]
+    set len [llength [split $root "."]]
+
+    mib walk oid $root {
+	set xindex [expr [llength [split $oid "."]] - $len]
+        set xpos [expr ($xindex * 8) * $scroll + 10]
+        if {$xpos > $xmaxpos} {
+	    set xmaxpos $xpos
+        }
+        if {$xpos <= $xprevpos} {
+	    set ypos [expr $ypos + $scroll]
+        }
+	set xids($xindex) [$c create text $xpos $ypos -text [mib name $oid] \
+			   -anchor nw -tag text]
+	set coords [$c bbox $xids($xindex)]
+        set x1 [lindex $coords 0]
+        set y1 [lindex $coords 1]
+        set x2 [lindex $coords 2]
+        set y2 [lindex $coords 3]
+        incr x1 -2
+        incr y1 -1
+        incr x2
+        incr y2
+        set item [$c create rectangle $x1 $y1 $x2 $y2 \
+		-tag [list rect [mib access $oid]]]
+	$c bind $item <Button-1> "PopUp %W %X %Y $oid"
+	$c bind $item <Button-3> "PopUp %W %X %Y $oid"
+	$c bind $xids($xindex) <Button-1> "PopUp %W %X %Y $oid"
+	$c bind $xids($xindex) <Button-3> "PopUp %W %X %Y $oid"
+	if {$xindex > 0} {
+	    set coords [$c bbox $xids([expr $xindex -1])]
+	    set px2 [lindex $coords 2]
+	    set py2 [lindex $coords 3]
+	    incr px2
+	    incr py2
+	    $c create line $px2 [expr $py2 -($scroll/2)] \
+		    $x1 [expr $y2 -($scroll/2)]
+	}
+        set xprevpos $xpos
+        incr index
+    }
+
+    set coords [$c bbox all]
+    set x2 [lindex $coords 2]
+    set y2 [lindex $coords 3]
+    $c configure -scrollregion \
+	    "0 0 [expr $x2 + $scroll + 10] [expr $y2 + $scroll + 10]"
+    $c xview moveto 0
+    $c yview moveto 0
+    set top [winfo toplevel $c]
+    wm iconname $top "mibtree [mib name $root]"
+    wm title $top "mibtree [mib name $root] ($root)"
+    set option(root,$top) $root
+
+    set zoom($c) 1.0
+    set font($c) 120
+
+    ShowAccess $c
+}
+
+##
+## This procedure is used to scale the canvas. Unfortunately, the
+## canvas widget does not support scaled texts. So we simply unmap
+## the text. Better solutions welcome.
+##
+
+proc ScaleTree {c factor} {
+    global zoom font
+    if {![info exists zoom($c)]} {
+	set zoom($c) 1.0
+	set font($c) 120
+    }
+    set n [expr $zoom($c) * $factor]
+    if {$n > 1 || $n < 0.3} return
+    set zoom($c) $n
+    $c scale all 0 0 $factor $factor
+    if {$factor < 1} {
+	incr font($c) -20
+    } else {
+	incr font($c) +20
+    }
+    if {$n < 0.9} {
+	if {$font($c) < 80} {
+	    $c itemconfigure text -fill [$c cget -bg]
+	} else {
+	    $c itemconfigure text -fill black -font \
+		-Adobe-Helvetica-Medium-R-Normal--*-$font($c)-*-*-*-*-*-*
+	}
+    } else {
+	$c itemconfigure text -fill black -font \
+	    -Adobe-Helvetica-Bold-R-Normal--*-120-*-*-*-*-*-*
+    }
+
+    set scroll 20
+    set coords [$c bbox all]
+    set x2 [lindex $coords 2]
+    set y2 [lindex $coords 3]
+    $c configure -scrollregion \
+	    "0 0 [expr $x2 + $scroll + 10] [expr $y2 + $scroll + 10]"
+
+    $c xview moveto 0
+    $c yview moveto 0
+}
+
+##
+## Indicate the access-mode by playing with the canvas items.
+##
+
+proc ShowAccess {c} {
+    global option
+    set w [winfo toplevel $c]
+    if {$option(showAccess,$w)} {
+	$c itemconfigure not-accessible -stipple gray25 -fill black
+	$c itemconfigure read-create -width 2
+	$c itemconfigure read-write -width 2
+	$c itemconfigure write-only -width 2
+    } else {
+	$c itemconfigure rect -width 1 -fill ""
+    }
+}
+
+##
+## Show the SNMP messages that we exchange with an agent.
+##
+
+proc ShowMessages {c} {
+    global option
+    set w [winfo toplevel $c]
+    if {$option(showMessages,$w)} {
+	if {[winfo exists .watch]} return
+	set t [toplevel .watch]
+	wm title $t "SNMP messages"
+        text $t.t -wrap none -highlightthickness 0 -setgrid true \
+                -relief sunken -borderwidth 2 \
+                -yscrollcommand "$t.yscroll set"
+        scrollbar $t.yscroll -orient vertical \
+                -command "$t.t yview" -relief sunken
+        pack $t.t -side left -padx 2 -pady 2 -fill both -expand true
+        pack $t.yscroll -side left -fill y
+	bind $t <Destroy> "set option(showMessages,$w) 0"
+    } else {
+	catch {destroy .watch}
+    }
+}
+
+##
+## Show trap messages in an output window.
+##
+
+proc HandleTrap {S A V} {
+    global option
+    if {$option(showTraps)} {
+	if {[info proc writeln] == "writeln"} {
+	    set w_args [info args writeln]
+	    set w_body [info body writeln]
+        }
+	Output_Create .traps
+	writeln "[getdate] [$S cget -version] trap from \[$A\]:"
+	foreach vb $V {
+	    writeln "  [mib name [lindex $vb 0]] = [lindex $vb 2]"
+	}
+	writeln
+	if {[info exists w_args] && [info exists w_body]} {
+	    proc writeln $w_args $w_body
+	}
+    }
+}
+
+##
+## Popup a menu on a canvas item which allows to get more information about
+## the tree node or to jump to some other node in the tree.
+##
+
+proc PopUp {c x y oid} {
+    global tkined
+    catch {destroy $c.popup}
+    menu $c.popup -tearoff false
+
+    $c.popup add command -label "Describe '[mib name $oid]'" \
+	    -command "DescribeNode $c $oid"
+    $c.popup add separator
+
+    switch [mib syntax $oid] {
+	"SEQUENCE" -
+	"SEQUENCE OF" {
+	    set type TABLE
+	}
+	default {
+	    if {[mib suc $oid] != ""} {
+		set type GROUP
+	    } else {
+		set type LEAF
+	    }
+	}
+    }
+
+    if {$type != "LEAF"} {
+	$c.popup add command -label "Walk MIB Tree" \
+		-command "WalkNode $c $oid"
+	$c.popup add separator
+    }
+
+    switch $type {
+	GROUP {
+	    $c.popup add command -label "Show MIB Scalars" \
+		    -command "ShowScalars $c $oid"
+	    if {!$tkined} {
+		$c.popup add command -label "Monitor MIB Scalars" \
+			-command "Monitor ShowScalars $c $oid"
+	    }
+	}
+	LEAF {
+	    $c.popup add command -label "Show MIB Variable" \
+                    -command "WalkNode $c $oid"
+	    if {!$tkined} {
+		$c.popup add command -label "Monitor MIB Variable" \
+			-command "Monitor WalkNode $c $oid"
+	    }
+	}
+	TABLE {
+	    $c.popup add command -label "Show MIB Table" \
+                    -command "ShowTable $c $oid"
+            if {!$tkined} {
+                $c.popup add command -label "Monitor MIB Table" \
+                        -command "Monitor ShowTable $c $oid"
+            }
+	}
+    }
+
+    switch [mib access $oid] {
+	read-write -
+	write-only {
+	    $c.popup add separator
+	    $c.popup add command -label "Set Value" \
+		-command "SetValue $c $oid"
+	}
+	read-create {
+	    $c.popup add separator
+	    $c.popup add command -label "Set Value" \
+		-command "SetValue $c $oid"
+	    $c.popup add command -label "Create Instance" \
+		-command "CreateInstance $c $oid"
+	}
+    }
+
+    $c.popup add separator
+    $c.popup add cascade -menu $c.popup.goto -label "Goto Node"
+    menu $c.popup.goto -tearoff 0
+
+    if {[mib suc $oid] != ""} {
+	$c.popup.goto add cascade -menu $c.popup.goto.sucs \
+		-label "child nodes"
+	menu $c.popup.goto.sucs -tearoff 0
+	foreach o [mib suc $oid] {
+	    $c.popup.goto.sucs add command -label [mib name $o] \
+		    -command "DrawTree $c $o"
+	}
+    }
+    $c.popup.goto add command -label [mib name $oid] \
+	    -command "DrawTree $c $oid"
+
+    set oidlist ""
+    set ignore ""
+    set i 0
+    foreach id [split [mib parent $oid] .] {
+	incr i
+	if {[info exists newoid]} {
+	    append newoid .$id
+	} else {
+	    set newoid $id
+	}
+	if {$i > 6} {
+	    set oidlist [concat $newoid $oidlist]
+	} else {
+	    set ignore [concat $newoid $ignore]
+	}
+    }
+    foreach o $oidlist {
+	$c.popup.goto add command -label [mib name $o] \
+		-command "DrawTree $c $o"
+    }
+    foreach o $ignore {
+	$c.popup.goto add command -label [mib name $o] -state disabled
+    }
+
+    tk_popup $c.popup $x $y 
+}
+
+##
+## Create a SNMP session handle and bind the send and recv events
+## to show the SNMP communication going on.
+##
+
+proc WatchPDUs {s} {
+    $s bind "" recv { DumpPDU "%A:%P" "%T" "%E" "%I" "%R" "%V" }
+    $s bind "" send { DumpPDU "%A:%P" "%T" "%E" "%I" "%R" "%V" }
+}
+
+proc DumpPDU {agent type error index id vbl} {
+    if {! [winfo exists .watch.t]} return
+    .watch.t insert end "\n$type $id \[$agent\] $error @ $index\n"
+    set i 0
+    foreach vb $vbl {
+	switch [lindex $vb 1] {
+	    noSuchObject -
+	    noSuchInstance -
+	    endOfMibView {
+		.watch.t insert end [format "%4d %s ** %s **\n" $i \
+			[mib name [lindex $vb 0]] [lindex $vb 1]]
+	    }
+	    default {
+		.watch.t insert end [format "%4d %s = %s\n" $i \
+			[mib name [lindex $vb 0]] [lindex $vb 2]]
+	    }
+	}
+	incr i
+    }
+    .watch.t yview -pickplace end
+    update
+}
+
+##
+## Describe a node given by the oid.
+##
+
+proc DescribeNode {c oid} {
+    Output_Create $c.output
+    SNMP_DescribeMibNode $oid
+}
+
+##
+## This is the tkined version: We simply call our library procedures
+## to display the table or to walk the MIB subtree.
+##
+
+proc WalkNode {c oid {o ""}} {
+    global tkined agent option
+    Busy $c
+    if {$tkined} {
+	set list ""
+	foreach id [ined select] {
+	    lappend list [ined retrieve $id]
+	}
+	ForeachIpNode id ip host $list {
+	    set s [SnmpOpen $id $ip]
+	    WatchPDUs $s
+	    SNMP_Walk $s $oid
+	    $s destroy
+	}
+    } else {
+	if {$o == ""} {
+	    set o $c.output
+	    Output_Create $o
+	} else {
+	    Output_Writeln $o
+	}
+	set top [winfo toplevel $c]
+	set name $option(agent,$top)
+	set s [eval snmp session $agent($name)]
+	WatchPDUs $s
+	SNMP_Walk $s $oid
+	$s destroy
+    }
+}
+
+##
+## Show SNMP tables.
+##
+
+proc ShowTable {c oid {o ""}} {
+    global tkined agent option
+    Busy $c
+    if {$tkined} {
+        set list ""
+        foreach id [ined select] {
+            lappend list [ined retrieve $id]
+        }
+        ForeachIpNode id ip host $list {
+	    set s [SnmpOpen $id $ip]
+	    WatchPDUs $s
+            SNMP_ShowTable $s $oid
+	    $s destroy
+        }
+    } else {
+	if {$o == ""} {
+	    set o $c.output
+	    Output_Create $o
+	} else {
+	    Output_Writeln $o
+	}
+	set top [winfo toplevel $c]
+	set name $option(agent,$top)
+	set s [eval snmp session $agent($name)]
+	WatchPDUs $s
+	SNMP_ShowTable $s $oid
+	$s destroy
+    }
+}
+
+##
+## Show SNMP scalars.
+##
+
+proc ShowScalars {c oid {o ""}} {
+    global tkined agent option
+    Busy $c
+    if {$tkined} {
+        set list ""
+        foreach id [ined select] {
+            lappend list [ined retrieve $id]
+        }
+        ForeachIpNode id ip host $list {
+	    set s [SnmpOpen $id $ip]
+	    WatchPDUs $s
+            SNMP_ShowScalars $s $oid
+	    $s destroy
+        }
+    } else {
+	if {$o == ""} {
+	    set o $c.output
+	    Output_Create $o
+	} else {
+	    Output_Writeln $o
+	}
+	set top [winfo toplevel $c]
+	set name $option(agent,$top)
+	set s [eval snmp session $agent($name)]
+	WatchPDUs $s
+	SNMP_ShowScalars $s $oid
+	$s destroy
+    }
+}
+
+##
+## Monitor variables / scalars / tables by creating a scotty job.
+##
+
+proc Monitor {cmd c oid} {
+    global option
+    set res [Dialog_Request $c.r questhead \
+            "Monitoring interval in seconds:" 10 "ok cancel"]
+    if {[lindex $res 0] == "ok"} {
+	set ms [expr [lindex $res 1] * 1000]
+	set o [lindex [split [mib name $oid] .] 0]
+	set o $c.$option(agent,[winfo toplevel $c]):$o
+	Output_Create $o
+	set j [job create "$cmd $c $oid $o" $ms]
+	bind $o <Destroy> [list catch [list $j status expired]]
+    }
+}
+
+##
+## Write a new value to an existing instance.
+##
+
+proc SetValue {c oid} {
+    global tkined agent option
+    Busy $c
+    if {$tkined} {
+        set list ""
+        foreach id [ined select] {
+            lappend list [ined retrieve $id]
+        }
+        ForeachIpNode id ip host $list {
+	    set s [SnmpOpen $id $ip]
+	    WatchPDUs $s
+	    if {[catch {SNMP_SetValue $s $oid $c} msg]} {
+		Dialog_Confirm .error error $msg ok
+	    }
+	    $s destroy
+        }
+    } else {
+	set top [winfo toplevel $c]
+	set name $option(agent,$top)
+	set s [eval snmp session $agent($name)]
+	WatchPDUs $s
+	if {[catch {SNMP_SetValue $s $oid $c} msg]} {
+	    Dialog_Confirm .error error $msg ok
+	}
+	$s destroy
+    }
+}
+
+##
+## Create a new instance.
+##
+
+proc CreateInstance {c oid} {
+    global tkined agent option
+    if {$tkined} {
+        set list ""
+        foreach id [ined select] {
+            lappend list [ined retrieve $id]
+        }
+        ForeachIpNode id ip host $list {
+	    set s [SnmpOpen $id $ip]
+	    WatchPDUs $s
+            if {[catch {SNMP_CreateInstance $s $oid $c} msg]} {
+		Dialog_Confirm .error error $msg ok
+	    }
+	    $s destroy
+        }
+    } else {
+	set top [winfo toplevel $c]
+	set name $option(agent,$top)
+	set s [eval snmp session $agent($name)]
+	WatchPDUs $s
+	if {[catch {SNMP_CreateInstance $s $oid $c} msg]} {
+	    Dialog_Confirm .error error $msg ok
+	}
+	$s destroy
+    }
+}
+
+##
+## Indicate that the application is busy for a while.
+##
+
+proc Busy {c} {
+    set top [winfo toplevel $c]
+    $top configure -cursor watch
+    update idletasks
+    after idle "$top configure -cursor {}"
+}
+
+##
+## Here is how we handle error messages.
+##
+
+proc tkerror {msg} {
+    Dialog_Confirm .error error $msg ok
+}
+
+##
+## Not much left to do here. Parse the options and start the
+## first view.
+##
+
+set tkined 0
+set newargv ""
+set parsing_options 1
+while {([llength $argv] > 0) && $parsing_options} {
+    set arg [lindex $argv 0]
+    set argv [lrange $argv 1 end]
+    if {[string index $arg 0] == "-"} {
+	switch -- $arg  {
+	    "-d" { set debug 1 }
+	    "-i" { set tkined 1 }
+	    "--" { set parsing_options 0 }
+	}
+    } else {
+	set parsing_options 0
+	lappend newargv $arg
+    }
+}
+set argv [concat $newargv $argv]
+
+wm withdraw .
+option add *Text.font	fixed	startupFile
+
+image create bitmap up -data {
+#define aa_width 13
+#define aa_height 14
+static unsigned char aa_bits[] = {
+   0x04, 0x04, 0x44, 0x04, 0x44, 0x04, 0xfc, 0x07, 0x44, 0x04, 0x44, 0x04,
+   0x44, 0x04, 0xe0, 0x00, 0xf0, 0x01, 0xf8, 0x03, 0xf8, 0x03, 0xf8, 0x03,
+   0xf0, 0x01, 0xe0, 0x00};
+}
+
+image create bitmap down -data {
+#define aa_width 13
+#define aa_height 14
+static unsigned char aa_bits[] = {
+   0xe0, 0x00, 0xf0, 0x01, 0xf8, 0x03, 0xf8, 0x03, 0xf8, 0x03, 0xf0, 0x01,
+   0xe0, 0x00, 0x44, 0x04, 0x44, 0x04, 0x44, 0x04, 0xfc, 0x07, 0x44, 0x04,
+   0x44, 0x04, 0x04, 0x04};
+}
+
+if {$tkined} {
+    ined size
+    LoadDefaults snmp
+    SnmpInit SNMP-TREE
+}
+
+set traps [snmp session]
+set agent(localhost) [$traps configure]
+catch {
+    $traps bind "" trap {HandleTrap %S %A "%V"}
+}
+
+foreach n [snmp alias] {
+    set agent($n) [snmp alias $n]
+}
+
+set default(root) [mib oid system]
+set default(agent) localhost
+set default(showAccess) 0
+set default(showMessages) 0
+set default(showTraps) 0
+set default(xscroll) 1
+set default(yscroll) 1
+set default(strictMotif) 0
+
+catch {source ~/.mibtreerc}
+
+set c [NewView]
+if {[catch {mib oid $default(root)}]} {
+    set default(root) [mib oid system]
+}
+DrawTree $c $default(root)
+if {! $tkined} {
+    UpdateAgent [winfo toplevel $c] $default(agent)
+}

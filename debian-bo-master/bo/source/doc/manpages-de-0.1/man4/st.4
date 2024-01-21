@@ -1,0 +1,560 @@
+.\" Copyright 1995 Robert K. Nichols (Robert.K.Nichols@att.com)
+.\" Copyright 1996 C.Schmidt - deutsche šbersetzung (c.schmidt@ius.gun.de)
+.\" Interner Versionslevel (Deutsche Version) : 0.1 
+.\" nur bersetzt, nicht korrekturgelesen... 
+.\"
+.\" Wenn jemand sich über Rechtschreibfehler bzw. eine fehlerhafte Über-
+.\" setzung aufregen möchte so kann er das /dev/null mitteilen.
+.\" (Schließlich übersetze ich diese Dinger um meine Englischkenntnisse
+.\"  aufzubessern...)
+.\"
+.\" KONSTRUKTIVE Kritik oder ein netter Hinweis auf Fehler, aller
+.\" Art, würden mich aber freuen. Danke!
+.\"
+.\" Nach dem Übersetzen dieser Manualpage muß ich "vermeindlich
+.\" schlecht eingedeutschte Bedinungsanleitungen" auch aus einem
+.\" Blickwinkel betrachten ;-)))
+.\"
+.\" Folgendes lass ich mal so steh'n ;-)
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\" 
+.\" Modified Mon Jun 10 01:42:49 1996 by Martin Schulze (joey@linux.de)
+.\" 
+.TH ST 4  "Januar 1996" "Linux 1.1.86" "Gera^tedateien"
+.SH BEZEICHNUNG
+st \- SCSI tape device (Bandlaufwerke, Streamer)
+.SH UEBERSICHT
+.nf
+.B #include <sys/mtio.h>
+.sp
+.BI "int ioctl(int " fd ", int " request " [, (void *)" arg3 "])"
+.BI "int ioctl(int " fd ", \s-1MTIOCTOP\s+1, (struct mtop *)" mt_cmd ")"
+.BI "int ioctl(int " fd ", \s-1MTIOCGET\s+1, (struct mtget *)" mt_status ")"
+.BI "int ioctl(int " fd ", \s-1MTIOCPOS\s+1, (struct mtpos *)" mt_pos ")"
+.fi
+.SH BESCHREIBUNG
+Der 
+.B st
+Treiber stellt eine einheitliche Schnittstelle für die Benutzung der
+diversen SCSI Bandlaufwerke zur Verfügung.  Im aktuellen Entwicklungsstand
+übernimmt der Treiber die Kontrolle über alle erkannten Laufwerke auf die nur
+.BI sequentiell 
+zugegriffen werden kann.
+Der
+.B st
+Treiber benutzt die dabei die 
+.IR "major device" 
+Nummer 9.
+.PP
+Zusätzlich werden generell zwei 
+.IR "minor device"
+Nummern benutzt.  Eine grundsätzliche 
+.IR "minor device"
+Nummer,
+.IR n ,
+die sequentiell beim Erkennen der Laufwerke vergeben wird, und eine
+\(lqnicht zurückspulen\(rq Device Nummer,
+.IR "" ( n "+ 128)."
+Wenn eine Bandeinheit über die grundsätzliche Device Nummer,
+.IR  n ,
+geöffnet wird, so wird nach dem Schließen ein
+\s-1REWIND\s+1 Kommando an die Bandeinheit geschickt; Bei der Benutzung
+der Bandeinheit über die \(lqnicht zurückspulen\(rq Device Nummer,
+.IR "" ( n "+ 128)."
+halt nicht ;-)
+.PP
+Optionen wie die Schreibdichte oder Blockgröße sind nicht in die
+.IR "minor device"
+Nummern implementiert.
+Diese Optionen müssen durch die Verwendung von
+.B ioctl()
+Aufrufen gesetzt werden
+Sie werden erst nach Schließen und einem darauffolgenden \(lqWieder-Öffnen\(rq
+der \(lqDevice-Datei\(rq aktiv.
+.PP
+Devices werden üblicherweise mit dem Programm
+.B mknod
+eingetragen
+.PP
+.RS
+.nf
+mknod -m 660 /dev/st0 c 9 0
+mknod -m 660 /dev/st1 c 9 1
+mknod -m 660 /dev/nst0 c 9 128
+mknod -m 660 /dev/nst1 c 9 129
+.fi
+.RE
+.PP
+Es gibt hier kein vergleichbares
+.IR BLOCK
+Device.
+Das
+.IR Character
+(zeichenorientierte) Device bietet standartmäßig das Zwischenspeichern
+von Zeichen (buffering) und das \(lq weiterlesen\(rq (read-ahead) Merkmal
+an.
+Ferner unterstützt es zufälliges Lesen und Schreiben, welches
+nur durch den internen Treiber Buffer begrenzt ist.
+(Standard: 32768 bytes)
+.PP
+Die Buffergröße kann sowohl als Kernelparameter, sowie auch im
+Quelltext \(lqfest\(rq vergeben werden.
+.PP
+Üblicherweise wird ein Soft-Link
+.B /dev/tape
+eingerichtet, der auf das im System vorhandene und zu benutzende
+Device zeigt.
+.SH "IOCTLS"
+Der Treiber unterstützt drei 
+.B ioctl() 
+Aufrufe.
+Alle dem 
+.B st 
+Treiber unbekannten Aufrufe werden an den SCSI Treiber
+übergeben.
+Die folgenden Definitionen sind aus
+.IR <linux/mtio.h> :
+.SS "\s-1MTIOCTOP\s+1 \- Ausführen einer Band Anweisung"
+.PP
+Diese Operation benötigt ein Argument vom Typ
+.PP
+.BR "(struct mtop *)" .
+.PP
+Nicht alle Laufwerke unterstützen jede der möglichen Anweisungen.
+Der Treiber gibt ein EIO zurück, wenn das Laufwerk die Anweisung
+nicht unterstützt.
+.PP
+Anm. des Übersetzers
+.PP
+Das Folgende ist nur sehr schwer 100%ig ins Deutsche zu übersetzen,
+da so mancher Begriff aus dem Englischen geläufiger ist, als seine
+deutsche Übersetzung.
+Da ich nicht in der \(lqIBM Übersetzerabteilung\(rq arbeite, habe ich
+hier und dort das englische Original stehen lassen.
+(Hauptsächlich bei sehr kurzen Beschreibungen)
+.PP
+Bei \(lqUnverstehbarkeit\(rq des folgenden bitte ich auf die Original
+(englischsprachige) man-page zu st.4 zurückzugreifen.
+Speziell für diesen Abschnitt würde der Übersetzter sich über 
+Rückmeldungen der \(lqpraktischen Anwender\(rq freuen. ;-)
+.PP
+Für eine gesunde Kritik einfach eine Mail an
+.B c.schmidt@ius.gun.de
+.PP
+.nf
+.ta +.4i +.7i +1i
+/* Struktur für \s-1MTIOCTOP\s+1 \- Anweisungen an das Bandlaufwerk  */
+.PP
+struct mtop {
+	short	mt_op;		/* Welche Anweisung (Auflistung folgt) */
+	int	mt_count;	/* Wie oft diese Anweisung ausführen */
+};
+.fi
+.PP
+Bandlaufwerk; mögliche Anweisungen:
+.PD 0
+.IP MTBSF 14
+Zurückspulen über
+.B mt_count
+Filemarks.
+.IP MTBSFM
+Zurückspulen über
+.B mt_count
+filemarks.
+Positionieren des Mediums(Schreibkopf?) auf die EOT Seite des
+letzten Filemarks.
+.IP MTBSR
+Zurückspulen über
+.B mt_count
+records (tape blocks) BLOCKS.
+.IP MTBSS
+Zurückspulen über
+.B mt_count
+setmarks.
+.IP MTEOM
+\(lqGeh an das Ende der aufgezeichenten Daten..\(rq Zum Anhängen
+von Dateien/Archiven.
+.IP MTERASE
+Band löschen.
+.IP MTFSF
+Vorspulen über
+.B mt_count
+Filemarks.
+.IP MTFSFM
+Vorspulen über
+.B mt_count
+Filemarks.
+Positionieren des Mediums(Schreibkopfes?) auf die BOT Seite des 
+letzen Filemarks.
+.IP MTFSR
+Vorspulen über
+.B mt_count
+records (tape blocks) BLOCKS.
+.IP MTFSS
+Vorspulen über
+.B mt_count
+Setmarks.
+.IP MTNOP
+Nichts machen \- Als Seiteneffekt wird der Treiberbuffer
+gelöscht.  Kann möglicherweise in Verbindung mit
+\s-1MTIOCGET\s+1 benutzt werden.
+.IP MTOFFL
+Zurückspulen und Bandlaufwerk stoppen.
+.IP MTRESET
+Reset drive.
+.IP MTRETEN
+Retension tape.
+(Medium nicht auswerfen?)
+.IP MTREW
+Zurückspulen.
+.IP MTSEEK
+Suche nach dem BLOCK mit der Nummer
+.BR mt_count .
+Diese Anweisung erfordert ein SCSI-2 Bandlaufwerk, welches das \s-1LOCATE\s+1
+Kommando unterstützt (Laufwerkspezifische Addresse),
+oder ein Tandberg-kompatibles SCSI-1 Laufwerk.
+(Tandberg, Archive, Viper, Wangtek, ... ).
+Die BLOCK NUMMER ist dabei Laufwerk spezifisch und kann möglicherweise
+über den Rückgabewert von \s-1MTIOCPOS\s+1 herausgefunden werden.
+.IP MTSETBLK
+Setzen der BLOCK Grö0e auf den Wert, der in 
+.BR mt_count 
+angegeben ist.
+Ein BLOCK Größe von 0 setzt das Laufwerk auf variable BLOCK Größe.
+.IP MTSETDENSITY
+Setzen der Schreibdichte (tape density) auf den Wert in 
+.BR mt_count .
+Übliche Werte für die Schreibdichte sind 
+:
+.RS 18
+.nf
+.ta +.5i +1.5i +.5i
+0x00	Implicit	0x11	QIC-525
+0x04	QIC-11	0x12	QIC-1350
+0x05	QIC-24	0x13	DDS
+0x0F	QIC-120	0x14	Exabyte EXB-8200
+0x10	QIC-150	0x15	Exabyte EXB-8500
+.fi
+.RE 
+.IP MTWEOF
+Schreibe 
+.B mt_count
+Filemarks.
+.IP MTWSM
+Schreibe
+.B mt_count
+Setmarks.
+.IP MTSETDRVBUFFER 8
+Set various drive and driver options according to bits encoded in
+.BR mt_count .
+.IP
+Setzen der Laufwerk und Treiber Optionen.
+.IP 
+Diese bestehen aus dem Setzen des Laufwerk \(lqbuffer\(rq Modi,
+6 Treiber Optionen vom Typ Boolean und dem \(lqSchreibschwellwert des 
+Treiberbuffers.\(rq (buffer write threshold); d.h. ab dem Erreichen
+des Schreibschwellwertes wird das Band physikalisch beschrieben.
+Diese Parameter können nur vor vor dem ersten Schreiben auf Laufwerkes benutzt 
+werden, und bleiben auch beim Schliessen und Öffenen des Devices bestehen.
+Eine einzelne Anweisung kann dabei (a) nur den \(lqbuffer\(rq
+Modi, und/oder (b) die Schalter von TYP Boolean, und/oder (c) den 
+Schreibschwellwert des Treiberbuffers betreffen.
+.PD
+.IP
+Ein Wert von 0 in den \(lqhigh-order 4 Bits\(rq muss zum Setzen des
+Laufwerk \(lqbuffer\(rq Modi benutzt werden.
+Folgende Modi sind möglich:
+.RS 12
+.IP 0 4
+Das Laufwerk gibt erst einen \s-1GOOD\s+1 Status zurück, wenn die
+Datenblöcke auf das Medium geschrieben wurden.
+.PD 0
+.IP 1
+Mit großer Wahrscheinlichkeit wird das Laufwerk nach einer WRITE
+Anweisung einen \s-1GOOD\s+1 Status zurückgeben, wenn alle Daten
+in den internen Laufwerksbuffer übertragen sind.
+.IP 2
+Mit großer Wahrscheinlichkeit wird das Laufwerk nach einer WRITE
+Anweisung einen \s-1GOOD\s+1 Status zurückgeben, wenn (a) alle Daten
+in den internen Laufwerksbuffer übertragen sind, und (b) alle in dem
+Laufwerksbuffer zwischengespeicherten Daten auf das Medium geschrieben
+wurden.
+.PD
+.RE
+.IP ""
+Der Schwellwert für das Schreiben wird über  
+.B mt_count
+kontrolliert.
+.PP
+.B mt_count
+kann wie folgende Werte beinhalten:
+.PP
+\s-1MT_ST_WRITE_THRESHOLD\s+1 
+.PP
+Logisch -ODER- Verknüpft mit einem BLOCK Zähler in den unteren
+28 Bits.
+(logically ORed with a block count in the low 28 bits.)
+Der BLOCK Zähler wird mit 1024-Byte großen BLÖCKEN bewertet,
+nicht mit der wirklichen physikalischen Größe auf dem Medium.
+Die Schwellwertgröße darf, wie vorher beschrieben, die interne 
+Treiberbuffergröße nicht überschreiten.
+.IP
+Setzen der Boolean\(aqschen Operatoren:
+.PP 
+false\=falscher Aussagewert, true\=wahrer Aussagewert
+.PP
+.B mt_count
+kann dabei folgende Werte annehmen.
+.PP
+Die KONSTANTE
+.B \s-1MT_ST_BOOLEANS\s+1
+logisch ODER verknüpft mit einer der folgenden Kombinationen.
+Jede nicht benutzte Option wird \(lqfalse\(rq gesetzt.
+.IP
+.PD 0
+.RS
+.IP "\s-1MT_ST_BUFFER_WRITES\s+1  (Default: true)"
+.IP
+Buffer all write operations.
+Wird diese Option auf \(lqfalse\(rq gesetzt und das Laufwerk arbeitet
+mit einer festen BLOCK Größe, dann müssen alle Schreiboperationen
+mit einem vielfachen der BLOCK Größe durchgeführt werden.
+Diese Option muss \(lqfalse\(rq gesetzt werden um ein sicheres
+Schreiben auf \(lqMulti-Volumes\(rq zu ermöglichen.
+.IP "\s-1MT_ST_ASYNC_WRITES\s+1  (Default: true)"
+Wird diese Option auf \(lqtrue\(rq gesetzt, wird eine Schreiboperation
+direkt beendet, ohne auf das \(lqwirklich physikalische\(rq Schreiben
+auf das Medium zu warten.
+Ein wirkliches SCSI \(lqWRITE\(rq Kommando wird erst nach erreichen
+der Schreibschwellwertgröße des Treiberbuffers abgesetzt.
+Eine mögliche Fehlermeldung wird erst nach der nächsten Anweisung
+zurückgegeben.
+Diese Option muss \(lqfalse\(rq gesetzt werden um ein sicheres
+Schreiben auf \(lqMulti-Volumes\(rq zu ermöglichen.
+.IP "\s-1MT_ST_READ_AHEAD\s+1  (Default: true)"
+Diese Option wird benutzt um die Zwischenspeicherung von Daten(buffering)
+und das \(lqWeiterlesen\(rq (read-ahead) Merkmal des Treibers zu setzen.
+Wird diese Option auf \(lqfalse\(rq gesetzt und das Laufwerk arbeitet
+mit einer festen BLOCK Größe, dann müssen alle Schreiboperationen
+mit einem vielfachen der BLOCK Größe durchgeführt werden.
+.IP "\s-1MT_ST_TWO_FM\s+1  (Default: false)"
+Diese Option beinflußt das Treiberverhalten beim Schließen einer Datei.
+Normalerweise wird ein einzelnes \(lqFilemark\(rq geschrieben, wenn
+diese Option auf \(lqtrue\(rq gesetzt wird werden zwei \(lqFilemarks\(rq
+geschrieben und danach an den Anfang des Zweiten zurückgesetzt.
+(backspace over the second one)
+.PD
+.IP
+Achtung:
+Seid QIC Bandlaufwerke nicht mehr in der Lage sind \(lqFILEMARKS\(rq
+zu überschreiben, sollte die Option \(lqtrue\(rq gesetzt werden.
+Diese Art von Bandlaufwerken versucht das \(lqEnde der geschrieben Daten\(rq
+durch einen Test auf freie Stellen auf dem Medium zu finden, anstatt
+nach zwei aufeinanderfolgende \(lqFILEMARKS\(rq zu suchen.
+.PP
+.PD 0
+.IP "\s-1MT_ST_DEBUGGING\s+1  (Default: false)"
+Diese Option wird benutzt um die \(lqDebug Meldungen\(rq des Treibers
+einzuschalten.(Unterstützung nur, wenn beim Treiberübersetzen
+\s-1DEBUG\s+1 gesetzt war.)
+.IP "\s-1MT_ST_FAST_EOM\s+1  (Default: false)"
+Diese Option führt dazu, das die \s-1MTEOM\s+1 Anweisung direkt zum
+Laufwerk geschickt wird; Möglicherweise ein Geschwindigkeitsvorteil
+der aber dazu führen kann, das der Treiber die aktuelle Dateinummer
+(die normalerweise durch die \s-1MTIOCGET\s+1 Abfrage herausgefunden
+werden kann) \(lqvergißt\(rq.
+Wenn \s-1MT_ST_FAST_EOM\s+1 den Status \(lqfalse\(rq hat, wird der Treiber
+eine \s-1MTEOM\s+1 Anfrage mit \(lqforward spacing over files\(rq
+beantworten.
+.IP \s-1BEISPIEL\s+1
+.nf
+.ta +.4i +.7i +1i
+.BI "struct mtop " mt_cmd ;
+.IB "mt_cmd.mt_op" " = \s-1MTSETDRVBUFFER\s+1;"
+.IB "mt_cmd.mt_count" " = \s-1MT_ST_BOOLEANS\s+1 |"
+.B "		\s-1MT_ST_BUFFER_WRITES\s+1 |"
+.B "		\s-1MT_ST_ASYNC_WRITES\s+1;"
+.BI "ioctl(" fd ", \s-1MTIOCTOP\s+1, &" mt_cmd ");"
+.fi
+.RE
+.PD
+.SS "\s-1MTIOCGET\s+1 \- Get status"
+.PP
+Diese Abfrage benötigt ein Argument von Typ
+.BR "(struct mtget *)" .
+Der Treiber gibt eine EIO Fehlermeldung zurück, wenn das Laufwerk
+die Operation nicht ausführt.
+.PP
+.nf
+/* Aufbau von \s-1MTIOCGET\s+1 - \(lqBesorge dir den Bandlaufwerk Status\(rq
+Anweisung
+struct mtget {
+	long	mt_type;
+	long	mt_resid;
+	/* Die folgenden Register sind Laufwerksabhängig */
+	long	mt_dsreg;
+	long	mt_gstat;
+	long	mt_erreg;
+	/* Die folgenden zwei Felder werden nicht immer benutzt */
+	daddr_t	mt_fileno;
+	daddr_t	mt_blkno;
+};
+.fi
+.IP \fBmt_type\fP 11
+Es gibt viele \(lqHeader\(rq Definitionen für 
+.BR mt_type ,
+aber der aktuelle Treiber unterstützt generell nur die Typen
+\s-1MT_ISSCSI1\s+1 (Generic SCSI-1 tape) und \s-1MT_ISSCSI2\s+1 (Generic SCSI-2 tape).
+.PD 0
+.IP \fBmt_resid\fP
+ist immer Null.
+(Nicht implementiert für SCSI Bandlaufwerke.)
+.IP \fBmt_dsreg\fP
+Gibt die aktuellen Laufwerk Einstellungen für die BLOCK Grösse (in den
+unteren 24 Bits) und der Schreibdichte (in den hohen 8 Bits) aus.
+Diese Felder sind durch \s-1MT_ST-BLKSIZE_SHIFT\s+1, \s-1MT_ST_BLKSIZE_MASK\s+1,
+\s-1MT_ST_DENSITY_SHIFT\s+1, und \s-1MT_ST_DENSITY_MASK\s+1 definiert.
+.IP \fBmt_gstat\fP
+Gibt generelle ( Laufwerksunabhängige) Status Informationen zurück.
+Das \(lqHeader File\(rq definiert die Makros zum Testen dieser
+Status Bits.
+.RS
+.HP 4
+\s-1GMT_EOF(\s+1\fIx\fP\s-1)\s+1:
+Das Bandposition ist direkt nach einem \(lqFILEMARK\(rq.
+(Immer \(lqfalse\(rq nach einer \s-1MTSEEK\s+1 Anweisung.
+.HP
+\s-1GMT_BOT(\s+1\fIx\fP\s-1)\s+1:
+Die Bandposition ist : Anfang des ersten Datei
+(Immer \(lqfalse\(rq nach einer \s-1MTSEEK\s+1 Anweisung.
+.HP
+\s-1GMT_EOT(\s+1\fIx\fP\s-1)\s+1:
+Eine Bandanweisung hat das physikalische Ende des Bandes erreicht (EOT).
+.HP
+\s-1GMT_SM(\s+1\fIx\fP\s-1)\s+1:
+Die Bandposition ist: Am Ende eines \(lqSETMARK.\(rq 
+(Immer \(lqfalse\(rq nach einer \s-1MTSEEK\s+1 Anweisung.
+.HP
+\s-1GMT_EOD(\s+1\fIx\fP\s-1)\s+1:
+Die Bandposition ist: Am Ende der letzten geschriebenen Datei.
+.HP
+\s+1GMT_WR_PROT(\s+1\fIx\fP\s-1)\s+1:
+Das Laufwerk(Medium??) ist schreibgeschützt.
+Bei manchen Laufwerken kann damit auch gemeint sein, das das 
+Laufwerk kein Schreiben auf das aktuelle Medium unterstützt.
+.HP
+\s-1GMT_ONLINE(\s+1\fIx\fP\s-1)\s+1:
+Das letzte
+.B open()
+hat festgestellt, das ein Medium eingelegt ist und das Laufwerk
+für Anweisungen \(lqempfänglich\(rq ist.
+.HP
+\s-1GMT_D_6250(\s+1\fIx\fP\s-1)\s+1, \s-1GMT_D_1600(\s+1\fIx\fP\s-1)\s+1, \s-1GMT_D_800(\s+1\fIx\fP\s-1)\s+1:
+Diese \(lqgenerelle\(rq Status Information gibt die aktuelle
+Schreibdichte für 9-Spuren (nur \(12" Laufwerke) aus
+.HP
+\s-1GMT_DR_OPEN(\s+1\fIx\fP\s-1)\s+1:
+Kein Band eingelegt
+.HP
+\s-1GMT_IM_REP_EN(\s+1\fIx\fP\s-1)\s+1:
+Unverzüglicher Report Mode (nicht unterstützt)
+Immediate report mode (not supported).
+.RE
+.IP 
+rreg\fP
+Das einzigste definierte Feld in 
+.B mt_erreg
+ist der \(lq Fehlerzähler\(rq (Es werden nur behobene Fehler gezählt)
+in den unteren 16 Bits (wie durch 
+\s-1MT_ST_SOFTERR_SHIFT\s+1 and \s-1MT_ST_SOFTERR_MASK\s+1 definiert).
+Da dieser Zähler keinem Standard unterliegt (also von Laufwerk zu Laufwerk
+unterschiedlich sein kann), wird er nicht oft benutzt.
+.IP \fBmt_fileno\fP
+Ausgabe der aktuellen Datei/Archiv Nummer (zero-based).
+Dieser Wert wird auf -1 gesetzt, wenn er nicht bekannt ist.
+(Z.B. nach einer \s-1MTBSS\s+1 oder \s-1MTSEEK\s+1 Anweisung).
+.IP \fBmt_blkno\fP
+Ausgabe der BLOCK Nummer der/des aktuellen Datei/Archiv (zero-based).
+Dieser Wert wird auf -1 gesetzt, wenn er nicht bekannt ist.
+(Z.B. nach einer \s-1MTBSF\s+1, \s-1MTBSS\s+1 oder \s-1MTSEEK\s+1 Anweisung).
+.PD
+.SS "\s-1MTIOCPOS\s+1 \- Get tape position"
+.PP
+Diese Anfrage benutzt ein Argument vom Typ
+.B "(struct mtpos *)"
+und gibt die aktuelle Band-Block Nummer aus.  Diese ist Laufwerksabhängig
+und nicht die gleiche wie
+.B mt_blkno
+welche durch Verwendung von 
+\s-1MTIOCGET\s+1.
+zurückgegeben wird.
+Das Laufwerk muß ein SCSI-2 Laufwerk sein, welches die \s-1READ POSITION\s+1
+Anweisung unterstützt (Laufwerksabhängige Adresse), oder ein
+Tandberg-kompatibles SCSI-1 Laufwerk (Tandberg, Archive, Viper, Wangtek, ... ).
+.PP
+.nf
+/* structure for \s-1MTIOCPOS\s+1 - mag tape get position command */
+struct	mtpos {
+	long 	mt_blkno;	/* aktielle Block Nummer */
+};
+
+.fi
+.SH "RETURN VALUE"
+.IP EIO 14
+Die Anweisung wurde nicht zuende geführt.
+.IP ENOSPC
+Eine Schreiboperation konnte nicht beendet werden, da das Ende des
+Mediums (EOT) erreicht wurde.
+.IP EACCES
+Es wurde Versucht ein schreibgeschütztes Medium zu beschreiben.
+(Dieser Fehler wird noch nicht bei einem 
+.BR open() .)
+erkannt!)
+.IP ENXIO
+Beim Öffen wurde festgestellt, das das Laufwerk nicht vorhanden ist.
+.IP EBUSY
+Das Laufwerk wird schon benutzt, oder der Treiber konnte keine
+Daten \(lqPuffern\(rq.
+(or the driver was unable to allocate a buffer)
+.IP EOVERFLOW
+Es wurde versucht einen Block mit einer variablen Länge zu lesen,
+der größer als der interne Treiber \(lqPuffer\(rq war.
+.IP EINVAL
+Einem 
+.B ioctl()
+Aufruf wurde ein unzulässiges Argument übergeben, oder die
+angeforderte Block Größe ist unzulässig.
+.IP ENOSYS
+Unbekannter
+.BR ioctl() .
+Aufruf
+.SH COPYRIGHT
+Copyright \(co 1995 Robert K. Nichols - englisches Original
+Copyright \(co 1996 Christian Schmidt - deutsche Übersetzung
+.PP
+Dieses Manual darf sowohl in der Original, als auch in der deutschen
+Version mit folgender Einschränkung benutzt, Vervielfältigt und Vertrieben
+werden.  Dieser Copyright Abschnitt und der \(lqHeader\(rq muß unverändert
+in allen Kopien beibehalten werden.  Ferner sind die zusätzlichen Vereinbarungen
+im \(lqHeader\(rq dieses Manuals zu beachten.
+.SH "SIEHE AUCH:"
+.BR mt (1).

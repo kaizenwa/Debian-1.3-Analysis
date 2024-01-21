@@ -1,0 +1,389 @@
+Super(1) is a setuid-root program that offers
+
+    o  restricted setuid-root access to executables, adjustable
+	on a per-program and per-user basis;
+
+    o  a relatively secure environment for scripts, so that well-written
+	scripts can be run as root (or some other uid/gid), without
+	unduly compromising security.
+
+Sample uses:
+    -  to call a script that allows users to use mount(8) on
+	cdrom's or floppy disks, but not other devices.
+
+    -  to restrict which users, on which hosts, may execute a
+	setuid-root program.
+
+    -  to call a script that allows users to send STOP/CONT
+	signals to certain jobs, but not others.
+
+    -  to allow groups of trusted users (e.g. an "operator" group) complete
+	root access to sets of selected commands such as, say, line-printer
+	control commands, without giving away access to other commands,
+	and with full logging of all commands used.
+
+--------------------
+
+	Copyright (c) 1993, 1994 by California Institute of Technology.
+	Written by William Deich.  Not derived from licensed software.
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of either:
+    
+        a) the GNU General Public License as published by the Free
+        Software Foundation; either version 1, or (at your option) any
+        later version, or
+
+        b) the "Artistic License" (from Larry Wall).
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See either
+    the GNU General Public License or the Artistic License for more details.
+
+    You should have received a copy of the Artistic License with this
+    Kit, in the file named "Artistic".  If not, I'll be glad to provide one.
+
+    You should also have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+--------------------
+
+Super and sudo
+
+I have received some enquiries regarding the difference between super
+and sudo, another program designed to give restricted access to certain
+commands.
+
+Sudo --
+    Sudo allows a permitted user to execute a command as the superuser.
+    I think its central design philosophy is that each user can be
+    trusted when executing certain commands.  This is implemented
+    by allowing each user to execute the restricted commands for
+    which s/he is trusted, without giving access to other restricted commands.
+
+Super --
+    The design philosophy behind super is two-fold:
+    (a) some users can be trusted when executing certain commands;
+    (b) there are some commands, such as a script to mount CDROM's,
+	which you'd like to be safely executable even by users who
+	are NOT trusted.  Although setuid-root scripts are insecure,
+	a good setuid-root wrapper around a sensible non-setuid script
+	can be hard to break, and super provides that wrapper so that
+	even a non-trusted user can use the scripts.
+
+In my view, the main differences to the administrator are:
+
+    (1) the files that specify valid user/command combinations have
+	a different look and feel.
+
+    (2) super provides a safe wrapper for scripts, so that a
+	well-written script can be run safely by ordinary
+	users without having to actually trust them.
+
+-------------------
+
+A (low-volume) mailing list for users of super is available, maintained
+by A.P. Harris (apharris@onShore.com).
+
+Send "subscribe" in the body of a message to  super-request@onshore.com,
+or for more information, send "help" in the body of a message to
+the same address.
+
+-------------------
+
+A "super.tab" file names each command that super is willing to execute, and
+says who can use it. It contains lines like:
+
+    CmdPattern	fullpathname		valid-user/group/host ed-type patterns
+e.g.
+    # Example 1
+    cdmount	/usr/local/bin/cdmount	{harry,sally}@kaa tom@surya
+    cdumount	/usr/local/bin/cdumount	{harry,sally}@kaa tom@surya
+
+    # Example 2
+    cdmount::/usr/local/bin/cdmount cdumount::/usr/local/bin/cdumount \
+		{harry,sally}@kaa tom@surya
+
+    # Example 3
+    {lp,lpstat,disable,enable,cancel} /usr/bin/* :operators
+
+    # Example 4
+    /*          *                       ReallyReallyTrustedUsers
+
+To execute a super command, type
+
+    % super command [args...]
+
+If <command> is "-h" or "-?", or missing, super prints its current
+list of allowed commands, but nothing is executed.
+
+The first example, above, shows a typical use for giving root
+access to scripts that mount/unmount a CD.  It restricts access to
+users harry and sally on host kaa, and user tom on host surya.
+
+The second example shows an alternative form for Command/filename entry,
+allowing you to combine several command/filename pairs on a single
+control line.  Generally, the notation
+	Cmd1::File1 Cmd2::File2 [...]
+can be used instead of a line containing a single whitespace-separated
+filename entry.
+
+The third example illustrates the special meaning of an asterisk in
+the FullPathName: it is replaced with the user-entered command name.
+A valid user can type ``super disable some_printer''; super will replace
+the asterisk in "/usr/bin/*" with "disable" to form the command
+``/usr/bin/disable some_printer''.
+
+The fourth example shows how the CmdPattern is treated as a pattern by
+super: the user's command is matched against the CmdPattern, and if
+it matches, the FullPath is executed.  Here, the CmdPattern can be matched
+by any absolute pathname (note the leading slash to force only absolute paths
+to match); the FullPath is just an asterisk, and is therefore replaced by
+the user's typed absolute path.  If you _completely_ trust some users,
+but want logging of all root actions, you could actually use this entry:
+a trusted user can now execute any command as root, by giving its full path to
+super.
+
+Each entry in the super.tab file can contain a variety of options, which
+include such things as setting the real uid and/or gid to something other
+than root, requiring the user's password before executing the command,
+and so on.  If you were really going to give everything away as shown
+in the fourth example, above, you'd probably want to exclude any public-area
+workstations, require the trusted users to periodically give
+their passwords, and set the real uid=root (instead of just the effective
+uid), so the entry might be modified to read:
+
+    /*  *  TrustedUsers !{PatternsOfPublicWorstations} \
+		password=y timeout=5 uid=0
+
+
+If a user is allowed to execute a given <command>, the <fullpathname>
+is exec'd, with <command> as argv[0].  If the <fullpathname> contains
+an asterisk, the asterisk is replaced by the typed <command> before exec'ing.
+The superuser is always allowed to execute any super command.
+By default, the effective uid is set to 0 (root) before executing the command.
+
+Super logs every failed or successful attempt to execute commands.
+
+For security, the environment variables are discarded, save for TERM, 
+LINES, and COLUMNS. If TERM contains any characters other than 
+[a-z][A-Z][0-9]_+.:/-, it is discarded. If LINES or COLUMNS contains
+any characters other than [0-9], they are discarded. To these are
+added reasonable values for IFS, PATH, USER and HOME (USER and HOME
+are set to the username and login directory, respectively, of the
+real uid under which the command is executed by super). LOGNAME is
+set to the same as USER. SUPERCMD is set to the <command>. ORIG_USER,
+ORIG_LOGNAME, and ORIG_HOME are set to the USER, LOGNAME, and HOME of
+the user who invoked super. All descriptors excepting 0,1,2 are closed.
+Signals are all reset to have default handling. 
+
+
+--------------------
+
+Acknowledgements
+
+This program uses the following extremely useful code from others:
+
+    o  Ozan Yigit's regex routines
+    o  Rich $alz's sh-style pattern-matching routines.
+    o  The BSD brace-expansion code.
+    o  Arnold Robbins (arnold@skeeve.atl.ga.us) PD implementation of hsearch.c.
+
+
+The following people contributed ideas, code, and/or fixes to various
+super versions (my apologies to anybody I've inadvertently left out):
+
+    Pedro Antonio Acebes Bayon (pacebes@cozuelos.tid.es)
+	- noted failure to match some TERM patterns, logging error,
+	  portability problems.
+    Olof Backing (obg@nada.kth.se)
+	- reported bugs in super 3.5.1: logging lines without newlines, and
+	  the unexpected (and unwanted!) appearance of a path as argv[1].
+	- reported more bugs in super 3.7.2: comparing character to NULL
+	  instead of '\0'.
+    Max Buchheit (buchheit@ccrs.emr.ca)
+	- provided Makefile entry + header #ifdef's for SGI v5.3.
+    Steve Carney (carney@gvc.dec.com)
+	- provided Makefile entries and patches for Digital UNIX V3.2.
+    Valter V. Cavecchia (valter@itnsg1.cineca.it)
+	- modifications for logging usage; suggested -h should show
+	  commands only valid for that user; inspired options for
+	  setting uid, gid, env, fd, extended SAFE_PATH.
+    Dave Curry (davy@ecn.purdue.edu)
+	- Changed super's logging to include the arguments passed to
+	  the command.  Suggested testing shorter parts of FQDN
+	  when the hostname didn't match host pattern.
+    Richard Czech (Richard.Czech@gmd.de)
+	- discovered problems with multiple :global_options lines.
+    Karen L Dickerson (kld@mudshark.sunquest.com).
+	- supplied bugfix for incorrect denial of execution when
+	  pattern is `uuu:ggg' or `uuu:'.
+    Gary Duncan (gduncan@penguin.pts.philips.oz.au)
+	- beta-test sufferer in extremis.
+    (ees1in@ee.surrey.ac.uk)
+	- fix for checking TERM.
+    Christoph Geelen (geelen@rzulx1.mpie-duesseldorf.mpg.de)
+	- provided Makefile entry for Ultrix 4.3.
+    Oyvind Gjerstad (ogj@it.tollpost.no)
+	- patches for running under TI's SysV 3.3.
+	- pointed out errors in super.tab comment processing.
+    H.C.den Harink (Harry@electron.ms.philips.nl)
+	- group id fixes, Makefile fixes.
+    Adam P. Harris (apharris@mcs.com)
+	- reported bug when USE_NETGROUP is not defined and a hostname
+	  is used in the super.tab file.
+	- pointed out that the copyright information should be improved.
+	- sent notes about unused variables, etc (from gcc -pendantic).
+	- added modifications to make gcc -Wall quieter.
+	- provided a Linux Makefile entry.
+	- maintains the super mailing list, provides a mirror ftp site, etc.
+    Pete Holsberg (pjh@tecoma.mccc.edu)
+	- provided Makefile entry for UnixWare 2.0.
+    Gordon Lack (gml4410@ggr.co.uk)
+	- provided bugfix for IRIX 5, and general improvement: using
+	  close-on-exec rather than close() in buttonup().
+    Geoffrey A. Lowney (geoffl@vallista.ca.boeing.com)
+	- provided bugfixes for debug initialization & help listing.
+	- suggested the symlink hack (a la rsh).
+	- suggested the -H / -h (long help / short help) option.
+	- found an error with an appended dot to hostnames.
+	- suggested the per-user $HOME/.supertab solution to user-offered cmds.
+    Keith Menard (menard@gateway.wtc.com)
+	- ported to SCO 3.2v4.
+    Pat Myrto (rwing!pat@rutgers.edu)
+	- portability modifications.
+    Steve Robbins (steve@cim.mcgill.ca)
+	- adjusted hostname comparisons to be case-insensitive.
+	- Substantial modifications to hostname matching to improve
+	  handling of netgroups.
+    Morten Rolland ((Morten.Rolland@si.sintef.no)
+	- pointed out security hole with lack of supplementary groups handling,
+	    and provided patch for same.
+	- suggested the cd=dir option.
+	- motivated the discussions that led to per-user super.tab files.
+    Martin Schulze (joey@infodrom.north.de)
+	- provided a Linux entry.
+	- modified man page to be more consistent with Linux conventions.
+    Gerry Singleton (Gerry.Singleton@canada.sun.com)
+	- ported to Solaris 5.3.
+	- key help in identifying the DNS vs NIS problem when appending dots
+	  in effort to get FQDN's.
+	- a variety of other problems.
+    Jean-luc Szpyrka (jls@sophia.inria.fr)
+	- inspired the addition of global user/group/host patterns
+	  and pattern negation (e.g. !user@xyz).
+	- Changed super's logging to provide networked syslog messages:
+	  all super's syslog messages can be directed to a single host.
+	- provided bugfix with -V option.
+    Rein Tollevik (Rein.Tollevik@si.sintef.no)
+	- provided patches for errors in processing options and symlinks
+	  under 3.9.
+    Amar Vadlamudi (nath@src.umd.edu)
+	- pointed out problems with network-wide logging, and workaround.
+    Olle Wikstrom (olle@ericsson.se)
+	- pointed out that I screwed up TERM checking yet again!
+    Many others for beta-testing various versions...
+
+--------------------
+
+Making and installation:
+
+The Makefile is short.  Modify it to suit yourself.
+You have to be root to install super, as it must run setuid root.
+
+Many SysV-derived Unix's don't have the getdtablesize() routine which
+returns the maximum number of file descriptors.  In that case, use
+-DMAXFD=nnn when compiling, where nnn is the largest valid file descriptor;
+alternatively, replace nnn with any C expression to return the
+maximum valid descriptor.
+
+By default, super expects to find its table of valid commands+users/groups/hosts
+in /usr/local/lib/super.tab.  If you change this, you must also change the
+documentation.
+
+A sample super.tab file is found in sample.tab.
+
+One sample script is enclosed: sample.cdmount, to mount cd-rom's under SunOS.
+
+--------------------
+Testing the entries in super.tab:
+
+You can test if super is restricting users properly by putting a
+harmless entry like
+
+    ECHO        /bin/echo       <a user/group/host pattern to test>
+
+in your super.tab file, then typing
+
+    % super ECHO arg1 arg2 arg3
+
+You can also use the -d option (debug), which will show you what super will
+do, but never actually execute a command:
+
+    % super -d ECHO arg1 arg2 arg3
+    
+--------------------
+Notes on super scripts:
+
+1.  Scripts run via super(1) must start "#!/bin/sh" (or whatever interpreter
+    is being used).
+
+2.  It's nice to be able to type something like
+	% cdmount
+    instead of
+	% super cdmount
+
+    You can make your script automatically invoke super on
+    itself by starting a script in the following manner:
+
+      #!/bin/sh
+      prog=`basename $0`
+      test "X$SUPERCMD" = "X$prog" || exec /usr/local/bin/super $prog ${1+"$@"}
+
+
+3.  Some variants of csh will not run setuid scripts unless the -b flag
+    (force a "break" from option processing) is set.  Generally, csh
+    scripts should _always_ contain the -f flag on the exec line to
+    prevent the .cshrc file from being sourced:
+	#!/bin/csh -fb
+
+4.  Better still, avoid csh scripts entirely -- they are harder to
+    write safely than Bourne-shell scripts.
+
+5.  Some programs need certain directories in the path.  Your
+    super scripts may have to add directories like /etc or /usr/etc
+    to make commands work.  (One common problem for SunOS 4.x users is
+    that /usr/etc has to be in the path in order to mount HSFS-format
+    cd-rom's.)
+
+6.  By default, super only changes the effective uid.  Some programs
+    (e.g. exportfs under SunOS 4.1.x) require the real uid to be root.
+    In that case, either your super script will have to change the real
+    uid to root before executing the command, or the super.tab file
+    should set "uid=root".
+
+7.  A brief security comment:
+    You must be exceedingly careful when writing scripts for super.
+    A surprising variety of seemingly-ordinary commands can, when
+    run setuid-root, be exploited to nasty purpose.  Always make your
+    scripts do as little as possible, and give the user as few options
+    as possible.
+
+    Think twice about side-effects and alternative uses of these
+    scripts.  For instance, you might write a script to allow users to
+    mount cd-rom's by executing mount(8).  But if you don't write it
+    carefully, a user could mount a floppy disk containing, say, a
+    setuid-root shell.
+
+    Be leery of using "env=var,..." to increase the list of preserved
+    environment variables -- some programs can be tricked into
+    executing commands embedded in certain environment variables.
+
+--------------------
+
+William Deich
+UCO / Lick Observatory, Kerr Hall    |  Internet: will@ucolick.org
+University of California             |  Phone: (408) 459-3913
+Santa Cruz, CA  95064                |  Fax:   (408) 426-3115

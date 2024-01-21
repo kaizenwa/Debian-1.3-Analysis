@@ -1,0 +1,12 @@
+"vertical { "
+"	horizontal { "
+"		topmanager <+inf-inf*+inf-inf> "
+"		2 "
+"		topvbar <*+inf-inf> "
+"	} "
+"	horizontal { "
+"		tophbar <+inf-inf*> "
+"		2 "
+"		width topvbar "
+"	} "
+"} ",

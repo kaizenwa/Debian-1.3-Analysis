@@ -1,0 +1,99 @@
+#! /bin/sh
+
+tail +2 /etc/shells |
+while read shell
+do
+	dirname $shell
+done |
+sort -u |
+while read dir
+do
+#
+#	cd to lshells directory, note that /lshell may already be present in
+#	/etc/shells
+#
+	if [ `basename $dir` = "lshells" ]
+	then
+		cd $dir
+	else
+		cd $dir/lshells
+	fi
+	tail +2 /etc/shells |
+	grep ^$dir |
+	while read shell
+	do
+#
+#		finally create the link
+#
+		ln -sf /usr/bin/lshell `basename $shell`
+	done
+done
+
+cat << EOF
+To enable lshell you have to add lshell to the path of the login shells in
+\`/etc/passwd'. You should also change the path in \`/etc/shells' to make
+sure the user does not switch back to an unprotected shell.
+
+Note, that each user with a protected shell will have set his resource
+limits according to /etc/lshell.conf.
+
+EOF
+
+while true
+do
+  echo -n "Shall I make these adjustments for you? [y/N] "
+  read input
+  if [ $input = "n" -o $input = "N" ]
+  then
+    exit 0
+  elif [ ! $input ]
+  then
+    exit 0
+  elif [ $input = "y" -o $input = "Y" ]
+  then
+    break
+  else
+    echo "Please answer \`Y' or \`N'."
+  fi 2>/dev/null
+done
+
+echo "Changing all login shells (except root's) that are listed in /etc/shells"
+
+head -1 /etc/shells > /etc/shells.tmp
+
+tail +2 /etc/shells | 
+while read shell
+do
+	dir=`dirname $shell`
+	if [ `basename $dir` != "lshells" ]
+	then
+		echo `dirname $shell`"/lshells/"`basename $shell` >> /etc/shells.tmp
+	else
+		echo $shell >> /etc/shells.tmp
+	fi
+done
+
+mv /etc/shells /etc/shells.old
+mv /etc/shells.tmp /etc/shells
+
+cat /etc/passwd |
+awk '{	FS=":"
+	if ( $1 == "root" ) next
+	if ( $7 == "" || $7 == "/bin/false" || $7 == "/bin/sync" ) next
+	print $1,$7
+     }' |
+while read user shell
+do
+	grep -v $shell /etc/shells.old >& /dev/null
+	if [ $? -eq 0 ]
+	then
+		dir=`dirname $shell`
+	        if [ `basename $dir` != "lshells" ]
+	        then
+			shell=`dirname $shell`"/lshells/"`basename $shell`
+			chsh -s $shell $user
+		fi
+	fi
+done
+
+/bin/rm -f /etc/shells.old

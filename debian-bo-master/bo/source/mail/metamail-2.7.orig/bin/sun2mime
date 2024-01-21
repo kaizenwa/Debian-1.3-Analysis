@@ -1,0 +1,43 @@
+#!/bin/sh -f
+#
+# This is sun2mime.  It makes a bold attempt to transform a Sun mailtool message into
+# MIME format.
+#
+# This program is for use with sun-message which takes an arg to figure out how
+# (or if) the message is encoded.
+#
+if [ x$METAMAIL_TMPDIR = x ]; then
+    METAMAIL_TMPDIR=/tmp
+fi
+TMPFILE=${METAMAIL_TMPDIR}/suntomime.$$
+
+/bin/nawk '
+  BEGIN { printf("Content-type: multipart/mixed; boundary=--------\n\n")
+          RS=""; FS="\n"; mode="HEADER" }
+  mode == "HEADER" {
+    encoding=""
+    for (i=1; i<=NF; i++)
+      if ($i ~ /^X-Sun-Encoding-Info:/) {
+        encoding = sprintf ("; encoding=%s", substr($i,index($i,":")+1))
+      }
+    for (i=1; i<=NF; i++)
+      if ($i ~ /^X-Sun-Data-Type:/)
+        printf ("Content-Type:%s%s\n", substr($i,index($i,":")+1), encoding)
+      else
+        print $i
+    RS="\n"; FS=" "; getline; mode="BODY"; printf ("\n") }
+  mode == "BODY" {
+    if ($0 == "----------") {
+      print
+      mode="HEADER"
+      RS=""; FS="\n"
+    }
+    else
+      print
+  }
+  END { printf("----------\n") }
+' $1 > $TMPFILE
+
+metamail -z $TMPFILE
+rm -f $TMPFILE
+

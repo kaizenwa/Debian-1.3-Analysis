@@ -1,0 +1,70 @@
+# Top-level Makefile for kpathsea-using programs.
+
+# Package subdirectories, the library, and all subdirectories.
+programs = dviljk dvipsk gsftopkk web2c xdvik
+kpathsea_dir = kpathsea
+all_dirs = $(programs) $(kpathsea_dir)
+
+ac_include make/paths.make
+ac_include make/makevars.make
+
+# It's too bad we have to pass all these down, but I see no alternative,
+# if we are to propagate changes at the top level.
+makeargs = $(MFLAGS) CC='$(CC)' CFLAGS='$(CFLAGS)' $(makevars) $(XMAKEARGS)
+installargs = INSTALL='$(INSTALL)' INSTALL_DATA='$(INSTALL_DATA)' \
+         INSTALL_PROGRAM='$(INSTALL_PROGRAM)' $(makeargs)
+
+# Not everything from common.make is relevant to this top-level
+# Makefile, but most of it is, and it doesn't seem worth separating the
+# compilation-specific stuff.
+ac_include make/common.make
+
+# kpathsea is not a sibling, it's a child.
+kpathsea_parent = .
+
+# Make the library before the programs.
+# Use if ... rather than || or && because Ultrix make exits for
+# no good reason with the latter.
+default all: do-kpathsea
+	for d in $(programs); do if test -d $$d; then \
+	  (cd $$d; $(MAKE) $(makeargs) $@); else true; fi; done
+
+install install-data install-exec:
+	for d in kpathsea $(programs); do if test -d $$d; then \
+	  (cd $$d; $(MAKE) $(installargs) $@); else true; fi; done
+
+# Other standard targets for everything.
+uninstall uninstall-exec uninstall-data \
+mostlyclean clean distclean realclean extraclean configclean \
+TAGS info dvi check depend::
+	for d in $(all_dirs); do if test -d $$d; then \
+	  (cd $$d; $(MAKE) $(makeargs) $@); else true; fi; done
+
+distclean realclean::
+	rm -f Makefile config.status config.cache config.log
+
+# Unconditionally remake the library, since we don't want to write out
+# the dependencies here.
+do-kpathsea:
+	cd $(kpathsea_dir); $(MAKE) $(makeargs)
+
+# Targets that only apply to web2c.
+triptrap run-triptrap clean-triptrap run-trip clean-trip run-trap clean-trap \
+c-sources programs TeX MF BibTeX \
+formats fmts bases install-fmts install-bases \
+manpages install-manpages: do-kpathsea
+	cd web2c && $(MAKE) $(makeargs) $@
+
+##ifdef HOSTNAME
+##ac_dir = $(gnu)/share/autoconf
+##autoconf = $(ac_dir)/acspecific.m4 $(ac_dir)/acgeneral.m4 $(ac_dir)/acsite.m4
+##configure_in = $(srcdir)/configure.in
+##$(srcdir)/configure: $(configure_in) $(autoconf)
+##	cd $(srcdir); autoconf
+##endif
+
+config.status: $(srcdir)/configure
+	$(SHELL) $(srcdir)/configure --no-create --verbose
+
+Makefile: $(srcdir)/Makefile.in config.status
+	$(SHELL) config.status

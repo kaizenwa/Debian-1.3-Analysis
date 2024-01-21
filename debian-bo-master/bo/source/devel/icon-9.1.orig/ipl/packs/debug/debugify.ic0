@@ -1,0 +1,568 @@
+############################################################################
+#
+#	File:     debugify.ic0 / debugify.icn
+#
+#	Subject:  Create a ucode file with hooks to __debug_proc
+#
+#	Author:   Charles A. Shartsis
+#
+#	Date:     December 29, 1991
+#
+###########################################################################
+#
+#	Version:  1.01
+#
+###########################################################################
+#
+# See documentation in DEBUGIFY.DOC
+#
+############################################################################
+
+link radcon
+
+global ws, nonws, label_prefix, labelno, high_labels, tmpname, builtin_tab
+global line, curproc, lineno, fname, symbol_id, symbol_type, symbol_name
+global con_id, con_type, first_filename, debug_proc_name, debug_proc_id
+global next_symbol_id, last_symbol_id, name_list_name, val_list_name
+global put_id, variable_id, name_list_id, val_list_id
+global last_con_id, next_con_id, proc_symbols, save_label, index_id, one_id
+global index_name, tmpfile, cur_sym_name, symbol_list, proc_name_id
+global modify, includes, include_procs, infile_name, infile
+global andfileid, andlineid, version
+    
+
+# Add __debug var or nodebug var & inhibit branch
+# DEBUGIFY SEQ
+procedure main(argv)
+
+    # DO NOT MODIFY, MOVE, OR DELETE THIS COMMENT LINE
+    (\andfileid & \andlineid & \version) | stop(&errout, "Debugify not configured.")
+    write(&errout, "Debugify running: Configured for Icon Version ", version)
+
+    # Process command line options
+    modify := &null
+    includes := &null
+    include_procs := table(&null)
+    infile_name := "-"
+    process_options(argv)
+    if infile_name == "-" then {
+        infile := &input
+    }
+    else {
+        (infile := open(infile_name, "r")) | stop(&errout, "Cannot open input file ", infile_name)
+    }
+
+    ws := ' \t'
+    nonws := &ascii -- ws
+    debug_proc_name := "__debug_proc"
+    name_list_name := "__names"
+    val_list_name := "__vals"
+    label_prefix := "L"
+    index_name := "__i"
+    high_labels := table(0)
+    tmpname := "debugify.tmp"
+    do_builtins()
+    
+    # Get high labels for each proc
+    get_high_labels()
+    
+    (tmpfile := open(tmpname, "r")) | stop(&errout, "Cannot open ", tmpname,"  for input")
+    
+    line := (read(tmpfile) | &null)
+    
+    # BODY ITR UNTIL EOF
+    until /line do {
+    
+        # PROC SEQ
+        curproc := &null
+        line ? {
+            cstar(ws) & ="proc" & cplus(ws) &
+            (curproc <- tab(many(nonws))) &
+            cstar(ws) & pos(0)
+        }
+        \curproc | stop(&errout, "invalid proc line:",line)
+
+        # Reset proc values
+        last_symbol_id := 0
+        last_con_id := 0
+        labelno := high_labels[curproc]
+        proc_symbols := table(&null)
+        symbol_list := []
+        
+        write(line)
+        
+        line := (read(tmpfile) | &null)
+        
+        
+            # SYMBOLS ITR UNTIL END OF LOCAL LIST
+            until not (line ? (cstar(ws) & ="local")) do {
+            
+                # SYMBOL SEQ
+                
+                    symbol_id := &null
+                    symbol_type := &null
+                    symbol_name := &null
+                    line ? {
+                        cstar(ws) & ="local" & cplus(ws) &
+                        symbol_id <- integer(tab(many(&digits))) & 
+                        cstar(ws) & ="," & cstar(ws) &
+                        symbol_type <- tab(many(&digits)) & 
+                        cstar(ws) & ="," & cstar(ws) &
+                        symbol_name <- tab(many(nonws)) &
+                        cstar(ws) & pos(0)
+                    }
+                    \symbol_id | stop(&errout, "invalid symbol line:",line)
+                    
+                    
+                    last_symbol_id := symbol_id
+                    if /(builtin_tab[symbol_name]) then proc_symbols[symbol_name] := 1
+                    
+                    write(line)
+                
+                    line := (read(tmpfile) | &null)
+                    
+                # SYMBOL END
+                
+            # SYMBOLS END
+            }
+            
+            # Install new symbols
+            
+            if curproc ~== debug_proc_name then {
+            
+                next_symbol_id := last_symbol_id + 1
+                write("\tlocal\t", next_symbol_id, ",000000,", debug_proc_name)
+                debug_proc_id := next_symbol_id
+            
+                next_symbol_id +:= 1
+                write("\tlocal\t", next_symbol_id, ",000000,put")
+                put_id := next_symbol_id
+            
+                next_symbol_id +:= 1
+                write("\tlocal\t", next_symbol_id, ",000000,variable")
+                variable_id := next_symbol_id
+            
+                next_symbol_id +:= 1
+                write("\tlocal\t", next_symbol_id, ",000020,", name_list_name)
+                name_list_id := next_symbol_id
+            
+                next_symbol_id +:= 1
+                write("\tlocal\t", next_symbol_id, ",000020,", val_list_name)
+                val_list_id := next_symbol_id
+            
+                next_symbol_id +:= 1
+                write("\tlocal\t", next_symbol_id, ",000020,", index_name)
+                index_id := next_symbol_id
+            
+                next_symbol_id +:= 1
+                
+            }
+    
+            
+            # CONSTANTS ITR UNTIL END OF CONSTANT LIST
+            until not (line ? (cstar(ws) & ="con")) do {
+            
+                #CONSTANT SEQ
+                               
+                    con_id := &null
+                    con_type := &null
+                    line ? {
+                        cstar(ws) & ="con" & cplus(ws) &
+                        con_id <- integer(tab(many(&digits))) & 
+                        cstar(ws) & ="," & cstar(ws) &
+                        con_type <- tab(many(&digits))
+                    }
+                    (\con_id) | stop(&errout, "invalid constant line:",line)
+                
+                    last_con_id := con_id
+                    
+                    write(line)
+                
+                    line := (read(tmpfile) | &null)
+                    
+                #CONSTANT END
+                
+                
+            # CONSTANTS END
+            }
+            
+            # Install new string constants for the names of all the 
+            # previously existing symbols
+            # When finished, proc_symbols will map names of previously
+            # existing symbols to their unique constant identifier
+            
+            if curproc ~== debug_proc_name then {
+            
+                next_con_id := last_con_id + 1
+
+                every cur_sym_name := key(proc_symbols) do {
+                    writes("\tcon\t", next_con_id, ",010000,", *cur_sym_name)
+                    octal_list(cur_sym_name)
+                    write("")
+                    proc_symbols[cur_sym_name] := next_con_id
+                    next_con_id +:= 1
+                }
+                
+                # Install other new constants
+                
+                # The constant 1
+                write("\tcon\t", next_con_id, ",002000,1,1")
+                one_id := next_con_id
+                
+                next_con_id +:= 1
+            
+                # The procedure name constant
+                writes("\tcon\t", next_con_id, ",010000,", *curproc)
+                octal_list(curproc)
+                write("")
+                proc_name_id := next_con_id
+                
+                next_con_id +:= 1
+            
+            }
+            
+            # DECLEND SEQ
+            
+                (line ? (cstar(ws) & ="declend" & cstar(ws) & pos(0))) |
+                    stop(&errout, "End Declaration Line not found where expected: ",line)
+            
+                write(line)
+                        
+                line := (read(tmpfile) | &null)
+                        
+            # DECLEND END
+            
+            # FILENAME SEQ
+            # The first procedure contains a file name line after the declarations
+            
+                if /first_filename then {
+                
+                    first_filename := 1
+            
+                    fname := &null
+                    line ? {
+                       cstar(ws) & ="filen" & cplus(ws) &
+                       (fname <- cplus(nonws)) &
+                      cstar(ws) & pos(0)
+                    }
+                
+                    \fname | stop(&errout, "file name not properly parsed")
+                    write(line)
+                        
+                    line := (read(tmpfile) | &null)
+                    
+                }
+                        
+            # FILENAME END
+
+            # Install __names := [ s1, s2, ... ]
+            # where s1, s2, ... are the names of previously existing symbols
+            if curproc ~== debug_proc_name then {
+                save_label := next_label()
+                write("\tmark\t",save_label)
+                write("\tpnull")
+                write("\tvar\t",name_list_id)
+                write("\tpnull")
+                every write("\tstr\t", (!sort(proc_symbols))[2])
+                write("\tllist\t", *proc_symbols)
+                write("\tasgn")
+                write("\tunmark")
+                write("lab ", save_label)
+            }
+            
+            
+            # SOURCE_LINES ITR UNTIL EOF OR END OF PROC
+            until (
+                /line |
+                (line ? (cstar(ws) & ="proc" & cplus(ws)))
+            ) do {
+            
+                # SOURCE_LINE SEQ
+                
+                    # LINE_NUMBER SEQ
+                    
+                    line_number()
+                  
+                    # LINE_NUMBER END
+                    
+                    # LINE_BODY ITR UNTIL EOF OR END OF SOURCE LINE
+                    
+                    line_body()
+                        
+                    # LINE_BODY END
+                    
+                # SOURCE_LINE END
+                
+            # SOURCE_LINES END
+            }
+            
+        # PROC END
+    
+    # BODY END
+    }
+    
+    close(tmpfile)
+    remove(tmpname) | stop(&errout, "Unable to delete ", tmpname)
+    
+# DEBUGIFY END
+end
+
+procedure cstar(c)
+    suspend "" | tab(many(c))
+end
+
+procedure cplus(c)
+    return tab(many(c))
+end
+
+# Print a string as a list of octal numbers, each preceded by a comma
+procedure octal_list(s)
+
+    every writes(",",exbase10(ord(!s),8))
+    
+end
+
+procedure next_label()
+
+    labelno +:= 1
+
+    return label_prefix || labelno
+
+end
+
+procedure get_high_labels()
+
+    local line, labelno, curproc, tmpfile
+    
+    (tmpfile := open(tmpname,"w")) | stop(&errout, "Unable to open ", tmpname, " for output")
+    
+    line := (read(infile) | &null)
+
+    until /line do {
+    
+        line ? (
+            cstar(ws) & ="proc" & cplus(ws) & 
+            curproc <- tab(many(nonws)) & 
+            cstar(ws) & pos(0)
+        )
+    
+        labelno := &null
+        if line ? (
+            ="lab L" & 
+            (labelno <- integer(tab(many(&digits)))) &
+            cstar(ws) & pos(0)
+        ) then {
+        
+            if labelno > high_labels[curproc] then      
+                high_labels[curproc] := labelno
+        }
+        
+        write(tmpfile, line)        
+    
+        line := (read(infile) | &null)
+        
+    }
+    
+    close(tmpfile)
+    
+end
+
+procedure do_builtins()
+
+    local builtin
+
+    builtin_tab := table(&null)
+    builtin :=
+        [ "abs", "any", "args", "bal", "center", "char", "close", "collect", 
+        "copy", "cset", "delete", "detab", "display", "entab", "errorclear", 
+        "exit", "find", "get", "getenv", "iand", "icom", "image", "insert", 
+        "integer", "ior", "ishift", "ixor", "key", "left", "list", "many", 
+        "map", "match", "member", "move", "name", "numeric", "open", "ord", 
+        "pop", "pos", "proc", "pull", "push", "put", "read", "reads", "real", 
+        "remove", "rename", "repl", "reverse", "right", "runerr", "seek", "seq", 
+        "set", "sort", "stop", "string", "tab", "table", "trim", "type", "upto", 
+        "variable", "where", "write", "writes", "system", "callout", "acos", 
+        "asin", "atan", "cos", "tor", "exp", "log", "rtod", "sin", "sqrt", 
+        "tan", "getch", "getche", "kbhit", "IntPeek", "Poke", "GetSpace", 
+        "FreeSpace", "InPort", "OutPort", "mmout", "mmpause", "mmshow" ]
+    every builtin_tab[!builtin] := 1
+    
+end
+
+procedure line_number()
+
+                    # LINE_NUMBER SEQ
+                    
+                        lineno := &null
+                        line ? {
+                            cstar(ws) & ="line" & cplus(ws) &
+                            (lineno <- integer(tab(many(&digits)))) &
+                            cstar(ws) & pos(0)
+                        }
+                        \lineno | stop(&errout, "Invalid Source Line Number Line: ", line)
+                    
+                        write(line)
+                        
+                        if not (
+                            curproc == debug_proc_name |
+                            (
+                                \includes & /include_procs[curproc]
+                            )
+                        ) then {
+                        
+                            # Install __vals := []
+                            write("\tmark\t", save_label := next_label())
+                            write("\tpnull")
+                            write("\tvar\t", val_list_id)
+                            write("\tpnull")
+                            write("\tllist\t0")
+                            write("\tasgn")
+                            write("\tunmark")
+                            write("lab ", save_label)
+                            
+                            # Install every put(_vals, variable(!__names))
+                            write("\tmark\t", save_label := next_label())
+                            write("\tmark0")
+                            write("\tvar\t", put_id)
+                            write("\tvar\t", val_list_id)
+                            write("\tvar\t", variable_id)
+                            write("\tpnull")
+                            write("\tvar\t", name_list_id)
+                            write("\tbang")
+                            write("\tinvoke\t1")
+                            write("\tinvoke\t2")
+                            write("\tpop")
+                            write("lab ",next_label())
+                            write("\tefail")
+                            write("lab ",next_label())
+                            write("\tunmark")
+                            write("lab ",save_label)
+
+                            
+                            # Install __debug_proc(&file, <proc_name>, &line, __names, __vals)
+                            write("\tmark\t", save_label := next_label())
+                            write("\tvar\t", debug_proc_id)
+                            write("\tkeywd\t", andfileid)
+                            write("\tstr\t", proc_name_id)
+                            write("\tkeywd\t", andlineid)
+                            write("\tvar\t", name_list_id)
+                            write("\tvar\t", val_list_id)
+                            write("\tinvoke\t5")
+                            write("\tunmark")
+                            write("lab ",save_label)
+                            
+                            # Install
+                            #   every __i := 1 to *__names do
+                            #       variable(__names[__i]) := __vals[__i]
+                            if \modify then {
+                                write("\tmark\t", save_label := next_label())
+                                write("\tmark0")
+                                write("\tpnull")
+                                write("\tvar\t", index_id)
+                                write("\tpnull")
+                                write("\tint\t", one_id)
+                                write("\tpnull")
+                                write("\tvar\t", name_list_id)
+                                write("\tsize")
+                                write("\tpush1")
+                                write("\ttoby")
+                                write("\tasgn")
+                                write("\tpop")
+                                write("\tmark0")
+                                write("\tpnull")
+                                write("\tvar\t", variable_id)
+                                write("\tpnull")
+                                write("\tvar\t", name_list_id)
+                                write("\tvar\t", index_id)
+                                write("\tsubsc")
+                                write("\tinvoke\t1")
+                                write("\tpnull")
+                                write("\tvar\t", val_list_id)
+                                write("\tvar\t", index_id)
+                                write("\tsubsc")
+                                write("\tasgn")
+                                write("\tunmark")
+                                write("lab ", next_label())
+                                write("\tefail")
+                                write("lab ", next_label())
+                                write("\tunmark")
+                                write("lab ", save_label)
+                            }
+                                            
+                        }
+                        
+                        line := (read(tmpfile) | &null)
+
+                    
+                    # LINE_NUMBER END
+
+end
+
+procedure line_body()
+
+                    # LINE_BODY ITR UNTIL EOF OR END OF SOURCE LINE
+                    until (
+                        /line |
+                        ( line ? (cstar(ws) & ="proc" & cplus(ws)) ) |
+                        ( line ? (cstar(ws) & ="line" & cplus(ws)) )
+                    ) do {
+                    
+                        # OTHER_LINES SEQ
+                        
+                        write(line)
+                        
+                        line := (read(tmpfile) | &null)
+                        
+                        # OTHER_LINES END
+                        
+                    # LINE_BODY END
+                    }
+
+end
+
+procedure process_options(argv)
+
+    local i, numfiles
+    
+    i := 1
+    numfiles := 0
+
+    while i <= *argv do {
+    
+        case argv[i] of {
+        
+            "-i": {
+            
+                includes := 1
+                i +:= 1
+                if i > *argv then stop(&errout, "Procedure name expected after -i option")
+                include_procs[argv[i]] := 1
+                
+            }
+        
+            "-m": {
+            
+                modify := 1
+                
+            }
+        
+            default: {
+            
+                if (argv[i] ? ="-") & *argv[i] > 1 then stop(&errout, "Unknown option: ", argv[i])
+            
+                infile_name := argv[i]
+                numfiles +:= 1
+                if numfiles > 1 then stop(&errout, "Only one input file name allowed on command line")
+            
+            }
+        
+        }
+        
+        i +:= 1
+        
+    }
+
+
+end
+
+  

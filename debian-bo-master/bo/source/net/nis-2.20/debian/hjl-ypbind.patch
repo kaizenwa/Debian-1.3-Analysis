@@ -1,0 +1,286 @@
+From hjl@lucon.org  Sun Mar 16 14:49:15 1997
+Return-Path: <hjl@lucon.org>
+Received: from elvis.sw.ods.com ([160.86.13.7]) by elo.sw.ods.com
+	 with esmtp id m0w6Mrj-0001EuC
+	(Debian Smail-3.2 1996-Jul-4 #2); Sun, 16 Mar 1997 14:49:15 -0600 (CST)
+Received: from ocean.lucon.org ([204.160.189.73]) by elvis.sw.ods.com
+          (Netscape Mail Server v2.01) with SMTP id AAA27324
+          for <david@sw.ods.com>; Sun, 16 Mar 1997 14:50:25 -0500
+Received: by ocean.lucon.org
+	id m0w6MrZ-0004IyC
+	(Debian /\oo/\ Smail3.1.29.1 #29.37); Sun, 16 Mar 97 12:49 PST
+Message-Id: <m0w6MrZ-0004IyC@ocean.lucon.org>
+From: hjl@lucon.org (H.J. Lu)
+Subject: Re: NIS help
+To: david@sw.ods.com (David Engel)
+Date: Sun, 16 Mar 1997 12:49:05 -0800 (PST)
+In-Reply-To: <19970316135025.31731@sw.ods.com> from "David Engel" at Mar 16, 97 01:50:25 pm
+X-Mailer: ELM [version 2.4 PL25 PGP2]
+MIME-Version: 1.0
+Content-Type: text/plain; charset=US-ASCII
+Content-Transfer-Encoding: 7bit
+Status: RO
+X-Status: A
+Content-Length: 6296
+Lines: 259
+
+> 
+> On Mar 16, H.J. Lu wrote
+> > Please put your bind at
+> > 
+> > ftp://ftp.lucon.org/pub/incoming
+> > 
+> > I will try to fix it for you by the end of today if you can put
+> > it there before noon PST.
+> 
+> OK, ypbind-bsd-1.15.tar.gz is now there.  Use the make.debian Mafefile
+> to build it.
+> 
+
+
+The only thing I can say is I don't like BSD code. It is not ANSI C
+and very buggy. Anyway here is my patch. Some are due to my change
+which is compatible with everyone else and some are real bug fixes.
+Please let me know if it works for you.
+
+BTW, ypserv is 1.1.5 now.
+
+
+H.J.
+---
+Index: make.debian
+===================================================================
+RCS file: /home/work/cvs/nis/debian-nis/ypbind-bsd-1.15/make.debian,v
+retrieving revision 1.1.1.1
+diff -u -r1.1.1.1 make.debian
+--- make.debian	1997/03/16 19:06:14	1.1.1.1
++++ make.debian	1997/03/16 19:14:21
+@@ -1,6 +1,6 @@
+ 
+ ypbind:	ypbind.c
+-	cc -O2 -D__BSD_SIGNAL -DDAEMON -s -o ypbind ypbind.c -lbsd
++	cc -Wall -O2 -D__BSD_SIGNAL -DDAEMON -s -o ypbind ypbind.c -lbsd
+ 
+ install:
+ 	install -m 755 -g root ypbind $(DEBDIR)/usr/sbin
+Index: ypbind.c
+===================================================================
+RCS file: /home/work/cvs/nis/debian-nis/ypbind-bsd-1.15/ypbind.c,v
+retrieving revision 1.1.1.1
+diff -u -r1.1.1.1 ypbind.c
+--- ypbind.c	1997/03/16 19:06:14	1.1.1.1
++++ ypbind.c	1997/03/16 20:47:45
+@@ -88,9 +88,13 @@
+ #define WRITEFD ypdb->dom_pipe_fds[1]
+ #define BROADFD broad_domain->dom_pipe_fds[1]
+ 
++#ifdef __linux__
++extern int daemon __P((int, int));
++#else
+ extern bool_t xdr_domainname(), xdr_ypbind_resp();
+ extern bool_t xdr_ypreq_key(), xdr_ypresp_val();
+ extern bool_t xdr_ypbind_setdom();
++#endif
+ 
+ void	checkwork __P((void));
+ void	*ypbindproc_null_2 __P((SVCXPRT *, void *, CLIENT *));
+@@ -156,7 +160,7 @@
+ void *argp;
+ CLIENT *clnt;
+ {
+-	static char res;
++	static char *res;
+ 
+ 	bzero((char *)&res, sizeof(res));
+ 	return (void *)&res;
+@@ -165,7 +169,11 @@
+ struct ypbind_resp *
+ ypbindproc_domain_2(transp, argp, clnt)
+ SVCXPRT *transp;
++#ifdef __linux__
++char **argp;
++#else
+ char *argp;
++#endif
+ CLIENT *clnt;
+ {
+ 	static struct ypbind_resp res;
+@@ -177,13 +185,21 @@
+ 	res.ypbind_respbody.ypbind_error = YPBIND_ERR_NOSERV;
+ 
+ 	for(ypdb=ypbindlist; ypdb; ypdb=ypdb->dom_pnext) {
++#ifdef __linux__
++		if( strcmp(ypdb->dom_domain, *argp) == 0)
++#else
+ 		if( strcmp(ypdb->dom_domain, argp) == 0)
++#endif
+ 			break;
+ 		}
+ 
+ 	if(ypdb==NULL) {
+ 		if (yp_restricted) {
++#ifdef __linux__
+ 			syslog(LOG_NOTICE, "Running in restricted mode -- request to bind domain \"%s\" rejected.\n", argp);
++#else
++			syslog(LOG_NOTICE, "Running in restricted mode -- request to bind domain \"%s\" rejected.\n", *argp);
++#endif
+ 			return &res;
+ 		}
+ 
+@@ -200,7 +216,11 @@
+ 			return &res;
+ 		}
+ 		bzero((char *)ypdb, sizeof *ypdb);
++#ifdef __linux__
++		strncpy(ypdb->dom_domain, *argp, sizeof ypdb->dom_domain);
++#else
+ 		strncpy(ypdb->dom_domain, argp, sizeof ypdb->dom_domain);
++#endif
+ 		ypdb->dom_vers = YPVERS;
+ 		ypdb->dom_alive = 0;
+ 		ypdb->dom_default = 0;
+@@ -246,6 +266,8 @@
+ struct ypbind_setdom *argp;
+ CLIENT *clnt;
+ {
++	static char *result = NULL;
++
+ 	struct sockaddr_in *fromsin, bindsin;
+ 
+ 	fromsin = svc_getcaller(transp);
+@@ -254,7 +276,7 @@
+ 	case YPSET_LOCAL:
+ 		if( fromsin->sin_addr.s_addr != htonl(INADDR_LOOPBACK)) {
+ 			svcerr_noprog(transp);
+-			return;
++			return((void *) &result);
+ 		}
+ 		break;
+ 	case YPSET_ALL:
+@@ -262,17 +284,17 @@
+ 	case YPSET_NO:
+ 	default:
+ 		svcerr_noprog(transp);
+-		return;
++		return((void *) &result);
+ 	}
+ 
+ 	if(ntohs(fromsin->sin_port) >= IPPORT_RESERVED) {
+ 		svcerr_noprog(transp);
+-		return;
++		return((void *) &result);
+ 	}
+ 
+ 	if(argp->ypsetdom_vers != YPVERS) {
+ 		svcerr_noprog(transp);
+-		return;
++		return((void *) &result);
+ 	}
+ 
+ 	bzero((char *)&bindsin, sizeof bindsin);
+@@ -281,7 +303,7 @@
+ 	bindsin.sin_port = argp->ypsetdom_port;
+ 	rpc_received(argp->ypsetdom_domain, &bindsin, 1);
+ 
+-	return;
++	return((void *) &result);
+ }
+ 
+ static void
+@@ -386,12 +408,11 @@
+ 	exit(0);
+ }
+ 
+-void
++int
+ main(argc, argv)
+ int argc;
+ char **argv;
+ {
+-	char path[MAXPATHLEN];
+ 	struct timeval tv;
+ 	int i;
+ 	DIR *dird;
+@@ -532,6 +553,7 @@
+ 			break;
+ 		}
+ 	}
++	return 0;
+ }
+ 
+ void
+@@ -650,6 +672,9 @@
+ {
+ 	bool_t out = FALSE;
+ 	enum clnt_stat stat;
++#ifdef __linux__
++	char *ypdomain;
++#endif
+ 
+ 	if (children >= MAX_CHILDREN || ypdb->dom_broadcast_pid)
+ 		return;
+@@ -659,7 +684,7 @@
+ 		return;
+ 	}
+ 
+-	if (ypdb->dom_vers = -1 && (long)ypdb->dom_server_addr.sin_addr.s_addr)
++	if (ypdb->dom_vers == -1 && (long)ypdb->dom_server_addr.sin_addr.s_addr)
+ 		syslog(LOG_WARNING, "NIS server [%s] for domain \"%s\" not responding",
+ 		inet_ntoa(ypdb->dom_server_addr.sin_addr), ypdb->dom_domain);
+ 
+@@ -691,9 +716,16 @@
+ 
+ 	retries = 0;
+ 
++#ifdef __linux__
++	ypdomain = ypdb->dom_domain;
++	stat = clnt_broadcast(YPPROG, YPVERS, YPPROC_DOMAIN_NONACK,
++	    xdr_domainname, (void *)&ypdomain, xdr_bool, (char *)&out,
++	    broadcast_result);
++#else
+ 	stat = clnt_broadcast(YPPROG, YPVERS, YPPROC_DOMAIN_NONACK,
+ 	    xdr_domainname, (char *)ypdb->dom_domain, xdr_bool, (char *)&out,
+ 	    broadcast_result);
++#endif
+ 
+ 	if (stat != RPC_SUCCESS) {
+ 		bzero((char *)&ypdb->dom_server_addr,
+@@ -726,7 +758,9 @@
+ 	enum clnt_stat stat;
+ 	int rpcsock = RPC_ANYSOCK;
+ 	CLIENT *client_handle;
+-	time_t t;
++#ifdef __linux__
++	char *ypdomain;
++#endif
+ 
+ 	interval.tv_sec = FAIL_THRESHOLD;
+ 	interval.tv_usec = 0;
+@@ -749,9 +783,17 @@
+ 		return(1);
+ 	}
+ 
++#ifdef __linux__
++	ypdomain = ypdb->dom_domain;
++	if ((stat = clnt_call(client_handle, YPPROC_DOMAIN,
++		xdr_domainname, (void *)&ypdomain, xdr_bool,
++		(char *)&out, timeout)) != RPC_SUCCESS || out == FALSE) {
++#else
+ 	if ((stat = clnt_call(client_handle, YPPROC_DOMAIN,
+ 		xdr_domainname, (char *)ypdb->dom_domain, xdr_bool,
+ 		(char *)&out, timeout)) != RPC_SUCCESS || out == FALSE) {
++#endif
++
+ #ifdef __linux__
+ 		if (ypdb->dom_alive) ypdb->timestamp = time(NULL);
+ #endif
+@@ -854,7 +896,7 @@
+ 	}
+ 
+ 	/* We've recovered from a crash: inform the world. */
+-	if (ypdb->dom_vers = -1 && ypdb->dom_server_addr.sin_addr.s_addr)
++	if (ypdb->dom_vers == -1 && ypdb->dom_server_addr.sin_addr.s_addr)
+ 		syslog(LOG_WARNING, "NIS server [%s] for domain \"%s\" OK",
+ 		inet_ntoa(raddrp->sin_addr), ypdb->dom_domain);
+ 
+

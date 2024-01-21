@@ -1,0 +1,151 @@
+.\" Copyright (c) 1983, 1990, 1991 The Regents of the University of California.
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. All advertising materials mentioning features or use of this software
+.\"    must display the following acknowledgement:
+.\"	This product includes software developed by the University of
+.\"	California, Berkeley and its contributors.
+.\" 4. Neither the name of the University nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"     @(#)accept.2	6.6 (Berkeley) 4/29/91
+.\"
+.\" Modified Sat Jul 24 16:42:42 1993 by Rik Faith (faith@cs.unc.edu)
+.\" Translated Wed Dec 13 1995  by Miguel A. Sepulveda (angel@angel.ifc.or.jp)
+.\" Modified  Jun 25 1996 by Miguel A. Sepulveda (angel@vivaldi.princeton.edu) 
+.TH ACCEPT 2 "25 Jun 1996" "Manual BSD" "Manual del Programador"
+.SH NOMBRE
+accept \- acepta una conexión en un zócalo (socket)
+.SH SINOPSIS
+.B #include <sys/types.h>
+.br 
+.B #include <sys/socket.h>
+.br
+.BI "int accept(int " s ", struct sockaddr *" addr ", int *" addrlen );
+.SH DESCRIPCION
+El argumento
+.I s
+es un  zócalo creado mediante el comando
+.BR socket (2),
+enlazado a una dirección gracias a
+.BR bind (2),
+y está escuchando por conexiones después de un
+.BR listen (2).
+La llamada 
+.B accept
+extrae la primera conexión pedida en la cola de conexiones pendientes,
+crea un nuevo  zócalo con las mismas propiedades de 
+.I s
+y asigna un nuevo fichero descriptor para el  zócalo. Si no quedan 
+conexiones en la cola, y el  zócalo no está marcado como no-bloqueador,
+.B accept
+bloquea la petición hasta que haya un  zócalo disponible. 
+Si el  zócalo está marcado no-bloqueador 
+y no hay conexiones pendientes en la cola en ese instante,
+.B accept
+regresa un error según se describe más adelante. 
+El  zócalo aceptado no puede usarse para aceptar conexiones adicionales.
+El  zócalo original 
+.I s
+permanece abierto.
+
+El argumento 
+.I addr
+en la salida contiene la dirección de la entidad conectante,
+según el nivel de comunicaciones. El formato exacto del parámetro  
+.I addr
+está determinado por el dominio en el que la comunicación se efectua.
+.I addrlen
+es un parámetro tanto para input como output;
+inicialmente contiene la cantidad de espacio indicado por 
+.IR addr ;
+cuando regresa contiene la longitud real
+(en bytes) de la dirección regresada. 
+Esta llamada se usa con  zócalos basados 
+en conexiones, por el momento via  
+.BR SOCK_STREAM . 
+
+Es posible elegir mediante 
+.BR select (2)
+un  zócalo para realizar un 
+.B accept
+simplemente elijiendolo para lectura.
+
+Para ciertos protocolos que requieren una confirmación explícita,
+tal como
+.B ISO
+o
+.BR DATAKIT ,
+.B accept
+puede interpretarse como una función para eliminar de la cola
+la próxima conexión solicitada sin implicar una confirmación.
+Se puede eludir a la confirmación a través de una lectura o escritura normal
+en el nuevo fichero descriptor, y un rechazo puede indicarse implícitamente
+cerrando el nuevo  zócalo.
+
+Uno puede obtener datos concernientes  a la conexión pedida
+sin confirmar la conexión simplemente llamando
+.BR recvmsg (2)
+con un valor 
+.I msg_iovlen
+de 0 y un valor no-nulo en
+.IR msg_controllen ,
+o también ejecutando una petición de
+.BR getsockopt (2)
+Similarmente, es posible proveer información sobre el rechazo
+de la conexión ejecutando
+.BR sendmsg (2)
+suministrando la información de control, o llamando
+.BR setsockopt (2).
+.SH "VALORES REGRESADOS"
+La llamada regresa \-1 en caso de error. Si tiene éxito, regresa un
+entero no-negativo que es un descriptor para el  zócalo aceptado.
+.SH ERRORES
+.TP 0.8i
+.B EBADF
+El descriptor no es válido.
+.TP
+.B ENOTSOCK
+El descriptor se refiere a un fichero, no a un  zócalo.
+.TP
+.B EOPNOTSUPP
+El  zócalo referido no es del tipo
+.BR SOCK_STREAM . 
+.TP
+.B EFAULT
+El parámetro
+.I addr
+no se encuentra en una zona escribible del espacio de direcciones del
+usuario.
+.TP
+.B EWOULDBLOCK
+El  zócalo está marcado como no-bloqueador y no hay  conexiones
+presentes que puedan ser aceptadas.
+.SH HISTORIA
+La función 
+.B accept
+apareció en BSD 4.2.
+.SH "VEASE"
+.BR bind "(2), " connect "(2), " listen "(2), " select "(2), "
+.BR socket "(2) "

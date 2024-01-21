@@ -1,0 +1,87 @@
+#!/usr/bin/perl
+#
+# Quick and dirty faq formatter for xmp
+# $Id: makefaq,v 1.1 1997/03/12 17:36:14 claudio Exp $
+
+$section=0;
+$date=`date`;
+
+$file=shift;
+
+open FILE,"$file";
+while(<FILE>) {
+    chomp;
+    if(/^T\s/) {
+	s/^.\s+//;
+	print "<html><head><title>$_</title></head><body>";
+	printf "<h1>%s</h1>\n",uc $_;
+	print "<h3>Last update: $date</h3><p><hr><p>\n";
+	print "<h1>Table of contents</h1>";
+	next;
+    }
+    if(/^S\s/) {
+	s/^.\s+//;
+	$section++;
+	$item=0;
+	print "<a href=\"#s_$section\"><h2>$section. $_</h2></a>\n";
+	next;
+    }
+    if(/^Q({\w+})?\s/) {
+	s/^.({\w+})?\s+//;
+	$item++;
+	$l=$1;
+	if($l=~s/{(.*)}/$1/) {
+	    $l_sect{$l}=$section;
+	    $l_item{$l}=$item;
+	}
+	print "<a href=\"#q_${section}_$item\">$section.$item. $_</a><br>\n";
+	next;
+    }
+}
+
+seek FILE,0,0;
+$section=0;
+print "<p><br><p><hr><blockquote>";
+
+while(<FILE>) {
+    if(/^R\s/) {
+	s/^.\s+//;
+	$rcsid=$_;
+	next;
+    }
+    if(/^S\s/) {
+	s/^.\s+//;
+	$section++;
+	$item=0;
+	print "</blockquote><p><br><p><a name=\"s_$section\"></a>";
+        print "<h2>$section. $_</h2><blockquote>\n";
+	next;
+    }
+    if(/^Q({\w+})?\s/) {
+	s/^.({\w+})?\s+//;
+	$l=$1;
+	if($l=~s/{(.*)}/$1/) {
+	    $label{$l}="$section.$item";
+	}
+	$item++;
+	print "<a name=\"q_${section}_$item\"></a>";
+	print "<b>$section.$item. $_</b><br>\n";
+	next;
+    }
+    if(/^A({.*})?\s/) {
+	s/^.\s+//;
+	while ((($n=<FILE>)!~/^\s*$/)&&$n) { $_.=$n; }
+	s#{(\w+)}#<a href="\#q_$l_sect{$1}_$l_item{$1}">\
+Question $l_sect{$1}.$l_item{$1}</a>#g unless /^Q{\w+}/;
+	print "$_<p>";
+    }
+}
+
+print <<EOF;
+</blockquote>
+<p><hr><p><i>FAQ source revision: $rcsid</i><p>
+</body></html>
+EOF
+
+close FILE;
+

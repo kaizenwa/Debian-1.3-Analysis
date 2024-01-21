@@ -1,0 +1,36 @@
+#! /bin/sh
+# snntpsend [site...] - invoke snntp for each site with queued articles
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/nntp:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+spool=$NEWSARTS/out.nntp
+btemp=tmp.$$.bat
+ltemp=tmp.$$.log
+
+cd $spool
+mkdir lock 2>/dev/null
+for site in ${*-*.*}
+do
+	# lock site
+	lock lock/$site $$
+
+	echo "`date`: snntp $site" >$ltemp
+	snntp $site <$site >$btemp 2>>$ltemp	# this can be slow
+	status=$?
+	case "$status" in
+	0)	mv $btemp $site ;;	# retry any unsent articles later
+	1)	rm -f $btemp ;;		# try all again later
+	*)	echo "weird exit status $status from snntp $site" >>$ltemp ;;
+	esac
+
+	# lock log, now that the slow part is done
+	lock lock/log $$
+	cat $ltemp >>log
+
+	unlock lock/$site lock/log
+	rm -f $ltemp
+done

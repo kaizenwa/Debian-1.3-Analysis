@@ -1,0 +1,1271 @@
+This is Info file mercury_library.info, produced by Makeinfo-1.63 from
+the input file library.texi.
+
+START-INFO-DIR-ENTRY
+* Mercury Library: (mercury_library). The Mercury Library Reference Manual
+END-INFO-DIR-ENTRY
+
+   This file documents the Mercury standard library.
+
+   Copyright (C) 1995 University of Melbourne.
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+   Permission is granted to copy and distribute modified versions of
+this manual under the conditions for verbatim copying, provided also
+that the entire resulting derived work is distributed under the terms
+of a permission notice identical to this one.
+
+   Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions.
+
+
+File: mercury_library.info,  Node: graph,  Next: group,  Prev: getopt,  Up: Top
+
+graph
+*****
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     %
+     % File: graph.m.
+     % Main author: conway.
+     % Stability: low.
+     %
+     % This module defines a directed graph data type. The type graph(N, A)
+     % stores information of type N in the nodes, and information of type A
+     % in the arcs.
+     %
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+     
+     :- module graph.
+     
+     :- interface.
+     :- import_module set, std_util.
+     
+     	% graph(Node, Arc) represents a directed graph with information of
+     	% type Node associated with each node, and information of type Arc
+     	% associated with each arc.
+     :- type graph(N, A).
+     
+     :- type node(N).
+     
+     :- type arc(A).
+     
+     	% Lots of graphs don't need to store anything in the arcs so here's
+     	% a type equivalence that only has `real' information in the nodes.
+     :- type graph(N)	== graph(N, unit).
+     
+     :- type arc		== arc(unit).
+     
+     	% graph__init(Graph) binds Graph to an empty graph
+     	% containing no nodes and no arcs. (The graph contains
+     	% a counter of the number of nodes allocated in it, so
+     	% it is possible for a graph to contain no nodes or arcs
+     	% and still fail to unify with the binding of Graph from
+     	% graph__init.)
+     :- pred graph__init(graph(N, A)).
+     :- mode graph__init(out) is det.
+     
+     	% graph__set_node(OldGraph, NodeInfo, Node, NewGraph) takes
+     	% OldGraph and NodeInfo which is the information to be stored
+     	% in a new node, and returns a key "Node" which refers to that
+     	% node, and the new graph NewGraph containing all of the nodes
+     	% and arcs in OldGraph as well as the new node.
+     	% It is possible to have two nodes in the graph with the
+     	% same information stored in them.
+     	%
+     	% This operation is O(lgN) for a graph containing N nodes.
+     :- pred graph__set_node(graph(N, A), N, node(N), graph(N, A)).
+     :- mode graph__set_node(in, in, out, out) is det.
+     
+     	% graph__insert_node/4 is the same as graph__set_node/4 except
+     	% that if the information to be stored in the node is stored
+     	% in another node, then the graph__insert_node/4 fails.
+     	%
+     	% This operation is O(N) for a graph containing N nodes since
+     	% this predicate has to check that the node data isn't in an
+     	% existing node.
+     :- pred graph__insert_node(graph(N, A), N, node(N), graph(N, A)).
+     :- mode graph__insert_node(in, in, out, out) is semidet.
+     
+     	% graph__det_insert_node/4 is like graph__insert_node, except
+     	% that if the insertion would fail, it calls error/1.
+     :- pred graph__det_insert_node(graph(N, A), N, node(N), graph(N, A)).
+     :- mode graph__det_insert_node(in, in, out, out) is det.
+     
+     	% graph__search_node(Graph, NodeInfo, Node) nondeterministically
+     	% produces bindings of Node such that Node is a node in Graph
+     	% that has the information NodeInfo attatched to it.
+     	%
+     	% This operation is O(lgN) for the first solution for a graph
+     	% containing N nodes.
+     :- pred graph__search_node(graph(N, A), N, node(N)).
+     :- mode graph__search_node(in, in, out) is nondet.
+     
+     	% graph__find_matching_nodes(Graph, NodeInfo, Nodes) takes a graph
+     	% Graph and the information NodeInfo and returns the set of nodes
+     	% Nodes which have the information NodeInfo stored in them. (The set
+     	% Nodes will of course be empty if there are no matching nodes.)
+     	%
+     	% This operation is O(NlgN) for a graph containing N nodes.
+     :- pred graph__find_matching_nodes(graph(N, A), N, set(node(N))).
+     :- mode graph__find_matching_nodes(in, in, out) is det.
+     
+     	% graph__node_contents(Graph, Node, NodeInfo) takes Graph and
+     	% Node and returns the information NodeInfo stored in Node.
+     	%
+     	% This operation is O(lgN) for a graph containing N nodes.
+     :- pred graph__node_contents(graph(N, A), node(N), N).
+     :- mode graph__node_contents(in, in, out) is det.
+     
+     	% graph__successors(Graph, Node, Nodes) takes a graph Graph and
+     	% a node Node and returns the set of nodes Nodes that are reachable
+     	% (directly - not transitively) from Node.
+     	%
+     	% This operation is O(NlgN) for a graph containing N nodes.
+     :- pred graph__successors(graph(N, A), node(N), set(node(N))).
+     :- mode graph__successors(in, in, out) is det.
+     
+     	% graph__nodes(Graph, Nodes) binds Nodes to the set of nodes in Graph.
+     :- pred graph__nodes(graph(N, A), set(node(N))).
+     :- mode graph__nodes(in, out) is det.
+     
+     	% graph__set_edge(OldGraph, Start, End, ArcInfo, Arc, NewGraph)
+     	% takes a graph OldGraph and adds an arc from Start to End with
+     	% the information ArcInfo stored in it, and returns a key for
+     	% that arc Arc, and the new graph NewGraph.
+     	% If an identical arc already exists then this operation has
+     	% no effect.
+     	%
+     	% This operation is O(lgN+lgM) for a graph with N nodes and M arcs.
+     :- pred graph__set_edge(graph(N, A), node(N), node(N), A,
+     						arc(A), graph(N, A)).
+     :- mode graph__set_edge(in, in, in, in, out, out) is det.
+     
+     	% graph__insert_edge/6 is the same as graph__set_edge/6 except that
+     	% if an identical arc already exists in the graph the operation fails.
+     	% This is O(N) for a graph with N edges between the two nodes.
+     :- pred graph__insert_edge(graph(N, A), node(N), node(N), A,
+     						arc(A), graph(N, A)).
+     :- mode graph__insert_edge(in, in, in, in, out, out) is semidet.
+     
+     	% graph__det_insert_edge/6 is like graph__insert_edge except
+     	% than instead of failing, it calls error/1.
+     :- pred graph__det_insert_edge(graph(N, A), node(N), node(N), A,
+     						arc(A), graph(N, A)).
+     :- mode graph__det_insert_edge(in, in, in, in, out, out) is det.
+     
+     	% graph__arc_contents(Graph, Arc, Start, End, ArcInfo) takes a
+     	% graph Graph and an arc Arc and returns the start and end nodes
+     	% and the information stored in that arc.
+     :- pred graph__arc_contents(graph(N, A), arc(A), node(N), node(N), A).
+     :- mode graph__arc_contents(in, in, out, out, out) is det.
+     
+     	% graph__path(Graph, Start, End, Path) is true iff there is a path
+     	% from the node Start to the node End in Graph that goes through
+     	% the sequence of arcs Arcs.
+     	% The algorithm will return paths containing at most one cycle.
+     :- pred graph__path(graph(N, A), node(N), node(N), list(arc(A))).
+     :- mode graph__path(in, in, in, out) is nondet.
+     :- mode graph__path(in, in, out, out) is nondet.
+     
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: group,  Next: int,  Prev: graph,  Up: Top
+
+group
+*****
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     %
+     % file: group.m.
+     % main author: conway.
+     % stability: low.
+     %
+     % This module is probably not terribly useful, and it may not be supported
+     % in future releases.
+     %
+     % The `group' module provides a facility for handling a partitioned set.
+     % A group is a set of sets of elements, where each element is unique within
+     % the scope of the group. The module provides moderately efficient ways for
+     % manipulating groups and elements.
+     %
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+     
+     :- module group.
+     
+     :- interface.
+     
+     :- import_module set, list, std_util, assoc_list.
+     
+     :- type group(T).
+     
+     :- type group__key.
+     
+     	% Create an empty group
+     
+     :- pred group__init(group(T)).
+     :- mode group__init(out) is det.
+     
+     	% Insert a set of elements into the group.
+     
+     :- pred group__insert(group(T), set(T), group(T)).
+     :- mode group__insert(in, in, out) is det.
+     
+     	% Given an element, get the set containing that element.
+     
+     :- pred group__group(group(T), T, set(T)).
+     :- mode group__group(in, in, out) is det.
+     
+     	% Convert the group to a set of sets.
+     
+     :- pred group__to_set(group(T), set(set(T))).
+     :- mode group__to_set(in, out) is det.
+     
+     :- pred group__sets_and_keys(group(T), assoc_list(set(T), group__key)).
+     :- mode group__sets_and_keys(in, out) is det.
+     
+     	% Given an element, get the key for the group containing
+     	% that element.
+     
+     :- pred group__group_key(group(T), T, group__key).
+     :- mode group__group_key(in, in, out) is det.
+     
+     	% Given a group key, get the corresponding set of elements.
+     
+     :- pred group__key_group(group(T), group__key, set(T)).
+     :- mode group__key_group(in, in, out) is det.
+     
+     	% Remove a set from the group, and return the set.
+     
+     :- pred group__remove_group(group(T), group__key, set(T), group(T)).
+     :- mode group__remove_group(in, in, out, out) is det.
+     
+     	% Test to see if two elements are in the same set.
+     
+     :- pred group__same_group(group(T), T, T).
+     :- mode group__same_group(in, in, in) is semidet.
+     
+     :- pred group__largest_group_key(group(T), group__key).
+     :- mode group__largest_group_key(in, out) is det.
+     
+     :- pred group__group_keys(group(T), list(group__key)).
+     :- mode group__group_keys(in, out) is det.
+     
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: int,  Next: io,  Prev: group,  Up: Top
+
+int
+***
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     %
+     % int - some predicates for dealing with machine-size integer numbers.
+     %
+     % Main authors: conway, fjh.
+     % Stability: medium.
+     %
+     %--------------------------------------------------%
+     
+     :- module int.
+     
+     :- interface.
+     
+     :- import_module float.
+     
+     	% less than
+     :- pred int < int.
+     :- mode in  < in is semidet.
+     
+     	% greater than
+     :- pred int > int.
+     :- mode in  > in is semidet.
+     
+     	% less than or equal
+     :- pred int =< int.
+     :- mode in  =< in is semidet.
+     
+     	% greater than or equal
+     :- pred int >= int.
+     :- mode in >= in is semidet.
+     
+     	% absolute value
+     :- pred int__abs(int, int).
+     :- mode int__abs(in, out) is det.
+     
+     	% maximum
+     :- pred int__max(int, int, int).
+     :- mode int__max(in, in, out) is det.
+     
+     	% minimum
+     :- pred int__min(int, int, int).
+     :- mode int__min(in, in, out) is det.
+     
+     	% conversion of integer to floating point
+     :- pred int__to_float(int, float) is det.
+     :- mode int__to_float(in, out) is det.
+     
+     	% expontiation
+     :- pred int__pow(int, int, int).
+     :- mode int__pow(in, in, out) is det.
+     	% int__pow(X, Y, Z): Z is X raised to the Yth power
+     	% Y must not be negative.
+     
+     	% base 2 logarithm
+     :- pred int__log2(int, int).
+     :- mode int__log2(in, out) is det.
+     	% int__log2(X, N): N is the least integer such that 2 to the power N
+     	% is greater than or equal to X.  X must be positive.
+     
+     	% addition
+     :- func int + int = int.
+     :- mode in  + in  = uo  is det.
+     :- mode uo  + in  = in  is det.
+     :- mode in  + uo  = in  is det.
+     
+     	% multiplication
+     :- func int * int = int.
+     :- mode in  * in  = uo  is det.
+     /*
+     % XXX need to change code_util.m before adding these modes
+     :- mode in  * in  = in  is semidet.
+     :- mode in  * in  = uo  is det.
+     :- mode uo  * in  = in  is semidet.
+     :- mode in  * uo  = in  is semidet.
+     */
+     
+     	% subtraction
+     :- func int - int = int.
+     :- mode in  - in  = uo  is det.
+     :- mode uo  - in  = in  is det.
+     :- mode in  - uo  = in  is det.
+     
+     	% modulus (or is it remainder?)
+     :- func int mod int = int.
+     :- mode in  mod in  = uo  is det.
+     
+     	% truncating integer division
+     	% should round toward zero
+     	% (if it doesn't, file a bug report)
+     :- func int // int = int.
+     :- mode in  // in  = uo  is det.
+     
+     	% left shift
+     :- func int << int = int.
+     :- mode in  << in  = uo  is det.
+     
+     	% (arithmetic) right shift
+     :- func int >> int = int.
+     :- mode in  >> in  = uo  is det.
+     
+     	% bitwise and
+     :- func int /\ int = int.
+     :- mode in  /\ in  = uo  is det.
+     
+     	% bitwise or
+     :- func int \/ int = int.
+     :- mode in  \/ in  = uo  is det.
+     
+     	% bitwise exclusive or (xor)
+     :- func int ^ int = int.
+     :- mode in  ^ in  = uo  is det.
+     
+     	% bitwise complement
+     :- func \ int = int.
+     :- mode \ in  = uo  is det.
+     
+     	% unary plus
+     :- func + int = int.
+     :- mode + in = uo is det.
+     
+     	% unary minus
+     :- func - int = int.
+     :- mode - in = uo is det.
+     
+     	% is/2, for backwards compatiblity with Prolog (and with
+     	% early implementations of Mercury)
+     :- pred is(T, T) is det.
+     :- mode is(uo, di) is det.
+     :- mode is(out, in) is det.
+     
+     /* The following routines are builtins that the compiler knows about.
+        Don't use them; use the functions above.
+        These will go away in some future release.
+     */
+     
+     :- pred builtin_plus(int, int, int).
+     :- mode builtin_plus(in, in, uo) is det.
+     :- mode builtin_plus(in, in, uo) is det.
+     
+     :- pred builtin_unary_plus(int, int).
+     :- mode builtin_unary_plus(in, uo) is det.
+     
+     :- pred builtin_minus(int, int, int).
+     :- mode builtin_minus(in, in, uo) is det.
+     
+     :- pred builtin_unary_minus(int, int).
+     :- mode builtin_unary_minus(in, uo) is det.
+     
+     :- pred builtin_times(int, int, int).
+     :- mode builtin_times(in, in, uo) is det.
+     
+     :- pred builtin_div(int, int, int).
+     :- mode builtin_div(in, in, uo) is det.
+     
+     :- pred builtin_mod(int, int, int).
+     :- mode builtin_mod(in, in, uo) is det.
+     
+     :- pred builtin_left_shift(int, int, int).
+     :- mode builtin_left_shift(in, in, uo) is det.
+     
+     :- pred builtin_right_shift(int, int, int).
+     :- mode builtin_right_shift(in, in, uo) is det.
+     
+     :- pred builtin_bit_or(int, int, int).
+     :- mode builtin_bit_or(in, in, uo) is det.
+     
+     :- pred builtin_bit_and(int, int, int).
+     :- mode builtin_bit_and(in, in, uo) is det.
+     
+     :- pred builtin_bit_xor(int, int, int).
+     :- mode builtin_bit_xor(in, in, uo) is det.
+     
+     :- pred builtin_bit_neg(int, int).
+     :- mode builtin_bit_neg(in, uo) is det.
+
+
+File: mercury_library.info,  Node: io,  Next: lexer,  Prev: int,  Up: Top
+
+io
+**
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     %
+     % File: io.m.
+     % Main author: fjh.
+     % Stability: medium to high.
+     %
+     % This file encapsulates all the file I/O.
+     % We implement a purely logical I/O system using non-logical I/O primitives
+     % of the underlying system (C or Prolog).
+     % The logicalness is ensured by passing around a ``state-of-the-world''
+     % argument using unique modes.  The compiler will check that the state
+     % of the world argument is properly single-threaded, and will also check
+     % to ensure that you don't attempt to backtrack over any I/O.
+     %
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+     
+     :- module io.
+     :- interface.
+     :- import_module char, int, float, string, std_util, list.
+     
+     %--------------------------------------------------%
+     
+     % External interface: imported predicate
+     
+     % :- pred main(io__state, io__state).
+     % :- mode main(di, uo) is det.
+     %	main(IOState0, IOState1).
+     %		This module provides startup code which calls main/2.
+     
+     %--------------------------------------------------%
+     
+     % Exported types
+     
+     	% The state of the universe.
+     
+     :- type io__state.
+     
+     	% Opaque handles for text I/O streams.
+     
+     :- type io__input_stream.
+     
+     :- type io__output_stream.
+     
+     	% Opaque handles for binary I/O streams.
+     
+     :- type io__binary_input_stream.
+     
+     :- type io__binary_output_stream.
+     
+     	% Various types used for the result from the access predicates
+     
+     :- type io__res		--->	ok
+     			;	error(io__error).
+     
+     :- type io__res(T)	--->	ok(T)
+     			;	error(io__error).
+     
+     :- type io__result	--->	ok
+     			;	eof
+     			;	error(io__error).
+     
+     :- type io__result(T)	--->	ok(T)
+     			;	eof
+     			;	error(io__error).
+     
+     :- type io__read_result(T)	--->	ok(T)
+     				;	eof
+     				;	error(string, int).
+     
+     :- type io__error.	% Use io__error_message to decode it.
+     
+     	% Poly-type is used for io__write_many, which does
+     	% some vaguely printf-like formatting.
+     
+     :- type io__poly_type == string__poly_type.
+     %			--->
+     %		c(char)
+     %	;	s(string)
+     %	;	i(int)
+     %	;	f(float).
+     %
+     
+     %--------------------------------------------------%
+     
+     % Text input predicates.
+     
+     :- pred io__read_char(io__result(char), io__state, io__state).
+     :- mode io__read_char(out, di, uo) is det.
+     %		Reads a character from the current input stream.
+     
+     :- pred io__read_word(io__result(list(char)), io__state, io__state).
+     :- mode io__read_word(out, di, uo) is det.
+     %		Reads a whitespace delimited word from the current input stream.
+     
+     :- pred io__read_line(io__result(list(char)), io__state, io__state).
+     :- mode io__read_line(out, di, uo) is det.
+     %		Reads a line from the current input stream.
+     
+     :- pred io__putback_char(char, io__state, io__state).
+     :- mode io__putback_char(in, di, uo) is det.
+     %		Un-reads a character from the current input stream.
+     %		You can put back as many characters as you like.
+     %		You can even put back something that you didn't actually read.
+     
+     :- pred io__read_char(io__input_stream, io__result(char),
+     				io__state, io__state).
+     :- mode io__read_char(in, out, di, uo) is det.
+     %		Reads a character from specified stream.
+     
+     :- pred io__read_word(io__input_stream, io__result(list(char)),
+     							io__state, io__state).
+     :- mode io__read_word(in, out, di, uo) is det.
+     %		Reads a whitespace delimited word from specified stream.
+     
+     :- pred io__read_line(io__input_stream, io__result(list(char)),
+     							io__state, io__state).
+     :- mode io__read_line(in, out, di, uo) is det.
+     %		Reads a line from specified stream.
+     
+     :- pred io__putback_char(io__input_stream, char, io__state, io__state).
+     :- mode io__putback_char(in, in, di, uo) is det.
+     %		Un-reads a character from specified stream.
+     %		You can put back as many characters as you like.
+     %		You can even put back something that you didn't actually read.
+     
+     :- pred io__read_anything(io__read_result(T), io__state, io__state).
+     :- mode io__read_anything(out, di, uo) is det.
+     %		Reads its argument from the current input stream.
+     %		The argument may be of (almost) any type.
+     %		The term read had better be of the right type!
+     %		XXX io__read_anything is NOT YET IMPLEMENTED.
+     %		It will also probably be renamed io__read.
+     
+     :- pred io__read_anything(io__input_stream, io__read_result(T),
+     							io__state, io__state).
+     :- mode io__read_anything(in, out, di, uo) is det.
+     %		Reads its argument to the specified stream.
+     %		The argument may be of (almost) any type.
+     %		The term read had better be of the right type!
+     %		XXX io__read_anything is NOT YET IMPLEMENTED.
+     %		It will also probably be renamed io__read.
+     
+     :- pred io__ignore_whitespace(io__result, io__state, io__state).
+     :- mode io__ignore_whitespace(out, di, uo) is det.
+     %		Discards all the whitespace from the current stream.
+     
+     :- pred io__ignore_whitespace(io__input_stream, io__result,
+     				io__state, io__state).
+     :- mode io__ignore_whitespace(in, out, di, uo) is det.
+     %		Discards all the whitespace from the specified stream.
+     
+     
+     
+     %--------------------------------------------------%
+     
+     % Text output predicates.
+     
+     :- pred io__write_string(string, io__state, io__state).
+     :- mode io__write_string(in, di, uo) is det.
+     %		Writes a string to the current output stream.
+     
+     :- pred io__write_string(io__output_stream, string, io__state, io__state).
+     :- mode io__write_string(in, in, di, uo) is det.
+     %		Writes a string to the specified stream.
+     
+     :- pred io__write_strings(list(string), io__state, io__state).
+     :- mode io__write_strings(in, di, uo) is det.
+     %		Writes a list of strings to the current output stream.
+     
+     :- pred io__write_strings(io__output_stream, list(string),
+     				io__state, io__state).
+     :- mode io__write_strings(in, in, di, uo) is det.
+     %		Writes a string to the specified stream.
+     
+     :- pred io__write_char(char, io__state, io__state).
+     :- mode io__write_char(in, di, uo) is det.
+     %		Writes a character to the current output stream.
+     
+     :- pred io__write_char(io__output_stream, char, io__state, io__state).
+     :- mode io__write_char(in, in, di, uo) is det.
+     %		Writes a character to the specified stream.
+     
+     :- pred io__write_int(int, io__state, io__state).
+     :- mode io__write_int(in, di, uo) is det.
+     %		Writes an integer to the current output stream.
+     
+     :- pred io__write_int(io__output_stream, int, io__state, io__state).
+     :- mode io__write_int(in, in, di, uo) is det.
+     %		Writes an integer to the specified stream.
+     
+     :- pred io__write_float(float, io__state, io__state).
+     :- mode io__write_float(in, di, uo) is det.
+     %	io__write_float(Float, IO0, IO1).
+     %		Writes a floating point number to the current output stream.
+     
+     :- pred io__write_float(io__output_stream, float, io__state, io__state).
+     :- mode io__write_float(in, in, di, uo) is det.
+     %	io__write_float(Float, IO0, IO1).
+     %		Writes a floating point number to the specified stream.
+     
+     :- pred io__write_many(list(io__poly_type), io__state, io__state).
+     :- mode io__write_many(in, di, uo) is det.
+     %	writes a polyglot to output.
+     
+     :- pred io__write_many(io__output_stream, list(io__poly_type), io__state, io__state).
+     :- mode io__write_many(in, in, di, uo) is det.
+     %	writes a polyglot to a specified stream.
+     
+     :- pred io__write(T, io__state, io__state).
+     :- mode io__write(in, di, uo) is det.
+     %		Writes its argument to the current output stream.
+     %		The argument may be of (almost) any type.
+     %		(Any type except a higher-order predicate type,
+     %		or some of the builtin types such as io__state itself.)
+     %		XXX Not all quoting of atoms is done correctly.
+     
+     :- pred io__write(io__output_stream, T, io__state, io__state).
+     :- mode io__write(in, in, di, uo) is det.
+     %		Writes its argument to the specified stream.
+     %		The argument may be of (almost) any type.
+     %		(Any type except a higher-order predicate type,
+     %		or some of the builtin types such as io__state itself.)
+     
+     :- pred io__flush_output(io__state, io__state).
+     :- mode io__flush_output(di, uo) is det.
+     %	Flush the output buffer of the current output stream.
+     
+     :- pred io__flush_output(io__output_stream, io__state, io__state).
+     :- mode io__flush_output(in, di, uo) is det.
+     %	Flush the output buffer of the specified output stream.
+     
+     %--------------------------------------------------%
+     
+     % Input text stream predicates.
+     
+     :- pred io__see(string, io__res, io__state, io__state).
+     :- mode io__see(in, out, di, uo) is det.
+     %	io__see(File, Result, IO0, IO1).
+     %		Attempts to open a file for input, and if successful
+     %		sets the current input stream to the newly opened stream.
+     %		Result is either 'ok' or 'error'.
+     
+     :- pred io__seen(io__state, io__state).
+     :- mode io__seen(di, uo) is det.
+     %		Closes the current input stream.
+     %		The current input stream reverts to standard input.
+     
+     :- pred io__open_input(string, io__res(io__input_stream), io__state, io__state).
+     :- mode io__open_input(in, out, di, uo) is det.
+     %	io__open_input(File, Result, IO0, IO1).
+     %		Attempts to open a file for input.
+     %		Result is either 'ok(Stream)' or 'error(ErrorCode)'.
+     
+     :- pred io__close_input(io__input_stream, io__state, io__state).
+     :- mode io__close_input(in, di, uo) is det.
+     %	io__close_input(File, IO0, IO1).
+     %		Closes an open input stream.
+     
+     :- pred io__input_stream(io__input_stream, io__state, io__state).
+     :- mode io__input_stream(out, di, uo) is det.
+     %		Retrieves the current input stream.
+     %		Does not modify the IO state.
+     
+     :- pred io__set_input_stream(io__input_stream, io__input_stream,
+     				io__state, io__state).
+     :- mode io__set_input_stream(in, out, di, uo) is det.
+     %       io__set_input_stream(NewStream, OldStream, IO0, IO1)
+     %		Changes the current input stream to the stream specified.
+     %		Returns the previous stream.
+     
+     :- pred io__stdin_stream(io__input_stream, io__state, io__state).
+     :- mode io__stdin_stream(out, di, uo) is det.
+     %		Retrieves the standard input stream.
+     %		Does not modify the IO state.
+     
+     :- pred io__input_stream_name(string, io__state, io__state).
+     :- mode io__input_stream_name(out, di, uo) is det.
+     %	Retrieves the human-readable name associated with the current input
+     %	stream.
+     %	For file streams, this is the filename.
+     %	For stdin this is the string "<standard input>".
+     
+     :- pred io__input_stream_name(io__input_stream, string, io__state, io__state).
+     :- mode io__input_stream_name(in, out, di, uo) is det.
+     %	Retrieves the human-readable name associated with the specified input
+     %	stream.
+     %	For file streams, this is the filename.
+     %	For stdin this is the string "<standard input>".
+     
+     :- pred io__get_line_number(int, io__state, io__state).
+     :- mode io__get_line_number(out, di, uo) is det.
+     
+     :- pred io__get_line_number(io__input_stream, int, io__state, io__state).
+     :- mode io__get_line_number(in, out, di, uo) is det.
+     
+     %	Return the line number of the current input stream.
+     %	Lines are numbered starting at 1.
+     
+     :- pred io__set_line_number(int, io__state, io__state).
+     :- mode io__set_line_number(in, di, uo) is det.
+     
+     :- pred io__set_line_number(io__input_stream, int, io__state, io__state).
+     :- mode io__set_line_number(in, in, di, uo) is det.
+     
+     %	Return the line number of the current input stream.
+     %	Lines are numbered starting at 1.
+     
+     %--------------------------------------------------%
+     
+     % Output text stream predicates.
+     
+     :- pred io__tell(string, io__res, io__state, io__state).
+     :- mode io__tell(in, out, di, uo) is det.
+     %	io__tell(File, Result, IO0, IO1).
+     %		Attempts to open a file for output, and if successful
+     %		sets the current output stream to the newly opened stream.
+     %		As per Prolog tell/1. Result is either 'ok' or 'error(ErrCode)'.
+     
+     :- pred io__told(io__state, io__state).
+     :- mode io__told(di, uo) is det.
+     %	io__told(IO0, IO1).
+     %		Closes the current output stream.
+     %		The default output stream reverts to standard output.
+     %		As per Prolog told/0.
+     
+     :- pred io__open_output(string, io__res(io__output_stream),
+     				io__state, io__state).
+     :- mode io__open_output(in, out, di, uo) is det.
+     %	io__open_output(File, Result, IO0, IO1).
+     %		Attempts to open a file for output.
+     %		Result is either 'ok(Stream)' or 'error(ErrorCode)'.
+     
+     :- pred io__open_append(string, io__res(io__output_stream),
+     				io__state, io__state).
+     :- mode io__open_append(in, out, di, uo) is det.
+     %	io__open_append(File, Result, IO0, IO1).
+     %		Attempts to open a file for appending.
+     %		Result is either 'ok(Stream)' or 'error(ErrorCode)'.
+     
+     :- pred io__close_output(io__output_stream, io__state, io__state).
+     :- mode io__close_output(in, di, uo) is det.
+     %	io__close_output(File, IO0, IO1).
+     %		Closes an open output stream.
+     
+     :- pred io__output_stream(io__output_stream, io__state, io__state).
+     :- mode io__output_stream(out, di, uo) is det.
+     %		Retrieves the current output stream.
+     %		Does not modify the IO state.
+     
+     :- pred io__set_output_stream(io__output_stream, io__output_stream,
+     				io__state, io__state).
+     :- mode io__set_output_stream(in, out, di, uo) is det.
+     %	io__set_output_stream(NewStream, OldStream, IO0, IO)
+     %		Changes the current output stream to the stream specified.
+     %		Returns the previous stream.
+     
+     :- pred io__stdout_stream(io__output_stream, io__state, io__state).
+     :- mode io__stdout_stream(out, di, uo) is det.
+     %		Retrieves the standard output stream.
+     %		Does not modify the IO state.
+     
+     :- pred io__stderr_stream(io__output_stream, io__state, io__state).
+     :- mode io__stderr_stream(out, di, uo) is det.
+     %		Retrieves the standard error stream.
+     %		Does not modify the IO state.
+     
+     :- pred io__output_stream_name(string, io__state, io__state).
+     :- mode io__output_stream_name(out, di, uo) is det.
+     %	Retrieves the human-readable name associated with the current
+     %	output stream.
+     %	For file streams, this is the filename.
+     %	For stdout this is the string "<standard output>".
+     %	For stderr this is the string "<standard error>".
+     
+     :- pred io__output_stream_name(io__output_stream, string, io__state, io__state).
+     :- mode io__output_stream_name(in, out, di, uo) is det.
+     %	Retrieves the human-readable name associated with the specified stream.
+     %	For file streams, this is the filename.
+     %	For stdout this is the string "<standard output>".
+     %	For stderr this is the string "<standard error>".
+     
+     %--------------------------------------------------%
+     
+     % Binary input predicates.
+     
+     :- pred io__read_byte(io__result(int), io__state, io__state).
+     :- mode io__read_byte(out, di, uo) is det.
+     %		Reads a single byte from the current binary input
+     %		stream and returns it in the bottom 8 bits of an integer.
+     
+     :- pred io__read_byte(io__binary_input_stream, io__result(int),
+     				io__state, io__state).
+     :- mode io__read_byte(in, out, di, uo) is det.
+     %		Reads a single byte from the specified binary input
+     %		stream and returns it in the bottom 8 bits of an integer.
+     
+     :- pred io__putback_byte(int, io__state, io__state).
+     :- mode io__putback_byte(in, di, uo) is det.
+     %		Un-reads a byte from the current binary input stream.
+     %		You can put back as many bytes as you like.
+     %		You can even put back something that you didn't actually read.
+     %		The byte is taken from the bottom 8 bits of an integer.
+     
+     :- pred io__putback_byte(io__binary_input_stream, int, io__state, io__state).
+     :- mode io__putback_byte(in, in, di, uo) is det.
+     %		Un-reads a byte from specified binary input stream.
+     %		You can put back as many bytes as you like.
+     %		You can even put back something that you didn't actually read.
+     %		The byte is returned in the bottom 8 bits of an integer.
+     
+     %--------------------------------------------------%
+     
+     % Binary output predicates.
+     
+     % XXX what about wide characters?
+     
+     :- pred io__write_byte(int, io__state, io__state).
+     :- mode io__write_byte(in, di, uo) is det.
+     %		Writes a single byte to the current binary output stream.
+     %		The byte is taken from the bottom 8 bits of an int.
+     
+     :- pred io__write_byte(io__binary_output_stream, int, io__state, io__state).
+     :- mode io__write_byte(in, in, di, uo) is det.
+     %		Writes a single byte to the specified binary output stream.
+     %		The byte is taken from the bottom 8 bits of an int.
+     
+     :- pred io__write_bytes(string, io__state, io__state).
+     :- mode io__write_bytes(in, di, uo) is det.
+     %		Writes several bytes to the current binary output stream.
+     %		The bytes are taken from a string.
+     
+     :- pred io__write_bytes(io__binary_output_stream, string, io__state, io__state).
+     :- mode io__write_bytes(in, in, di, uo) is det.
+     %		Writes several bytes to the specified binary output stream.
+     %		The bytes are taken from a string.
+     
+     :- pred io__flush_binary_output(io__state, io__state).
+     :- mode io__flush_binary_output(di, uo) is det.
+     %	Flush the output buffer of the current binary output stream.
+     
+     :- pred io__flush_binary_output(io__binary_output_stream, io__state, io__state).
+     :- mode io__flush_binary_output(in, di, uo) is det.
+     %	Flush the output buffer of the specified binary output stream.
+     
+     %--------------------------------------------------%
+     
+     % Binary input stream predicates.
+     
+     :- pred io__see_binary(string, io__res, io__state, io__state).
+     :- mode io__see_binary(in, out, di, uo) is det.
+     %	io__see_binary(File, Result, IO0, IO1).
+     %		Attempts to open a file for binary input, and if successful
+     %		sets the current binary input stream to the newly opened stream.
+     %		Result is either 'ok' or 'error'.
+     
+     :- pred io__seen_binary(io__state, io__state).
+     :- mode io__seen_binary(di, uo) is det.
+     %		Closes the current input stream.
+     %		The current input stream reverts to standard input.
+     
+     :- pred io__open_binary_input(string, io__res(io__binary_input_stream),
+     			io__state, io__state).
+     :- mode io__open_binary_input(in, out, di, uo) is det.
+     %	io__open_binary_input(File, Result, IO0, IO1).
+     %		Attempts to open a binary file for input.
+     %		Result is either 'ok(Stream)' or 'error(ErrorCode)'.
+     
+     :- pred io__close_binary_input(io__binary_input_stream, io__state, io__state).
+     :- mode io__close_binary_input(in, di, uo) is det.
+     %	io__close_binary_input(File, IO0, IO1).
+     %		Closes an open binary input stream.
+     
+     :- pred io__binary_input_stream(io__binary_input_stream, io__state, io__state).
+     :- mode io__binary_input_stream(out, di, uo) is det.
+     %		Retrieves the current binary input stream.
+     %		Does not modify the IO state.
+     
+     :- pred io__set_binary_input_stream(io__binary_input_stream,
+     			io__binary_input_stream, io__state, io__state).
+     :- mode io__set_binary_input_stream(in, out, di, uo) is det.
+     %       io__set_binary_input_stream(NewStream, OldStream, IO0, IO1)
+     %		Changes the current input stream to the stream specified.
+     %		Returns the previous stream.
+     
+     :- pred io__stdin_binary_stream(io__binary_input_stream, io__state, io__state).
+     :- mode io__stdin_binary_stream(out, di, uo) is det.
+     %		Retrieves the standard binary input stream.
+     %		Does not modify the IO state.
+     
+     :- pred io__binary_input_stream_name(string, io__state, io__state).
+     :- mode io__binary_input_stream_name(out, di, uo) is det.
+     %	Retrieves the human-readable name associated with the current binary
+     %	input stream.
+     %	For file streams, this is the filename.
+     
+     :- pred io__binary_input_stream_name(io__binary_input_stream, string,
+     		io__state, io__state).
+     :- mode io__binary_input_stream_name(in, out, di, uo) is det.
+     %	Retrieves the human-readable name associated with the specified binary
+     %	input stream.
+     %	For file streams, this is the filename.
+     
+     %--------------------------------------------------%
+     
+     % Binary output stream predicates.
+     
+     :- pred io__tell_binary(string, io__res, io__state, io__state).
+     :- mode io__tell_binary(in, out, di, uo) is det.
+     %	io__tell_binary(File, Result, IO0, IO1).
+     %		Attempts to open a file for binary output, and if successful
+     %		sets the current binary output stream to the newly opened
+     %		stream. As per Prolog tell/1. Result is either 'ok' or
+     %		'error(ErrCode)'.
+     
+     :- pred io__told_binary(io__state, io__state).
+     :- mode io__told_binary(di, uo) is det.
+     %	io__told_binary(IO0, IO1).
+     %		Closes the current binary output stream.
+     %		The default binary output stream reverts to standard output.
+     %		As per Prolog told/0.
+     
+     :- pred io__open_binary_output(string, io__res(io__binary_output_stream),
+     				io__state, io__state).
+     :- mode io__open_binary_output(in, out, di, uo) is det.
+     %	io__open_binary_output(File, Result, IO0, IO1).
+     %		Attempts to open a file for binary output.
+     %		Result is either 'ok(Stream)' or 'error(ErrorCode)'.
+     
+     :- pred io__open_binary_append(string, io__res(io__binary_output_stream),
+     				io__state, io__state).
+     :- mode io__open_binary_append(in, out, di, uo) is det.
+     %	io__open_binary_append(File, Result, IO0, IO1).
+     %		Attempts to open a file for binary appending.
+     %		Result is either 'ok(Stream)' or 'error(ErrorCode)'.
+     
+     :- pred io__close_binary_output(io__binary_output_stream, io__state, io__state).
+     :- mode io__close_binary_output(in, di, uo) is det.
+     %	io__close_binary_output(File, IO0, IO1).
+     %		Closes an open binary output stream.
+     
+     :- pred io__binary_output_stream(io__binary_output_stream,
+     			io__state, io__state).
+     :- mode io__binary_output_stream(out, di, uo) is det.
+     %		Retrieves the current binary output stream.
+     %		Does not modify the IO state.
+     
+     :- pred io__stdout_binary_stream(io__binary_output_stream, io__state,
+     				io__state).
+     :- mode io__stdout_binary_stream(out, di, uo) is det.
+     %		Retrieves the standard binary output stream.
+     %		Does not modify the IO state.
+     
+     :- pred io__set_binary_output_stream(io__binary_output_stream,
+     			io__binary_output_stream, io__state, io__state).
+     :- mode io__set_binary_output_stream(in, out, di, uo) is det.
+     %	io__set_binary_output_stream(NewStream, OldStream, IO0, IO)
+     %		Changes the current binary output stream to the stream
+     %		specified. Returns the previous stream.
+     
+     :- pred io__binary_output_stream_name(string, io__state, io__state).
+     :- mode io__binary_output_stream_name(out, di, uo) is det.
+     %	Retrieves the human-readable name associated with the current
+     %	binary output stream.
+     %	For file streams, this is the filename.
+     
+     :- pred io__binary_output_stream_name(io__binary_output_stream, string,
+     			io__state, io__state).
+     :- mode io__binary_output_stream_name(in, out, di, uo) is det.
+     %	Retrieves the human-readable name associated with the specified
+     %	output stream.
+     %	For file streams, this is the filename.
+     
+     %--------------------------------------------------%
+     
+     % Global state predicates.
+     
+     :- pred io__progname(string, string, io__state, io__state).
+     :- mode io__progname(in, out, di, uo) is det.
+     % 	io__progname(DefaultProgname, Progname)
+     %		Returns the name that the program was invoked with,
+     %		if available, or DefaultProgname if the name is not
+     %		available.
+     %
+     %		Does not modify the IO state.
+     
+     :- pred io__progname_base(string, string, io__state, io__state).
+     :- mode io__progname_base(in, out, di, uo) is det.
+     % 	io__progname_base(DefaultProgname, Progname)
+     %		Like `io__progname', except that it strips off any path name
+     %		preceding the program name.  Useful for error messages.
+     
+     :- pred io__command_line_arguments(list(string), io__state, io__state).
+     :- mode io__command_line_arguments(out, di, uo) is det.
+     % 	io__command_line_arguments(Args)
+     %		Returns the arguments that the program was invoked with,
+     %		if available, otherwise an empty list.
+     %
+     %		Does not modify the IO state.
+     
+     % The io__state contains an integer used to record the program's exit status.
+     % When the program finishes, it will return this exit status to the operating
+     % system.  The following predicates can be used to get and set the exit status.
+     
+     :- pred io__get_exit_status(int, io__state, io__state).
+     :- mode io__get_exit_status(out, di, uo) is det.
+     
+     :- pred io__set_exit_status(int, io__state, io__state).
+     :- mode io__set_exit_status(in, di, uo) is det.
+     
+     % The io__state includes a `globals' field which is not used by the I/O
+     % library, but can be used by the application.  The globals field is
+     % of type `univ' so that the application can store any data it wants there.
+     % The following predicates can be used to access this global state.
+     
+     :- pred io__get_globals(univ, io__state, io__state).
+     :- mode io__get_globals(uo, di, uo) is det.
+     	% Doesn't modify the io__state.
+     
+     :- pred io__set_globals(univ, io__state, io__state).
+     :- mode io__set_globals(di, di, uo) is det.
+     
+     % The following predicates provide an interface to the environment list.
+     % Do not attempt to put spaces or '=' signs in the names of environment
+     % variables, or bad things may result!
+     
+     :- pred io__get_environment_var(string, maybe(string), io__state, io__state).
+     :- mode io__get_environment_var(in, out, di, uo) is det.
+     	% First argument is the name of the environment variable.
+     	% Returns yes(Value) if the variable was set (Value will
+     	% be set to the value of the variable) and no if the
+     	% variable was not set.
+     
+     :- pred io__set_environment_var(string, string, io__state, io__state).
+     :- mode io__set_environment_var(in, in, di, uo) is det.
+     	% First argument is the name of the environment variable,
+     	% second argument is the value to be assigned to that
+     	% variable.  Will abort if the system runs out of environment
+     	% space.
+     
+     %--------------------------------------------------%
+     
+     % Memory management predicates.
+     
+     	% Write some memory/time usage statistics to stdout.
+     
+     :- pred io__report_stats(io__state, io__state).
+     :- mode io__report_stats(di, uo) is det.
+     
+     	% Preallocate heap space (to avoid NU-Prolog panic).
+     
+     :- pred io__preallocate_heap_space(int, io__state, io__state).
+     :- mode io__preallocate_heap_space(in, di, uo) is det.
+     
+     /*** no longer supported, sorry
+     :- pred io__gc_call(pred(io__state, io__state), io__state, io__state).
+     :- mode io__gc_call(pred(di, uo) is det, di, uo) is det.
+     %	io__gc_call(Goal, IO0, IO1).
+     %		Execute Goal, passing IO0, and IO1, and
+     %		collect any garbage created during it's execution.
+     ***/
+     
+     %--------------------------------------------------%
+     
+     % Miscellaneous predicates
+     
+     :- pred io__call_system(string, io__res(int), io__state, io__state).
+     :- mode io__call_system(in, out, di, uo) is det.
+     %	io__call_system(Command, Result, IO0, IO1).
+     %		Invokes the operating system shell with the specified
+     %		Command.  Result is either `ok(ExitStatus)', if it was
+     %		possible to invoke the command, or `error(ErrorCode)' if not.
+     
+     :- pred io__error_message(io__error, string).
+     :- mode io__error_message(in, out) is det.
+     %	io__error_message(ErrorCode, ErrorMessage).
+     %		Look up the error message corresponding to a particular error
+     %		code.
+     
+     %--------------------------------------------------%
+     
+     % For use by term_io.m:
+     
+     :- import_module ops.
+     
+     :- pred io__get_op_table(ops__table, io__state, io__state).
+     :- mode io__get_op_table(out, di, uo) is det.
+     
+     :- pred io__set_op_table(ops__table, io__state, io__state).
+     :- mode io__set_op_table(di, di, uo) is det.
+     
+     % For use by the Mercury runtime:
+     
+     :- type io__external_state.
+     
+     :- pred io__init_state(io__external_state, io__state).
+     :- mode io__init_state(di, uo) is det.
+     
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: lexer,  Next: library,  Prev: io,  Up: Top
+
+lexer
+*****
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     %
+     % file: lexer.m.
+     % main author: fjh.
+     % stability: high.
+     %
+     % Lexical analysis.  This module defines the representation of tokens
+     % and exports predicates for reading in tokens from an input stream.
+     %
+     % See ISO Prolog 6.4.  Also see the comments at the top of parser.m.
+     %
+     %--------------------------------------------------%
+     
+     :- module lexer.
+     :- interface.
+     :- import_module char, string, int, float, list, std_util, io.
+     
+     :- type	token
+     	--->	name(string)
+     	;	variable(string)
+     	;	integer(int)
+     	;	float(float)
+     	;	string(string)		% "...."
+     	;	open			% '('
+     	;	open_ct			% '(' without any preceding whitespace
+     	;	close			% ')'
+     	;	open_list		% '['
+     	;	close_list		% ']'
+     	;	open_curly		% '}'
+     	;	close_curly		% '{'
+     	;	ht_sep			% '|'
+     	;	comma			% ','
+     	;	end			% '.'
+     	;	junk(character)		% junk character in the input stream
+     	;	error(string)		% some other invalid token
+     	;	io_error(io__error)	% error reading from the input stream
+     	;	eof.			% end-of-file
+     
+     % For every token, we record the line number of the line on
+     % which the token occurred.
+     
+     :- type token_context == int.	% line number
+     
+     :- type token_list == list(pair(token, token_context)).
+     
+     :- pred lexer__get_token_list(token_list, io__state, io__state).
+     :- mode lexer__get_token_list(out, di, uo) is det.
+     %	Read a list of tokens from the current input stream.
+     %	Keep reading until either we encounter either an `end' token
+     %	(i.e. a full stop followed by whitespace) or the end-of-file.
+     
+     :- pred lexer__token_to_string(token, string).
+     :- mode lexer__token_to_string(in, out) is det.
+     %	Convert a token to a human-readable string describing the token.
+     
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: library,  Next: list,  Prev: lexer,  Up: Top
+
+library
+*******
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     %
+     % This module imports all the modules in the Mercury library.
+     %
+     % It is used as a way for the Makefiles to know which library interface
+     % files, objects, etc., need to be installed, and it is also linked to
+     % create the executable invoked by the `mnp' script.
+     %
+     % ---------------------------------------------------------------------------%
+     % ---------------------------------------------------------------------------%
+     
+     :- module library.
+     
+     :- interface.
+     
+     :- import_module array, assoc_list, bag, bimap, bintree, bintree_set, bool.
+     :- import_module char, dir, eqvclass, float, math, getopt, graph, group, int.
+     :- import_module io, list, map, multi_map, pqueue, queue, random, relation.
+     :- import_module require, set, set_bbbtree, set_ordlist, set_unordlist, stack.
+     :- import_module std_util, string, term, term_io, tree234, uniq_array, varset.
+     :- import_module store, rbtree, parser, lexer, ops, time.
+     
+     :- pred library__version(string::out) is det.
+     
+     
+     %--------------------------------------------------%
+

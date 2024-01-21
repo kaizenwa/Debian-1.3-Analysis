@@ -1,0 +1,79 @@
+### -------------------------------------------------------------------------
+###
+###  Local (TkDesk Extension File)
+###
+###  This file is the place where you can add any procs you care to write
+###  to extend TkDesk's capabilities.  You might also add code that will
+###  be immediately executed when this file is sourced during start up.
+###
+###  *** Press F5 to save changes and reload this file into TkDesk, 
+###  *** F6 to do the same plus to close this window.
+###
+### -------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# view_manual_page names:
+# Example of an extension proc.  This one's used by the default application
+# bar to look up manual pages. 
+# Example for $names: "col socket(2) malloc(3)"
+
+proc view_manual_page {names} {
+    foreach name $names {
+	set l [split $name ()]
+	if {[llength $l] == 1} {
+	    dsk_view man $l | col -b
+	} else {
+	    dsk_view man [lindex $l 1] [lindex $l 0] | col -b
+	}
+    }
+}
+
+
+# ---------------------------------------------------------------------------
+# xemacs_load what ?where?
+# An improved proc provided by Erez Strauss (erez@newplaces.com) to
+# communicate with a running XEmacs.  For this to work you need to put the
+# lines:
+# (gnuserv-start)
+# (require 'ange-ftp)
+# into your ~/.emacs.  The second line allows for FTP through XEmacs.
+# $what is the file that is to be loaded, $where may be: same, other, frame.
+
+proc xemacs_load {what {where same}} {
+
+    catch {auto_reset}        
+    if ![dsk_auto_execok "gnudoit"] {
+        dsk_errbell
+        cb_error "Couldn't find gnudoit.  Maybe you don't have XEmacs installed?"
+        return
+    }
+    
+    switch $where {
+        "same" {
+            set func find-file
+            # exec gnudoit -q (find-file \"$what\")
+        }
+        "other" {
+            set func find-file-other-window
+            # exec gnudoit -q (find-file-other-window \"$what\")
+        }
+        "frame" {
+            set func find-file-other-frame
+            # exec gnudoit -q (find-file-other-frame \"$what\")
+        }
+        "scratch" {
+            set func switch-to-buffer-other-frame
+            set what {*scratch*}
+            # exec gnudoit -q (switch-to-buffer-other-frame \"*scratch*\")
+        }
+    }
+    set err [catch { exec gnudoit -q ($func \"$what\") }]
+    if $err {
+        if {[cb_yesno "XEmacs is not yet running on your display. Start it now
+	?"] == 0} {
+            # start new netscape
+            eval dsk_exec xemacs $what
+        }
+    }
+}
+

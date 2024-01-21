@@ -1,0 +1,76 @@
+;; pick.gwm --- Pick a window with the mouse, and do something with it.
+;;
+;; Author: Anders Holst  (aho@sans.kth.se)  
+;; Copyright (C) 1994  Anders Holst
+;; Last change: 13/9
+;;
+;; This file is copyrighted under the same terms as the rest of GWM
+;; (see the X Inc license for details). There is no warranty that it
+;; works. 
+;;
+;; --------------------------------------------------------------------- 
+;; 
+;; Let the user pick a window with the mouse, and then evaluate some
+;; expression on that window.
+;; The basic function is "(pick-window)", which lets the user pick a
+;; window, and returns the wob number. It considers the variable
+;; "cursor".
+;; More advanced functions are "(with-picked EXPR)" which runs EXPR
+;; on the picked window, and "(kill-picked)" which deletes the picked
+;; window. Calls to these can for example be done from a root menu.
+
+(setq pick-result ())
+
+(setq pick-fsm
+  (fsm-make 
+   (state-make
+    (on (buttonrelease 1 any)
+        (with (xpos (current-event-x)
+               ypos (current-event-y))
+          (: pick-result (wob-at-coords xpos ypos))
+          (unpop-menu)))
+    (on (buttonrelease 2 any)
+        (progn (: pick-result ())
+               (unpop-menu)))
+    (on (buttonrelease 3 any)
+        (progn (: pick-result ())
+               (unpop-menu)))
+    )))
+
+(defun pick-menu ()
+  (with (fsm pick-fsm
+         background black
+         borderwidth 0
+         inner-borderwidth 0
+         describe-window '(lambda () (list (window-make () () () () ())
+                                           (window-make () () () () ())))
+         reenter-on-opening ())
+     (with (menu-min-width 1
+            menu-max-width 1
+            bar-min-width 1
+            bar-max-width 1)
+       (menu-make (bar-make ())))))
+
+(defun pick-window ()
+  (with (menu (pick-menu))
+    (move-window (menu-wob menu) -1 -1)
+    (: pick-result t)
+    (pop-menu menu 'here)
+    (while (= pick-result t) (process-events))  ; Wait for result (ugly).
+    pick-result))
+
+(defunq with-picked expr
+  (with (win (with (cursor (or cursor (cursor-make 38)))
+                   (pick-window)))
+    (if win
+        (with (wob win)
+          (eval (+ '(progn) expr))))))
+
+(defun kill-picked ()
+  (with (win (with (cursor (cursor-make 88))
+                   (pick-window)))
+    (if win
+        (with (wob win)
+          (or (delete-window)
+              (kill-window))))))
+

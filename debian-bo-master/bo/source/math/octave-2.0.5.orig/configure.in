@@ -1,0 +1,1211 @@
+dnl configure.in
+dnl
+dnl Process this file with autoconf to produce a configure script.
+dnl
+dnl Copyright (C) 1996 John W. Eaton
+### 
+### This file is part of Octave.
+### 
+### Octave is free software; you can redistribute it and/or modify it
+### under the terms of the GNU General Public License as published by the
+### Free Software Foundation; either version 2, or (at your option) any
+### later version.
+### 
+### Octave is distributed in the hope that it will be useful, but WITHOUT
+### ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+### FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+### for more details.
+### 
+### You should have received a copy of the GNU General Public License
+### along with Octave; see the file COPYING.  If not, write to the Free
+### Software Foundation, 59 Temple Place - Suite 330, Boston, MA
+### 02111-1307, USA. 
+
+AC_REVISION($Revision: 1.258 $)
+AC_PREREQ(2.9)
+AC_INIT(src/octave.cc)
+AC_CONFIG_HEADER(config.h)
+
+AC_DEFINE(OCTAVE_SOURCE, 1)
+
+AC_CANONICAL_HOST
+if test -z "$host"; then
+  host=unknown
+fi
+target_host_type=$host
+canonical_host_type=$host
+if test "$host" = unknown; then
+  AC_MSG_WARN([configuring Octave for unknown system type
+])
+fi
+AC_SUBST(target_host_type)
+
+AC_PREFIX_DEFAULT(/usr/local)
+
+### some defaults
+
+man1dir='$(mandir)/man1'
+man1ext='.1'
+infofile='$(infodir)/octave.info'
+octincludedir='$(includedir)/octave-$(version)'
+fcnfiledir='$(datadir)/octave/$(version)/m'
+localfcnfiledir='$(datadir)/octave/site/m'
+localfcnfilepath='$(localfcnfiledir)//'
+archlibdir='$(libexecdir)/octave/$(version)/exec/$(target_host_type)'
+localarchlibdir='$(libexecdir)/octave/site/exec/$(target_host_type)'
+octfiledir='$(libexecdir)/octave/$(version)/oct/$(target_host_type)'
+localoctfiledir='$(libexecdir)/octave/site/oct/$(target_host_type)'
+localoctfilepath='$(localoctfiledir)//'
+fcnfilepath='.:$(localoctfilepath):$(localfcnfilepath):$(octfiledir)//:$(fcnfiledir)//'
+imagedir='$(datadir)/octave/$(version)/imagelib'
+imagepath='.:$(imagedir)//'
+
+AC_MSG_RESULT([defining prefix to be $prefix])
+AC_MSG_RESULT([defining exec_prefix to be $exec_prefix])
+AC_MSG_RESULT([defining bindir to be $bindir])
+AC_MSG_RESULT([defining datadir to be $datadir])
+AC_MSG_RESULT([defining libdir to be $libdir])
+AC_MSG_RESULT([defining libexecdir to be $libexecdir])
+AC_MSG_RESULT([defining topincludedir to be $topincludedir])
+AC_MSG_RESULT([defining includedir to be $includedir])
+AC_MSG_RESULT([defining mandir to be $mandir])
+AC_MSG_RESULT([defining man1dir to be $man1dir])
+AC_MSG_RESULT([defining man1ext to be $man1ext])
+AC_MSG_RESULT([defining infodir to be $infodir])
+AC_MSG_RESULT([defining infofile to be $infofile])
+AC_MSG_RESULT([defining fcnfiledir to be $fcnfiledir])
+AC_MSG_RESULT([defining localfcnfiledir to be $localfcnfiledir])
+AC_MSG_RESULT([defining localfcnfilepath to be $localfcnfilepath])
+AC_MSG_RESULT([defining archlibdir to be $archlibdir])
+AC_MSG_RESULT([defining localarchlibdir to be $localarchlibdir])
+AC_MSG_RESULT([defining octfiledir to be $octfiledir])
+AC_MSG_RESULT([defining localoctfiledir to be $localoctfiledir])
+AC_MSG_RESULT([defining localoctfilepath to be $localoctfilepath])
+AC_MSG_RESULT([defining fcnfilepath to be $fcnfilepath])
+AC_MSG_RESULT([defining imagedir to be $imagedir])
+AC_MSG_RESULT([defining imagepath to be $imagepath])
+
+AC_SUBST(exec_prefix)
+AC_SUBST(bindir)
+AC_SUBST(datadir)
+AC_SUBST(libdir)
+AC_SUBST(libexecdir)
+AC_SUBST(includedir)
+AC_SUBST(octincludedir)
+AC_SUBST(mandir)
+AC_SUBST(man1dir)
+AC_SUBST(man1ext)
+AC_SUBST(infodir)
+AC_SUBST(infofile)
+AC_SUBST(fcnfiledir)
+AC_SUBST(localfcnfiledir)
+AC_SUBST(localfcnfilepath)
+AC_SUBST(archlibdir)
+AC_SUBST(localarchlibdir)
+AC_SUBST(octfiledir)
+AC_SUBST(localoctfiledir)
+AC_SUBST(localoctfilepath)
+AC_SUBST(fcnfilepath)
+AC_SUBST(imagedir)
+AC_SUBST(imagepath)
+
+### Make configure args available for other uses.
+
+config_opts=$ac_configure_args
+AC_SUBST(config_opts)
+
+### Path separator.
+
+AC_DEFINE(SEPCHAR, [':'])
+AC_DEFINE(SEPCHAR_STR, [":"])
+
+### Allow the user to force us to use f2c.
+
+AC_ARG_WITH(f2c,
+  [  --with-f2c              use f2c even if Fortran compiler is available],
+  [if test $withval = no; then use_f2c=false; else use_f2c=true; fi],
+  use_f2c=false)
+
+### Allow the user to force us to use g77.
+
+AC_ARG_WITH(g77,
+  [  --with-g77              use g77 to compile Fortran subroutines],
+  [if test $withval = no; then use_g77=false; else use_g77=true; fi],
+  use_g77=false)
+
+if $use_f2c && $use_g77; then
+  AC_MSG_WARN([--with-f2c and --with-g77 both specified!  Using g77...])
+  use_f2c=false
+fi
+
+### Allow the user disable support for GNU info.
+
+case "$canonical_host_type" in
+  *-*-cygwin32)
+    USE_GNU_INFO=false
+  ;;
+  *)
+    USE_GNU_INFO=true
+  ;;
+esac
+
+INFO_DIR=info
+
+AC_ARG_ENABLE(info,
+  [  --enable-info           use GNU info (default is yes)],
+  [if test $enableval = no; then
+     USE_GNU_INFO=false;
+     INFO_DIR="";
+   fi], [])
+if $USE_GNU_INFO; then
+  AC_DEFINE(USE_GNU_INFO, 1)
+fi
+AC_SUBST(INFO_DIR)
+
+dnl ### Allow the user disable support for plplot.
+dnl 
+dnl # USE_PLPLOT=true
+dnl # PLPLOT_DIR=plplot
+dnl # LIBPLPLOT=../plplot/libplplot.a
+USE_PLPLOT=false
+PLPLOT_DIR=""
+LIBPLPLOT=""
+dnl AC_ARG_ENABLE(plplot,
+dnl   [  --enable-plplot         use plplot for plotting (default is yes)],
+dnl   [if test $enableval = no; then
+dnl      USE_PLPLOT=false;
+dnl      LIBPLPLOT="";
+dnl      PLPLOT_DIR="";
+dnl    fi], [])
+dnl if $USE_PLPLOT; then
+dnl   AC_DEFINE(USE_PLPLOT, 1)
+dnl fi
+AC_SUBST(LIBPLPLOT)
+AC_SUBST(PLPLOT_DIR)
+
+### Allow the user disable support for command line editing using GNU
+### readline.
+
+READLINE_DIR=readline
+USE_READLINE=true
+LIBREADLINE=-lreadline
+dnl AC_ARG_ENABLE(readline,
+dnl  [  --enable-readline       use readline library (default is yes)],
+dnl  [if test "$enableval" = no; then
+dnl     USE_READLINE=false;
+dnl     LIBREADLINE="";
+dnl     READLINE_DIR="";
+dnl   fi], [])
+if $USE_READLINE; then
+  AC_DEFINE(USE_READLINE, 1)
+fi
+AC_SUBST(LIBREADLINE)
+AC_SUBST(READLINE_DIR)
+
+### By default, Octave's internal array and matrix classes do bounds
+### checking on element references.  This slows some operations down a
+### bit, so give the user the option of disabling it.
+
+BOUNDS_CHECKING=false
+AC_ARG_ENABLE(bounds-check,
+  [  --enable-bounds-check   for internal array classes (default is yes)],
+  [if test "$enableval" = no; then BOUNDS_CHECKING=false; fi], [])
+if $BOUNDS_CHECKING; then
+  AC_DEFINE(BOUNDS_CHECKING, 1)
+fi
+
+### See which C++ compiler to use (we expect to find g++).
+
+EXTERN_CXXFLAGS="$CXXFLAGS"
+
+AC_PROG_CXX
+AC_PROG_CXXCPP
+
+### Do special things for g++.
+
+ADD_CXX_WALL=false
+NO_IMPLICIT_TEMPLATES=
+gxx_version=`$CXX -v 2>&1 | grep "^.*g.. version" | \
+  sed -e 's/^.*g.. version *//' -e 's/cygnus-//'`
+case "$gxx_version" in
+changequote(,)dnl
+  2.[6789].*|2.[123456789][0123456789].*)
+changequote([,])dnl
+    if test -z "$EXTERN_CXXFLAGS"; then
+      ADD_CXX_WALL=true
+    fi
+    NO_IMPLICIT_TEMPLATES="-fno-implicit-templates"
+    AC_MSG_RESULT([defining NO_IMPLICIT_TEMPLATES to be $NO_IMPLICIT_TEMPLATES])
+  ;;
+changequote(,)dnl
+  1.*|2.[012345].*)
+changequote([,])dnl
+    AC_MSG_ERROR([g++ version $gxx_version will not work to compile Octave])
+  ;;
+  *)
+    AC_MSG_WARN([Octave has only been tested with g++, and I can't find it])
+  ;;
+esac
+
+HOST_CXXFLAGS=
+case "$gxx_version" in
+  2.6.*)
+    case "$canonical_host_type" in
+      rs6000-ibm-aix* | powerpc-ibm-aix*)
+        HOST_CXXFLAGS="-Wa,-u"
+        AC_MSG_RESULT([defining HOST_CXXFLAGS to be $HOST_CXXFLAGS])
+      ;;
+    esac
+  ;;
+esac
+
+CXX_VERSION=
+if test -n "$gxx_version"; then
+  CXX_VERSION="$gxx_version"
+fi
+AC_SUBST(CXX_VERSION)
+
+AC_SUBST(HOST_CXXFLAGS)
+AC_SUBST(NO_IMPLICIT_TEMPLATES)
+
+### See which C compiler to use (we expect to find gcc).
+
+EXTERN_CFLAGS="$CFLAGS"
+
+AC_PROG_CC
+AC_PROG_CPP
+AC_PROG_GCC_TRADITIONAL
+
+### Do special things for gcc.
+
+ADD_CC_WALL=false
+gcc_version=`$CC -v 2>&1 | grep "^.*gcc version" | \
+  sed -e 's/^.*g.. version *//' -e 's/cygnus-//'`
+case "$gcc_version" in
+  2.*)
+    if test -z "$EXTERN_CFLAGS"; then
+      ADD_CC_WALL=true
+    fi
+    if test -z "$LDFLAGS"; then
+      LDFLAGS="-g"
+      AC_MSG_RESULT([defining LDFLAGS to be $LDFLAGS])
+    fi
+  ;;
+  1.*)
+    AC_MSG_WARN([gcc version $gcc_version is likely to cause problems])
+  ;;
+  *)
+    AC_MSG_WARN([Octave has only been tested with gcc, and I can't find it])
+  ;;
+esac
+
+CC_VERSION=
+if test -n "$gcc_version"; then
+  CC_VERSION="$gcc_version"
+fi
+AC_SUBST(CC_VERSION)
+
+### On Intel systems with gcc, we need to compile with -mieee-fp to
+### get full support for IEEE floating point.
+###
+### On Alpha/OSF systems, wee need -mieee-with-inexact, but that also
+### requires gcc 2.8.x or later.
+
+case "$canonical_host_type" in
+changequote(,)dnl
+  i[3456789]86-*-*)
+changequote([,])dnl
+    GCC_IEEE_FP_FLAG="-mieee-fp"
+    AC_MSG_RESULT([defining GCC_IEEE_FP_FLAG to be $GCC_IEEE_FP_FLAG])
+  ;;
+  alpha-dec-osf*)
+    case "$gcc_version" in
+changequote(,)dnl
+      1.* | 2.[01234567].*)
+changequote([,])dnl
+      ;;
+      *)
+        GCC_IEEE_FP_FLAG="-mieee-with-inexact"
+        AC_MSG_RESULT([defining GCC_IEEE_FP_FLAG to be $GCC_IEEE_FP_FLAG])
+      ;;
+    esac
+  ;;
+esac
+AC_SUBST(GCC_IEEE_FP_FLAG)
+
+### Use -static if compiling on Alpha OSF/1 1.3 systems.
+
+case "$canonical_host_type" in
+  alpha-dec-osf1.3)
+    LD_STATIC_FLAG=-static
+  ;;
+esac
+if test -n "$LD_STATIC_FLAG"; then
+  AC_MSG_RESULT([defining LD_STATIC_FLAG to be $LD_STATIC_FLAG])
+fi
+AC_SUBST(LD_STATIC_FLAG)
+
+### Handle dynamic linking and shared library options.
+
+### Allow the user to experiment with dynamic linking using dlopen/dlsym.
+
+AC_ARG_ENABLE(dl,
+  [  --enable-dl             use dlopen/dlsym for dynamic linking (not all systems)],
+  [if test $enableval = no; then WITH_DL=no;
+   elif test $enableval = yes; then WITH_DL=yes;
+   else WITH_DL=maybe; fi],
+  WITH_DL=maybe)
+
+### Allow the user to experiment with dynamic linking using
+### shl_load/shl_findsym (HP/UX only?).
+
+AC_ARG_ENABLE(shl,
+  [  --enable-shl            use shl_load/shl_findsym for dynamic linking (HP only)],
+  [if test $enableval = no; then WITH_SHL=no;
+   elif test $enableval = yes; then WITH_SHL=yes;
+   else WITH_SHL=maybe; fi],
+  WITH_SHL=maybe)
+
+### Enable creation of shared libraries.  Currently only works with
+### gcc on some systems.
+
+AC_ARG_ENABLE(shared,
+  [  --enable-shared         create shared libraries (not all systems)],
+  [if test $enableval = no; then SHARED_LIBS=false; else SHARED_LIBS=true; fi],
+  SHARED_LIBS=false)
+AC_SUBST(SHARED_LIBS)
+
+use_rpath=true
+AC_ARG_ENABLE(rpath,
+  [  --enable-rpath          add -rpath to link command for shared libraries],
+  [if test $enableval = no; then use_rpath=false; fi], [])
+
+DLFCN_DIR=
+CPICFLAG=-fPIC
+CXXPICFLAG=-fPIC
+FPICFLAG=-fPIC
+SHLEXT=so
+SH_LD="$CC"
+SH_LDFLAGS=-shared
+RLD_FLAG=
+case "$canonical_host_type" in
+  *-*-386bsd* | *-*-openbsd* | *-*-netbsd* | *-*-freebsd*)
+    SH_LD=ld
+    SH_LDFLAGS=-Bshareable
+  ;;
+  alpha-dec-osf*)
+    CPICFLAG=
+    CXXPICFLAG=
+    FPICFLAG=
+    SH_LDFLAGS="-shared -Xlinker -expect_unresolved -Xlinker '*'"
+    RLD_FLAG='-Xlinker -rpath -Xlinker $(libdir)'
+  ;;
+changequote(,)dnl
+  i[3456789]86-*-linux*)
+changequote([,])dnl
+    RLD_FLAG='-Xlinker -rpath -Xlinker $(libdir)'
+  ;;
+  rs6000-ibm-aix* | powerpc-ibm-aix*)
+    CPICFLAG=
+    CXXPICFLAG=
+    FPICFLAG=
+    DLFCN_DIR=dlfcn
+  ;;
+  hppa*-hp-hpux*)
+    if $use_g77; then
+      FPICFLAG=-fPIC
+    else
+      FPICFLAG=+Z
+    fi
+    SHLEXT=sl
+    SH_LDFLAGS="-shared -fPIC"
+    RLD_FLAG='-Xlinker +b -Xlinker $(libdir)'
+  ;;
+  *-sgi-*)
+    if $use_g77; then
+      FPICFLAG=-fPIC
+    else
+      FPICFLAG=-KPIC
+    fi
+    RLD_FLAG='-L$(libdir)'
+  ;;
+  sparc-sun-sunos4*)
+    if $use_g77; then
+      FPICFLAG=-fPIC
+    else
+      FPICFLAG=-PIC
+    fi
+  ;;
+  sparc-sun-solaris2*)
+    if $use_g77; then
+      FPICFLAG=-fPIC
+    else
+      FPICFLAG=-PIC
+    fi
+    RLD_FLAG='-Xlinker -R -Xlinker $(libdir)'
+  ;;
+esac
+
+if $use_rpath; then
+  true
+else
+  RLD_FLAG=
+fi
+
+AC_MSG_RESULT([defining FPICFLAG to be $FPICFLAG])
+AC_MSG_RESULT([defining CPICFLAG to be $CPICFLAG])
+AC_MSG_RESULT([defining CXXPICFLAG to be $CXXPICFLAG])
+AC_MSG_RESULT([defining SHLEXT to be $SHLEXT])
+AC_MSG_RESULT([defining DLFCN_DIR to be $DLFCN_DIR])
+AC_MSG_RESULT([defining SH_LD to be $SH_LD])
+AC_MSG_RESULT([defining SH_LDFLAGS to be $SH_LDFLAGS])
+AC_MSG_RESULT([defining RLD_FLAG to be $RLD_FLAG])
+AC_SUBST(FPICFLAG)
+AC_SUBST(CPICFLAG)
+AC_SUBST(CXXPICFLAG)
+AC_SUBST(SHLEXT)
+AC_SUBST(DLFCN_DIR)
+AC_SUBST(SH_LD)
+AC_SUBST(SH_LDFLAGS)
+AC_SUBST(RLD_FLAG)
+
+### Allow compilation of smaller kernel.  This only works if some form
+### of dynamic linking is also supported and used.
+
+AC_ARG_ENABLE(lite-kernel,
+  [  --enable-lite-kernel    compile smaller kernel (requires dynamic linking)],
+  [if test $enableval = no; then OCTAVE_LITE=false; else OCTAVE_LITE=true; fi],
+  OCTAVE_LITE=false)
+if $OCTAVE_LITE; then
+  AC_DEFINE(OCTAVE_LITE, 1)
+fi
+AC_SUBST(OCTAVE_LITE)
+
+### special checks for odd OS specific things.
+###
+### I am told that on some SCO systems, the only place to find some
+### functions like gethostname and gettimeofday is in libsocket.
+
+AC_ISC_POSIX
+AC_MINIX
+AC_AIX
+AC_CHECK_LIB(sun, getpwnam)
+AC_CHECK_LIB(socket, gethostname)
+
+### How big are ints and how are they oriented?  These could probably
+### be eliminated in favor of run-time checks.
+
+AC_CHECK_SIZEOF(short)
+AC_CHECK_SIZEOF(int)
+AC_CHECK_SIZEOF(long)
+
+### Does the C compiler handle alloca() and const correctly?
+
+AC_ALLOCA
+AC_C_CONST
+
+### Get the list of libraries that the C++ compiler normally uses.
+
+OCTAVE_CXXLIBS
+
+### See if we should define NPOS.
+
+OCTAVE_STRING_NPOS
+
+### We need these before trying to find libf2c.
+
+if test -z "$AR"; then
+  AR=ar
+fi
+AC_SUBST(AR)
+
+if test -z "$ARFLAGS"; then
+  ARFLAGS="rc"
+fi
+AC_SUBST(ARFLAGS)
+
+AC_PROG_RANLIB
+
+### If we haven't been forced to use f2c, try to find a Fortran compiler
+### under any one of several common Un*x Fortran compiler names. 
+### Put fc last to avoid confusion with some vendor's /bin/sh fc
+### builtin.
+###
+###    f77 : mostUnix systems
+###    xlf : IBM / AIX
+###   cf77 : Cray / Unicos
+###    g77 : GNU Fortran
+###     fc : Convex
+###
+### I don't think the Cray compiler will ever work like f2c...
+###
+### The optional arguments to --with-g77 or --with-f2c force g77 or
+### f2c to be used.  The optional argument to can be used to set the
+### name of g77 or f2c.  For example `--with-g77=/opt/gnu/bin/f77'
+### says that we are using g77 but it is installed as
+### /opt/gnu/bin/f77.
+###
+### If neither of those options are specified, look for a Fortran
+### compiler.  If one is found, see if it is compatible with our
+### assumptions.  If it is, use it.  Otherwise, look for f2c.
+###
+### Issue a warning if we can't find a compatible fortran compiler or
+### f2c.
+
+if $use_g77; then
+  if test "$with_g77" = yes; then
+    F77=g77
+  else
+    F77="$with_g77"
+  fi
+  AC_MSG_RESULT([defining F77 to be $F77])
+elif $use_f2c; then
+  F77=
+  if test "$with_f2c" = yes; then
+    F2C=f2c
+  else
+    F2C="$with_f2c"
+  fi
+  AC_MSG_RESULT([defining F2C to be $F2C])
+else
+  AC_CHECK_PROGS(F77, g77 f77 f90 xlf cf77 fc)
+fi
+
+have_fortran_compiler=false
+have_f2c=false
+
+if $use_g77; then
+  OCTAVE_FLIBS
+  AC_DEFINE(F77_APPEND_UNDERSCORE, 1)
+  AC_MSG_RESULT([defining F77_APPEND_UNDERSCORE to be 1])
+  have_fortran_compiler=true
+elif $use_f2c; then
+  have_f2c=true
+else
+  if test -n "$F77"; then
+    OCTAVE_FLIBS
+    OCTAVE_F77_APPEND_UNDERSCORE
+    OCTAVE_F2C_F77_COMPAT
+    if test "$octave_cv_f2c_f77_compat" = no; then
+      F77=
+    else
+      if test -z "$FFLAGS"; then
+        FFLAGS="-O"
+      fi
+      case "$canonical_host_type" in
+        alpha-dec-osf*)
+          case "$F77" in
+            g77*)
+            ;;
+            *)
+              FFLAGS="-fpe1 $FFLAGS"
+            ;;
+          esac
+        ;;
+      esac
+      if test -n "$FFLAGS"; then
+        AC_MSG_RESULT([defining FFLAGS to be $FFLAGS])
+      fi
+    fi
+  fi
+  if test -n "$F77"; then
+    have_fortran_compiler=true
+  else
+    AC_CHECK_PROG(F2C, f2c, f2c, [])
+    if test -n "$F2C"; then
+      have_f2c=true
+    fi
+  fi
+fi
+
+
+f77_rules_frag=/dev/null
+if $have_fortran_compiler; then
+  f77_rules_frag=Makefrag.f77
+changequote(,)dnl
+  cat << \EOF > $f77_rules_frag
+
+%.c : %.f
+
+%.o : %.f
+	$(FC) -c $(ALL_FFLAGS) $<
+
+pic/%.o : %.f
+	$(FC) -c $(FPICFLAG) $(ALL_FFLAGS) $< -o $@
+
+EOF
+changequote([,])dnl
+elif $have_f2c; then
+  AC_DEFINE(F77_APPEND_UNDERSCORE, 1)
+  AC_MSG_RESULT([defining F77_APPEND_UNDERSCORE to be 1])
+
+### This seems to be necessary on some Linux system.
+
+  cat > conftest.$ac_ext << EOF
+int MAIN_ () { return 0; }
+int MAIN__ () { return 0; }
+EOF
+
+### XXX FIMXE XXX -- these shouldn't be fixed names, eh?
+
+  oct_conflib=libconflib.a
+  oct_obj_ext=o
+
+  if AC_TRY_EVAL(ac_compile); then
+    $AR $ARFLAGS $oct_conflib conftest.$oct_obj_ext 1>&AC_FD_CC
+    if test -n "$RANLIB"; then
+      $RANLIB $oct_conflib 1>&AC_FD_CC
+    fi
+  fi
+  rm -f conftest*
+  AC_CHECK_LIB(f2c, f_open, FLIBS=-lf2c, FLIBS=, [-L. -lconflib -lm])
+  rm -f $oct_conflib
+
+  if test -z "$FLIBS"; then
+    AC_CHECK_LIB(F77, d_sin, FLIBS=-lF77, FLIBS=, -lm)
+    if test -n "$FLIBS"; then
+      AC_CHECK_LIB(I77, f_rew, FLIBS="$FLIBS -lI77", FLIBS=, -lF77)
+    fi
+  fi
+
+  if test -z "$FLIBS"; then
+    AC_MSG_WARN([I found f2c but not libf2c.a, or libF77.a and libI77.a])
+  fi
+  f77_rules_frag=Makefrag.f77
+  cat << \EOF > $f77_rules_frag
+
+%.c : %.f
+	cat $< | $(F2C) $(F2CFLAGS) > $(@F)
+
+%.o : %.f
+
+EOF
+else
+  AC_MSG_WARN([in order to build octave, you must have a compatible])
+  AC_MSG_WARN([Fortran compiler or f2c installed and in your path.])
+  AC_MSG_ERROR([See the file INSTALL for more information.])
+fi
+
+FORTRAN_MAIN_FLAG=
+case "$canonical_host_type" in
+  *-linux-*)
+    FORTRAN_MAIN_FLAG="-u MAIN__"
+  ;;
+esac
+if test -n "$FORTRAN_MAIN_FLAG"; then
+  AC_MSG_RESULT([defining FORTRAN_MAIN_FLAG to be $FORTRAN_MAIN_FLAG])
+fi
+
+FC=$F77
+AC_SUBST(FC)
+AC_SUBST(F77)
+AC_SUBST(FFLAGS)
+AC_SUBST(FLIBS)
+AC_SUBST(F2C)
+AC_SUBST(F2CFLAGS)
+AC_SUBST(FORTRAN_MAIN_FLAG)
+AC_SUBST_FILE(f77_rules_frag)
+
+### Checks for header files.
+
+AC_HEADER_STDC
+AC_HEADER_DIRENT
+AC_HEADER_TIME
+AC_HEADER_SYS_WAIT
+
+AC_CHECK_HEADERS(assert.h curses.h fcntl.h float.h floatingpoint.h \
+  grp.h ieeefp.h limits.h memory.h nan.h ncurses.h pwd.h sgtty.h \
+  stdlib.h string.h sys/param.h sys/resource.h sys/select.h sys/stat.h \
+  sys/time.h sys/times.h sys/types.h sys/utsname.h termcap.h termio.h \
+  termios.h unistd.h varargs.h)
+
+if test "$ac_cv_header_termios_h" = yes \
+    || test "$ac_cv_header_termio_h" = yes \
+    || test "$ac_cv_header_sgtty_h" = yes; then
+  true
+else
+  AC_MSG_ERROR([I couldn't find termios.h, termio.h, or sgtty.h!])
+fi
+
+### See if the optional nonlinear programming code is present.
+
+AC_MSG_CHECKING([for npsol])
+if test -f $srcdir/libcruft/npsol/npsol.f; then
+  AC_MSG_RESULT(yes)
+else
+  AC_MSG_RESULT(no)
+  AC_DEFINE(NPSOL_MISSING, 1)
+fi
+
+AC_MSG_CHECKING([for qpsol])
+if test -f $srcdir/libcruft/qpsol/qpsol.f; then
+  AC_MSG_RESULT(yes)
+else
+  AC_MSG_RESULT(no)
+  AC_DEFINE(QPSOL_MISSING, 1)
+fi
+
+AC_MSG_CHECKING([for fsqp])
+if test -f $srcdir/libcruft/fsqp/fsqpd.f; then
+  AC_MSG_RESULT(yes)
+else
+  AC_MSG_RESULT(no)
+  AC_DEFINE(FSQP_MISSING, 1)
+fi
+
+### Checks for functions and variables.
+
+AC_CHECK_FUNCS(atexit bcopy bzero dup2 endgrent endpwent execvp fcntl \
+  fork getcwd getegid geteuid getgid getgrent getgrgid getgrnam \
+  gethostname getpgrp getpid getppid getpwent getpwnam getpwuid getuid \
+  lstat memmove mkdir mkfifo on_exit pipe putenv rename rindex rmdir \
+  setgrent setpwent setvbuf sigaction sigpending sigprocmask \
+  sigsuspend stat strcasecmp strdup strerror stricmp strncasecmp \
+  strnicmp tempnam umask unlink usleep vfprintf vsprintf waitpid)
+
+OCTAVE_SMART_PUTENV
+OCTAVE_PROGRAM_INVOCATION_NAME
+
+LIBDLFCN=
+DLFCN_INCFLAGS=
+if test "$WITH_DL" = yes || test "$WITH_DL" = maybe; then
+  case "$canonical_host_type" in
+    rs6000-ibm-aix* | powerpc-ibm-aix*)
+      LIBDLFCN="-ldlfcn -ll -lld"
+      DLFCN_INCFLAGS='-I$(top_srcdir)/dlfcn -I$(TOPDIR)/dlfcn'
+      WITH_DL=true
+    ;;
+    *)
+      AC_CHECK_LIB(dl, dlopen)
+      AC_CHECK_FUNCS(dlopen dlsym dlerror dlclose)
+      if test "$ac_cv_func_dlopen" = yes \
+	 && test "$ac_cv_func_dlsym" = yes \
+	 && test "$ac_cv_func_dlerror" = yes \
+	 && test "$ac_cv_func_dlclose" = yes; then
+	WITH_DL=true
+      else
+	if test "$WITH_DL" = yes; then
+	  AC_MSG_ERROR([--enable-dl specified, but functions are missing!])
+	fi
+	WITH_DL=false
+      fi
+    ;;
+  esac
+  if $WITH_DL; then
+    AC_DEFINE(WITH_DL, 1)
+  fi
+else
+  WITH_DL=false
+fi
+AC_SUBST(WITH_DL)
+AC_SUBST(LIBDLFCN)
+AC_SUBST(DLFCN_INCFLAGS)
+
+if test "$WITH_SHL" = yes || test "$WITH_SHL" = maybe; then
+  AC_CHECK_LIB(dld, shl_load)
+  AC_CHECK_FUNCS(shl_load shl_findsym)
+  if test "$ac_cv_func_shl_load" = yes \
+     && test "$ac_cv_func_shl_findsym" = yes; then
+    WITH_SHL=true
+  else
+    if test "$WITH_SHL" = yes; then
+      AC_MSG_ERROR([--enable-shl specified, but functions are missing!])
+    fi
+    WITH_SHL=false
+  fi
+  if $WITH_SHL; then
+    AC_DEFINE(WITH_SHL, 1)
+  fi
+else
+  WITH_SHL=false
+fi
+AC_SUBST(WITH_SHL)
+
+### Set WITH_DYNAMIC_LINKING after all the other shared library stuff
+### has been determined.
+
+if $WITH_DL || $WITH_SHL; then
+  AC_DEFINE(WITH_DYNAMIC_LINKING, 1)
+  WITH_DYNAMIC_LINKING=true
+else
+  WITH_DYNAMIC_LINKING=false
+fi
+AC_SUBST(WITH_DYNAMIC_LINKING)
+
+### There is more than one possible prototype for gettimeofday.  See
+### which one (if any) appears in sys/time.h.
+
+AC_CHECK_FUNC(gettimeofday,
+  AC_TRY_COMPILE([#include <sys/time.h>],
+  [gettimeofday ((struct timeval *) 0,(struct timezone *) 0);],
+  [], AC_DEFINE(GETTIMEOFDAY_NO_TZ)))
+
+dnl Would like to get rid of this cruft, and just have
+dnl
+dnl   AC_CHECK_FUNCS(finite isnan isinf)
+dnl
+dnl instead, but that used to fail on some systems...
+dnl
+dnl Also just using AC_CHECK_FUNCS doesn't seem to work to find isinf
+dnl and isnan on Linux systems, so we use AC_CHECK_FUNC, and if that
+dnl fails, we try again by including math.h and invoking the function
+dnl with an argument. 
+
+### Check to see if we have IEEE math functions, and if so, which ones.
+###
+### For Linux: add -mieee-fp flag to CFLAGS when checking for IEEE FP
+### functions, otherwise we may not find them.
+###
+### Also check for some additional trig functions that aren't ANSI but
+### are often available.  If they are missing, we try to replace them
+### with functions from the BSD/NET2 math library.
+
+AC_CHECK_LIB(sunmath, quiet_nan, , , -lm)
+
+dnl This is bogus.  We shouldn't have to explicitly add libc too!
+
+case "$canonical_host_type" in
+  *-*-linux*)
+    AC_CHECK_LIB(m, sin, , , -lc)
+  ;;
+  *)
+    AC_CHECK_LIB(m, sin)
+  ;;
+esac
+
+XCFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS $GCC_IEEE_FP_FLAG"
+
+### I am told that Inf and NaN don't work on m68k HP sytems, and that
+### on SCO systems, isnan and isinf don't work, but they can be
+### replaced by something that does.
+
+case "$canonical_host_type" in
+  m68k-hp-hpux*)
+  ;;
+  *-*-sco*)
+    AC_MSG_RESULT([defining SCO to be 1])
+    AC_DEFINE(SCO, 1)
+    AC_MSG_RESULT([forcing HAVE_ISINF for SCO])
+    AC_DEFINE(HAVE_ISINF, 1)
+    AC_MSG_RESULT([forcing HAVE_ISNAN for SCO])
+    AC_DEFINE(HAVE_ISNAN, 1)
+  ;;
+  *)
+    AC_CHECK_FUNCS(finite isnan isinf infinity quiet_nan)
+  ;;
+esac
+
+### Check for nonstandard but common math functions that we need.
+
+AC_CHECK_FUNCS(acosh asinh atanh erf erfc)
+
+CFLAGS="$XCFLAGS"
+
+### Checks for OS specific cruft.
+
+AC_STRUCT_ST_BLKSIZE
+AC_STRUCT_ST_BLOCKS
+AC_STRUCT_ST_RDEV
+AC_STRUCT_TM
+AC_STRUCT_TIMEZONE
+AC_FUNC_CLOSEDIR_VOID
+
+OCTAVE_STRUCT_GR_PASSWD
+
+TERMLIBS=""
+for termlib in ncurses curses termcap terminfo termlib; do
+  AC_CHECK_LIB(${termlib}, tputs, [TERMLIBS="${TERMLIBS} -l${termlib}"])
+  case "${TERMLIBS}" in
+    *-l${termlib}*)
+      AC_MSG_RESULT([defining TERMLIBS to be $TERMLIBS])
+      break
+    ;;
+  esac
+done
+AC_SUBST(TERMLIBS)
+
+if test "$ac_cv_lib_termcap_tputs" = yes \
+    || test "$ac_cv_lib_terminfo_tputs" = yes \
+    || test "$ac_cv_lib_ncurses_tputs" = yes \
+    || test "$ac_cv_lib_curses_tputs" = yes \
+    || test "$ac_cv_lib_termlib_tputs" = yes; then
+  true
+else
+  AC_MSG_WARN([I couldn't find -ltermcap, -lterminfo, -lncurses, -lcurses, or -ltermlib!])
+fi
+
+AC_MSG_CHECKING([for struct exception in math.h])
+AC_TRY_LINK([#include <math.h>],
+  [struct exception *x; x->type; x->name;],
+  AC_MSG_RESULT(yes)
+  AC_DEFINE(EXCEPTION_IN_MATH, 1),
+  AC_MSG_RESULT(no))
+
+### Signal stuff.
+
+AC_TYPE_SIGNAL
+AC_DECL_SYS_SIGLIST
+AC_MSG_CHECKING([for sys_siglist variable])
+AC_TRY_LINK([#include <stdio.h>],
+  [extern char *sys_siglist[]; printf ("%s\n", sys_siglist[1]);],
+  AC_MSG_RESULT(yes)
+  AC_DEFINE(HAVE_SYS_SIGLIST, 1),
+  AC_MSG_RESULT(no))
+OCTAVE_SIGNAL_CHECK
+OCTAVE_REINSTALL_SIGHANDLERS
+
+### Type stuff.
+
+AC_TYPE_MODE_T
+AC_TYPE_OFF_T
+AC_TYPE_PID_T
+AC_TYPE_SIZE_T
+AC_TYPE_UID_T
+AC_CHECK_TYPE(dev_t, short)
+AC_CHECK_TYPE(ino_t, unsigned long)
+AC_CHECK_TYPE(nlink_t, short)
+OCTAVE_CHECK_TYPE(sigset_t, [#include <signal.h>], int)
+
+### Define VOID_SIGHANDLER for readline.
+
+case "$RETSIGTYPE" in
+  int)
+  ;;
+  *)
+    VOID_SIGHANDLER="-DVOID_SIGHANDLER=1"
+    AC_MSG_RESULT([defining VOID_SIGHANDLER to be 1])
+  ;;
+esac
+AC_SUBST(VOID_SIGHANDLER)
+
+### A system dependent kluge or two.
+
+AC_CHECK_FUNCS(getrusage times)
+case "$canonical_host_type" in
+  *-*-cygwin32)
+    AC_DEFINE(RUSAGE_TIMES_ONLY, 1)
+  ;;
+esac
+
+bsd_gcc_kluge_targets_frag=/dev/null
+case "$canonical_host_type" in
+  *-*-386bsd* | *-*-openbsd* | *-*-netbsd* | *-*-freebsd*)
+    bsd_gcc_kluge_targets_frag=Makefrag.bsd
+    cat << \EOF > $bsd_gcc_kluge_targets_frag
+
+lex.o: lex.cc 
+	$(CXX) -c $(CPPFLAGS) $(CXXFLAGS_NO_PT_FLAGS) $<
+
+pt-plot.o: pt-plot.cc
+	$(CXX) -c $(CPPFLAGS) $(CXXFLAGS_NO_PT_FLAGS) $<
+
+symtab.o: symtab.cc
+	$(CXX) -c $(CPPFLAGS) $(CXXFLAGS_NO_PT_FLAGS) $<
+
+toplev.o: toplev.cc
+	$(CXX) -c $(CPPFLAGS) $(CXXFLAGS_NO_PT_FLAGS) $<
+
+unwind-prot.o: unwind-prot.cc 
+	$(CXX) -c $(CPPFLAGS) $(CXXFLAGS_NO_PT_FLAGS) $<
+
+EOF
+  ;;
+esac
+AC_SUBST_FILE(bsd_gcc_kluge_targets_frag)
+
+### Checks for other programs used for building, testing, installing,
+### and running Octave.
+###
+### For now, don't define LEXLIB to be -lfl -- we don't use anything in
+### it, and it might not be installed.
+###
+### Also make sure that we generate an interactive scanner if we are
+### using flex.
+
+AC_PROG_LEX
+case "$LEX" in
+  flex*)
+    LFLAGS="-t -I"
+    AC_MSG_RESULT([defining LFLAGS to be $LFLAGS])
+    LEXLIB=
+  ;;
+  *)
+    LFLAGS="-t"
+    AC_MSG_RESULT([defining LFLAGS to be $LFLAGS])
+    AC_MSG_WARN([I didn't find flex, but that's only a problem])
+    AC_MSG_WARN([if you need to reconstruct lex.cc])
+  ;;
+esac
+AC_SUBST(LFLAGS)
+
+AC_PROG_YACC
+case "$YACC" in
+  bison*)
+  ;;
+  *)
+    AC_MSG_WARN([I didn't find bison, but that's only a problem])
+    AC_MSG_WARN([if you need to reconstruct parse.cc])
+  ;;
+esac
+
+AC_PROG_LN_S
+
+AC_CHECK_PROG(RUNTEST, runtest, runtest, [])
+AC_CHECK_PROG(EXPECT, expect, expect, [])
+if test -z "$EXPECT"; then
+  RUNTEST=
+fi
+AC_SUBST(RUNTEST)
+
+AC_PROG_INSTALL
+INSTALL_SCRIPT='${INSTALL}'
+AC_SUBST(INSTALL_SCRIPT)
+
+EXE=
+case "$canonical_host_type" in
+  *-*-cygwin32)
+    EXE=.exe
+  ;;
+esac
+AC_SUBST(EXE)
+
+AC_CHECK_PROG(GNUPLOT_BINARY, gnuplot, gnuplot, [])
+if test -n "$GNUPLOT_BINARY"; then
+  AC_MSG_CHECKING([to see if your gnuplot supports multiplot])
+  if test -z "`echo 'set term unknown; set multiplot' | \
+    $GNUPLOT_BINARY 2>&1`"; then
+    AC_MSG_RESULT([yes])
+    AC_DEFINE(GNUPLOT_HAS_MULTIPLOT, 1)
+  else
+    AC_MSG_RESULT([no])
+  fi
+  AC_MSG_CHECKING([to see if your gnuplot supports multiple plot windows])
+  if test -z "`echo 'set term x11 2' | $GNUPLOT_BINARY 2>&1`"; then
+    AC_MSG_RESULT([yes])
+    AC_DEFINE(GNUPLOT_HAS_FRAMES, 1)
+  else
+    AC_MSG_RESULT([no])
+  fi
+else
+  AC_MSG_WARN([I didn't find gnuplot.  It isn't necessary to have gnuplot])
+  AC_MSG_WARN([installed, but you won't be able to use any of Octave's])
+  AC_MSG_WARN([plotting commands without it.])
+  AC_MSG_WARN([])
+  AC_MSG_WARN([If gnuplot is installed but it isn't in your path, you can])
+  AC_MSG_WARN([tell Octave where to find it by typing the command])
+  AC_MSG_WARN([])
+  AC_MSG_WARN([gnuplot_binary = "/full/path/to/gnuplot/binary"])
+  AC_MSG_WARN([])
+  AC_MSG_WARN([at the Octave prompt.])
+fi
+
+octave_possible_pagers="less more page pg"
+case "$canonical_host_type" in
+  *-*-cygwin32)
+    octave_possible_pagers="$octave_possible_pagers more.com"
+  ;;
+esac
+
+AC_CHECK_PROGS(DEFAULT_PAGER, $octave_possible_pagers, [])
+if test -z "$DEFAULT_PAGER"; then
+  AC_MSG_WARN([I couldn't find `less', `more', `page', or `pg'])
+fi
+
+### Even though we include config.h, we need to have the preprocessor
+### defines available in a variable for the octave-bug script.  Use
+### UGLY_DEFS for that.
+
+AC_OUTPUT_MAKE_DEFS
+UGLY_DEFS=`echo $DEFS | sed 's,\\",\\\\\\\\\\\\\\\\\\",g'`
+AC_MSG_RESULT([defining UGLY_DEFS to be $UGLY_DEFS])
+AC_SUBST(UGLY_DEFS)
+
+### Maybe add -Wall to compiler flags now that we're done feature
+### testing. 
+###
+### To get gcc and g++ to be really picky, try these adding these
+### options to CFLAGS and CXXFLAGS along with -Wall:
+###
+###   -ansi
+###   -pedantic
+###   -Wwrite-strings
+###   -Wid-clash-31
+###   -Wpointer-arith
+###   -Wcast-qual
+###   -Wenum-clash
+###   -Wcast-align
+###   -Wtraditional
+###   -Wstrict-prototypes
+###   -Wmissing-prototypes
+###   -Wnested-externs
+###   -Woverloaded-virtual
+###   -Winline
+###   -felide-constructors
+###   -fnonnull-objects
+
+if $ADD_CXX_WALL; then
+  CXXFLAGS="$CXXFLAGS -Wall"
+  AC_MSG_RESULT([adding -Wall to CXXFLAGS])
+fi
+if $ADD_CC_WALL; then
+  CFLAGS="$CFLAGS -Wall"
+  AC_MSG_RESULT([adding -Wall to CFLAGS])
+fi
+
+### Run configure in subdirectories.
+
+export CC
+export CXX
+export F77
+
+AC_CONFIG_SUBDIRS(glob kpathsea scripts $INFO_DIR $PLPLOT_DIR $READLINE_DIR)
+
+### Do the substitutions in all the Makefiles.
+
+AC_OUTPUT(Makefile octMakefile Makeconf test/Makefile dlfcn/Makefile
+  doc/Makefile doc/faq/Makefile doc/interpreter/Makefile
+  doc/liboctave/Makefile doc/refcard/Makefile emacs/Makefile
+  emacs/Makefile examples/Makefile liboctave/Makefile
+  src/Makefile libcruft/Makefile libcruft/Makerules
+  libcruft/blas/Makefile libcruft/balgen/Makefile
+  libcruft/dassl/Makefile libcruft/eispack/Makefile
+  libcruft/fftpack/Makefile libcruft/fsqp/Makefile
+  libcruft/lapack/Makefile libcruft/linpack/Makefile
+  libcruft/minpack/Makefile libcruft/misc/Makefile
+  libcruft/npsol/Makefile libcruft/odepack/Makefile
+  libcruft/qpsol/Makefile libcruft/quadpack/Makefile
+  libcruft/ranlib/Makefile libcruft/slatec-fn/Makefile
+  libcruft/villad/Makefile)
+
+### Print a summary so that important information isn't missed.
+
+CXX_EXTRAS="$HOST_CXXFLAGS $NO_IMPLICIT_TEMPLATES $GCC_IEEE_FP_FLAG"
+
+if test -z "$F77"; then
+  FORT="$F2C $F2CFLAGS"
+else
+  FORT="$F77 $FFLAGS"
+fi
+
+AC_MSG_RESULT([
+
+Octave is now configured for $canonical_host_type
+
+  Source directory:     $srcdir
+  Installation prefix:  $prefix
+  C compiler:           $CC $GCC_IEEE_FP_FLAG $CFLAGS
+  C++ compiler:         $CXX $CXX_EXTRAS $CXXFLAGS
+  Fortran compiler:     $FORT
+  Fortran libraries:    $FLIBS
+  Use GNU readline:     $USE_READLINE
+  Use GNU info reader:  $USE_GNU_INFO
+  Default pager:        $DEFAULT_PAGER
+  gnuplot:              $GNUPLOT_BINARY
+
+  Do internal array bounds checking:       $BOUNDS_CHECKING
+  Build shared libraries:                  $SHARED_LIBS
+  Minimal kernel option:                   $OCTAVE_LITE
+  Dynamic Linking (dlopen/dlsym):          $WITH_DL
+  Dynamic Linking (shl_load/shl_findsym):  $WITH_SHL
+])

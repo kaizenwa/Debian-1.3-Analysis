@@ -1,0 +1,848 @@
+<!--% Articolo tratto dal Linux Journal
+% N. 28, pag. 19
+%
+%     Autore: Georg von Zezschwitz
+% Traduzione: Andrea Cisternino (acister@sunfe3.fe.infn.it)
+%
+% Titolo originale: Device Drivers Concluded
+
+@hdbx:Kernel Korner
+-->
+<p>
+Questo è l'ultimo di una serie di cinque articoli sui
+character device drivers. In questa parte finale Georg si occupa dei
+devices per i quali è possibile il memory mapping, iniziando con
+una descrizione generale del sistema di memory management di Linux.
+
+<i>di Georg v. Zezschwitz</i>
+
+<p>
+Anche se pochi driver implementano la tecnica del memory mapping,
+essa ci fornisce interessanti punti di vista sul funzionamento di Linux.
+Introdurrò la gestione della memoria e le sue caratteristiche,
+permettendoci così di giocare con la console, di aggiungere il
+memory mapping ai drivers e di "piantare" il sistema...
+
+<h3>Spazi di indirizzamento ed altre cose irreali.</h3>
+
+<p>
+Sin dai giorni del 80386, il mondo Intel supporta una tecnica chiamata
+indirizzamento virtuale. Proveniendo dallo Z80 e dal mondo 68000, la prima
+cosa che ho associato a questo termine è stata ``è possibile
+allocare più memoria della RAM fisica, poiché alcuni
+indirizzi verranno associati a parti del disco rigido''.
+
+<p>
+Per essere più accademico: ogni indirizzo usato dal programma per
+accedere alla memoria (non importa se codice o dati) sarà
+<I>tradotto</I>---o in un indirizzo fisico nella RAM, o in una eccezione
+che sarà gestita dal sistema per fornire la memoria richiesta.
+Alcune volte, tuttavia, l'accesso ad una particolare locazione di memoria
+virtuale rivela che il programma non si sta comportando correttamente---in
+questo caso, il sistema operativo genererà una ``vera'' eccezione
+(normalmente il segnale 11, <code>SIGSEGV</code>).
+
+<p>
+L'unità più piccola utilizzata da questo sistema di
+traduzione è la <I>pagina</I>, che è di 4 kB
+sull'architettura Intel e di 8 kB sull'Alpha (è definita in
+<code>asm/page.h</code>).
+
+<p>
+Quando si cerca di comprendere il sistema di traduzione dell'indirizzo si
+entra in una confusione di page table descriptors, segment descriptors,
+page table flags e diversi spazi di indirizzamento. Per ora diciamo che
+l'<I>indirizzo logico</I> (o virtuale) è quello usato dal programma;
+esso viene trasformato tramite le page-tables in un <I>indirizzo fisico</I>
+(o un page-fault). La <I>Linux Kernel Hacker's Guide</I> impiega una
+ventina di pagine per spiegare questo meccanismo, e non credo che sia
+possibile diminuirle ulteriormente, anche perché l'implementazione
+Intel è leggermente più complicata.
+
+<p>
+Per comprendere meglio l'inizializzazione, l'utilizzo e la tecnica
+sottostante l'uso delle pagine in Linux, specialmente per i processori
+Intel, <I>dovete</I> leggere la <I>Linux Kernel Hacker's Guide</I>. Essa
+è liberamente disponibile nella directory
+<code>/pub/linux/docs/LDP</code> di ogni mirror di sunsite.unc.edu. Anche se
+il libro è vecchio, niente è cambiato nel funzionamento del
+i386, ed altri processori sono simili (in particolare il Pentium è
+praticamente uguale ad un 386). Una versione un po' più aggiornata
+del libro si può trovare su Web, all'indirizzo
+http://www.redhat.com:8080/HyperNews/get/khg.html.
+
+<h3>Pagine---più che un po' di memoria.</h3>
+
+<p>
+Se volete conoscere meglio la gestione delle pagine, potete leggere la
+KHG <I>adesso</I> o credere a questa breve descrizione.
+<ul>
+<li>Ogni processo ha uno <I>Spazio di Indirizzi Virtuale</I>
+implementato mediante alcuni registri della CPU che sono cambiati durante
+i context switches (questa è la confusione di selectors e page
+description pointers). Per mezzo di questi registri la CPU ha accesso a
+tutti i segmenti di memoria di cui ha bisogno.
+<br>
+<br>
+<li>La traduzione dall'indirizzo logico fornito dal programma ad
+un indirizzo fisico utilizzabile per accedere alla RAM è effettuata
+mediante più livelli di tabelle di traduzione. Queste tabelle
+risiedono in memoria e vengono utilizzate automaticamente dall'hardware
+della CPU, ma vengono create e modificate dal sistema operativo. Il loro
+nome è <I>page tables</I>, e servono per fornire la mappatura
+dall'indirizzo virtuale all'indirizzo fisico: ogni pagina di indirizzi
+virtuali fa riferimento tramite queste tabelle ad un descrittore di
+pagina, che ne fornisce la locazione fisica in RAM e le caratteristiche (i
+permessi).
+</ul>
+Ci concentreremo ora su alcuni aspetti importanti delle pagine <I>dal
+punto di vista della CPU</I>:
+<ul>
+<li>Una pagina può essere ``presente'' o no---a seconda
+se è effettivamente presente in memoria fisica o meno (ad es. se
+è stata swappata su disco, o se non è stata ancora caricata
+in RAM dall'immagine eseguibile del programma su disco). Questo attributo
+è un flag nel page descriptor. L'accesso ad una pagina non presente
+è chiamato un ``major page fault''. Questa eccezione è
+gestita da Linux nella funzione <code>do_no_page()</code>, in
+<code>mm/memory.c</code>. Il numero di page faults per ogni processo è
+memorizzato nel campo <code>maj_flt</code> di <code>struct task_struct</code>.
+<br>
+<br>
+<li>Una pagina può essere protetta dalla
+scrittura---ogni tentativo di scriverci provocherà una eccezione
+(chiamata ``minor page fault'', gestita da <code>do_wp_page()</code> e contata
+in <code>min_flt</code> di <code>struct task_struct</code>).
+<br>
+<br>
+<li>Una pagina può appartenere allo spazio indirizzi di
+uno o più task: ognuno di essi possiede un descriptor per quella
+pagina. ``Task'' è il nome dato ai processi dai progettisti di
+microprocessori.
+</ul>
+Altre importanti caratteristiche delle pagine <I>dal punto di vista
+del Sistema Operativo</I> sono:
+<ul>
+<li>Quando più di un processo usa la stessa pagina di
+memoria fisica, si dice che essi la ``condividono''. Ogni processo
+utilizza un proprio descrittore di pagina (page descriptor) per la pagina
+condivisa, ed ognuno di essi può differire dagli altri---per
+esempio, un processo può avere il permesso di scrittura sulla
+pagina mente un altro no.
+<br>
+<br>
+<li>Una pagina può essere marcata come
+<I>copy-on-write</I> (cercate la sigla <code>COW</code> nei sorgenti del
+kernel). Se, per esempio, un processo esegue una <code>fork()</code>, il
+processo figlio condividerà il segmento dati con il padre, ma
+entrambe saranno protetti dalla scrittura: le pagine sono condivise in
+lettura. Non appena uno dei due processi effettua una operazione di
+scrittura sulla pagina, essa viene copiata ed il processo può
+continuare l'operazione su questa nuova pagina. Il processo che <I>non</I>
+ha scritto continuerà ad usare la pagina originale per la quale
+sarà stato decrementato un contatore (``share count'') che tiene
+conto del numero di processi che condividono la pagina stessa. Se lo share
+count è già uno al momento della scrittura la pagina non
+viene copiata ed essa viene semplicemente marcata come scrivibile al
+momento del minor fault. Il sistema del copy-on-write minimizza l'uso di
+memoria.
+<br>
+<br>
+<li>Una pagina può essere <I>bloccata</I> ai fini della
+paginazione per evitarne il possibile scaricamento su disco. Il kernel ed
+i suoi moduli sono memorizzati in pagine bloccate. Come potrete ricordare
+dall'ultima puntata, anche le pagine usate per il DMA devono essere
+protette dalla paginazione.
+<br>
+<br>
+<li>I page descriptor possono contenere indirizzi non situati
+in RAM, bensì nella ROM di qualche espansione, in buffer di memoria
+video o in buffer sul bus PCI. Tradizionalmente su macchine con
+architettura Intel, l'intervallo di indirizzi nei primi due casi è
+compreso fra 640 kB e 1024 kB, mentre i buffer PCI sono situati al di
+sopra di <code>high_memory</code> (il più alto indirizzo della RAM
+fisica, definito in <code>asm/pgtable.h</code>). L'intervallo fra 640 kB e
+1024 kB non è usato da Linux, e viene identificato come
+``reserved'' nella struttura <code>mem_map</code>. Questi indirizzi sono i
+``384k reserved'' che appaiono nel primo messaggio del kernel dopo il
+calcolo dei BogoMips.
+</ul>
+La memoria virtuale permette di fare cose interessanti come:
+<ul>
+<li><I>Caricamento su richiesta</I> (Demand-loading): alla
+partenza di un processo, invece di caricare completamente in memoria il
+file eseguibile, è possibile associare allo spazio di
+indirizzamento del processo solo poche pagine fisiche per le variabili ed
+alcuni blocchi del file eseguile dal filesystem. Quando verranno eseguite
+sezioni di codice ad indirizzi non mappati, verrà allocata memoria
+fisica ed i corrispondenti blocchi verranno caricati. In questo modo la
+memoria viene utilizzata solo quando necessario.
+<br>
+<br>
+<li><I>Swapping</I>, se si è a corto di memoria. Questo
+significa che ogniqualvolta Linux ha bisogno di memoria per se stesso o
+per un programma egli cercherà di rimpicciolire i buffer a
+disposizione del filesystem, di liberare pagine occupate da codice
+eseguibile (potranno essere ricaricate dal disco in qualsiasi momento) o
+di <I>swappare</I> alcune pagine occupate da dati sulla partizione di swap
+del disco rigido.
+<br>
+<br>
+<li><I>Protezione della memoria</I>: Ogni processo ha il suo
+spazio di indirizzamento e non può accedere alla memoria di altri
+processi.
+<br>
+<br>
+<li><I>Memory Mapping</I>: con una semplice chiamata ad una
+funzione è possibile creare una corrispondenza diretta tra un file
+su disco, o una sua parte, ed una zona di memoria accessibile dal
+processo.
+</ul>
+<h3> Memory Mapping: un Esempio</h3>
+
+<p>
+La prima assunzione che si deve fare quando si pensa di mappare in
+memoria un device è quella di poter definire una posizione esatta
+ed una lunghezza per quel device. Naturalmente è possibile contare
+l'ennesimo carattere in arrivo dalla porta seriale ad es., ma il paradigma
+su cui si basa la <code>mmap()</code> si applica molto più chiaramente
+a device che abbiano una dimensione ben definita. Anche perché
+<code>mmap()</code> si basa sulla costruzione di page-tables, e quindi solo
+dati che vivono in un indizzo fisico di memoria possono essere mappati.
+
+<p>
+Un character ``device'' impiegato ogni volta che usate la svgalib o il
+server X è <code>/dev/mem</code>. Questo device rappresenta la vostra
+memoria <I>fisica</I>.  Il server X e la svgalib lo usano per mappare i
+buffer video della scheda grafica nel proprio spazio di indirizzamento.
+
+<p>
+Una volta (sono così vecchio?) la gente scriveva in BASIC giochi
+come Tetris che dovevano funzionare da una console di tipo testo.
+Piuttosto che usare i lenti comandi del BASIC i programmatori scrivevano
+direttamente nella memoria video. Questo è esattamente come usare
+il memory-mapping.
+
+<p>
+Per creare un piccolo esempio di utilizzo della <code>mmap()</code>, ho
+scritto un piccolo programma chiamato <B>nasty</B>. Come potete sapete, la
+scrittura araba è da destra verso sinistra. Anche se non credo che
+qualcuno possa preferire questo stile con le normali lettere dell'alfabeto
+latino, il programma seguente vi dà un idea di questo stile. Nasty
+gira esclusivamente su architettura Intel con scheda grafica VGA, in
+quanto usa esplicitamente gli indirizzi VGA. Questo limite non si applica
+a <code>mmap()</code> in generale, solo a questo esempio.
+
+<p>
+<I>Se</I> farete mai girare questo programma, fatelo come <code>root</code>
+(altrimenti non avrete accesso a <code>/dev/mem</code>), fatelo dalla console
+(non vedrete nulla se lo lanciate sotto X) e accertatevi di avere una
+scheda VGA o EGA.
+
+<pre>
+<code>
+/*
+ * nasty.c - flips right and left on the VGA console.
+ * "Arabic" display
+ */
+
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+#include &lt;sys/mman.h&gt;
+
+int main(int argc, char **argv)
+{
+    FILE *fh;
+    short *vid_addr, temp;
+    int x, y, ofs;
+
+    fh = fopen("/dev/mem", "r+");
+
+    vid_addr = (short *) mmap(
+    /* where to map to: don't mind */
+                 NULL,
+    /* how many bytes ? */
+                 0x4000,
+    /* want to read and write */
+                 PROT_READ | PROT_WRITE,
+    /* no copy on write */
+                 MAP_SHARED,
+    /* handle to /dev/mem */
+                 fileno(fh),
+    /* hopefully the Text-buffer :-) */
+                 0xB8000);
+
+    if (vid_addr)
+        for (y = 0; y &lt; 100; y++)
+            for (x = 0; x &lt; 40; x++) {
+                ofs = y * 80;
+                temp = vid_addr[ofs + x];
+                vid_addr[ofs + x] = vid_addr[ofs + 79 - x];
+                vid_addr[ofs + 79 - x] = temp;
+            }
+
+    munmap((caddr_t) vid_addr, 0x4000);
+    fclose(fh);
+    return 0;
+}
+</code>
+</pre>
+
+<h3> Giochiamo con la <code>mmap()</code></h3>
+
+<p>
+Cosa è possibile cambiare nella chiamata alla <code>mmap()</code>
+vista prima?
+
+<p>
+È possibile cambiare i privilegi per le pagine mappate modificando
+uno dei flag <code>PROT</code> chiedendo di poter scrivere, leggere o eseguire
+(<code>PROT_READ</code>, <code>PROT_WRITE</code>, e <code>PROT_EXEC</code>) i dati mappati nel programma.
+
+<p>
+Rimpiazzando <code>MAP_SHARED</code> con <code>MAP_PRIVATE</code> verrà
+settato il flag Copy-On-Write delle pagine interessate permettendovi di
+scrivere nel text buffer senza però modificarlo. Le eventuali
+modifiche saranno apportate alla vostra copia privata delle pagine.
+
+<p>
+Cambiando il parametro <code>offset</code> è possibile adattare
+<code>nasty</code> alle schede monocromatiche Hercules (usando
+<code>0xB0000</code> invece di <code>0xB8000</code>), o ottenere risultati
+inaspettati, anche far piantare la macchina (usando un indirizzo casuale).
+
+<p>
+La <code>mmap()</code> può essere ``applicata'' anche ad un file su
+disco, invece cha alla memoria di sistema, convertendone il contenuto in
+stile ``arabo'' (ma verificate che le dimensioni mappate non siano
+superiori alla lunghezza del file). Non preoccupatevi se la vostra pagina
+del manuale dice che <code>mmap()</code> è una funzione di BSD---La
+questione con Linux ormai è ``chi scrive la documentazione''
+piuttosto che ``chi implementa cosa''...
+
+<p>
+Invece che il <code>NULL</code> utilizzato come primo parametro è
+possibile specificare un indirizzo preciso (nello spazio di indirizzamento
+del vostro processo) a partire dal quale volete mappare le pagine fisiche
+richieste. Nelle versioni di Linux più recenti questa richiesta
+viene ignorata se non viene contemporaneamente utilizzato il flag
+<code>MAP_FIXED</code>. In questo caso Linux eliminerà qualsiasi
+mappatura precedente per l'indirizzo in questione, rimpiazzandola con
+quella richiesta. Se utilizzerete questa possibilità, dovete essere
+sicuri che l'indirizzo specificato sia quello del primo byte di una pagina
+(<code>(addr & PAGE_MASK) == addr</code>).
+
+<p>
+Concludendo, abbiamo visto uno degli usi preferiti della
+<code>mmap()</code>--- specialmente quando avrete a che fare con piccole
+porzioni di file di grandi dimensioni come i database, troverete utile---e
+più veloce--- mappare l'intero file in memoria per poterlo leggere
+e scrivere come se fosse memoria fisica, lasciando agli algoritmi di
+gestione dei buffer di Linux tutti i problemi di caching. L'accesso al
+file sarà molto più rapido che l'uso delle classiche
+<code>fread()</code> e <code>fwrite()</code>.
+
+<h3> VMA ed altri cyberspazi</h3>
+
+<p>
+La persona che si dovrà occupare di tutte queste utili
+caratteristiche è il vostro povero programmatore di device driver.
+Mentre il supporto per la <code>mmap()</code> sui file è cura del
+kernel (dei singoli filesystem in realtà), il sistema di memory
+mapping per altri device deve essere supportato direttamente dai driver,
+rendendo disponibile una apposita funzione nella struttura <code>fops</code>
+che è stata descritta in un precedente articolo.
+
+<p>
+Come prima cosa daremo un'occhiata ad una delle poche ``vere''
+implementazioni di questo supporto, basando la nostra discussione sul
+driver per il device <code>/dev/mem</code>. Quindi vi mostrerò una
+particolare implementazione utile per schede tipo frame-grabber, schede di
+I/O analogico-digitale per laboratorio e, probabilmente, anche per altre
+periferiche.
+
+<p>
+La funzione <code>mmap()</code> è fondamentalmente basata sulla
+<code>do_mmap()</code>, definita nel file mm/mmap.c del kernel. La
+<code>do_mmap()</code> fà due cose importanti:
+
+<ul>
+<li>Controlla i permessi di scrittura e lettura del file
+handle rispetto a quanto richiesto dalla <code>mmap()</code>. In più,
+controlla che non si superi il limite massimo indirizzabile (4GB sulle
+macchine Intel) oltre ad effettuare altre verifiche sui parametri.
+<br>
+<br>
+<li>Se tutti questi controlli forniscono un risultato
+positivo, viene creata una struttura <code>struct vm_area_struct</code> per la
+nuova ``fetta'' di memoria virtuale. Ogni processo può possedere
+diverse di queste strutture, chiamate VMA (Virtual Memory Area).
+</ul>
+Le VMA hanno bisogno di qualche spiegazione: esse rappresentano gli
+indirizzi, i metodi, le protezioni ed i flag di parti dello spazio di
+indirizzamento del processo. L'area di memoria da voi mappata
+aggiungerà una propria <code>vm_area_struct</code> a quelle normalmente
+possedute dal processo. Le strutture VMA sono gestite dal kernel ed
+ordinate in un albero bilanciato per permettere un accesso veloce.
+
+<p>
+I campi della <code>struct vm_area_struct</code> sono definiti in
+<code>linux/mm.h</code>. I contenuti ed il numero di VMA per un dato processo
+possono essere osservati guardando i file
+<code>/proc/</code><I>pid</I><code>/maps</code> di qualsiasi processo in
+esecuzione, ove <I>pid</I> è il process id di quel particolare
+processo. Vediamo il contenuto di <code>maps</code> per il programma
+<B>nasty</B> visto in precedenza e compilato in formato ELF. Durante
+l'esecuzione del programma il file <code>maps</code> assomiglierà a
+quanto segue (senza commenti):
+
+<pre>
+<code>
+# /dev/sdb2: nasty CSS
+08000000-08001000 rwxp 00000000 08:12 36890
+# /dev/sdb2: nasty DSS
+08001000-08002000 rw-p 00000000 08:12 36890
+# BSS for nasty
+08002000-08008000 rwxp 00000000 00:00 0
+# /dev/sda2: /lib/ld-linux.so.1.7.3 CSS
+40000000-40005000 r-xp 00000000 08:02 38908
+# /dev/sda2: /lib/ld-linux.so.1.7.3 DSS
+40005000-40006000 rw-p 00004000 08:02 38908
+# BSS for ld-linux.so
+40006000-40007000 rw-p 00000000 00:00 0
+# /dev/sda2: /lib/libc.so.5.2.18 CSS
+40009000-4007f000 rwxp 00000000 08:02 38778
+# /dev/sda2: /lib/libc.so.5.2.18 DSS
+4007f000-40084000 rw-p 00075000 08:02 38778
+# BSS for libc.so
+40084000-400b6000 rw-p 00000000 00:00 0
+# /dev/sda2: /dev/mem (our mmap)
+400b6000-400c6000 rw-s 000b8000 08:02 32767
+# the user stack
+bfffe000-c0000000 rwxp fffff000 00:00 0
+</code>
+</pre>
+
+I primi due campi di ogni linea, separati da un trattino,
+rappresentano l'indirizzo al quale sono mappati i dati. Il campo
+successivo mostra le protezioni per le pagine in questione (<code>r</code>
+significa leggibile, <code>w</code> scrivibile, <code>p</code> private ed
+<code>s</code> shared).  Il quarto campo indica a quale offset all'interno del
+file è effettuato il mapping mentre i successivi due campi sono
+rispettivamente il device fisico e l'inode del file. Il numero di device
+rappresenta un disco (hard disk o altro) montato (ad es. 03:01 è
+/dev/hda1, 08:01 è /dev/sda1). Per conoscere il file associato ad
+un certo inode il metodo più semplice (ma anche il più
+lento) è:
+
+<pre>
+<code>
+        % cd your_mount_point
+        % find . -inum your_inode_number -print
+</code>
+</pre>
+
+Nel cercare di comprendere il file <code>maps</code> ed i commenti,
+ricordate che Linux distingue tra ``Code Storage Segment'' (<code>CSS</code>),
+a volte chiamato ``text'' segment; ``Data Storage Segment''
+(<code>DSS</code>), contenenti dati inizializzati; e ``Block Storage Segment''
+(<code>BSS</code>), area generica per variabili non inizializzate e
+normalmente azzerata alla partenza. Poichè non devono essere
+caricati da disco valori iniziali per le variabili del BSS, tutti i campi
+di questo tipo in <code>maps</code> non hanno né numero di device
+né inode (un major number ``0'' equivale a <code>NODEV</code>). Questo
+ci mostra un altro possibile impiego della <code>mmap()</code>: passando
+<code>MAP_ANONYMOUS</code> come file handle è possibile richiedere
+blocchi di memoria libera per il programma (alcune versioni di
+<code>malloc()</code> ottengono memoria dal sistema in questo modo).
+
+<h3> Il vostro turno</h3>
+
+<p>
+Quando la <code>do_mmap()</code> chiama la funzione del vostro driver per
+il mmapping, una VMA per la nuova regione di memoria è già
+stata creata, ma non ancora inserita nella struttura <code>task_struct</code>
+(definita in <code>linux/sched.h</code>) del processo.
+
+<p>
+La funzione del device driver deve implementare la seguente interfaccia:
+
+<pre>
+<code>
+	int skel_mmap (struct inode *inode,
+	               struct file *file,
+	               struct vm_area_struct *vma)
+</code>
+</pre>
+
+<code>vma->vm_start</code> conterrà l'indirizzo nello user space a
+partire dal quale deve essere mappata la memoria. <code>vma->vm_end</code>
+contiene il primo indirizzo non valido alla fine dell'area cosicché
+la differenza fra i due campi corrisponde all'argomento <code>length</code>
+della chiamata alla <code>mmap()</code>. Il campo <code>vma->vm_offset</code>
+è l'offset all'interno del file a partire da quale il kernel
+mapperà la memoria ed è identico all'argomento
+<code>offset</code> della <code>mmap()</code>.
+
+<p>
+Studiamo ora come il driver per <code>/dev/mem</code> implementa il memory
+mapping. Troverete il codice nella funzione <code>mmap_mem()</code> del file
+<code>drivers/char/mem.c</code>. Se vi siete aspettati qualcosa di complesso
+rimarrete delusi: essa chiama semplicemente <code>remap_page_range()</code>
+(in <code>mm/memory.c</code>). Se veramente volete comprendere il
+funzionamento di questa funzione dovete leggere le relative venti pagine
+della <I>Kernel Hacker's Guide</I>. In breve, vengono prima creati i page
+descriptors per lo spazio di indirizzamento del processo e quindi vengono
+inizializzati con link alla memoria fisica. Notate che la struttura
+<code>vm_area_struct</code> è utilizzata per il memory management,
+mentre i page descriptor sono direttamente interpretati dalla <I>CPU</I>
+nel generare l'indirizzo fisico.
+
+<p>
+Se la <code>remap_page_range()</code> ritorna zero, dicendo così che
+nessun errore è avvenuto, il vostro mmap-handler dovrebbe fare lo
+stesso. In questo caso la <code>do_mmap()</code> ritornerà l'indirizzo
+a partire dal quale sono state mappate le pagine. Qualsiasi altro valore
+restituito verrà considerato un errore.
+
+<h3> Un driver reale</h3>
+
+<p>
+È impossibile fornire esempi di codice per ogni possibile
+applicazione del memory mapping di character devices. Alessandro ed io ci
+siamo occupati di un problema concreto nel caso di una scheda per
+laboratorio dotata di RAM, CPU e naturalmente convertitori ADC e DAC,
+ingressi ed uscite digitali, generatori di clock ed altro.
+
+<p>
+Per prima cosa descriverò il funzionamento dell'interfaccia per
+meglio comprendere i problemi che un programmatore deve affrontare nello
+scrivere device drivers.
+
+<p>
+La scheda di cui ci siamo occupati può campionare i suoi ingressi
+direttamente nella sua memoria in maniera continua. Lo stato di questa
+operazione può essere investigato dall'esterno tramite una porta di
+I/O chiamata ``character channel''. Questo canale accetta un flusso di
+caratteri ASCII che rappresentano i comandi. I processi interagiscono con
+la scheda attraverso questo canale usando le classiche funzioni
+<code>read()</code> e <code>write()</code>.
+
+<p>
+I reali trasferimenti di dati sono effettuati in maniera indipendente dal
+funzionamento del character channel: inviando su quest'ultimo un comando
+come <code>TOHOST <I>interface address</I>, <I>length</I>, <I>host
+address</I></code>, la scheda genererà un interrupt dicendo al PC che
+desidera trasferire, in DMA, un blocco di dati in un certo indirizzo della
+memoria centrale. Ma dove dobbiamo mettere questi dati? Abbiamo deciso di
+non complicare la semplice interfaccia a caratteri con i traferimenti di
+dati. In più, poiché l'utente può inviare qualsiasi
+comando alla scheda, non abbiamo fatto assunzioni sull'ordinamento ed il
+significato dei dati.
+
+<p>
+Per queste ragioni abbiamo deciso lasciare il pieno controllo all'utente,
+permettendogli di richiedere al sistema regioni di memoria accessibili al
+DMA e di mapparle nel proprio spazio di indirizzamento. Ogni richiesta di
+DMA proveniente dalla scheda verrà controllata confrontandola con
+queste aree. In altre parole abbiamo implementato qualcosa di simile ad
+una <code>skel_malloc()</code> od una <code>skel_free()</code> per mezzo di
+chiamate a comandi <code>ioctl()</code>, disabilitando contemporaneamente ogni
+trasferimento verso altre regioni per rendere sicuro il tutto.
+
+<p>
+Vi chiederete perché non abbiamo usato direttamente la
+<code>mmap()</code> per questo lavoro. Principalmente perché non era
+possibile realizzare l'equivalente <code>munmap()</code>. Il driver infatti
+non riesce a sapere quando termina l'operazione di memory mapping. Linux
+fà tutto da solo: rimuove la <code>vm_area_struct</code> e le page
+tables decrementando il numero di utilizzatori nel caso di pagine shared.
+<ul>
+	NDT: In effetti, è possibile sapere quando termina una mmap,
+	ma per fare questo bisogna implementare una serie di operazioni
+	per agire sulla vma, simili alle file-operations introdotte nei
+	precedenti articoli. Siccome l'argomento è abbastanza complesso
+	non è il caso di affrontarlo qui.
+</ul>
+
+Poiché dobbiamo allocare i buffer per il DMA con la
+<code>kmalloc()</code>, essi devono essere liberati con la <code>kfree()</code> ma
+Linux non ci permetterà di farlo quando automaticamente
+eliminerà il mapping. Ma se non esiste più il mapping per i
+buffer, essi non sono più necessari. Perciò abbiamo
+implementato una <code>skel_malloc()</code> che alloca i buffer mappandoli
+contemporaneamente nello user space, ed una <code>skel_free()</code> che
+rilascia i buffer eliminando il mapping (dopo aver controllato che non
+stia avvenendo un trasferimento in DMA).
+
+<p>
+Avremmo potuto implementare il sistema di memory mapping nella libreria di
+funzioni che accompagna il driver con lo stesso sistema usato nel
+programma <B>nasty</B> visto prima. Ma, per valide ragioni,
+<code>/dev/mem</code> è accessibile solo da root, mentre i programmi
+che usano il device devono poter essere eseguiti da qualsiasi utente.
+
+<p>
+Abbiamo usato due trucchi nel nostro codice. Per prima cosa modifichiamo
+direttamente l'array <code>mem_map</code> comunicando a Linux l'utilizzo ed i
+permessi delle nostre pagine di memoria fisica. L'array <code>mem_map</code>
+(<code>mm/memory.c</code>) di strutture <code>mem_map_t</code>
+(<code>linux/mm.h</code>), ed è usato per mantenere informazioni su
+tutta la memoria fisica.
+
+<p>
+Per ogni pagina allocata settiamo il flag <code>PG_reserved</code>. Questo
+è un metodo piuttosto sporco, ma ragiunge il suo scopo con tutte le
+versioni di Linux (almeno a partire dalla 1.2.x): Linux tiene le sue mani
+lontane dalle nostre pagine! Le considera come RAM video o una ROM o
+qualsiasi cosa non possa swappare o utilizzare come memoria libera. Lo
+stesso array <code>mem_map</code> usa questo trucco per proteggersi da
+processi troppo avidi di memoria.
+
+<p>
+Il secondo trucco che abbiamo utilizzato è quello di generare
+velocemente uno pseudo-file che assomiglia in qualche modo ad un
+<code>/dev/mem</code> già aperto. La mancanza di una
+<code>mmap_mem()</code> nel kernel ci ha fatto riscrivere una funzione simile
+prendendo come esempio quella del driver per <code>/dev/mem</code>. Questa
+semplice funzione è quindi utilizzata con 
+<code>remap_page_range()</code>. Questo sistema non è sicuramente il
+più ``pulito'' ma funziona. Si sarebbe potuta ottenenere la stessa
+funzionalità in maniera più corretta ma con codice
+più complesso.
+
+<p>
+Oltre a ciò, viene tenuta traccia dei buffer DMA allocati dalla
+nostra <code>skel_malloc()</code> inserendoli in liste per poter verificare se
+le richieste di DMA coinvolgono aree di memoria valide. Le liste sono
+usate anche per rilasciare i buffer quando il programma chiude il device
+senza chiamare precedentemente <code>skel_free()</code>. <code>dma_desc</code>
+è il tipo di queste liste, come mostrato dalle seguenti linee di
+codice. Esse mostrano le nostre <code>skel_malloc()</code> e
+<code>skel_free()</code> implementate tramite chiamate a <code>ioctl()</code>:
+
+<pre>
+<code> 
+/* =============================================
+ * SKEL_MALLOC
+ *
+ * The user desires a(nother) dma-buffer, that
+ * is allocated by kmalloc (GFP_DMA) (continous
+ * and in lower 16 MB).
+ * The allocated buffer is mapped into
+ * user-space by
+ *  a) a pseudo-file as you would get it when
+ *     opening /dev/mem
+ *  b) the buffer-pages tagged as "reserved"
+ *     in memmap
+ *  c) calling the normal entry point for
+ *     mmap-calls "do_mmap" with our pseudo-file
+ *
+ * 0 or &lt; 0 means an error occured, otherwise
+ * the user space address is returned.
+ * This is the main basis of the Skel_Malloc
+ * Library-Call
+ */
+
+/* ---------------------------------------------
+ * Ma's little helper replaces the mmap
+ * file_operation for /dev/mem which is declared
+ * static in Linux and has to be rebuilt by us.
+ * But ain't that much work; we better drop more
+ * comments before they exceed the code in length.
+ */
+
+static int
+skel_mmap_mem (struct inode *inode,
+               struct file *file,
+               struct vm_area_struct *vma)
+{
+    if (remap_page_range (vma-&gt;vm_start,
+                          vma-&gt;vm_offset,
+                          vma-&gt;vm_end - vma-&gt;vm_start,
+                          vma-&gt;vm_page_prot))
+        return -EAGAIN;
+    vma-&gt;vm_inode = NULL;
+    return 0;
+}
+
+static unsigned long
+skel_malloc (struct file *file,
+             unsigned long size)
+{
+    unsigned long pAdr, uAdr;
+    dma_desc *dpi;
+    skel_file_info *fip;
+    struct file_operations fops;
+    struct file memfile;
+
+    /* Our helpful pseudo-file only ... */
+    fops.mmap = skel_mmap_mem;
+    /* ... support mmap */
+    memfile.f_op = &fops;
+    /* and is read'n write */
+    memfile.f_mode = 0x3;
+    fip = (skel_file_info *) (file-&gt;private_data);
+    if (!fip)
+        return 0;
+    dpi = kmalloc (sizeof (dma_desc), GFP_KERNEL);
+    if (!dpi)
+        return 0;
+    PDEBUG ("skel: Size requested: %ld\n", size);
+    if (size &lt;= PAGE_SIZE / 2)
+        size = PAGE_SIZE - 0x10;
+    if (size &gt; 0x1FFF0)
+        return 0;
+    pAdr = (unsigned long) kmalloc (size,
+                                    GFP_DMA | GFP_BUFFER);
+    if (!pAdr) {
+        printk ("skel: Trying to get %ld bytes"
+                "buffer failed - no mem\n", size);
+        kfree_s (dpi, sizeof (dma_desc));
+        return 0;
+    }
+    for (uAdr = pAdr & PAGE_MASK;
+         uAdr &lt; pAdr + size;
+         uAdr += PAGE_SIZE)
+#if LINUX_VERSION_CODE &lt; 0x01031D
+        /* before 1.3.29 */
+        mem_map[MAP_NR (uAdr)].reserved |=
+            MAP_PAGE_RESERVED;
+#elseif        /* LINUX_VERSION_CODE &lt; 0x01033A */
+        /* before 1.3.58 */
+        mem_map[MAP_NR (uAdr)].reserved = 1;
+#else
+        /* most recent versions */
+        mem_map_reserve (MAP_NR (uAdr));
+#endif
+    uAdr = do_mmap (&memfile, 0,
+                    (size + ~PAGE_MASK) & PAGE_MASK,
+                    PROT_READ | PROT_WRITE | PROT_EXEC,
+                    MAP_SHARED, pAdr & PAGE_MASK);
+    if ((signed long) uAdr &lt;= 0) {
+        printk ("skel: A pity - "
+                "do_mmap returned %lX\n", uAdr);
+        kfree_s (dpi, sizeof (dma_desc));
+        kfree_s ((void *) pAdr, size);
+        return uAdr;
+    }
+    PDEBUG ("skel: Mapped physical %lX to %lX\n",
+            pAdr, uAdr);
+    uAdr |= pAdr & ~PAGE_MASK;
+    dpi-&gt;dma_adr = pAdr;
+    dpi-&gt;user_adr = uAdr;
+    dpi-&gt;dma_size = size;
+    dpi-&gt;next = fip-&gt;dmabuf_info;
+    fip-&gt;dmabuf_info = dpi;
+    return uAdr;
+}
+
+
+/* =============================================
+ * SKEL_FREE
+ *
+ * Releases memory previously allocated by
+ * skel_malloc
+ */
+
+static int
+skel_free (struct file *file,
+           unsigned long ptr)
+{
+    dma_desc *dpi, **dpil;
+    skel_file_info *fip;
+
+    fip = (skel_file_info *) (file-&gt;private_data);
+    if (!fip)
+        return 0;
+    dpil = &(fip-&gt;dmabuf_info);
+    for (dpi = fip-&gt;dmabuf_info;
+         dpi; dpi = dpi-&gt;next) {
+        if (dpi-&gt;user_adr == ptr)
+            break;
+        dpil = &(dpi-&gt;next);
+    }
+    if (!dpi)
+        return -EINVAL;
+    PDEBUG ("skel: Releasing %lX bytes at %lX\n",
+            dpi-&gt;dma_size, dpi-&gt;dma_adr);
+    do_munmap (ptr & PAGE_MASK,
+               (dpi-&gt;dma_size + (~PAGE_MASK)) & PAGE_MASK);
+    ptr = dpi-&gt;dma_adr;
+    do {
+#if LINUX_VERSION_CODE &lt; 0x01031D
+        /* before 1.3.29 */
+        mem_map[MAP_NR (ptr)] &= ~MAP_PAGE_RESERVED;
+#elseif        /* LINUX_VERSION_CODE \ 0x01033A */
+        /* before 1.3.58 */
+        mem_map[MAP_NR (ptr)].reserved = 0;
+#else
+        mem_map_unreserve (MAP_NR (ptr));
+#endif
+        ptr += PAGE_SIZE;
+    }
+    while (ptr &lt; dpi-&gt;dma_adr + dpi-&gt;dma_size);
+    *dpil = dpi-&gt;next;
+    kfree_s ((void *) dpi-&gt;dma_adr, dpi-&gt;dma_size);
+    kfree_s (dpi, sizeof (dma_desc));
+    return 0;
+}
+</code>
+</pre>
+
+<h3>Considerazioni finali sul PCI</h3>
+
+<p>
+La tecnologia evolve, ma le idee spesso rimangono le stesse. Nel
+vecchio mondo ISA le periferiche avevano i loro buffer ``alla fine dello
+spazio di indirizzamento'': sopra i 640 kB. Molte schede PCI moderne fanno
+la stessa cosa, ma oggi questa frase và riferita allo spazio di
+indirizzamento a 32-bit (ad es. indirizzi come <code>0xF0100000</code>).
+
+<p>
+Se volete avere accesso a buffer posti a questi indirizzi dovrete usare la
+<code>vremap()</code> definita in <code>mm/vmalloc.c</code> per rimappare le
+pagine di questa memoria fisica nel vostro spaizio di indirizzamento.
+<ul>
+	NDT: Nel file <code>Documentation/IO-mapping.txt</code> Lo stesso
+	Linus afferma che il nome <code>vremap()</code> non è del tutto
+	corretto. Nei kernel della serie 2.1.x la funzione è stata
+	rinominata più correttamente in <code>ioremap()</code>. Nello
+	stesso file è possibile trovare altre interessanti
+	informazioni sull'uso della memoria.
+</ul>
+<code>vremap()</code> lavora in modo simile alla funzione <code>mmap()</code>
+vista in <B>nasty</B>, ma è molto più semplice:
+
+<code>
+        void * vremap (unsigned long offset, unsigned long size);
+</code>
+
+Dovete semplicemente passare l'indirizzo fisico del buffer e la sua
+dimensione. Ricordate che vengono sempre mappate <I>pagine</I> quindi
+<code>offset</code> e <code>size</code> devono essere multipli della dimensione di
+una pagina. Se il buffer è più piccolo di una pagina,
+mappate tutta la pagina e fate attenzione a non usare indirizzi non
+validi.
+
+<p>
+Non ho provato personalmente questa funzione, e non sono sicuro se i
+trucchi visti precedentemente per mappare i buffer in user space
+funzionano con memoria sul bus PCI. Se vorrete provare, dovrete
+sicuramente eliminare la ``brutale'' manipolazione dell'array
+<code>mem_map</code>: esso è <B>solo</B> per normale memoria fisica.
+Provate a rimpiazzare le <code>kmalloc()</code> e <code>kfree()</code> con le
+corrispondenti <code>vremap()</code> e <code>vfree()</code> ed effettuate un
+ulteriore mapping (questa volta in user space) con la <code>do_mmap()</code>.
+
+<p>
+Come avrete capito, siamo giunti al termine di questa serie di articoli.
+Ora spetta a voi andare spavaldamente dove nessun Linuxer è mai
+andato prima...
+
+<p>
+Buona fortuna!
+
+<p>
+<i>Georg è un ventisettenne appassionato di Linux che ama
+l'hacking notturno e odia le scadenze.</i>

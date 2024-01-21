@@ -1,0 +1,231 @@
+.SUFFIXES:
+.SUFFIXES: .S .o .c .s .i .C .cc
+
+.s.o:
+	$(CC) $(PIC_CFLAGS) -c $<
+
+.S.o:
+	$(CC) $(PIC_CFLAGS) -c $<
+
+.c.o:
+ifeq ($(SHARED),true)
+	$(CC) $(PIC_CFLAGS) -c $<
+else
+ifeq ($(STATIC),true)
+	$(CC) $(CFLAGS) -c $<
+else
+ifeq ($(DEBUG),true)
+	$(CC) $(DEBUG_CFLAGS) -c $<
+else
+ifeq ($(PROFILE),true)
+	$(CC) $(PROFILE_CFLAGS) -c $<
+else
+ifeq ($(CHECKER),true)
+	$(CC) $(CHECKER_CFLAGS) -c $<
+else
+	$(CC) $(CFLAGS) -c $<
+endif
+endif
+endif
+endif
+endif
+
+.cc.o:
+ifeq ($(SHARED),true)
+	$(CC) $(PIC_CFLAGS) -c $<
+else
+ifeq ($(STATIC),true)
+	$(CC) $(CFLAGS) -c $<
+else
+ifeq ($(DEBUG),true)
+	$(CC) $(DEBUG_CFLAGS) -c $<
+else
+ifeq ($(PROFILE),true)
+	$(CC) $(PROFILE_CFLAGS) -c $<
+else
+ifeq ($(CHECKER),true)
+	$(CC) $(CHECKER_CFLAGS) -c $<
+else
+	$(CC) $(CFLAGS) -c $<
+endif
+endif
+endif
+endif
+endif
+
+.S.s:
+	$(CC) $(PIC_CFLAGS) -E $< -o $*.s
+
+.c.s:
+ifeq ($(SHARED),true)
+	$(CC) $(PIC_CFLAGS) -S $<
+else
+ifeq ($(STATIC),true)
+	$(CC) $(CFLAGS) -S $<
+else
+ifeq ($(DEBUG),true)
+	$(CC) $(DEBUG_CFLAGS) -S $<
+else
+ifeq ($(PROFILE),true)
+	$(CC) $(PROFILE_CFLAGS) -S $<
+else
+ifeq ($(CHECKER),true)
+	$(CC) $(CHECKER_CFLAGS) -S $<
+else
+	$(CC) $(CFLAGS) -S $<
+endif
+endif
+endif
+endif
+endif
+
+.cc.s:
+ifeq ($(SHARED),true)
+	$(CC) $(PIC_CFLAGS) -S $<
+else
+ifeq ($(STATIC),true)
+	$(CC) $(CFLAGS) -S $<
+else
+ifeq ($(DEBUG),true)
+	$(CC) $(DEBUG_CFLAGS) -S $<
+else
+ifeq ($(PROFILE),true)
+	$(CC) $(PROFILE_CFLAGS) -S $<
+else
+ifeq ($(CHECKER),true)
+	$(CC) $(CHECKER_CFLAGS) -S $<
+else
+	$(CC) $(CFLAGS) -S $<
+endif
+endif
+endif
+endif
+endif
+
+.c.i .cc.i:
+	$(CC) $(PIC_CFLAGS) -E $< -o $*.i
+
+
+ifeq ($(STATIC_SHARED),true)
+
+# We don't want the default archive rule.
+(%): %
+	$(AR) $(ARFLAGS) $@ $^
+	$(RM) $^
+
+ifneq ($(PIC),true)
+
+$(STATIC_DIR)/$(SUBDIR)/%.o $(SHARED_DIR)/$(SUBDIR)/%.o: %.c
+	$(CC) $(CFLAGS) -S $<
+	$(JUMPAS)as -o $(SHARED_DIR)/$(SUBDIR)/$*.o $*.s
+ifneq ($(LD),true)
+	$(LD) -o $(SHARED_DIR)/$(SUBDIR)/a.out $(LDFLAGS) \
+		$(SHARED_DIR)/$(SUBDIR)/$*.o
+endif
+ifneq ($(MV),true)
+	$(MV) $(SHARED_DIR)/$(SUBDIR)/a.out \
+		$(SHARED_DIR)/$(SUBDIR)/$*.o
+endif
+	$(AS) -o $(STATIC_DIR)/$(SUBDIR)/$*.o $*.s
+ifneq ($(LD),true)
+	$(LD) -o $(STATIC_DIR)/$(SUBDIR)/a.out $(LDFLAGS) \
+		$(STATIC_DIR)/$(SUBDIR)/$*.o
+endif
+ifneq ($(MV),true)
+	$(MV) $(STATIC_DIR)/$(SUBDIR)/a.out \
+		$(STATIC_DIR)/$(SUBDIR)/$*.o
+endif
+	@$(RM) $*.s
+
+$(STATIC_DIR)/$(SUBDIR)/%.o $(SHARED_DIR)/$(SUBDIR)/%.o \
+	$(DEBUG_DIR)/$(SUBDIR)/%.o $(PROFILE_DIR)/$(SUBDIR)/%.o: %.S
+	$(CC) $(CFLAGS) -E $< -o $*.s
+	$(JUMPAS)as -o $(SHARED_DIR)/$(SUBDIR)/$*.o  $*.s
+	$(AS) -o $(STATIC_DIR)/$(SUBDIR)/$*.o $*.s
+ifeq ($(DEBUG),true)
+	cp $(STATIC_DIR)/$(SUBDIR)/$*.o $(DEBUG_DIR)/$(SUBDIR)
+endif
+ifeq ($(PROFILE),true)
+	cp $(STATIC_DIR)/$(SUBDIR)/$*.o $(PROFILE_DIR)/$(SUBDIR)
+endif
+	@$(RM) $*.s
+
+else
+
+$(SHARED_DIR)/$(SUBDIR)/%.o: %.S
+	$(CC) $(PIC_CFLAGS) -c $< -o $@
+
+$(STATIC_DIR)/$(SUBDIR)/%.o \
+	$(DEBUG_DIR)/$(SUBDIR)/%.o $(PROFILE_DIR)/$(SUBDIR)/%.o: %.S
+	$(CC) $(CFLAGS) -c $< -o $@
+ifeq ($(DEBUG),true)
+	cp $(STATIC_DIR)/$(SUBDIR)/$*.o $(DEBUG_DIR)/$(SUBDIR)
+endif
+ifeq ($(PROFILE),true)
+	cp $(STATIC_DIR)/$(SUBDIR)/$*.o $(PROFILE_DIR)/$(SUBDIR)
+endif
+
+$(SHARED_DIR)/$(SUBDIR)/%.o: %.c
+	$(CC) $(PIC_CFLAGS) -c $< -o $@
+ifneq ($(LD),true)
+	$(LD) -o $(@D)/a.out $(LDFLAGS) $@
+endif
+ifneq ($(MV),true)
+	$(MV) $(@D)/a.out $@
+endif
+
+$(STATIC_DIR)/$(SUBDIR)/%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+ifneq ($(LD),true)
+	$(LD) -o $(@D)/a.out $(LDFLAGS) $@
+endif
+ifneq ($(MV),true)
+	$(MV) $(@D)/a.out $@
+endif
+
+endif
+
+else
+
+$(SHARED_DIR)/$(SUBDIR)/%.o $(SHARED_DIR)/%.o: %.S
+	$(CC) $(PIC_CFLAGS) -c $< -o $@
+
+$(STATIC_DIR)/$(SUBDIR)/%.o $(STATIC_DIR)/%.o $(PROFILE_DIR)/%.o \
+	$(DEBUG_DIR)/$(SUBDIR)/%.o $(PROFILE_DIR)/$(SUBDIR)/%.o: %.S
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(SHARED_DIR)/$(SUBDIR)/%.o: %.c
+	$(CC) $(PIC_CFLAGS) -c $< -o $@
+ifneq ($(LD),true)
+	$(LD) -o $(@D)/a.out $(LDFLAGS) $@
+endif
+ifneq ($(MV),true)
+	$(MV) $(@D)/a.out $@
+endif
+
+$(STATIC_DIR)/$(SUBDIR)/%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+ifneq ($(LD),true)
+	$(LD) -o $(@D)/a.out $(LDFLAGS) $@
+endif
+ifneq ($(MV),true)
+	$(MV) $(@D)/a.out $@
+endif
+
+endif
+
+ifeq ($(DEBUG),true)
+$(DEBUG_DIR)/$(SUBDIR)/%.o: %.c
+	$(CC) $(DEBUG_CFLAGS) -c $< -o $@
+endif
+ifeq ($(PROFILE),true)
+$(PROFILE_DIR)/$(SUBDIR)/%.o: %.c
+	$(CC) $(PROFILE_CFLAGS) -c $< -o $@
+endif
+ifeq ($(CHECKER),true)
+$(CHECKER_DIR)/$(SUBDIR)/%.o: %.c
+	$(CC) $(CHECKER_CFLAGS) -c $< -o $@
+
+$(CHECKER_DIR)/$(SUBDIR)/%.o $(CHECKER_DIR)/%.o: %.S
+	$(CC) $(CHECKER_CFLAGS) $(CHECKER_ASFLAGS) -c $< -o $@
+endif

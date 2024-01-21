@@ -1,0 +1,90 @@
+#!/usr/bin/perl
+
+#
+# Variables
+#
+
+$LANGUAGE       = "german";
+$dict 		= "/etc/dictionary";
+$dict_rel_words = "../../etc/dictionary";
+$lang_rel_dict 	= "../usr/dict/$LANGUAGE";
+$words 		= "/usr/dict/words";
+
+$prompt = "Would you like to use $LANGUAGE for the default dictionary?";
+
+##############################################################################
+
+#
+# Main.
+#
+
+if ( -f "$dict" || -l "$dict" ) {	
+
+    $link = readlink("$dict") if ( -l "$dict");
+    (&check_words && exit)   if ($link eq $lang_rel_dict);
+
+    (&mk_symlink("$lang_rel_dict", "$dict") && &check_words)
+	if &yorn("$prompt");
+}
+else {
+    (&mk_symlink("$lang_rel_dict", "$dict") && (&check_words))
+	if &yorn("$prompt");
+}
+
+
+###############################################################################
+
+#
+# Functions.
+#
+
+sub check_words {
+
+    if ( -l $words ) 
+    {
+	local($link) = readlink("$words");
+	exit if ("$link" eq "$dict_rel_words");
+    }	
+
+    &mk_symlink("$dict_rel_words", "$words");
+}
+
+sub mk_symlink {
+
+    local($link)	  = pop(@_);
+    local($original_file) = pop(@_);
+
+    unlink("$link") if ( -l "$link");
+    &backup("$link") if ( -f "$link");
+
+    symlink("$original_file", "$link")
+	|| die "Can't link(\"$original_file\",\"$link\")";
+}
+
+sub backup {
+
+    local($filename) = @_;
+
+    link("$filename","$filename.old")
+	|| die "Can't link(\"$filename\",\"$filename.old\")";
+    unlink("$filename")
+	|| die "Can't unlink(\"$filename\")";
+}
+
+###############################################################################
+
+#
+# Misc.
+#
+
+sub yorn {
+
+    local($prompt) = @_;
+
+    $prompt .= " [y/N]: ";
+
+    print STDOUT "$prompt";
+    local($answer) = scalar(<STDIN>);
+
+    $answer =~ m/^y/i;
+}

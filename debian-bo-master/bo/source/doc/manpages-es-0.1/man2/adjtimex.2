@@ -1,0 +1,138 @@
+.\" Hey Emacs! This file is -*- nroff -*- source.
+.\"
+.\" Copyright (c) 1995 Michael Chastain (mec@shell.portal.com), 15 April 1995.
+.\"
+.\" This is free documentation; you can redistribute it and/or
+.\" modify it under the terms of the GNU General Public License as
+.\" published by the Free Software Foundation; either version 2 of
+.\" the License, or (at your option) any later version.
+.\"
+.\" The GNU General Public License's references to "object code"
+.\" and "executables" are to be interpreted as the output of any
+.\" document formatting or typesetting system, including
+.\" intermediate and printed output.
+.\"
+.\" This manual is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public
+.\" License along with this manual; if not, write to the Free
+.\" Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139,
+.\" USA.
+.\" Translated 15 Dec 1995 Miguel A. Sepulveda (miguel@typhoon.harvard.edu)
+.\" Modified 30 Jun 1996 Miguel A. Sepulveda (angel@vivaldi.princeton.edu)
+.TH ADJTIMEX 2 "30 Junio 1996" "Linux 1.2.4" "Manual del Programador"
+.SH NOMBRE
+adjtimex \- ajusta el reloj del kernel
+.SH SINOPSIS
+.B #include <sys/timex.h>
+.sp
+.BI "int adjtimex(struct timex *" "buf" ");"
+.SH DESCRIPCIÓN
+Linux usa el algoritmo de 
+David Mill para ajustar el reloj.
+.B adjtimex
+lee y opcionalmente prepara parámetros de ajuste para dicho algoritmo.
+.PP
+.B adjtimex
+toma un indicador a una estructura
+.I timex 
+, actualiza parámetros del kernel a partir de los valores en los campos, 
+y regresa la misma estructura con los valores del kernel actuales.
+Esta estructura se declara como sigue a continuación:
+.PP
+.RS
+.nf
+struct timex
+{
+    int mode;            /* modo selector */
+    long offset;         /* ajuste de la hora (usec) */
+    long frequency;      /* ajuste de la frecuencia (ppm escalada) */
+    long maxerror;       /* error máximo  (usec) */
+    long esterror;       /* error estimado  (usec) */
+    int status;          /* comando/estatus del reloj*/
+    long time_constant;  /* pll constante de tiempo */
+    long precision;      /* precisión del reloj(usec) (read only) */
+    long tolerance;      /* tolerancia de la frecuencia del reloj (ppm)
+                            (read only) */
+    struct timeval time; /* (read only) */
+    long tick;           /* usecs entre ticks del reloj */
+};
+.fi
+.RE
+.PP
+El campo 
+.I mode
+determina que parámetros serán asignados, si alguno en absoluto.
+Puede contener una combinación
+.RI bitwise- or
+de cero o más elementos de la lista siguiente:
+.PP
+.RS
+.nf
+#define ADJ_OFFSET            0x0001 /* ajuste de la hora */
+#define ADJ_FREQUENCY         0x0002 /* ajuste de la frecuencia */
+#define ADJ_MAXERROR          0x0004 /* error máximo de la hora*/
+#define ADJ_ESTERROR          0x0008 /* error estimado de la hora */
+#define ADJ_STATUS            0x0010 /* estatus del reloj */
+#define ADJ_TIMECONST         0x0020 /* pll constante de tiempo */
+#define ADJ_TICK              0x4000 /* valor tick*/
+#define ADJ_OFFSET_SINGLESHOT 0x8001 /* ajuste de hora; método antiguo */
+.fi
+.RE
+.PP
+Usuarios ordinarios están limitados a un valor de cero para
+.IR mode .
+Sólo el superusuario puede asignar cualquier parámetro.
+.br
+.ne 12v
+.SH "VALOR REGRESADO"
+En caso de éxito,
+.B adjtimex
+regresa el valor de 
+.IR buf.status :
+.PP
+.RS
+.nf
+#define TIME_OK  0 /* reloj sincronizado */
+#define TIME_INS 1 /* inserte segundo saltado */
+#define TIME_DEL 2 /* borrar un segundo saltado */
+#define TIME_OOP 3 /* saltando un segundo en progreso */
+#define TIME_BAD 4 /* reloj no sincronizado  */
+.fi
+.RE
+.PP
+En caso de fallo,
+.B adjtimex
+regresa \-1 y asigna el valor apropiado a
+.IR errno .
+.SH ERRORES
+.TP
+.B EFAULT
+.I buf
+no señala una zona de memoria escribible.
+.TP
+.B EPERM
+.I buf.mode
+no es cero y el usuario no es superusuario.
+.TP
+.B EINVAL
+Se ha hecho un intento de asignar a
+.I buf.offset
+un valor fuera del intervalo \-131071 a  +131071,
+o de asignar a 
+.I buf.status
+un valor no contenido en la lista anteriormente discutida,
+o de asignar a
+.I buf.tick
+un valor fuera del intervalo 
+.RB 900000/ HZ
+a  
+.RB 1100000/ HZ ,
+donde
+.B HZ
+es la frecuencia de interrupción del reloj del sistema.
+.SH "VÉASE"
+.BR settimeofday (2).

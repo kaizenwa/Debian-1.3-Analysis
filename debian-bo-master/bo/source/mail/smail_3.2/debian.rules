@@ -1,0 +1,117 @@
+#!/usr/bin/make -f
+
+package=smail
+orig-version=3.2
+version=3.2-3
+
+DIR:=$(shell pwd)
+arch=$(shell dpkg --print-architecture)
+
+build:
+	$(checkdir)
+	cd src && $(MAKE)  iobpeek.h; cd ..
+	$(MAKE) $(FLAGS)  depend
+	$(MAKE) $(FLAGS) 
+	@set -e; for f in `find . -name defs.sh`; do \
+		echo munging "$$f" ... ; \
+		d=`dirname $$f`/debian-defs.sh ; \
+		perl -pe 's,(['"'"' ])/(usr|var|etc),$$1$(DIR)/debian-tmp/$$2,g' \
+			$$f > $$d ; \
+		touch -m -r $$f $$d ; \
+	done
+	(cat debian.README; echo -e '\n\n'; cat COPYING) >debian-tmp.copyright
+	touch build
+
+clean:
+	$(checkdir)
+	-rm -f build
+	-$(MAKE) $(FLAGS) clobber
+	set -e; \
+	for f in `find . -name AUX-support -prune -false -o -name Makefile` ; do \
+		perl -i.dep~ -ne 'print || die $$! \
+				  if 1 .. /^# DO NOT REMOVE THIS LINE/' \
+			$$f ; \
+	done
+	-rm -rf debian-tmp debian-tmp.deb debian-tmp.copyright
+	-rm -f man/man?/.Makefile pd/pathalias/.Makefile mkdep.out
+	find . -name debian-defs.sh -o -name '*~' -o -name '*.orig' -o -name '*.rej' \
+	    -o -name '#*#' | xargs rm -f -
+
+binary:		checkroot build
+	-rm -rf debian-tmp
+	install -m 755 -o root -g root -d debian-tmp/DEBIAN \
+		debian-tmp/etc/{smail,cron.daily} debian-tmp/var/log{,/smail} \
+		debian-tmp/usr/{bin,sbin,lib,man} debian-tmp/var/{lib,spool}/smail \
+		debian-tmp/usr/doc/smail/{guide,examples} \
+		debian-tmp/var/spool/smail/{input,msglog,retry,error}
+	$(MAKE) $(FLAGS) install MAKEFILES=$(DIR)/debian.overrides
+	$(MAKE) $(FLAGS) installman MAKEFILES=$(DIR)/debian.overrides
+	strip debian-tmp/usr/sbin/smail
+	find debian-tmp -type l -ls | perl -n debian.mungelinks
+	rm -f debian-tmp/usr/sbin/{mailq,runq}
+	ln -s ../sbin/smail debian-tmp/usr/bin/rmail
+	ln -s ../sbin/smail debian-tmp/usr/bin/mailq
+	ln -s ../sbin/smail debian-tmp/usr/bin/runq
+	mv debian-tmp/usr/sbin/{smtpd,in.smtpd}
+	mv debian-tmp/usr/man/man8/{smtpd,in.smtpd}.8
+	rm debian-tmp/usr/lib/smail/{savelog,getopt}
+	rm debian-tmp/usr/man/man8/savelog.8
+	cp debian.crontab debian-tmp/etc/smail/crontab
+	cp debian.crontab debian-tmp/usr/doc/smail/examples/crontab
+	cp debian.Changelog debian-tmp/usr/doc/smail/changelog.Debian
+	cp CHANGES debian-tmp/usr/doc/smail/CHANGES
+	cp debian.multihomed debian-tmp/usr/doc/smail/multihomed
+	install -m 755 debian.cronroot debian-tmp/etc/cron.daily/smail
+	cp debian-tmp.copyright debian-tmp/usr/doc/smail/copyright
+	rm -f debian-tmp/etc/smail/COPYING
+	cp -r samples/{bigsite,bsmtp,generic,queryprog} \
+		debian-tmp/usr/doc/smail/examples/.
+	cp debian.samplesreadme debian-tmp/usr/doc/smail/examples/README
+	cp guide/admin/[a-z]* debian-tmp/usr/doc/smail/guide
+	#gzip -9v debian-tmp/usr/doc/smail/guide/*
+	cp debian.guidemakefile debian-tmp/usr/doc/smail/guide/Makefile
+	cp debian.guidereadme debian-tmp/usr/doc/smail/guide/README
+	install -m 755 -o root -g root debian.config debian-tmp/usr/sbin/smailconfig
+	sed -e 's/==VERSION==/$(version)/' debian.testmsg > debian-tmp/usr/sbin/smailtest 
+	chmod 755 debian-tmp/usr/sbin/smailtest
+	chown root.root debian-tmp/usr/sbin/smailtest
+	find debian-tmp/usr/{sbin,lib} \! -type l -perm +111 -type f | \
+	xargs file | grep executable| grep -v stripped|awk -F\: '{print $$1}'|xargs -r  strip 
+	sed -e 's/=V/$(version)/' -e  's/=A/$(arch)/' \
+	debian.control > debian-tmp/DEBIAN/control
+	cp debian.preinst debian-tmp/DEBIAN/preinst
+	cp debian.postinst debian-tmp/DEBIAN/postinst
+	cp debian.prerm debian-tmp/DEBIAN/prerm
+	cp debian.postrm debian-tmp/DEBIAN/postrm
+	cp debian.conffiles debian-tmp/DEBIAN/conffiles
+	chmod +x debian-tmp/DEBIAN/{preinst,postinst,prerm,postrm}
+	find debian-tmp -type d | xargs chmod g-s
+	(cd debian-tmp/usr/doc/smail&& find -type f|xargs -n1 gzip -9v)
+	chmod -R u+w,g-w debian-tmp/usr/{man,doc,sbin}
+	chown -R root.root debian-tmp/usr/{man,doc,sbin}
+	set -e; for f in debian-tmp/var/spool/uumaps \
+	         debian-tmp/{etc,usr/lib,var/lib,var/spool}/smail; do \
+		chown -R mail.root $$f && chmod -R u+w,g-w $$f ; \
+		find $$f -type d | xargs chmod g+s ; \
+	done
+	dpkg --build debian-tmp  && dpkg-name -o -s .. debian-tmp.deb
+
+define checkdir
+	test -f src/smail.h
+endef
+
+source:		clean
+	chmod +x debian.rules
+	cd .. && \
+	tar cf $(package)_$(version).tar $(package)_$(orig-version) && \
+	gzip -9vf $(package)_$(version).tar
+
+diff:		clean
+	cd .. && \
+	(diff -ruN $(package)_$(orig-version).orig $(package)_$(orig-version) \
+	 >$(package)_$(version).diff; [ $$? = 1 ])
+	gzip -9vf ../$(package)_$(version).diff
+
+checkroot:
+	$(checkdir)
+	test root = "`whoami`"

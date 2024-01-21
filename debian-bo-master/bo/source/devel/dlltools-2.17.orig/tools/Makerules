@@ -1,0 +1,53 @@
+all: jumpas mkimage mkstubs getsize jumpas verify mkcompat
+
+jumpas: jumpas.o utils.o fixassy.o
+	$(CC) -o $@ jumpas.o utils.o fixassy.o $(MISC_OBJS) $(LIBS)
+
+mkimage: mkimage.o utils.o $(MD)
+	$(CC) -o $@ mkimage.o utils.o $(MD) $(MISC_OBJS) $(LIBS)
+
+mkcompat: mkcompat.o utils.o mkcompat.h
+	$(CC) -o $@ mkcompat.o utils.o $(MISC_OBJS) $(LIBS)
+
+mkcompat.c: mkcompat.h
+
+mkcompat.h: ../doc/table_description gentable
+	./genheader ../doc/table_description >$@
+
+gentable: gentable.c
+	$(HOST_CC) -o $@ gentable.c
+	[ -h genheader ] || ln -s $@ genheader
+
+mkstubs: mkstubs.o utils.o
+	$(CC) -o $@ mkstubs.o utils.o $(MISC_OBJS) $(LIBS)
+
+getsize: getsize.o utils.o
+	$(CC) -o $@ getsize.o utils.o $(MISC_OBJS) $(LIBS)
+
+
+jumpas.o: jumpas.c utils.h
+	$(CC) $(CFLAGS) -c jumpas.c
+
+verify: verify.o utils.o $(MD)
+	$(CC) -o $@ verify.o utils.o $(MD) $(MISC_OBJS) $(LIBS)
+
+clean:
+	/bin/rm -f *.o jumpas mkimage mkstubs getsize verify mkcompat gentable genheader mkcompat.h *~ #*#
+
+install: all
+	strip getsize mkimage mkstubs jumpas verify mkcompat
+	if [ ! -d $(BINDIR) ]; then mkdir -p $(BINDIR); fi
+	cp jumpas getsize mkimage mkstubs mkcompat $(BINDIR)
+	cp verify $(BINDIR)/verify-shlib
+	cd $(BINDIR); /bin/rm -f getvars getfuncs libinfo; \
+	ln -s mkcompat getvars; \
+	ln -s mkcompat getfuncs; \
+	ln -s mkcompat libinfo
+	@echo "========== Run 'make install-compat' for /usr/dll links."
+
+install-compat:
+	if [ -d /usr/dll ]; then rm -rf /usr/dll; fi
+	echo "Making tools backwards compatibility links"
+	mkdir -p /usr/dll/jump
+	ln -s /usr/bin /usr/dll/bin
+	ln -s /usr/bin/jumpas /usr/dll/jump/as

@@ -1,0 +1,70 @@
+#! /bin/sh
+# report - report a problem
+# report [-u] subject <details		(details must be nonempty)
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN:$NEWSPATH ; export PATH
+
+ctl=$NEWSCTL/report.ctl
+
+case "$#" in
+0)	echo "Usage: $0 [-u] subject" >&2 ; exit 2	;;
+esac
+
+kind=nonurgent
+case "$1" in
+-u)	kind=urgent ; shift	;;
+esac
+
+trap '' 1 2
+r=/tmp/rep$$
+status=1
+trap "rm -f $r ; trap 0 ; exit \$status" 0
+>$r
+
+if test ! -r $ctl
+then
+	# not a whole lot we can do... but try anyway
+	urgentto=root
+	nonurgentto=root
+	echo >>$r
+	echo "No $ctl file!!!" >>$r
+	echo >>$r
+else
+	. $ctl
+	status=0
+fi
+
+case "$kind" in
+nonurgent)	dest="$nonurgentto" ; nb=		;;
+urgent)		dest="$urgentto" ; nb=' (urgent)'	;;
+esac
+args="`echo \"$dest\" | tr ',' ' '`"
+
+cat >>$r
+
+if test ! -s $r
+then
+	status=0
+	exit
+fi
+
+(
+	echo "To: $dest"
+	echo "Subject: news$nb: $1"
+	echo
+	if egrep '^~' $r >/dev/null
+	then
+		echo 'WARNING:  the lines in this message that begin with'
+		echo '"***~" originally began with "~".  THIS MAY BE AN'
+		echo 'ATTEMPT TO BREACH SECURITY ON YOUR SYSTEM.'
+		echo
+		sed '/^~/s/^/***/' $r
+	else
+		cat $r
+	fi
+) | mail $args		# some sites might want "/usr/lib/sendmail -t" instead
+
+# and the trap handles the exit status

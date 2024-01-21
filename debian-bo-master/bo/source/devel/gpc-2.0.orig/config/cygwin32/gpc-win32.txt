@@ -1,0 +1,120 @@
+Supporting WindowsNT or Windows95 involves two steps:
+
+(1) Supporting the executable format (PE-executables).
+    Because of the modular structure of gcc (and gpc), adding a new
+platform is not so hard. The cygwin32 project implemented PE, but they use
+the current cygnus gcc snapshot, which is some sort of pre-2.8, and not
+compatible with gpc. I extracted the PE support from this compiler and merged
+it back into gcc 2.6.3 and 2.7.2. Thus, I have a created gpc-1.1(2.6.3) and
+pre-1.2(2.7.2) that can create PE executables.
+
+(2) Being able to access the Win32 API.
+    If you want to write GUI programs, you have to be able to use the Win32
+API. There are two ways to manage the stack, when a subroutine is called:
+the caller can do this ("C-style"), or the function called can do it.
+(traditionally called "Pascal style"). Although GPC is a Pascal compiler, it
+uses C-style stack management, like GCC. The Win32 API uses the "Pascal"
+method.
+
+A sample "hello world" program in C, and it's assembly look like:
+
+hello.c:
+-----------------------------------------------------------------
+#include <stdio.h>
+
+void main(void)
+{
+	printf("Hello, world!\n");
+}
+-----------------------------------------------------------------
+
+
+hello.s:
+-----------------------------------------------------------------
+	.file	"hello.c"
+gcc2_compiled.:
+___gnu_compiled_c:
+.text
+LC0:
+	.ascii "Hello, world!\12\0"
+	.align 4
+.globl _main
+_main:
+	pushl %ebp
+	movl %esp,%ebp
+	call ___main
+	pushl $LC0
+	call _printf
+	addl $4,%esp
+L1:
+	leave
+	ret
+-----------------------------------------------------------------
+
+Notice that the caller (_main) restores the stack after calling _printf
+with a "addl $4,%esp".
+
+Next, a sample GUI win32 hello world program:
+
+whello.c:
+-----------------------------------------------------------------
+#include <windows.h>
+
+void main(void)
+{
+	MessageBox(NULL, "Greetings from GNU C", "Hello World!",
+		MB_OK | MB_ICONINFORMATION);
+}
+-----------------------------------------------------------------
+
+
+whello.s:
+-----------------------------------------------------------------
+	.file	"whello.c"
+gcc2_compiled.:
+___gnu_compiled_c:
+.text
+LC0:
+	.ascii "Hello World!\0"
+LC1:
+	.ascii "Greetings from GNU C\0"
+	.align 4
+.globl _main
+_main:
+	pushl %ebp
+	movl %esp,%ebp
+	call ___main
+	pushl $64
+	pushl $LC0
+	pushl $LC1
+	pushl $0
+	call _MessageBoxA@16
+L1:
+	leave
+	ret
+-----------------------------------------------------------------
+
+Two things differ:
+(1) The stack is not adjusted by _main, but (out of sight) by _MessageBox.
+(2) The MessageBox symbol is transformed to MessageBox@16
+
+The "@16" part specifies the number of bytes allocated by the arguments
+pushed on the stack.
+
+These are from "windows.h" or it's sub-includes:
+
+-----------------------------------------------------------------
+
+#define WINAPI __attribute__ ((stdcall))
+
+#ifdef UNICODE
+#define MessageBox  MessageBoxW
+#else
+#define MessageBox  MessageBoxA
+#endif
+
+int WINAPI MessageBoxA (HWND, const char *, const char *, unsigned int);
+int WINAPI MessageBoxW (HWND, const wchar_t *, const wchar_t *, unsigned int);
+ 
+-----------------------------------------------------------------
+

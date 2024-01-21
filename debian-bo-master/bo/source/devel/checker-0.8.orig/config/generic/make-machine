@@ -1,0 +1,112 @@
+:
+# Guess values for system-dependent variables and create Makefiles.
+# Copyright (C) 1991 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+trap 'rm -f conftest conftest.c; exit 1' 1 3 15
+
+set +u # Make sure unset variables are ok.
+# set -x
+
+progname=$0
+srcdir=$1
+if [ -z $1 ]; then
+ echo "Usage: $progname srcdir";
+ exit;
+fi
+
+INCLUDEDIR=${INCLUDEDIR-/usr/include}
+
+rm -f conftest conftest.c
+compile='$CC $DEFS conftest.c -o conftest $LIBS >/dev/null 2>&1'
+#compile='$CC $DEFS conftest.c -o conftest $LIBS '
+
+# The Bourne shell writes "command not found" to /dev/tty, so if we get
+# a usage message on stderr, we have the program.
+#
+# ksh and zsh write "command not found" to stderr, but test -n does not
+# want any output if there is no program.  So we use the `type' builtin
+# instead for them (and bash).
+if test "$RANDOM" = "$RANDOM"; then
+  checkfor='test -n "`$checkprog $checkargs 2>&1`"'
+else
+  checkfor='type $checkprog >/dev/null'
+fi
+
+echo checking for gcc
+checkprog=gcc checkargs=''
+test -z "$CC" && eval $checkfor && CC='gcc -O'
+CC=${CC-cc}
+
+echo checking for ranlib
+checkprog=ranlib checkargs='/dev/null'
+test -z "$RANLIB" && eval $checkfor && RANLIB='ranlib '
+RANLIB=${RANLIB-true}
+
+echo checking for ANSI C header files
+test -f $INCLUDEDIR/stdlib.h && test -f $INCLUDEDIR/string.h &&
+  DEFS="$DEFS -DSTDC_HEADERS"
+
+echo checking for unistd.h
+test -f $INCLUDEDIR/unistd.h && DEFS="$DEFS -DHAVE_UNISTD_H"
+
+echo checking for sys/resource.h
+test -f $INCLUDEDIR/sys/resource.h && DEFS="$DEFS -DHAVE_SYS_RESOURCE_H"
+
+echo checking for sys/time.h
+test -f $INCLUDEDIR/sys/time.h && DEFS="$DEFS -DHAVE_SYS_TIME_H"
+
+echo checking for sys/mman.h
+test -f $INCLUDEDIR/sys/mman.h && DEFS="$DEFS -DHAVE_SYS_MMAN_H"
+
+echo checking for getpagesize
+echo "#include <unistd.h>
+main() { exit(0); } t() { getpagesize(); }" > conftest.c
+eval $compile
+if test -s conftest && ./conftest 2>/dev/null; then 
+  DEFS="$DEFS -DHAVE_GETPAGESIZE"
+fi
+rm -f conftest conftest.c
+
+echo checking for _SC_PAGESIZE
+echo "#include <unistd.h>
+main() { exit(0); } t() { sysconf(_SC_PAGESIZE); }" > conftest.c
+eval $compile
+if test -s conftest && ./conftest 2>/dev/null; then
+  DEFS="$DEFS -DHAVE_SC_PAGESIZE"
+fi
+rm -f conftest conftest.c
+
+echo checking for _SC_PAGE_SIZE
+echo "#include <unistd.h>
+main() { exit(0); } t() { sysconf(_SC_PAGE_SIZE); }" > conftest.c
+eval $compile
+if test -s conftest && ./conftest 2>/dev/null; then
+  DEFS="$DEFS -DHAVE_SC_PAGE_SIZE"
+fi
+rm -f conftest conftest.c
+
+rm -f machine.h
+echo creating prospect with \`$DEFS\'
+$CC -g $DEFS $srcdir/config/generic/prospect.c -o prospect
+cp $srcdir/config/generic/tm-generic.h machine.h
+echo Running prospect...
+if ./prospect >> machine.h; then
+  exit 0
+else
+  rm machine.h
+  exit 1
+fi

@@ -1,0 +1,98 @@
+# $Id: Makefile.in,v 1.22 1996/05/07 16:38:17 steve Exp $
+#
+#	Development Makefile for netcdf c++ interface
+#
+
+# dvips is part of the TeX package
+DVIPS		= dvips
+# texi2dvi and makeinfo are part of the texinfo package
+TEXI2DVI	= texi2dvi
+MAKEINFO	= makeinfo
+# texi2html is available from http://wwwcn.cern.ch/dci/texi2html/
+TEXI2HTML	= texi2html
+
+libdir		= ../libsrc
+
+includes	= -I../libsrc
+
+MANIFEST	= Makefile.in README depend example.c example.cc \
+		  nctst.cc ncvalues.cc ncvalues.hh netcdf.cc netcdf.hh \
+		  expected expected.dos cxxdoc.tex cxxdoc.ps \
+		  djgpp32.mak emx.mak
+defines		=
+CPPFLAGS	= $(includes) $(defines) @CPPFLAGS@
+CXXCPPFLAGS	= $(includes) $(defines) @CXXCPPFLAGS@
+CXXFLAGS	= @CXXFLAGS@
+LIBRARY		= netcdf_c++
+HEADERS		= netcdf.hh ncvalues.hh
+ld_xdr		= @LD_XDR@
+LIBS		=  -L. -l$(LIBRARY) -L$(libdir) -lnetcdf $(ld_xdr)
+PURIFY		= purify
+
+LIB_SRCS	= netcdf.cc ncvalues.cc
+LIBOBJS		= netcdf.o ncvalues.o
+
+# a test program that uses some of the draft C++ interface
+PROG		= nctst
+PROG_SRCS	= nctst.cc
+PROG_OBJS 	= nctst.o
+GARBAGE		= $(PROG) $(PROG_OBJS) $(LIBOBJS) test.out example.nc \
+		  *.cps *.dvi *.fns \
+		  *.log *~ *.gs *.aux *.cp *.fn *.ky *.pg *.toc *.tp *.vr
+
+all:		library $(PROG)
+
+test:	expected $(PROG)
+	./$(PROG) > test.out
+	@cmp expected test.out && \
+	    echo "*** C++ test successful ***" ;
+
+install:	installed_library installed_headers
+
+clean:		default_clean
+	-rm -f $(PROG_OBJS) $(PROG) $(LIBOBJS) example.nc test.out
+
+distclean:	default_distclean
+
+netcdf.o: netcdf.hh ../libsrc/netcdf.h netcdf.cc
+ncvalues.o: ncvalues.hh ncvalues.cc
+nctst.o: netcdf.hh nctst.cc
+
+nctst_src: nctst.cc netcdf.cc ncvalues.cc
+	#load -I../libsrc nctst.cc netcdf.cc ncvalues.cc
+	#load -L../../lib ../../lib/libnetcdf.a
+	#link
+
+print: nctst.cc netcdf.hh netcdf.cc ncvalues.hh ncvalues.cc
+	vgrind -s11 -lC++ -t nctst.cc netcdf.hh netcdf.cc ncvalues.hh \
+				ncvalues.cc | lpr
+ps: cxxdoc.ps
+
+info: cxxdoc.info
+
+html: cxxdoc.html
+
+cxxdoc.dvi:	cxxdoc.tex
+	$(TEXI2DVI) cxxdoc.tex
+
+cxxdoc.ps:	cxxdoc.dvi
+	$(DVIPS) -D 300 -o cxxdoc.ps cxxdoc.dvi
+
+cxxdoc.info: cxxdoc.tex
+	$(MAKEINFO) cxxdoc.tex
+
+cxxdoc.html:	cxxdoc.tex
+	$(TEXI2HTML) cxxdoc.tex
+
+include ../port/master.mk
+
+$(PROG) : $(PROG_OBJS) $(LIB_A)
+	$(CXX) $(CXXFLAGS) $(PROG_OBJS) $(LIBS) -o $@
+
+nctst.pure:	$(PROG_OBJS)
+	$(PURIFY) $(LINK.cc) $(PROG_OBJS) $(LIBS) -o $@
+	.
+
+### Everything after the following line might be overwritten ###
+### DO NOT DELETE THIS LINE.  make depend DEPENDS ON IT ###
+include depend

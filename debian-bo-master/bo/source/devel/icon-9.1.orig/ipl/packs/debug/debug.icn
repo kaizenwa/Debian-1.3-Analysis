@@ -1,0 +1,469 @@
+############################################################################
+#
+#	File:     debug.icn
+#
+#	Subject:  Procedures for debugify.icn
+#
+#	Author:   Charles A. Shartsis
+#
+#	Date:     December 29, 1991
+#
+###########################################################################
+#
+# See documentation in DEBUGIFY.DOC
+#
+############################################################################
+
+link strings
+
+global __trace, __nodebug, __debug_in, __debug_out, __cmdlist, __trace_silent
+
+procedure __debug_proc(file_name, proc_name, lineno, names, vals)
+
+    static bp, default_io
+    local paramnum, varindex, curelt
+    
+    # First we do this:
+    initial {
+        
+        # Determine the initial trace mode
+        __trace := getenv("TRACEINIT")
+    
+        bp := table(&null)
+        default_io := table(&null)
+        default_io["UNIX"] := ["/dev/tty", "/dev/tty"]
+        default_io["MS-DOS"] := ["CON", "CON"]
+        
+        # Determine the input & output devices for debug
+        __debug_in := getenv("DEBUG_IN")
+        __debug_out := getenv("DEBUG_OUT")
+        if /__debug_in then 
+            if \default_io[&features] then
+                __debug_in := default_io[&features][1]
+            else
+                __debug_in := &input
+        if /__debug_out then 
+            if \default_io[&features] then
+                __debug_out := default_io[&features][2]
+            else
+                __debug_out := &output
+                
+        # Open the I/O devices if they are strings rather than files
+        case type(__debug_in) of {
+        
+            "string": ( __debug_in := open(__debug_in,"r")) |
+                stop(&errout, "Input debug device \"", __debug_in, "\" could not be opened")
+        
+            "file" | "window" : 1
+        
+            default:
+                stop(&errout, "The type of __debug_in is ", type(__debug_in),"\n",
+                    "It should be of type string or file")
+        
+        }
+        case type(__debug_out) of {
+        
+            "string": ( __debug_out := open(__debug_out,"w")) |
+                stop(&errout, "Output debug device \"", __debug_out, "\" could not be opened")
+        
+            "file" | "window": {}
+        
+            default:
+                stop(&errout, "The type of __debug_out is ", type(__debug_out),"\n",
+                    "It should be of type string or file")
+        
+        }
+    
+    }
+
+    # Return if debug is suppressed
+    /__nodebug | return
+    
+    # If not in trace mode or
+    #   (trace is on and trace verbose is on) or
+    #   (trace is on and at a breakpoint)
+    # Print where we are
+    if /__trace | /__trace_silent | \bp[file_name || ": " || lineno] then {
+        __write_debug(
+            file_name || ":" || 
+            image(&current) || ":" || 
+            proc_name || ":" || 
+            lineno
+        )
+    }
+        
+    # Not in trace mode or in trace mode and at a breakpoint
+    if not (\__trace & /bp[file_name || ": " || lineno]) then {
+    
+        # Read the first command
+        __read_cmd()
+        
+        # Process commands until no command entered
+        until *__cmdlist = 0 do {
+        
+            if *__cmdlist > 0 then {
+        
+                case __cmdlist[1] of {
+            
+                "p": {
+                
+                    if *__cmdlist = 1 then {
+                        __write_debug("**** No variable names entered")
+                    }
+                    else {
+                    
+                        every paramnum := 2 to *__cmdlist do {
+                        
+                            if (varindex := __findvar(__cmdlist[paramnum], names)) = 0 then {
+                                __write_debug("**** Variable \"" || __cmdlist[paramnum] || "\" does not exist")
+                            }
+                            else {
+                                __write_debug(
+                                    names[varindex] || 
+                                    " TYPE: " || type(vals[varindex]) ||
+                                    " IMAGE: " || image(vals[varindex])
+                                )
+                            }
+                        }
+                    }
+                    
+                    # Read the next command
+                    __read_cmd()
+                }
+                
+                "pa": {
+                    if *__cmdlist > 1 then {
+                        __write_debug("**** No parameters allowed after \"pa\"")               
+                    }
+                    else {
+                    
+                        # print all variables
+                        every varindex := 1 to *names do {
+                            if type(vals[varindex]) ~== "procedure" then {
+                                __write_debug(
+                                    names[varindex] || 
+                                    " TYPE: " || type(vals[varindex]) ||
+                                    " IMAGE: " || image(vals[varindex])
+                                )
+                            }
+                        }
+                    }
+                   
+                    # Read the next command
+                    __read_cmd()
+                }
+                
+                "sn":{
+                
+                    if *__cmdlist ~= 3 then {
+                        __write_debug("**** \"sn\" requires exactly 2 paramaters")
+                    }
+                    else {
+                    
+                        if (varindex := __findvar(__cmdlist[2], names)) = 0 then {
+                            __write_debug("**** Variable \"" || __cmdlist[2] || "\" does not exist")
+                        }
+                        else {
+                            if not (vals[varindex] := numeric(__cmdlist[3])) then {
+                                __write_debug("**** \"" || __cmdlist[3] || "\" is not numeric")
+                            }
+                        } 
+                    
+                    }
+                    
+                    # Read the next command
+                    __read_cmd()
+                }
+                
+                "ss":{
+               
+                    if *__cmdlist < 3 then {
+                        __write_debug("**** \"ss\" requires 2 or more paramaters")
+                    }
+                    else {
+                    
+                        if (varindex := __findvar(__cmdlist[2], names)) = 0 then {
+                            __write_debug("**** Variable \"" || __cmdlist[2] || "\" does not exist")
+                        }
+                        else {
+                            
+                            tmpstring := __cmdlist[3]
+                            every paramnum := 4 to *__cmdlist do {
+                                tmpstring ||:= " " || __cmdlist[paramnum]
+                            }
+                            vals[varindex] := replace(tmpstring, "\\ ", " ")
+                        } 
+                    
+                    }
+                    
+                    # Read the next command
+                    __read_cmd()
+                }
+                
+                "sbp":{
+
+                    if *__cmdlist = 1 then {
+                        __write_debug("**** No line numbers entered")
+                    }
+                    else {
+                    
+                        every paramnum := 2 to *__cmdlist do {
+                        
+                            if bpnum := integer(__cmdlist[paramnum]) then {
+                                bp[file_name || ": " || bpnum] := 1
+                                __write_debug(bpnum || ": breakpoint set")
+                            }
+                            else {
+                                __write_debug("**** \"" || __cmdlist[paramnum] || "\" is not a valid line number")
+                            }
+                        }
+                    }
+                    
+                    # Read the next command
+                    __read_cmd()
+                }
+                
+                "ubp":{
+                    if *__cmdlist = 1 then {
+                        __write_debug("**** No line numbers entered")
+                    }
+                    else {
+                    
+                        every paramnum := 2 to *__cmdlist do {
+                        
+                            if bpnum := integer(__cmdlist[paramnum]) then {
+                                bp[file_name || ": " || bpnum] := &null
+                                __write_debug(bpnum || ": breakpoint unset")
+                            }
+                            else {
+                                __write_debug("**** \"" || __cmdlist[paramnum] || "\" is not a valid line number")
+                            }
+                        }
+                    }
+                       # Read the next command
+                    __read_cmd()
+                }
+                
+                "pbp":{
+                    
+                    __write_debug("Breakpoints currently set:")
+                    every curelt := !sort(bp) do {
+                        if \curelt[2] then {
+                            __write_debug(curelt[1])
+                        }
+                    }
+                    
+                    # Read the next command
+                    __read_cmd()
+                    
+                }
+                
+                "nd":{
+                
+                    __nodebug := 1
+                    break
+                }
+                
+                "t":{
+                
+                    __trace := 1
+                    __write_debug("**** Trace is now on")
+                
+                    # Read the next command
+                    __read_cmd()
+                }
+                
+                "ts":{
+                
+                    __trace_silent := 1
+                    __write_debug("**** Trace is now silent")
+                
+                    # Read the next command
+                    __read_cmd()
+                }
+                
+                "tv":{
+                    __trace_silent := &null
+                    __write_debug("**** Trace is now verbose")
+                
+                    # Read the next command
+                    __read_cmd()
+                }
+                              
+                "ut":{
+                    __trace := &null
+                    __write_debug("**** Trace is now off")
+                
+                    # Read the next command
+                    __read_cmd()
+                }
+                              
+                ("?" | "h" | "help"):{
+                
+                    __write_help()
+                    
+                    # Read the next command
+                    __read_cmd()
+                }
+                
+                "stop":{
+                    stop(__debug_out, "**** Program stopped in DEBUG")
+                }
+                
+                default:{
+                
+                    __write_debug("**** Invalid command entered")
+                
+                
+                    # Read the next command
+                    __read_cmd()
+                
+                }
+            
+                }
+            }
+        
+        }
+        
+    
+    }
+
+
+end
+
+procedure __read_cmd(noprompt)
+
+    static ws, nonws
+    local cmdline
+    initial {
+        ws := ' \t'
+        nonws := &ascii -- ws
+    }
+    
+    # Print the prompt
+    if /noprompt then
+        writes(__debug_out, "debug> ") | 
+            stop(&errout, "Could not write to debug output device")
+
+    # Read next command line
+    (cmdline := read(__debug_in)) |
+        stop(&errout, "Could not read from debug input device")
+    
+    # Extract tokens into list
+    __cmdlist := []
+    cmdline ? {
+    
+        tab(many(ws))
+        while not pos(0) do{
+        
+            put(__cmdlist, tab(many(nonws)))
+            tab(many(ws))
+        
+        }
+    
+    }
+
+end
+
+procedure __lcase(s)
+
+    static lcase, ucase
+    
+    initial {
+    
+        lcase := string(&lcase)
+        ucase := string(&ucase)
+    
+    }
+    
+    return map(s, ucase, lcase)
+    
+end
+
+procedure __write_debug(line)
+
+    write(__debug_out, line) | stop(&errout, "Could not write to debug output device")
+
+end
+
+procedure __findvar(varname, names)
+
+    local varindex
+    
+    every varindex := 1 to *names do {
+    
+        if varname == names[varindex] then return varindex
+    
+    }
+    
+    return 0
+
+end
+
+procedure __write_help()
+
+__scroll(&null)
+__scroll("p var [var]...              Print the type and image of each variable")
+__scroll("                            specified")
+__scroll("")
+__scroll("pa                          Print the type and image of all variables")
+__scroll("")
+__scroll("sn var number               Set the value of the variable to the number")
+__scroll("")
+__scroll("ss var sring                Set the value of the variable to the string")
+__scroll("")
+__scroll("sbp integer [integer]...    Set each of the specified line numbers as")
+__scroll("                            trace breakpoints")
+__scroll("")
+__scroll("ubp integer [integer]...    Unset each of the specified trace breakpoints")
+__scroll("")
+__scroll("pbp                         Print the line numbers of all current")
+__scroll("                            breakpoints")
+__scroll("")
+__scroll("nd                          Exit DEBUG immediately and do not return to")
+__scroll("                            DEBUG later unless __nodebug has been set")
+__scroll("                            to &null by the program")
+__scroll("")
+__scroll("t                           Turn on trace mode")
+__scroll("")
+__scroll("ut                          Turn off trace mode")
+__scroll("")
+__scroll("ts                          Make trace run silently")
+__scroll("")
+__scroll("tv                          Make trace run verbosely (default)")
+__scroll("")
+__scroll("?, h, help                  Print a list of DEBUG interpreter commands")
+__scroll("")
+__scroll("stop                        Immediately exit DEBUG and the program")
+__scroll("")
+__scroll("blank or empty line         Return to the program.  If trace mode is")
+__scroll("                            on then DEBUG status information will")
+__scroll("                            print prior to the execution of each")
+__scroll("                            program line until a breakpoint is")
+__scroll("                            encountered.  Otherwise the DEBUG")
+__scroll("                            interpreter will be invoked prior to the")
+__scroll("                            execution of each program line.")
+
+end
+
+procedure __scroll(line)
+
+    static count, max
+    
+    initial max := 22
+    
+    if /line then {
+        count := 0
+        return
+    }
+        
+    __write_debug(line)
+    count +:= 1
+            
+    # Pause for operator input
+    if count = max-2 then {
+        __write_debug("\nPRESS ENTER TO CONTINUE")
+        __read_cmd(1)
+    }
+        
+end

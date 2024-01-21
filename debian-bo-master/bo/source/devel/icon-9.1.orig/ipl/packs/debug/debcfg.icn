@@ -1,0 +1,97 @@
+############################################################################
+#
+#	File:     debcfg.icn
+#
+#	Subject:  Configure debugify
+#
+#	Author:   Charles A. Shartsis
+#
+#	Date:     September 6, 1992
+#
+###########################################################################
+#
+# See documentation in DEBUGIFY.DOC
+#
+############################################################################
+
+procedure main()
+
+    local debcfgu1, debcfgu2, debic0, debicn, andfileid, andlineid, version, line
+    local debmarker, opcode, operand, debmark_found
+    
+    &file; &line
+    
+    write(&errout, "Configuring Debugify")
+    
+    debmarker := "# DO NOT MODIFY, MOVE, OR DELETE THIS COMMENT LINE"
+    
+    # get Version number from debcfg.u2
+    (debcfgu2 := open("debcfg.u2", "r")) | stop(&errout, "Could not open debcfg.u2")
+    write(&errout, "Reading debcfg.u2")
+    (line := read(debcfgu2)) | stop("Could not read debcfg.u2")
+    line ? (="version" & tab(many(' \t')) & version <- tab(many(~' \t')))
+    \line | stop(&errout, "Could not find version in debcfg.u2")
+    write(&errout, "Configuring for Icon Version ", version)
+    close(debcfgu2)
+    
+    # get &file & &line tokens from debcfg.u1
+    write(&errout, "Reading debcfg.u1")
+    (debcfgu1 := open("debcfg.u1", "r")) | stop(&errout, "Could not open debcfg.u1")
+    opcode := &null; operand := &null
+    while line := read(debcfgu1) do {
+        line ? {
+                tab(upto(~' \t')) & opcode <- tab(many(~' \t')) & 
+                tab(upto(~' \t')) & operand <- tab(many(~' \t')) &
+                (tab(many(~' \t')) | "") & pos(0)
+        }
+        if opcode === "keywd" & \operand then {
+            write(&errout, "&file token is ", operand)
+            andfileid := operand
+            break
+        }
+    }
+    \andfileid | stop(&errout, "Could not find &file or &line tokens in debcfg.u1")
+    
+    opcode := &null; operand := &null
+    while line := read(debcfgu1) do {
+        line ? {
+                tab(upto(~' \t')) & opcode <- tab(many(~' \t')) & 
+                tab(upto(~' \t')) & operand <- tab(many(~' \t')) &
+                (tab(many(~' \t')) | "") & pos(0)
+        }
+        if opcode === "keywd" & \operand then {
+            write(&errout, "&line token is ", operand)
+            andlineid := operand
+            break
+        }
+    }
+    \andlineid | stop(&errout, "Could not find &line token in debcfg.u1")
+    
+    close(debcfgu1)
+    
+    # create debugify.icn, inserting new statements where appropriate
+    (debic0 := open("debugify.ic0", "r")) | stop(&errout, "Could not open debugify.ic0")
+    (debicn := open("debugify.icn", "w")) | stop(&errout, "Could not open debugify.icn")
+    write(&errout, "Reading debugify.ic0 and writing debugify.icn")
+    debmark_found := &null
+    while line := read(debic0) do {
+    
+        write(debicn, line)
+    
+        if /debmark_found & 
+            reverse(trim(reverse(trim(line, ' \t')), ' \t')) == debmarker then {
+            # insert new statements
+            debmark_found := 1
+            write(debicn, "andfileid := \"", andfileid, "\"")
+            write(debicn, "andlineid := \"", andlineid, "\"")
+            write(debicn, "version := \"", version, "\"")
+            write(&errout, "Successfully inserted &file, &line tokens and Icon Version")
+        }
+    
+    }
+    
+    close(debic0)
+    close(debicn)
+
+end
+

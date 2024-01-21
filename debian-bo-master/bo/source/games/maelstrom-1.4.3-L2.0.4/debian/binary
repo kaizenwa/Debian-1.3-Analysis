@@ -1,0 +1,91 @@
+#!/bin/sh -ex
+#
+# Script to build a Debian binary package
+# Version 1.5
+#
+# Robert Leslie <rob@mars.org>
+
+test $# -eq 4 || exit 1
+
+PKG="$1"
+VER="$2"
+ARC="$3"
+TMP="$4"
+
+rm -rf $TMP
+umask 022
+
+install -m 755 -d $TMP/DEBIAN
+sed -e "2s/=/$VER/" -e "3s/=/$ARC/" debian/control > $TMP/DEBIAN/control
+chown 0.0 $TMP/DEBIAN/control
+chmod 644 $TMP/DEBIAN/control
+
+install -m 644 debian/conffiles $TMP/DEBIAN/.
+
+install -m 755 debian/postinst $TMP/DEBIAN/.
+
+install -m 755 -d $TMP/usr/doc/copyright
+install -m 644 debian/README $TMP/usr/doc/copyright/$PKG
+
+# maelstrom proper
+
+bindir="usr/games"
+libdir="usr/lib/games/maelstrom"
+vardir="var/lib/games/maelstrom"
+relvar="../../../../$vardir"
+rellib="../../../../$libdir"
+
+scores="Maelstrom-Scores"
+sounds="Maelstrom Sounds"
+sprites="Maelstrom Sprites"
+
+install -m 755 -d $TMP/$bindir $TMP/$libdir $TMP/$vardir
+
+make install  \
+  LIBDIR="$TMP/$libdir"  \
+  OLDBINDIR="$TMP/$bindir"  \
+  BINDIR="$TMP/$bindir"
+
+ln -s Maelstrom $TMP/$bindir/maelstrom
+
+# fix ownership/permissions
+
+chgrp games $TMP/$bindir/Maelstrom
+chmod 6755 $TMP/$bindir/Maelstrom
+
+chown -R 0.0 $TMP/$libdir
+
+chgrp games $TMP/$libdir/$scores
+chmod 664 $TMP/$libdir/$scores
+
+chgrp games $TMP/$vardir
+chmod g+w $TMP/$vardir
+
+# move scores, sounds, and sprites files
+
+mv "$TMP/$libdir/$scores" $TMP/$vardir/.
+ln -s "$relvar/$scores" $TMP/$libdir/.
+
+mkdir $TMP/$libdir/sounds
+mv "$TMP/$libdir/$sounds" $TMP/$libdir/sounds/.
+ln -s "$relvar/$sounds" $TMP/$libdir/.
+ln -s "$rellib/sounds/$sounds" $TMP/$vardir/.
+
+mkdir $TMP/$libdir/sprites
+mv "$TMP/$libdir/$sprites" $TMP/$libdir/sprites/.
+ln -s "$relvar/$sprites" $TMP/$libdir/.
+ln -s "$rellib/sprites/$sprites" $TMP/$vardir/.
+
+# documentation
+
+install -m 755 -d $TMP/usr/man/man6
+install -m 644 debian/maelstrom.man $TMP/usr/man/man6/Maelstrom.6
+
+echo ".so man6/Maelstrom.6" >$TMP/usr/man/man6/Maelstrom_sound.6
+echo ".so man6/Maelstrom.6" >$TMP/usr/man/man6/maelstrom.6
+chmod 644 $TMP/usr/man/man6/*
+
+install -m 755 -d $TMP/usr/doc/maelstrom
+install -m 644 Doc/{*.FAQ,*.Paper,Technical_*} $TMP/usr/doc/maelstrom/.
+
+gzip -9v $TMP/usr/doc/maelstrom/*

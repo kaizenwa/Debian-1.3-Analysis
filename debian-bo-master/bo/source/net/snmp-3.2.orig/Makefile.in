@@ -1,0 +1,111 @@
+##
+## Makefile.in for cmu_snmp (v1.1b-v2usec) for linux:
+## (added by schoenfr@gaertner.de)
+##
+
+## set to installation prefix:
+prefix=@prefix@
+
+## where to install the snmpd and snmptrapd daemons:
+SBINDIR=$(prefix)/sbin
+
+## where to install the binaries:
+BINDIR=$(prefix)/bin
+
+## where to install mib.txt (path is used in ``snmplib/mib.c''):
+MIBFILEPATH=$(prefix)/lib
+
+## where to install the manpages:
+MANDIR=$(prefix)/man
+
+## where to install mib.txt and the shared library:
+LIBDIR=$(prefix)/lib
+SHLIBDIR=/lib
+
+## where to install the snmp/snmp*h headers:
+INCDIR=$(prefix)/include
+
+## where to look about the default config-file:
+CONFFILE=/etc/snmp.conf
+
+##
+## used for installation:
+##
+INSTALL =		@INSTALL@
+INSTALL_PROGRAM =	@INSTALL_PROGRAM@
+INSTALL_DATA =		@INSTALL_DATA@
+
+MAKE = make
+SHELL= /bin/sh
+
+## name and version of the shared lib (for linux, ELF system)
+## look at snmplib/Makefile{.in} for more.
+SHLIB= libsnmp.so.3.1
+
+##
+## anything else should be independent:
+##
+MIBDEFS = -DMIBFILEPATH=\"$(MIBFILEPATH)\"
+CONFDEFS = -DCONFFILE=\"$(CONFFILE)\"
+
+
+all:
+	cd snmplib; $(MAKE)
+	cd apps; $(MAKE)
+	cd apps/snmpnetstat; $(MAKE)
+
+
+install: 	all
+	-$(INSTALL_PROGRAM) snmplib/libsnmp.so $(SHLIBDIR)/$(SHLIB) 
+	-@ldconfig || echo 'please run ldconfig by hand'
+	-mkdir -p $(INCDIR)/snmp || true
+	-@for f in snmp.h snmp_impl.h asn1.h snmp_api.h ; do \
+		echo $(INSTALL_DATA) snmplib/$$f $(INCDIR)/snmp/$$f ; \
+		$(INSTALL_DATA) snmplib/$$f $(INCDIR)/snmp/$$f ; \
+	done
+	-if [ -f $(SBINDIR)/snmpd ] ; then rm -f $(SBINDIR)/snmpd ; fi
+	-$(INSTALL_PROGRAM) apps/snmpd $(SBINDIR)/snmpd
+	-if [ -f $(SBINDIR)/snmptrapd ] ; then rm -f $(SBINDIR)/snmptrapd ; fi
+	-$(INSTALL_PROGRAM) apps/snmptrapd $(SBINDIR)/snmptrapd
+	-@for f in authkey snmpget snmpgetnext snmpwalk snmpset snmptest \
+		snmptrap ; do \
+		echo $(INSTALL_PROGRAM) apps/$$f $(BINDIR)/$$f ; \
+		$(INSTALL_PROGRAM) apps/$$f $(BINDIR)/$$f ; \
+	done
+	-$(INSTALL_PROGRAM) apps/snmpnetstat/snmpnetstat $(BINDIR)/snmpnetstat
+	-@for f in snmpwalk.1 snmptest.1 snmpset.1 authkey.1 \
+		snmpget.1 snmpgetnext.1 snmpnetstat.1 snmptrap.1 ; do \
+		echo $(INSTALL_DATA) man/$$f $(MANDIR)/man1/$$f ; \
+		$(INSTALL_DATA) man/$$f $(MANDIR)/man1/$$f ; \
+	done
+	-$(INSTALL_DATA) man/snmp_api.3 $(MANDIR)/man3/snmp_api.3
+	-$(INSTALL_DATA) man/snmpd.conf.5 $(MANDIR)/man5/snmpd.conf.5
+	-$(INSTALL_DATA) man/variables.5 $(MANDIR)/man5/variables.5
+	-$(INSTALL_DATA) man/snmpd.8 $(MANDIR)/man8/snmpd.8
+	-$(INSTALL_DATA) man/snmptrapd.8 $(MANDIR)/man8/snmptrapd.8
+	-$(INSTALL_DATA) mib.txt $(MIBFILEPATH)/mib.txt
+	( cd etc ; $(MAKE) install )
+	@echo "**"
+	@echo "**" looking for old files from a previous installation ...
+	@echo "**"
+	-@for f in /usr/lib/libsnmp.a /usr/bin/snmpbulkwalk \
+		/usr/bin/snmptranslate /usr/bin/snmpstatus \
+		/usr/man/man1/snmptranslate.1 /usr/man/man1/snmpbulkwalk \
+		/etc/party.conf /etc/view.conf /etc/context.conf \
+		/etc/acl.conf ; do \
+		if [ -f $$f ] ; then echo "* " you may wish to rm $$f ; fi ; \
+	done
+	@echo "** done."
+
+clean:
+	cd snmplib; $(MAKE) clean
+	cd apps; $(MAKE) clean
+	cd apps/snmpnetstat; $(MAKE) clean
+	rm -f core */core *~ */*~ */*/*~ *\# */*\# */*/*\#
+
+distclean realclean: clean
+	rm -f config.* TAGS */TAGS
+
+tags:
+	etags */*.[ch] */*/*.[ch]
+

@@ -1,0 +1,113 @@
+#! /usr/bin/perl
+#                              -*- Mode: Perl -*- 
+# image.prerm --- 
+# Author           : root ( root@melkor.pilgrim.umass.edu ) 
+# Created On       : Fri May 17 03:28:59 1996
+# Created On Node  : melkor.pilgrim.umass.edu
+# Last Modified By : root
+# Last Modified On : Thu Jun 13 08:39:12 1996
+# Last Machine Used: melkor.pilgrim.umass.edu
+# Update Count     : 50
+# Status           : Unknown, Use with caution!
+# HISTORY          : 
+# Description      : 
+# 
+# 
+
+$|=1;
+# Predefined values:
+my $version = "=V";
+
+# Variables used
+my $image='';
+my $answer='';
+my $running = '';
+my $WouldInvalidate = 0;
+
+# Ignore all invocations uxcept when called on to remove
+exit 0 unless ($ARGV[0] && $ARGV[0] =~ /remove/) ;
+
+#check to see if we are trying to remove a running kernel
+# if so we abort right now.
+chop($running=`uname -r`);
+if ($running eq $version) {
+  print STDERR "Can Not remove running kernel image (version $running)\n";
+  exit 1; #Operation not permitted
+}
+
+#Now, they have an alternate kernel which they are currently running
+# The rest is just us being nice to lilo users.
+
+chdir("/") or die "could not chdir to /:$!\n";
+
+if (-f "/etc/lilo.conf") { #I know, could be a link, but ..
+  open (LILO, "/etc/lilo.conf") || &success(); # this is not critical
+  while (<LILO>) {
+    chop;
+    s/\#.*//;			  # nix the comments
+    next unless /^\s*image\s*=\s(\S+)/o;
+    $image = $1;
+    if ($image && -e $image) {
+      while (defined($image) && -l $image) {
+	$image = readlink ($image);
+      }
+      if (defined($image) && -e $image) {
+	$WouldInvalidate |= $image =~ /vmlinuz-$version/;
+      }
+      else {
+	&success(); # invalid lilo.conf file
+      }
+    }
+    else {
+      &success(); # invalid lilo.conf file
+    }
+  }
+  close (LILO);
+  if ($WouldInvalidate) {
+    print STDERR <<"EOF";
+
+ You have a valid /etc/lilo.conf file that mentions vmlinuz-$version.
+ Removing kernel-image-$version would invalidate that file. (you will
+ have to edit /etc/lilo.conf to not refer to vmlinuz-$version and
+ re-run lilo).
+
+EOF
+  ;
+    if (&ask("Are you sure you want to remove kernel-image-$version")) {
+      print STDERR <<"EOG";
+
+Remember to edit /etc/lilo.conf and re-run lilo, or Make other
+arrangemnts to boot your machine.
+
+EOG
+;
+      &success();
+    }
+    else {
+      print STDERR "\nNot removing kernel-image-$version.\n";
+      exit 1;
+    }
+  }
+}
+
+sub success () {
+    -f "/lib/modules/$version/modules.dep"  && 
+      unlink "/lib/modules/$version/modules.dep";
+    -f "/boot/psdatabase-$version" && unlink "/boot/psdatabase-$version";
+    exit 0;
+}
+
+sub ask {
+    print @_,"? [Yes] ";
+    $answer=<STDIN>;
+    return ( $answer !~ /^[Nn].*/ );
+}
+
+&success();
+exit 0;
+__END__
+
+
+
+
+

@@ -1,0 +1,277 @@
+#-----------------------------------------------------------------------------#
+# Copyright (C) 1995 University of Melbourne.
+# This file may only be copied under the terms of the GNU General
+# Public License - see the file COPYING in the Mercury distribution.
+#-----------------------------------------------------------------------------#
+
+# library/Mmake - this is the main part of the Makefile
+# for building the Mercury libraries.
+
+MERCURY_DIR=..
+include $(MERCURY_DIR)/Mmake.common
+
+MAIN_TARGET=mercury
+
+VPATH=.
+
+#-----------------------------------------------------------------------------#
+
+# Specify which compilers to use to compile the library.
+# Don't change these without good reason - if you want to
+# do a temporary change, change ../Mmake.params.
+
+MNC	=	MERCURY_NC_BUILTIN="`vpath_find nc_builtin.nl`" \
+		$(SCRIPTS_DIR)/mnc
+MNL	=	MERCURY_NU_LIB_DIR=. \
+	MERCURY_NU_LIB_OBJS="`vpath_find $(library.nos) $(NU_LIBRARY_NOS)`" \
+		$(SCRIPTS_DIR)/mnl -v
+
+MSC	=	MERCURY_SICSTUS_COMPILER=./sicstus_compile $(SCRIPTS_DIR)/msc
+MSL	=	MERCURY_SP_LIB_DIR=. \
+		MERCURY_SICSTUS_PROLOG=./sicstus_saved_state \
+		MERCURY_SP_LIB_OBJS="`vpath_find sp_builtin.ql \
+				$(library.qls) $(NU_LIBRARY_QLS) portray.ql`" \
+		$(SCRIPTS_DIR)/msl
+
+MCD	=	MERCURY_INT_DIR=. \
+		MERCURY_C_INCL_DIR=$(RUNTIME_DIR) $(MC) \
+			--generate-dependencies
+MCI	=	MERCURY_INT_DIR=. \
+		MERCURY_C_INCL_DIR=$(RUNTIME_DIR) $(MC) --make-interface
+MCG	=	MERCURY_INT_DIR=. \
+		MERCURY_C_INCL_DIR=$(RUNTIME_DIR) $(MC) \
+			--compile-to-c
+MCS	=	MERCURY_INT_DIR=. \
+		MERCURY_C_INCL_DIR=$(RUNTIME_DIR) $(MC) --split-c-files -c \
+		--cflags "-I$(RUNTIME_DIR) -I$(BOEHM_GC_DIR) $(EXTRA_CFLAGS)"
+MGNUC	=	MERCURY_C_INCL_DIR=$(RUNTIME_DIR) $(SCRIPTS_DIR)/mgnuc
+MGNUCFLAGS =	-I$(RUNTIME_DIR) -I$(BOEHM_GC_DIR) $(EXTRA_CFLAGS)
+
+MTAGS	=	$(SCRIPTS_DIR)/mtags
+
+#-----------------------------------------------------------------------------#
+
+NU_LIBRARY_NOS = \
+	io.nu.no require.nu.no std_util.nu.no string.nu.no term_io.nu.no \
+	int.nu.no float.nu.no mercury_builtin.nu.no
+NU_LIBRARY_QLS = \
+	io.nu.ql require.nu.ql std_util.nu.ql string.nu.ql term_io.nu.ql \
+	int.nu.ql float.nu.ql mercury_builtin.nu.ql sp_lib.ql
+
+#-----------------------------------------------------------------------------#
+
+# targets
+
+.PHONY: all
+all : mercury nuprolog sicstus
+
+.PHONY: mercury
+mercury : ints opts libmercury
+
+.PHONY: nuprolog
+nuprolog : ints library.nu library.nu.debug $(library.nos) $(NU_LIBRARY_NOS) \
+			nc_builtin.nl
+
+.PHONY: sicstus
+sicstus : ints sicstus_compile library.sicstus.debug
+
+#-----------------------------------------------------------------------------#
+
+.PHONY: depend
+depend		: library.depend
+
+.PHONY: check
+check		: library.check
+
+.PHONY: ints 
+ints		: library.ints
+
+.PHONY: opts 
+opts		: library.opts
+library.opts	: $(library.opts)
+
+#-----------------------------------------------------------------------------#
+
+tags		: $(MTAGS) $(library.ms)
+	$(MTAGS) $(library.ms)
+
+library.stats : $(COMPILER_DIR)/source_stats.awk $(library.ms)
+	awk -f $(COMPILER_DIR)/source_stats.awk `vpath_find $(library.ms)` > $@
+	
+#-----------------------------------------------------------------------------#
+
+.PHONY: dates
+dates		:
+	touch $(library.dates)
+
+#-----------------------------------------------------------------------------#
+
+.PHONY: os cs
+os: $(library.os)
+cs: $(library.cs)
+
+#-----------------------------------------------------------------------------#
+
+.PHONY: libmercury
+# the following dependency is just there to improve compilation speed;
+# making tree234.o first improves effective parallelism with parallel makes.
+libmercury : tree234.o
+libmercury : libmercury.a libmercury.$(EXT_FOR_SHARED_LIB) library.init
+
+libmercury.a : $(library.os)
+	rm -f libmercury.a
+	ar cr libmercury.a $(library.os)
+	$(RANLIB) libmercury.a
+
+libmercury.so : $(library.pic_os)
+	$(LINK_SHARED_OBJ) -o libmercury.so $(library.pic_os) \
+		-L$(RUNTIME_DIR) -lmer ` \
+		case "$(GRADE)" in \
+			*.gc.prof) echo "-L$(BOEHM_GC_DIR) -lgc_prof" ;; \
+			*.gc) echo "-L$(BOEHM_GC_DIR) -lgc" ;; \
+		esac \
+		` $(SHARED_LIBS)
+
+library.init: library.dep
+	for file in $(library.ms); do \
+		grep '^INIT ' $$file; \
+		echo "INIT mercury__`basename $$file .m`__init"; \
+	done > library.init
+
+#-----------------------------------------------------------------------------#
+
+# we need to add some manual dependencies, since the
+# automatic dependencies assume that the library
+# isn't part of the application, but in this case it is.
+
+library.nu library.nu.debug: $(NU_LIBRARY_NOS)
+library.sicstus library.sicstus.debug: sp_builtin.ql $(NU_LIBRARY_QLS)
+
+library.nu.debug: error.no debug.no portray.no
+library.sicstus library.sicstus.debug: portray.ql
+
+sp_builtin.ql $(library.qls) $(NU_LIBRARY_QLS) portray.ql: sicstus_compile
+
+$(library.nos) $(NU_LIBRARY_NOS) error.no debug.no portray.no: nc_builtin.nl
+
+#-----------------------------------------------------------------------------#
+
+sicstus_saved_state:
+	echo "save('$@')." | $(SP)
+
+sicstus_compile: sp_builtin.pl sicstus_saved_state
+	echo "\
+on_exception(Error, (						\
+	/* if we are using Sicstus 3, we need to turn off */	\
+	/* character escapes */					\
+	( prolog_flag(argv,_) ->				\
+		prolog_flag(character_escapes, _, off) 		\
+	;							\
+  		true                           			\
+	),                           				\
+	( prolog_flag(compiling, _, fastcode) -> true ; true ),	\
+	compile(sp_builtin),					\
+	garbage_collect,					\
+	save('$@', 1),						\
+	( prolog_flag(argv,Args) -> true ; unix(argv(Args)) ), 	\
+	( Args = [CompileMode|Files] ->				\
+		( prolog_flag(compiling, _, CompileMode) -> true ; true ), \
+		fcompile(Files)					\
+	;							\
+		true						\
+	)							\
+), print_message(error, Error)), halt ; halt.			\
+	" | ./sicstus_saved_state
+
+#-----------------------------------------------------------------------------#
+
+# We need to clean up the .no and .ql files for *.nu.nl, etc.
+
+clean:
+	rm -f *.no *.ql
+
+realclean:
+	rm -f libmercury.a libmercury.so library.init
+	rm -f sicstus_saved_state sicstus_compile sp_builtin.pl
+
+#-----------------------------------------------------------------------------#
+
+CHGRP=mercury
+CHMOD=go+w
+
+# Installation targets
+
+.PHONY: install
+install: install_mercury $(INSTALL_SICSTUS) $(INSTALL_NUPROLOG)
+
+.PHONY: install_all
+install_all: install_mercury install_nuprolog install_sicstus
+
+.PHONY: install_mercury
+install_mercury: install_ints install_init install_library
+
+.PHONY: install_ints
+install_ints: $(library.ints) $(library.int3s) $(library.opts)
+	[ -d $(INSTALL_INT_DIR) ] || mkdir -p $(INSTALL_INT_DIR)
+	for file in $(library.ints) $(library.int3s) $(library.opts); do \
+		target=$(INSTALL_INT_DIR)/`basename $$file`; \
+		if cmp -s $$file $$target; then \
+			echo "$$target unchanged"; \
+		else \
+			echo "installing $$target"; \
+			cp $$file $$target; \
+		fi; \
+	done
+
+.PHONY: install_init
+install_init: library.init
+	[ -d $(INSTALL_MODULE_DIR) ] || mkdir -p $(INSTALL_MODULE_DIR)
+	cp `vpath_find library.init` $(INSTALL_MODULE_DIR)
+
+.PHONY: install_library
+install_library: libmercury.a libmercury.$(EXT_FOR_SHARED_LIB)
+	[ -d $(INSTALL_MERC_LIB_DIR) ] || mkdir -p $(INSTALL_MERC_LIB_DIR)
+	cp `vpath_find libmercury.a libmercury.$(EXT_FOR_SHARED_LIB)` \
+		$(INSTALL_MERC_LIB_DIR)
+
+# library.split.a is a version of libmercury.a that has been compiled
+# with `--split-c-files'.
+.PHONY: install_split_library
+install_split_library: library.split.a
+	[ -d $(INSTALL_MERC_LIB_DIR) ] || mkdir -p $(INSTALL_MERC_LIB_DIR)
+	cp `vpath_find library.split.a` $(INSTALL_MERC_LIB_DIR)/libmercury.a
+
+.PHONY: install_nuprolog
+install_nuprolog: install_library_nu install_interpreter_nu
+
+.PHONY: install_library_nu
+install_library_nu: $(library.nos) $(NU_LIBRARY_NOS) \
+			error.no debug.no portray.no nc_builtin.nl
+	[ -d $(INSTALL_NU_DIR) ] || mkdir -p $(INSTALL_NU_DIR)
+	cp `vpath_find nc_builtin.nl` $(INSTALL_NU_DIR)
+	[ -d $(INSTALL_NU_ARCH_DIR) ] || mkdir -p $(INSTALL_NU_ARCH_DIR)
+	cp `vpath_find $(library.nos) $(NU_LIBRARY_NOS) \
+		error.no debug.no portray.no` $(INSTALL_NU_ARCH_DIR)
+
+.PHONY: install_interpreter_nu
+install_interpreter_nu: library.nu
+	[ -d $(INSTALL_NU_ARCH_DIR) ] || mkdir -p $(INSTALL_NU_ARCH_DIR)
+	sed "s^`pwd`^$(INSTALL_NU_ARCH_DIR)^g" `vpath_find library.nu` \
+		> $(INSTALL_NU_ARCH_DIR)/library.nu
+	-chmod +x $(INSTALL_NU_ARCH_DIR)/library.nu
+	cp `vpath_find library.nu.save` $(INSTALL_NU_ARCH_DIR)
+
+.PHONY: install_sicstus
+install_sicstus: install_interpreter_sicstus install_sicstus_compile
+
+.PHONY: install_interpreter_sicstus
+install_interpreter_sicstus: library.sicstus.debug
+	[ -d $(INSTALL_SP_ARCH_DIR) ] || mkdir -p $(INSTALL_SP_ARCH_DIR)
+	cp `vpath_find library.sicstus.debug` $(INSTALL_SP_ARCH_DIR)
+
+.PHONY: install_sicstus_compile
+install_sicstus_compile: sicstus_compile
+	[ -d $(INSTALL_SP_ARCH_DIR) ] || mkdir -p $(INSTALL_SP_ARCH_DIR)
+	cp `vpath_find sicstus_compile` $(INSTALL_SP_ARCH_DIR)
+
+#-----------------------------------------------------------------------------#

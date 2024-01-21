@@ -1,0 +1,363 @@
+%***********************************************************************
+%***********************************************************************
+%***********************************************************************
+\chapter{A V Tutorial}
+
+%------------------------------------------------------------------------
+
+This chapter is intended to cover the elements that make up a
+\V\ application. The first section covers the general
+organization of a ``Standard \V\ Application''. Read this section
+to get an overview of a \V\ application. Don't worry about the details
+yet -- just the the main idea. Then read Section~\ref{sec:tutexamp}
+and Appendix A, which has the source code of a small, complete
+\V\ application, to get the details.
+
+\section{Getting Started with Your Own V Application}
+\index{getting started}
+
+As with any new system, \V\ has a learning curve before you can
+write applications of your own. \V's learning curve is actually
+pretty short. The experience of the students using \V\ has shown
+the best way to get started with \V\ is to first read the first
+part of this reference manual, including this chapter. Then begin
+with an example \V\ application. 
+
+The \V application generator, \code{vgen}, included with the
+\V distribution is the easiest way to begin building a \V
+application. Run \code{vgen}, select the basic options you
+want to include in your application, select the directory
+to save the generated code in, and then generate the basic
+skeleton application. From the skeleton app, it is relatively
+easy to add your own functionality.
+
+The tutorial application described in this chapter is also an
+excellent \V example. Start by getting the example to compile.
+Then modify the code to add or remove features. Before long, you
+will have a good feel for \V, and be able to add all the features
+you need.
+
+There are several other example programs provided with the \V\
+distribution. This tutorial is found in \code{\~{}/v/tutor}.
+The VDraw program is found in \code{\~{}/v/draw}. The program
+used to test all \V\ functionality is found in \code{\~{}/v/test}.
+It will have an example of how to use every \V\ feature,
+although it is not as well structured as the other examples.
+
+\section{A Standard V Application}
+\index{standard V application}
+
+While the \V\ framework is flexible enough to allow many different
+approaches to building an application, you should find it easier
+to base your applications on a model \emph{Standard \V\ Application}.
+The software organization described by a Standard \V\ Application
+can support MVC (Model-View-Controller) object-oriented architecture paradigm.
+
+Figure~\ref{fig:stdvapp} shows the hierarchy of a standard \V\ application.
+A standard \V\ application consists of the parts described below.
+Each part consists of a pair of \code{.cpp} (or \code{.cxx}) and
+\code{.h} files (except the \code{makefile}).
+
+\begin{rawhtml}
+<IMG BORDER=0 ALIGN=BOTTOM ALT="" SRC="../fig/stdvapp.gif">
+\end{rawhtml}
+
+\begin{figure}[htb]
+\begin{center}
+\vspace{.1in}
+
+\small
+\begin{latexonly}
+\input{fig/stdvapp.tex}
+\end{latexonly}
+\normalfont\normalsize
+\end{center}
+
+\caption{Standard V Application} \label{fig:stdvapp}
+
+\end{figure}
+
+\begin{description}
+
+\item [The Application]
+
+In many ways, the heart of a Standard \V\ Application is the
+application class derived from the \code{vApp} class. By
+convention, this derived class is called \code{myApp} (but you
+can use a different name if you want.) There will always be
+exactly one instance of the \code{myApp} class.  The \code{myApp}
+class acts as a coordinator between the windows that implement
+the user interface (the views) and the objects and algorithms
+that actually make up the application (the model).  The \code{myApp}
+class will contain in a whole/part (or aggregation) relationship
+the windows defined by the application, as well as any classes
+needed to implement the application.
+
+The \code{vApp} class has several utility methods that are
+usually used unmodified, plus several methods that are usually
+overridden by the \code{myApp} class.  These are described in the
+section covering \code{vApp}.  In addition, your \code{myApp}
+class will usually have several other programmer defined methods
+used to interface the command windows with the application model.
+
+\item [Windows and Canvases]
+
+Each Standard \V\ Application will have at least one top level
+window, and possible subwindows. These will usually be
+command windows derived from the \code{vCmdWindow} class. Your
+main derived class should be called \code{myCmdWindow}, and
+include a constructor that defines a menu bar, a canvas, and
+possible command and status bars. Of course, there will be a
+corresponding destructor. The \code{.cpp} file will contain the
+static definitions of the menu and any command and status bars.
+It will also override the \code{WindowCommand} method of \code{vCmdWindow}
+superclass. In your \code{WindowCommand} method, you will have a
+\code{switch} with a \code{case} for each menu item and button
+defined for the window.
+
+Since a \code{vCmdWindow} contains different panes such as
+\code{vMenuPanes}, \code{vCanvasPanes}, \code{vCommandPanes}, and
+\code{vStatusPanes}, your top level command window object will
+usually define the appropriate pointers to each of these objects
+as required by the specific application. The \code{myCmdWindow}
+constructor will then have a \code{new} for each pane used.
+
+Each instance of a window will be built using a call to the
+\code{vApp::NewAppWin} method. This allows the app object
+to track windows, and control interaction between the app
+model and the views represented by each window. 
+
+Some applications need to open subwindows. These windows may or
+may not use the same menu, command bar, and canvas as the top
+level window. If they do, then they can use the same static
+definitions used by the top level window. Subwindows may also
+have their own menu, button, and canvas definitions.
+
+\item [Canvases for Windows]
+
+Since each window usually needs a canvas, you will usually derive
+a canvas object from the \code{vCanvasPane} class. At
+this point in the life of \V, there are only two possible kinds
+of canvas.  The first is for graphics drawing, and is
+derived directly from the \code{vCanvasPane} class.  The other
+kind is a text canvas derived from the \code{vTextCanvasPane}
+class. The derived class will define override methods required
+for the user to interact with the canvas.
+
+\item [Optional Dialogs]
+
+Most applications will need dialogs -- either modeless or modal.
+A Standard \V\ dialog consists of a \code{.cpp} file with the
+static definition of the dialog commands, and the definitions
+of methods derived from the \code{vDialog} class. These will
+include a constructor and destructor, and a \code{DialogCommand}
+override with a \code{switch} with a \code{case} for each command
+defined for the dialog. Each \code{case} will have the code
+required to carry out useful work.
+
+The top level window (or the subwindow that
+defines and uses the dialog) will create an instance of each
+dialog it needs (via \code{new}). The constructor for the
+dialog sets up the commands used for the dialog.
+
+Typically, the top level window defines menu and button commands
+that result in the creation of a dialog. The top level window
+is thus usually responsible for invoking dialogs.
+
+\item [Optional Modal Dialogs]
+
+Modal dialogs are almost identical to modeless dialogs. The main
+difference is how the dialog is invoked from the defining window.
+
+\item [Menu, Command and Status Bars]
+
+By definition, the look and feel of a \V\ application requires
+a menu bar on the command window. A \V\ application also typically
+has a command bar and a status bar, but these are not required.
+
+\item [The Application Model]
+
+Each application will need code to implement its data structures
+and algorithms. The design of the application model is beyond the
+scope of \V, but will usually be defined as a relatively
+independent hierarchy contained by the \code{myApp} object.
+Interaction between the application model and the various
+views represented by \code{myCmdWindows} can be coordinated with
+the \code{myAppWinInfo} class.
+
+\item [The Makefile]
+
+Each \V\ Standard Application should have an associated \code{makefile}
+that can be used to compile and link the application.
+
+\end{description}
+
+Please note that while \V\ is object-oriented, the objects
+represent real screen windows. Thus, it makes no sense for most
+\index{copy constructors}
+\index{object assignment (=)}
+\V\ objects to support copy constructors or object assignment. If
+you use one of these \V\ objects in a way requiring a copy
+constructor or an assignment (fortunately, it is difficult to
+contrive such an example), the code will generate a run time
+error.
+
+\section{Special V Applications}
+
+\subsection*{Windows MDI/SDI}
+\index{MDI model}\index{SDI model}
+
+The basic standard \V application includes a command window
+with a menu, a command bar, a canvas, and a status bar. While
+this model suits most applications, there are some special
+cases that \V supports.
+
+First, on Windows, \V supports the standard Windows MDI model
+(Multiple Document Interface)
+by default. The MDI model consists of a parent window that
+can contain several children canvases, each with a different
+menu that changes in the main parent window when a child
+gets focus. In practice, the menus are usually the same for
+all children windows, and each window is used to hold a
+new document or data object. One of the main advantages
+of the MDI model is that each application has a main window
+to distinguish it from other Windows applications, and
+as many child windows as it needs to manipulate its data.
+
+On X versions, there is no need for a special parent window.
+Each time you open a new command window, you get a new window
+on the X display.
+
+The Windows MDI model forces some screen decorations that
+are not appropriate for all applications. Thus, \V also supports
+the standard Windows SDI model. The SDI model allows only one
+canvas/command window combination. There is a parameter to
+the \code{vApp} constructor that tells \V to use the SDI model.
+This parameter is not used on the X version.
+
+\subsection*{Canvasless, menuless V Application}
+
+Sometimes an application needs just a command bar with no menu or
+canvas. By setting the \code{simSDI} parameter to 1, and
+supplying a width and height value to the \code{vApp}
+constructor, \V allows this kind of simple interface. Instead of
+adding a menu and a canvas as is done for normal \V apps, a
+menuless and canvasless app just defines a command pane for the
+command bar. The height and width are used to specify the height
+and width of the application, and require different values for
+Windows or X.
+
+\section{A Tutorial Example V Application}
+\index{tutorial example}
+\label{sec:tutexamp}
+
+Now that you've read about the parts of a standard \V\
+application, it might be useful to go over a simple example of a
+\V\ application. Appendix A contains the source code for a simple
+\V\ application. The code is tutorial, and well commented. You
+can read the code directly and get a good understanding of what
+elements are required for a \V\ application. This section will
+give a higher level overview of the code in Appendix A.
+
+You should read this code, paying special attention to the comments.
+Most of the information you need to build a typical \V\
+application is explained in this code. This sample code is also
+available on line under the \code{\tild/v/tutor} directory.
+The source code of a slightly different standard \V\ application
+is included the \code{\tild/v/examp} directory of the \V\
+distribution.
+
+The previous section suggested using \code{myApp} for names. This
+tutorial uses a \code{t} prefix instead of \code{my}. You really
+can use whatever names you want. It will help to be consistent,
+however.
+
+The code is broken down into five sections, corresponding to the
+main application, the main window, a simple canvas, and  modal
+and modeless dialogs. The source code for each of these parts is
+included in Appendix A. The source code is extensively commented,
+and the comments contain much detail on how you should structure
+a \V\ application, so please read them carefully. The following
+sections give a brief overview of each source file included in
+the tutorial example.
+
+\subsection*{The Base Application Class}
+\Indextt{vApp}\index{base application class}
+
+The file \code{tutapp.cpp} contains the overridden definitions of
+the classes \code{NewAppWin}, \code{Exit}, \code{Close\-App\-Win},
+\code{App\-Command}, and \code{KeyIn} methods. These examples
+don't do much work, but are provided as a template for building
+complete applications.
+
+The single definition of the application (\code{static} \code{tutApp}
+\code{tut\_App("TutorApp")}, and the \code{AppMain} main program
+are also in this file. The initial window is created in \code{AppMain}
+by calling \code{NewAppWin}.
+
+One thing that can be difficult to grasp when using a
+framework such as \V\ is understanding where the program starts,
+and how you get things rolling. This happens in \code{tutapp.cpp},
+so it is especially important to understand this piece of code.
+The essential thing to understand is that C++ will invoke the
+constructors of static objects before beginning execution of the
+program proper. Thus, you declare a static instance of the
+\code{vApp} object, and its constructor is used to initialize the
+native GUI library and get things going. Your program will
+\emph{not} have a \code{main} function (see \code{AppMain} in the
+description of the \code{vApp} class for more details).
+
+As with all files in the tutorial, each has a \code{.cpp} source
+file, and its associated \code{.h} header file. All \V\ code has
+been written using the coding guidelines given in Appendix B.
+This includes the order of the declarations included in header
+files.
+
+
+\subsection*{The Command Window}
+\index{window}\index{command window}\Indextt{vCmdWindow}
+
+The file \code{tcmdwin.cpp} contains the code for the main
+command window. Of particular interest are the definitions of
+the main menu, command pane, and status pane. These panes are
+defined and added to the window in the constructor.
+
+There is also code to demonstrate handling keyboard and window
+command events in the \code{KeyIn} and \code{WindowCommand} methods.
+There is also a simple example of using the \code{vFileSelect}
+utility class, as well as invoking modeless and modal dialogs.
+
+\subsection*{The Canvas}
+\index{canvas}\Indextt{vCanvas}
+
+The file \code{tcanvas.cpp} contains the code for the canvas.
+This is a really simple canvas example which supports
+drawing a few lines. This class handles redrawing after
+expose events very simply, but demonstrates what must be done
+in general.
+
+
+\subsection*{A Modeless Dialog}
+\index{dialog}
+
+The file \code{tdialog.cpp} contains the code for a modeless
+dialog. There are just a few example buttons, check boxes, and
+radio buttons. The \code{DialogCommand} methods demonstrates how
+to handle commands from a dialog.
+
+
+\subsection*{A Modal Dialog}
+
+The file \code{tmodal.cpp} contains the code for a modal dialog.
+The definition of a modal dialog is nearly identical to a modeless
+dialog. The main difference is how they are invoked, which is
+shown in the \code{tcmdwin.cpp} code.
+
+
+\subsection*{The Makefile}
+\index{makefile}
+
+The file \code{makefile} contains a sample Unix-style make file.
+This version is for Gnu make, which has features different
+than some other flavors of make. It should still serve as a
+decent example.

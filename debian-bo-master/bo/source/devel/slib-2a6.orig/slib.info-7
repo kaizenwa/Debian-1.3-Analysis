@@ -1,0 +1,615 @@
+This is Info file slib.info, produced by Makeinfo-1.64 from the input
+file slib.texi.
+
+  This file documents SLIB, the portable Scheme library.
+
+  Copyright (C) 1993 Todd R. Eigenschink Copyright (C) 1993, 1994, 1995
+Aubrey Jaffer
+
+  Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+  Permission is granted to copy and distribute modified versions of this
+manual under the conditions for verbatim copying, provided that the
+entire resulting derived work is distributed under the terms of a
+permission notice identical to this one.
+
+  Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions, except that this permission notice may be stated in a
+translation approved by the author.
+
+
+File: slib.info,  Node: Getopt,  Next: Command Line,  Prev: Trace,  Up: Session Support
+
+Getopt
+======
+
+  `(require 'getopt)'
+
+  This routine implements Posix command line argument parsing.  Notice
+that returning values through global variables means that `getopt' is
+*not* reentrant.
+
+ - Variable: *optind*
+     Is the index of the current element of the command line.  It is
+     initially one.  In order to parse a new command line or reparse an
+     old one, *OPTING* must be reset.
+
+ - Variable: *optarg*
+     Is set by getopt to the (string) option-argument of the current
+     option.
+
+ - Procedure: getopt ARGC ARGV OPTSTRING
+     Returns the next option letter in ARGV (starting from `(vector-ref
+     argv *optind*)') that matches a letter in OPTSTRING.  ARGV is a
+     vector or list of strings, the 0th of which getopt usually
+     ignores. ARGC is the argument count, usually the length of ARGV.
+     OPTSTRING is a string of recognized option characters; if a
+     character is followed by a colon, the option takes an argument
+     which may be immediately following it in the string or in the next
+     element of ARGV.
+
+     *OPTIND* is the index of the next element of the ARGV vector to be
+     processed.  It is initialized to 1 by `getopt.scm', and `getopt'
+     updates it when it finishes with each element of ARGV.
+
+     `getopt' returns the next option character from ARGV that matches
+     a character in OPTSTRING, if there is one that matches.  If the
+     option takes an argument, `getopt' sets the variable *OPTARG* to
+     the option-argument as follows:
+
+        * If the option was the last character in the string pointed to
+          by an element of ARGV, then *OPTARG* contains the next
+          element of ARGV, and *OPTIND* is incremented by 2.  If the
+          resulting value of *OPTIND* is greater than or equal to ARGC,
+          this indicates a missing option argument, and `getopt'
+          returns an error indication.
+
+        * Otherwise, *OPTARG* is set to the string following the option
+          character in that element of ARGV, and *OPTIND* is
+          incremented by 1.
+
+     If, when `getopt' is called, the string `(vector-ref argv
+     *optind*)' either does not begin with the character `#\-' or is
+     just `"-"', `getopt' returns `#f' without changing *OPTIND*.  If
+     `(vector-ref argv *optind*)' is the string `"--"', `getopt'
+     returns `#f' after incrementing *OPTIND*.
+
+     If `getopt' encounters an option character that is not contained in
+     OPTSTRING, it returns the question-mark `#\?' character.  If it
+     detects a missing option argument, it returns the colon character
+     `#\:' if the first character of OPTSTRING was a colon, or a
+     question-mark character otherwise.  In either case, `getopt' sets
+     the variable GETOPT:OPT to the option character that caused the
+     error.
+
+     The special option `"--"' can be used to delimit the end of the
+     options; `#f' is returned, and `"--"' is skipped.
+
+     RETURN VALUE
+
+     `getopt' returns the next option character specified on the command
+     line.  A colon `#\:' is returned if `getopt' detects a missing
+     argument and the first character of OPTSTRING was a colon `#\:'.
+
+     A question-mark `#\?' is returned if `getopt' encounters an option
+     character not in OPTSTRING or detects a missing argument and the
+     first character of OPTSTRING was not a colon `#\:'.
+
+     Otherwise, `getopt' returns `#f' when all command line options
+     have been parsed.
+
+     Example:
+          #! /usr/local/bin/scm
+          ;;;This code is SCM specific.
+          (define argv (program-arguments))
+          (require 'getopt)
+          
+          (define opts ":a:b:cd")
+          (let loop ((opt (getopt (length argv) argv opts)))
+            (case opt
+              ((#\a) (print "option a: " *optarg*))
+              ((#\b) (print "option b: " *optarg*))
+              ((#\c) (print "option c"))
+              ((#\d) (print "option d"))
+              ((#\?) (print "error" getopt:opt))
+              ((#\:) (print "missing arg" getopt:opt))
+              ((#f) (if (< *optind* (length argv))
+                        (print "argv[" *optind* "]="
+                               (list-ref argv *optind*)))
+                    (set! *optind* (+ *optind* 1))))
+            (if (< *optind* (length argv))
+                (loop (getopt (length argv) argv opts))))
+          
+          (slib:exit)
+
+Getopt-
+=======
+
+ - Function: getopt- ARGC ARGV OPTSTRING
+     The procedure `getopt--' is an extended version of `getopt' which
+     parses "long option names" of the form `--hold-the-onions' and
+     `--verbosity-level=extreme'.  `Getopt--' behaves as `getopt'
+     except for non-empty options beginning with `--'.
+
+     Options beginning with `--' are returned as strings rather than
+     characters.  If a value is assigned (using `=') to a long option,
+     `*optarg*' is set to the value.  The `=' and value are not
+     returned as part of the option string.
+
+     No information is passed to `getopt--' concerning which long
+     options should be accepted or whether such options can take
+     arguments.  If a long option did not have an argument, `*optarg'
+     will be set to `#f'.  The caller is responsible for detecting and
+     reporting errors.
+
+          (define opts ":-:b:")
+          (define argc 5)
+          (define argv '("foo" "-b9" "--f1" "--2=" "--g3=35234.342" "--"))
+          (define *optind* 1)
+          (define *optarg* #f)
+          (require 'qp)
+          (do ((i 5 (+ -1 i)))
+              ((zero? i))
+            (define opt (getopt-- argc argv opts))
+            (print *optind* opt *optarg*)))
+          -|
+          2 #\b "9"
+          3 "f1" #f
+          4 "2" ""
+          5 "g3" "35234.342"
+          5 #f "35234.342"
+
+
+File: slib.info,  Node: Command Line,  Next: System Interface,  Prev: Getopt,  Up: Session Support
+
+Command Line
+============
+
+  `(require 'read-command)'
+
+ - Function: read-command PORT
+ - Function: read-command
+     `read-command' converts a "command line" into a list of strings
+     suitable for parsing by `getopt'.  The syntax of command lines
+     supported resembles that of popular "shell"s.  `read-command'
+     updates PORT to point to the first character past the command
+     delimiter.
+
+     If an end of file is encountered in the input before any
+     characters are found that can begin an object or comment, then an
+     end of file object is returned.
+
+     The PORT argument may be omitted, in which case it defaults to the
+     value returned by `current-input-port'.
+
+     The fields into which the command line is split are delimited by
+     whitespace as defined by `char-whitespace?'.  The end of a command
+     is delimited by end-of-file or unescaped semicolon (;) or newline.
+     Any character can be literally included in a field by escaping it
+     with a backslach (\).
+
+     The initial character and types of fields recognized are:
+    `\'
+          The next character has is taken literally and not interpreted
+          as a field delimiter.  If \ is the last character before a
+          newline, that newline is just ignored.  Processing continues
+          from the characters after the newline as though the backslash
+          and newline were not there.
+
+    `"'
+          The characters up to the next unescaped " are taken literally,
+          according to [R4RS] rules for literal strings (*note Strings:
+          (r4rs)Strings.).
+
+    `(', `%''
+          One scheme expression is `read' starting with this character.
+          The `read' expression is evaluated, converted to a string
+          (using `display'), and replaces the expression in the returned
+          field.
+
+    `;'
+          Semicolon delimits a command.  Using semicolons more than one
+          command can appear on a line.  Escaped semicolons and
+          semicolons inside strings do not delimit commands.
+
+     The comment field differs from the previous fields in that it must
+     be the first character of a command or appear after whitespace in
+     order to be recognized.  # can be part of fields if these
+     conditions are not met.  For instance, `ab#c' is just the field
+     ab#c.
+
+    `#'
+          Introduces a comment.  The comment continues to the end of
+          the line on which the semicolon appears.  Comments are
+          treated as whitespace by `read-dommand-line' and backslashes
+          before newlines in comments are also ignored.
+
+
+File: slib.info,  Node: System Interface,  Next: Require,  Prev: Command Line,  Up: Session Support
+
+System Interface
+================
+
+  If `(provided? 'getenv)':
+
+ - Function: getenv NAME
+     Looks up NAME, a string, in the program environment.  If NAME is
+     found a string of its value is returned.  Otherwise, `#f' is
+     returned.
+
+  If `(provided? 'system)':
+
+ - Function: system COMMAND-STRING
+     Executes the COMMAND-STRING on the computer and returns the
+     integer status code.
+
+
+File: slib.info,  Node: Require,  Next: Vicinity,  Prev: System Interface,  Up: Session Support
+
+Require
+=======
+
+  These variables and procedures are provided by all implementations.
+
+ - Variable: *features*
+     Is a list of symbols denoting features supported in this
+     implementation.
+
+ - Variable: *modules*
+     Is a list of pathnames denoting files which have been loaded.
+
+ - Variable: *catalog*
+     Is an association list of features (symbols) and pathnames which
+     will supply those features.  The pathname can be either a string
+     or a pair.  If pathname is a pair then the first element should be
+     a macro feature symbol, `source', or `compiled'.  The cdr of the
+     pathname should be either a string or a list.
+
+  In the following three functions if FEATURE is not a symbol it is
+assumed to be a pathname.
+
+ - Function: provided? FEATURE
+     Returns `#t' if FEATURE is a member of `*features*' or `*modules*'
+     or if FEATURE is supported by a file already loaded and `#f'
+     otherwise.
+
+ - Procedure: require FEATURE
+     If `(not (provided? FEATURE))' it is loaded if FEATURE is a
+     pathname or if `(assq FEATURE *catalog*)'.  Otherwise an error is
+     signaled.
+
+ - Procedure: provide FEATURE
+     Assures that FEATURE is contained in `*features*' if FEATURE is a
+     symbol and `*modules*' otherwise.
+
+ - Function: require:feature->path FEATURE
+     Returns `#t' if FEATURE is a member of `*features*' or `*modules*'
+     or if FEATURE is supported by a file already loaded.  Returns a
+     path if one was found in `*catalog*' under the feature name, and
+     `#f' otherwise.  The path can either be a string suitable as an
+     argument to load or a pair as described above for *catalog*.
+
+  Below is a list of features that are automatically determined by
+`require'.  For each item, `(provided? 'FEATURE)' will return `#t' if
+that feature is available, and `#f' if not.
+
+   * 'inexact
+
+   * 'rational
+
+   * 'real
+
+   * 'complex
+
+   * 'bignum
+
+
+File: slib.info,  Node: Vicinity,  Next: Configuration,  Prev: Require,  Up: Session Support
+
+Vicinity
+========
+
+  A vicinity is a descriptor for a place in the file system.  Vicinities
+hide from the programmer the concepts of host, volume, directory, and
+version.  Vicinities express only the concept of a file environment
+where a file name can be resolved to a file in a system independent
+manner.  Vicinities can even be used on "flat" file systems (which have
+no directory structure) by having the vicinity express constraints on
+the file name.  On most systems a vicinity would be a string.  All of
+these procedures are file system dependent.
+
+  These procedures are provided by all implementations.
+
+ - Function: make-vicinity FILENAME
+     Returns the vicinity of FILENAME for use by `in-vicinity'.
+
+ - Function: program-vicinity
+     Returns the vicinity of the currently loading Scheme code.  For an
+     interpreter this would be the directory containing source code.
+     For a compiled system (with multiple files) this would be the
+     directory where the object or executable files are.  If no file is
+     currently loading it the result is undefined.  *Warning:*
+     `program-vicinity' can return incorrectl values if your program
+     escapes back into a `load'.
+
+ - Function: library-vicinity
+     Returns the vicinity of the shared Scheme library.
+
+ - Function: implementation-vicinity
+     Returns the vicinity of the underlying Scheme implementation.  This
+     vicinity will likely contain startup code and messages and a
+     compiler.
+
+ - Function: user-vicinity
+     Returns the vicinity of the current directory of the user.  On most
+     systems this is `""' (the empty string).
+
+ - Function: in-vicinity VICINITY FILENAME
+     Returns a filename suitable for use by `slib:load',
+     `slib:load-source', `slib:load-compiled', `open-input-file',
+     `open-output-file', etc.  The returned filename is FILENAME in
+     VICINITY.  `in-vicinity' should allow FILENAME to override
+     VICINITY when FILENAME is an absolute pathname and VICINITY is
+     equal to the value of `(user-vicinity)'.  The behavior of
+     `in-vicinity' when FILENAME is absolute and VICINITY is not equal
+     to the value of `(user-vicinity)' is unspecified.  For most systems
+     `in-vicinity' can be `string-append'.
+
+ - Function: sub-vicinity VICINITY NAME
+     Returns the vicinity of VICINITY restricted to NAME.  This is used
+     for large systems where names of files in subsystems could
+     conflict.  On systems with directory structure `sub-vicinity' will
+     return a pathname of the subdirectory NAME of VICINITY.
+
+
+File: slib.info,  Node: Configuration,  Next: Input/Output,  Prev: Vicinity,  Up: Session Support
+
+Configuration
+=============
+
+  These constants and procedures describe characteristics of the Scheme
+and underlying operating system.  They are provided by all
+implementations.
+
+ - Constant: char-code-limit
+     An integer 1 larger that the largest value which can be returned by
+     `char->integer'.
+
+ - Constant: most-positive-fixnum
+     The immediate integer closest to positive infinity.
+
+ - Constant: slib:tab
+     The tab character.
+
+ - Constant: slib:form-feed
+     The form-feed character.
+
+ - Function: software-type
+     Returns a symbol denoting the generic operating system type.  For
+     instance, `unix', `vms', `macos', `amiga', or `ms-dos'.
+
+ - Function: slib:report-version
+     Displays the versions of SLIB and the underlying Scheme
+     implementation and the name of the operating system.  An
+     unspecified value is returned.
+
+          (slib:report-version) => slib "2a3" on scm "4e1" on unix
+
+ - Function: slib:report
+     Displays the information of `(slib:report-version)' followed by
+     almost all the information neccessary for submitting a problem
+     report.  An unspecified value is returned.
+
+ - Function: slib:report #T
+     provides a more verbose listing.
+
+ - Function: slib:report FILENAME
+     Writes the report to file `filename'.
+
+          (slib:report)
+          =>
+          slib "2a3" on scm "4e1" on unix
+          (implementation-vicinity) is "/usr/local/src/scm/"
+          (library-vicinity) is "/usr/local/lib/slib/"
+          (scheme-file-suffix) is ".scm"
+          implementation *features* :
+                  bignum complex real rational
+                  inexact vicinity ed getenv
+                  tmpnam system abort transcript
+                  with-file ieee-p1178 rev4-report rev4-optional-procedures
+                  hash object-hash delay eval
+                  dynamic-wind multiarg-apply multiarg/and- logical
+                  defmacro string-port source array-for-each
+                  array full-continuation char-ready? line-i/o
+                  i/o-extensions pipe
+          implementation *catalog* :
+                  (rev4-optional-procedures . "/usr/local/lib/slib/sc4opt")
+                  ...
+
+
+File: slib.info,  Node: Input/Output,  Next: Legacy,  Prev: Configuration,  Up: Session Support
+
+Input/Output
+============
+
+  These procedures are provided by all implementations.
+
+ - Procedure: file-exists? FILENAME
+     Returns `#t' if the specified file exists.  Otherwise, returns
+     `#f'.  If the underlying implementation does not support this
+     feature then `#f' is always returned.
+
+ - Procedure: delete-file FILENAME
+     Deletes the file specified by FILENAME.  If FILENAME can not be
+     deleted, `#f' is returned.  Otherwise, `#t' is returned.
+
+ - Procedure: tmpnam
+     Returns a pathname for a file which will likely not be used by any
+     other process.  Successive calls to `(tmpnam)' will return
+     different pathnames.
+
+ - Procedure: current-error-port
+     Returns the current port to which diagnostic and error output is
+     directed.
+
+ - Procedure: force-output
+ - Procedure: force-output PORT
+     Forces any pending output on PORT to be delivered to the output
+     device and returns an unspecified value.  The PORT argument may be
+     omitted, in which case it defaults to the value returned by
+     `(current-output-port)'.
+
+ - Procedure: output-port-width
+ - Procedure: output-port-width PORT
+     Returns the width of PORT, which defaults to
+     `(current-output-port)' if absent.  If the width cannot be
+     determined 79 is returned.
+
+ - Procedure: output-port-height
+ - Procedure: output-port-height PORT
+     Returns the height of PORT, which defaults to
+     `(current-output-port)' if absent.  If the height cannot be
+     determined 24 is returned.
+
+
+File: slib.info,  Node: Legacy,  Next: System,  Prev: Input/Output,  Up: Session Support
+
+Legacy
+======
+
+ - Function: identity X
+     IDENTITY returns its argument.
+
+     Example:
+          (identity 3)
+             => 3
+          (identity '(foo bar))
+             => (foo bar)
+          (map identity LST)
+             == (copy-list LST)
+
+  These were present in Scheme until R4RS (*note Language changes:
+(r4rs)Notes.).
+
+ - Constant: t
+     Derfined as `#t'.
+
+ - Constant: nil
+     Defined as `#f'.
+
+ - Function: last-pair L
+     Returns the last pair in the list L.  Example:
+          (last-pair (cons 1 2))
+             => (1 . 2)
+          (last-pair '(1 2))
+             => (2)
+              == (cons 2 '())
+
+
+File: slib.info,  Node: System,  Prev: Legacy,  Up: Session Support
+
+System
+======
+
+  These procedures are provided by all implementations.
+
+ - Procedure: slib:load-source NAME
+     Loads a file of Scheme source code from NAME with the default
+     filename extension used in SLIB.  For instance if the filename
+     extension used in SLIB is `.scm' then `(slib:load-source "foo")'
+     will load from file `foo.scm'.
+
+ - Procedure: slib:load-compiled NAME
+     On implementations which support separtely loadable compiled
+     modules, loads a file of compiled code from NAME with the
+     implementation's filename extension for compiled code appended.
+
+ - Procedure: slib:load NAME
+     Loads a file of Scheme source or compiled code from NAME with the
+     appropriate suffixes appended.  If both source and compiled code
+     are present with the appropriate names then the implementation
+     will load just one.  It is up to the implementation to choose
+     which one will be loaded.
+
+     If an implementation does not support compiled code then
+     `slib:load' will be identical to `slib:load-source'.
+
+ - Procedure: slib:eval OBJ
+     `eval' returns the value of OBJ evaluated in the current top level
+     environment.
+
+ - Procedure: slib:eval-load FILENAME EVAL
+     FILENAME should be a string.  If filename names an existing file,
+     the Scheme source code expressions and definitions are read from
+     the file and EVAL called with them sequentially.  The
+     `slib:eval-load' procedure does not affect the values returned by
+     `current-input-port' and `current-output-port'.
+
+ - Procedure: slib:error ARG1 ARG2 ...
+     Outputs an error message containing the arguments, aborts
+     evaluation of the current form and responds in a system dependent
+     way to the error.  Typical responses are to abort the program or
+     to enter a read-eval-print loop.
+
+ - Procedure: slib:exit N
+ - Procedure: slib:exit
+     Exits from the Scheme session returning status N to the system.
+     If N is omitted or `#t', a success status is returned to the
+     system (if possible).  If N is `#f' a failure is returned to the
+     system (if possible).  If N is an integer, then N is returned to
+     the system (if possible).  If the Scheme session cannot exit an
+     unspecified value is returned from `slib:exit'.
+
+
+File: slib.info,  Node: Optional SLIB Packages,  Next: Procedure and Macro Index,  Prev: Session Support,  Up: Top
+
+Optional SLIB Packages
+**********************
+
+  Several Scheme packages have been written using SLIB.  There are
+several reasons why a package might not be included in the SLIB
+distribution:
+   * Because it requires special hardware or software which is not
+     universal.
+
+   * Because it is large and of limited interest to most Scheme users.
+
+   * Because it has copying terms different enough from the other SLIB
+     packages that its inclusion would cause confusion.
+
+   * Because it is an application program, rather than a library module.
+
+   * Because I have been too busy to integrate it.
+
+  Once an optional package is installed (and an entry added to
+`*catalog*', the `require' mechanism allows it to be called up and used
+as easily as any other SLIB package.  Some optional packages (for which
+`*catalog*' already has entries) available from SLIB sites are:
+
+SLIB-PSD is a portable debugger for Scheme (requires emacs editor).
+          ftp-swiss.ai.mit.edu:pub/scm/slib-psd1-3.tar.gz
+          prep.ai.mit.edu:pub/gnu/jacal/slib-psd1-3.tar.gz
+          ftp.maths.tcd.ie:pub/bosullvn/jacal/slib-psd1-3.tar.gz
+          ftp.cs.indiana.edu:/pub/scheme-repository/utl/slib-psd1-3.tar.gz
+
+     With PSD, you can run a Scheme program in an Emacs buffer, set
+     breakpoints, single step evaluation and access and modify the
+     program's variables. It works by instrumenting the original source
+     code, so it should run with any R4RS compliant Scheme. It has been
+     tested with SCM, Elk 1.5, and the sci interpreter in the Scheme->C
+     system, but should work with other Schemes with a minimal amount
+     of porting, if at all. Includes documentation and user's manual.
+     Written by Pertti Kellom\"aki, pk@cs.tut.fi.  The Lisp Pointers
+     article describing PSD (Lisp Pointers VI(1):15-23, January-March
+     1993) is available as
+          http://www.cs.tut.fi/staff/pk/scheme/psd/article/article.html
+
+SLIB-SCHELOG is an embedding of Prolog in Scheme.
+          ftp-swiss.ai.mit.edu:pub/scm/slib-schelog.tar.gz
+          prep.ai.mit.edu:pub/gnu/jacal/slib-schelog.tar.gz
+          ftp.maths.tcd.ie:pub/bosullvn/jacal/slib-schelog.tar.gz
+          ftp.cs.indiana.edu:/pub/scheme-repository/utl/slib-schelog.tar.gz
+

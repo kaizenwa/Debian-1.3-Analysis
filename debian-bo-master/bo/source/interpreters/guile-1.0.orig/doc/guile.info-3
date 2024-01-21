@@ -1,0 +1,1070 @@
+This is Info file guile.info, produced by Makeinfo version 1.67 from
+the input file guile.texi.
+
+
+File: guile.info,  Node: Using Emacs and Guile,  Next: Records,  Prev: Auto-Loading Modules,  Up: Top
+
+Emacs and Guile
+***************
+
+  The recommended way to organize large collections of Guile Scheme code
+
+  modules can be grouped in a subdirectory.   Choose module names that
+reflect the subdirectory structure of the source that defines them.
+For example, for the source files:
+
+     project/utils/string-fun.scm
+     project/utils/runq.scm
+     project/widgets/simple.scm
+     project/widgets/app.scm
+
+  Use the module names:
+
+     #/utils/string-fun
+     #/utils/runq
+     #/widgets/simple
+     #/widgets/app
+
+  Installed versions of the source files should keep the same
+subdirectory structure:
+
+     some-dir-on-%load-path/utils/string-fun.scm
+     some-dir-on-%load-path/utils/runq.scm
+     some-dir-on-%load-path/widgets/simple.scm
+     some-dir-on-%load-path/widgets/app.scm
+
+  If you are a developer working on the project, create a file like
+this:
+
+  Contents of `project/=ws.scm:'
+
+     (define-module #/work-space
+       :use-module #/utils/app
+       :use-module #/utils/simple
+       :use-module #/utils/runq
+       :use-module #/utils/string-fun)
+
+  and add this to your .emacs file:
+
+     (defun modular-scheme-send-definition ()
+       "Send the first then the current definition to the inferior Scheme process."
+       (interactive)
+       (save-excursion
+         (end-of-defun)
+         (let ((pos (point)))
+           (goto-char (point-min))
+           (end-of-defun)
+           (if (not (= pos (point)))
+     	  (progn
+     	   (beginning-of-defun)
+     	   (if (looking-at "(define-module")
+     	       (scheme-send-definition))))))
+       (scheme-send-definition)))
+     
+     (define-key scheme-mode-map "\M-\C-x" 'modular-scheme-send-definition)
+
+  `modular-scheme-send-definition' works like the traditional emacs
+command `scheme-send-definition', except that before sending the
+current definition, emacs first sends the `define-module' expression,
+if any can be found, from the top of the same file.  This has the
+effect of setting the current module correctly before sending the
+current definition.
+
+  You can start things off by running `M-x run-scheme', visiting
+`=ws.scm', and using `modular-scheme-send-definition' on an expression
+in `=ws.scm'.  This will send the `define-module' expression shown
+above causing the auto-loader to load the source files `app.scm',
+`simple.scm', `runq.scm', and `string-fun.scm'.
+
+  For this to work properly, the module names you use must reflect the
+sub-directory structure of the source files, and the source files must
+be found on the `%load-path' of your Guile process.  `.' is on
+`%load-path' by default and so usually it should work simply to run the
+scheme process in the root directory of your source.
+
+  [fill in reference: "Modular Programming In Scheme" ....]
+
+
+File: guile.info,  Node: Records,  Next: Structures,  Prev: Using Emacs and Guile,  Up: Top
+
+Records
+*******
+
+  A "record type" is a first class object representing a user-defined
+data type.  A "record" is an instance of a record type.
+
+ - Function: record? OBJ
+     Returns `#t' if OBJ is a record of any type and `#f' otherwise.
+
+     Note that `record?' may be true of any Scheme value; there is no
+     promise that records are disjoint with other Scheme types.
+
+ - Function: make-record-type TYPE-NAME FIELD-NAMES
+     Returns a "record-type descriptor", a value representing a new data
+     type disjoint from all others.  The TYPE-NAME argument must be a
+     string, but is only used for debugging purposes (such as the
+     printed representation of a record of the new type).  The
+     FIELD-NAMES argument is a list of symbols naming the "fields" of a
+     record of the new type.  It is an error if the list contains any
+     duplicates.  It is unspecified how record-type descriptors are
+     represented.
+
+ - Function: record-constructor RTD [FIELD-NAMES]
+     Returns a procedure for constructing new members of the type
+     represented by RTD.  The returned procedure accepts exactly as
+     many arguments as there are symbols in the given list,
+     FIELD-NAMES; these are used, in order, as the initial values of
+     those fields in a new record, which is returned by the constructor
+     procedure.  The values of any fields not named in that list are
+     unspecified.  The FIELD-NAMES argument defaults to the list of
+     field names in the call to `make-record-type' that created the
+     type represented by RTD; if the FIELD-NAMES argument is provided,
+     it is an error if it contains any duplicates or any symbols not in
+     the default list.
+
+ - Function: record-predicate RTD
+     Returns a procedure for testing membership in the type represented
+     by RTD.  The returned procedure accepts exactly one argument and
+     returns a true value if the argument is a member of the indicated
+     record type; it returns a false value otherwise.
+
+ - Function: record-accessor RTD FIELD-NAME
+     Returns a procedure for reading the value of a particular field of
+     a member of the type represented by RTD.  The returned procedure
+     accepts exactly one argument which must be a record of the
+     appropriate type; it returns the current value of the field named
+     by the symbol FIELD-NAME in that record.  The symbol FIELD-NAME
+     must be a member of the list of field-names in the call to
+     `make-record-type' that created the type represented by RTD.
+
+ - Function: record-modifier RTD FIELD-NAME
+     Returns a procedure for writing the value of a particular field of
+     a member of the type represented by RTD.  The returned procedure
+     accepts exactly two arguments: first, a record of the appropriate
+     type, and second, an arbitrary Scheme value; it modifies the field
+     named by the symbol FIELD-NAME in that record to contain the given
+     value.  The returned value of the modifier procedure is
+     unspecified.  The symbol FIELD-NAME must be a member of the list
+     of field-names in the call to `make-record-type' that created the
+     type represented by RTD.
+
+ - Function: record-type-descriptor RECORD
+     Returns a record-type descriptor representing the type of the given
+     record.  That is, for example, if the returned descriptor were
+     passed to `record-predicate', the resulting predicate would return
+     a true value when passed the given record.  Note that it is not
+     necessarily the case that the returned descriptor is the one that
+     was passed to `record-constructor' in the call that created the
+     constructor procedure that created the given record.
+
+ - Function: record-type-name RTD
+     Returns the type-name associated with the type represented by rtd.
+     The returned value is `eqv?' to the TYPE-NAME argument given in
+     the call to `make-record-type' that created the type represented by
+     RTD.
+
+ - Function: record-type-field-names RTD
+     Returns a list of the symbols naming the fields in members of the
+     type represented by RTD.  The returned value is `equal?' to the
+     field-names argument given in the call to `make-record-type' that
+     created the type represented by RTD.
+
+
+File: guile.info,  Node: Structures,  Next: Arrays,  Prev: Records,  Up: Top
+
+Structures
+**********
+
+  A "structure type" is a first class user-defined data type.  A
+"structure" is an instance of a structure type.  A structure type is
+itself a structure.
+
+  Structures are less abstract and more general than traditional
+records.  In fact, in Guile Scheme, records are implemented using
+structures.
+
+* Menu:
+
+* Structure Concepts::          The structure of Structures
+* Structure Layout::            Defining the layout of structure types
+* Structure Basics::            make-, -ref and -set! procedures for structs
+* Vtables::                     Accessing type-specific data
+
+
+File: guile.info,  Node: Structure Concepts,  Next: Structure Layout,  Prev: Structures,  Up: Structures
+
+Structure Concepts
+==================
+
+  A structure object consists of a handle, structure data, and a vtable.
+The handle is a Scheme value which points to both the vtable and the
+structure's data.  Structure data is a dynamically allocated region of
+memory, private to the structure, divided up into typed fields.  A
+vtable is another structure used to hold type-specific data.  Multiple
+structures can share a common vtable.
+
+  Three concepts are key to understanding structures.
+
+   * "layout specifications"
+
+     Layout specifications determine how memory allocated to structures
+     is divided up into fields.  Programmers must write a layout
+     specification whenever a new type of structure is defined.
+
+   * "structural accessors"
+
+     Structure access is by field number.   There is only one set of
+     accessors common to all structure objects.
+
+   * "vtables"
+
+     Vtables, themselves structures, are first class representations of
+     disjoint sub-types of structures in general.   In most cases, when
+     a new structure is created, programmers must specifiy a vtable for
+     the new structure.   Each vtable has a field describing the layout
+     of its instances.   Vtables can have additional, user-defined
+     fields as well.
+
+
+File: guile.info,  Node: Structure Layout,  Next: Structure Basics,  Prev: Structure Concepts,  Up: Structures
+
+Structure Layout
+================
+
+  When a structure is created, a region of memory is allocated to hold
+its state.  The "layout" of the structure's type determines how that
+memory is divided into fields.
+
+  Each field has a specified type.  There are only three types allowed,
+each corresponding to a one letter code.  The allowed types are:
+
+   * 'u' - unprotected
+
+     The field holds binary data that is not GC protected.
+
+   * 'p' - protected
+
+     The field holds a Scheme value and is GC protected.
+
+   * 's' - self
+
+     The field holds a Scheme value and is GC protected.  When a
+     structure is created with this type of field, the field is
+     initialized to refer to the structure's own handle.  This kind of
+     field is mainly useful when mixing Scheme and C code in which the
+     C code may need to compute a structure's handle given only the
+     address of its malloced data.
+
+  Each field also has an associated access protection.   There are only
+three kinds of protection, each corresponding to a one letter code.
+The allowed protections are:
+
+   * 'w' - writable
+
+     The field can be read and written.
+
+   * 'r' - readable
+
+     The field can be read, but not written.
+
+   * 'o' - opaque
+
+     The field can be neither read nor written.   This kind of
+     protection is for fields useful only to built-in routines.
+
+  A layout specification is described by stringing together pairs of
+letters: one to specify a field type and one to specify a field
+protection.    For example, a traditional cons pair type object could
+be described as:
+
+     ; cons pairs have two writable fields of Scheme data
+     "pwpw"
+
+  A pair object in which the first field is held constant could be:
+
+     "prpw"
+
+  Binary fields, (fields of type "u"), hold one *word* each.  The size
+of a word is a machine dependent value defined to be equal to the value
+of the C expression: `sizeof (long)'.
+
+  The last field of a structure layout may specify a tail array.  A
+tail array is indicated by capitalizing the field's protection code
+('W', 'R' or 'O').   A tail-array field is replaced by a read-only
+binary data field containing an array size.   The array size is
+determined at the time the structure is created.  It is followed by a
+corresponding number of fields of the type specified for the tail
+array.   For example, a conventional Scheme vector can be described as:
+
+     ; A vector is an arbitrary number of writable fields holding Scheme
+     ; values:
+     "pW"
+
+  In the above example, field 0 contains the size of the vector and
+fields beginning at 1 contain the vector elements.
+
+  A kind of tagged vector (a constant tag followed by conventioal
+vector elements) might be:
+
+     "prpW"
+
+  Structure layouts are represented by specially interned symbols whose
+name is a string of type and protection codes.  To create a new
+structure layout, use this procedure:
+
+ - Function: make-struct-layout FIELDS
+     Return a new structure layout object.
+
+     FIELDS must be a read-only string made up of pairs of characters
+     strung together.  The first character of each pair describes a
+     field type, the second a field protection.  Allowed types are 'p'
+     for GC-protected Scheme data, 'u' for unprotected binary data, and
+     's' for fields that should point to the structure itself.
+     Allowed protections are 'w' for mutable fields, 'r' for read-only
+     fields, and 'o' for opaque fields.  The last field protection
+     specification may be capitalized to indicate that the field is a
+     tail-array.
+
+
+File: guile.info,  Node: Structure Basics,  Next: Vtables,  Prev: Structure Layout,  Up: Structures
+
+Structure Basics
+================
+
+  This section describes the basic procedures for creating and accessing
+structures.
+
+ - Function: make-struct TYPE TAIL-ELTS . INITS
+     Create a new structure.
+
+     TYPE must be a vtable structure (*Note Vtables::).
+
+     TAIL-ELTS must be a non-negative integer.  If the layout
+     specification indicated by TYPE includes a tail-array, this is the
+     number of elements allocated to that array.
+
+     The INITS are optional arguments describing how successive fields
+     of the structure should be initialized.  Only fields with
+     protection 'r' or 'w' can be initialized - fields of protection
+     's' are automatically initialized to point to the new structure
+     itself;  fields of protection 'o' can not be initialized by Scheme
+     programs.
+
+ - Function: struct? OBJ
+     Return #t iff OBJ is a structure object.
+
+ - Function: struct-ref STRUCT N
+ - Function: struct-set! STRUCT N VALUE
+     Access (or modify) the Nth field of STRUCT.
+
+     If the field is of type 'p', then it can be set to an arbitrary
+     value.
+
+     If the field is of type 'u', then it can only be set to a
+     non-negative integer value small enough to fit in one machine word.
+
+
+File: guile.info,  Node: Vtables,  Prev: Structure Basics,  Up: Structures
+
+Vtables
+=======
+
+  Vtables are structures that are used to represent structure types.
+Each vtable contains a layout specification in field 0 - instances of
+the type are laid out according to that specification.  Vtables contain
+additional fields which are used only internally to libguile.  The
+variable `struct-vtable-offset' is bound to a field number.  Vtable
+fields at that position or greater are user definable.
+
+ - Function: struct-vtable STRUCT
+     Return the vtable structure that describes the type of STRUCT.
+
+ - Function: struct-vtable? OBJ
+     Return #t iff obj is a vtable structure.
+
+  If you have a vtable structure, `V', you can create an instance of
+the type it describes by using `(make-struct V ...)'.  But where does
+`V' itself come from?  One possibility is that `V' is an instance of a
+user-defined vtable type, `V'', so that `V' is created by using
+`(make-struct V' ...)'.  Another possibility is that `V' is an instance
+of the type it itself describes.  Vtable structures of the second sort
+are created by this procedure:
+
+ - Function: make-vtable-vtable NEW-FIELDS TAIL-SIZE . INITS
+     Return a new, self-describing vtable structure.
+
+     NEW-FIELDS is a layout specification describing fields of the
+     resulting structure beginning at the position bound to
+     `struct-vtable-offset'.
+
+     TAIL-SIZE specifies the size of the tail-array (if any) of this
+     vtable.
+
+     INITS initializes the fields of the vtable.  Minimally, one
+     initializer must be provided: the layout specification for
+     instances of the type this vtable will describe.
+
+          ;;; loading ,a...
+          (define x
+            (make-vtable-vtable (make-struct-layout (quote pw))
+                                0
+                                'foo))
+          
+          (struct? x)
+          => #t
+          (struct-vtable? x)
+          => #t
+          (eq? x (struct-vtable x))
+          => #t
+          (struct-ref x struct-vtable-offset)
+          => foo
+          (struct-ref x 0)
+          => pruosrpw
+          
+          
+          (define y
+            (make-struct x
+                         0
+                         (make-struct-layout (quote pwpwpw))
+                         'bar))
+          
+          (struct? y)
+          => #t
+          (struct-vtable? y)
+          => #t
+          (eq? x y)
+          => ()
+          (eq? x (struct-vtable y))
+          => #t
+          (struct-ref y 0)
+          => pwpwpw
+          (struct-ref y struct-vtable-offset)
+          => bar
+          
+          
+          (define z (make-struct y 0 'a 'b 'c))
+          
+          (struct? z)
+          => #t
+          (struct-vtable? z)
+          => ()
+          (eq? y (struct-vtable z))
+          => #t
+          (map (lambda (n) (struct-ref z n)) '(0 1 2))
+          => (a b c)
+
+
+
+File: guile.info,  Node: Arrays,  Next: Object Properties,  Prev: Structures,  Up: Top
+
+Arrays
+******
+
+* Menu:
+
+* Conventional Arrays::
+* Array Mapping::
+* Uniform Array::
+* Bit Vectors::
+
+
+File: guile.info,  Node: Conventional Arrays,  Next: Array Mapping,  Prev: Arrays,  Up: Arrays
+
+Conventional Arrays
+===================
+
+  "Arrays" read and write as a `#' followed by the "rank" (number of
+dimensions) followed by what appear as lists (of lists) of elements.
+The lists must be nested to the depth of the rank.  For each depth, all
+lists must be the same length.
+     (make-array 'ho 3 3) =>
+     #2((ho ho ho) (ho ho ho) (ho ho ho))
+
+  Unshared conventional (not uniform) 0-based arrays of rank 1
+(dimension) are equivalent to (and can't be distinguished from) vectors.
+     (make-array 'ho 3) => (ho ho ho)
+
+  When constructing an array, BOUND is either an inclusive range of
+indices expressed as a two element list, or an upper bound expressed as
+a single integer.  So
+     (make-array 'foo 3 3) == (make-array 'foo '(0 2) '(0 2))
+
+ - Function: array? OBJ
+     Returns `#t' if the OBJ is an array, and `#f' if not.
+
+ - Function: make-array INITIAL-VALUE BOUND1 BOUND2 ...
+     Creates and returns an array that has as many dimensions as there
+     are BOUNDs and fills it with INITIAL-VALUE.
+
+ - Function: array-ref ARRAY INDEX1 INDEX2 ...
+     Returns the element at the `(index1, index2)' element in ARRAY.
+
+ - Function: array-in-bounds? ARRAY INDEX1 INDEX2 ...
+     Returns `#t' if its arguments would be acceptable to array-ref.
+
+ - Function: array-set! ARRAY NEW-VALUE INDEX1 INDEX2 ...
+     Sets the element at the `(index1, index2)' element in ARRAY to
+     NEW-VALUE.  The value returned by array-set! is unspecified.
+
+ - Function: make-shared-array ARRAY MAPPER BOUND1 BOUND2 ...
+     `make-shared-array' can be used to create shared subarrays of other
+     arrays.  The MAPPER is a function that translates coordinates in
+     the new array into coordinates in the old array.  A MAPPER must be
+     linear, and its range must stay within the bounds of the old
+     array, but it can be otherwise arbitrary.  A simple example:
+          (define fred (make-array #f 8 8))
+          (define freds-diagonal
+            (make-shared-array fred (lambda (i) (list i i)) 8))
+          (array-set! freds-diagonal 'foo 3)
+          (array-ref fred 3 3) => foo
+          (define freds-center
+            (make-shared-array fred (lambda (i j) (list (+ 3 i) (+ 3 j))) 2 2))
+          (array-ref freds-center 0 0) => foo
+
+ - Function: transpose-array ARRAY DIM0 DIM1 ...
+     Returns an array sharing contents with ARRAY, but with dimensions
+     arranged in a different order.  There must be one DIM argument for
+     each dimension of ARRAY.  DIM0, DIM1, ... should be integers
+     between 0 and the rank of the array to be returned.  Each integer
+     in that range must appear at least once in the argument list.
+
+     The values of DIM0, DIM1, ... correspond to dimensions in the
+     array to be returned, their positions in the argument list to
+     dimensions of ARRAY.  Several DIMs may have the same value, in
+     which case the returned array will have smaller rank than ARRAY.
+
+     examples:
+          (transpose-array '#2((a b) (c d)) 1 0) => #2((a c) (b d))
+          (transpose-array '#2((a b) (c d)) 0 0) => #1(a d)
+          (transpose-array '#3(((a b c) (d e f)) ((1 2 3) (4 5 6))) 1 1 0) =>
+                          #2((a 4) (b 5) (c 6))
+
+ - Function: enclose-array ARRAY DIM0 DIM1 ...
+     DIM0, DIM1 ... should be nonnegative integers less than the rank
+     of ARRAY.  ENCLOSE-ARRAY returns an array resembling an array of
+     shared arrays.  The dimensions of each shared array are the same
+     as the DIMth dimensions of the original array, the dimensions of
+     the outer array are the same as those of the original array that
+     did not match a DIM.
+
+     An enclosed array is not a general Scheme array.  Its elements may
+     not be set using `array-set!'.  Two references to the same element
+     of an enclosed array will be `equal?' but will not in general be
+     `eq?'.  The value returned by ARRAY-PROTOTYPE when given an
+     enclosed array is unspecified.
+
+     examples:
+          (enclose-array '#3(((a b c) (d e f)) ((1 2 3) (4 5 6))) 1) =>
+             #<enclosed-array (#1(a d) #1(b e) #1(c f)) (#1(1 4) #1(2 5) #1(3 6))>
+          
+          (enclose-array '#3(((a b c) (d e f)) ((1 2 3) (4 5 6))) 1 0) =>
+             #<enclosed-array #2((a 1) (d 4)) #2((b 2) (e 5)) #2((c 3) (f 6))>
+
+ - Function: array-shape ARRAY
+     Returns a list of inclusive bounds of integers.
+          (array-shape (make-array 'foo '(-1 3) 5)) => ((-1 3) (0 4))
+
+ - Function: array-dimensions ARRAY
+     `Array-dimensions' is similar to `array-shape' but replaces
+     elements with a `0' minimum with one greater than the maximum. So:
+          (array-dimensions (make-array 'foo '(-1 3) 5)) => ((-1 3) 5)
+
+ - Function: array-rank OBJ
+     Returns the number of dimensions of OBJ.  If OBJ is not an array,
+     `0' is returned.
+
+ - Function: array->list ARRAY
+     Returns a list consisting of all the elements, in order, of ARRAY.
+
+ - Function: array-copy! SOURCE DESTINATION
+     Copies every element from vector or array SOURCE to the
+     corresponding element of DESTINATION.  DESTINATION must have the
+     same rank as SOURCE, and be at least as large in each dimension.
+     The order is unspecified.
+
+ - Function: serial-array-copy! SOURCE DESTINATION
+     Same as `array-copy!' but guaranteed to copy in row-major order.
+
+ - Function: array-fill! ARRAY FILL
+     Stores FILL in every element of ARRAY.  The value returned is
+     unspecified.
+
+ - Function: array-equal? ARRAY0 ARRAY1 ...
+     Returns `#t' iff all arguments are arrays with the same shape, the
+     same type, and have corresponding elements which are either
+     `equal?'  or `array-equal?'.  This function differs from `equal?'
+     in that a one dimensional shared array may be ARRAY-EQUAL? but not
+     EQUAL? to a vector or uniform vector.
+
+ - Function: array-contents ARRAY
+ - Function: array-contents ARRAY STRICT
+     If ARRAY may be "unrolled" into a one dimensional shared array
+     without changing their order (last subscript changing fastest),
+     then `array-contents' returns that shared array, otherwise it
+     returns `#f'.  All arrays made by MAKE-ARRAY and
+     MAKE-UNIFORM-ARRAY may be unrolled, some arrays made by
+     MAKE-SHARED-ARRAY may not be.
+
+     If the optional argument STRICT is provided, a shared array will
+     be returned only if its elements are stored internally contiguous
+     in memory.
+
+
+File: guile.info,  Node: Array Mapping,  Next: Uniform Array,  Prev: Conventional Arrays,  Up: Arrays
+
+Array Mapping
+=============
+
+ - Function: array-map! ARRAY0 PROC ARRAY1 ...
+     ARRAY1, ... must have the same number of dimensions as ARRAY0 and
+     have a range for each index which includes the range for the
+     corresponding index in ARRAY0.  PROC is applied to each tuple of
+     elements of ARRAY1 ... and the result is stored as the
+     corresponding element in ARRAY0.  The value returned is
+     unspecified.  The order of application is unspecified.
+
+ - Function: serial-array-map! ARRAY0 PROC ARRAY1 ...
+     Same as ARRAY-MAP!, but guaranteed to apply PROC in row-major
+     order.
+
+ - Function: array-for-each PROC ARRAY0 ...
+     PROC is applied to each tuple of elements of ARRAY0 ...  in
+     row-major order.  The value returned is unspecified.
+
+ - Function: array-index-map! ARRAY PROC
+     applies PROC to the indices of each element of ARRAY in turn,
+     storing the result in the corresponding element.  The value
+     returned and the order of application are unspecified.
+
+     One can implement ARRAY-INDEXES as
+          (define (array-indexes array)
+              (let ((ra (apply make-array #f (array-shape array))))
+                (array-index-map! ra (lambda x x))
+                ra))
+     Another example:
+          (define (apl:index-generator n)
+              (let ((v (make-uniform-vector n 1)))
+                (array-index-map! v (lambda (i) i))
+                v))
+
+
+File: guile.info,  Node: Uniform Array,  Next: Bit Vectors,  Prev: Array Mapping,  Up: Arrays
+
+Uniform Array
+=============
+
+"Uniform Arrays" and vectors are arrays whose elements are all of the
+same type.  Uniform vectors occupy less storage than conventional
+vectors.  Uniform Array procedures also work on vectors,
+uniform-vectors, bit-vectors, and strings.
+
+PROTOTYPE arguments in the following procedures are interpreted
+according to the table:
+
+     prototype       type                            printing character
+     
+     #t              boolean (bit-vector)                    b
+     #\a             char (string)                           a
+     integer >0      unsigned integer                        u
+     integer <0      signed integer                          e
+     1.0             float (single precision)                s
+     1/3             double (double precision float)         i
+     +i              complex (double precision)              c
+     ()              conventional vector
+
+Unshared uniform character 0-based arrays of rank 1 (dimension) are
+equivalent to (and can't be distinguished from) strings.
+     (make-uniform-array #\a 3) => "$q2"
+
+Unshared uniform boolean 0-based arrays of rank 1 (dimension) are
+equivalent to (and can't be distinguished from) *Note bit-vectors: Bit
+Vectors.
+     (make-uniform-array #t 3) => #*000
+     ==
+     #b(#f #f #f) => #*000
+     ==
+     #1b(#f #f #f) => #*000
+
+Other uniform vectors are written in a form similar to that of vectors,
+except that a single character from the above table is put between `#'
+and `('.  For example, `'#e(3 5 9)' returns a uniform vector of signed
+integers.
+
+ - Function: array? OBJ PROTOTYPE
+     Returns `#t' if the OBJ is an array of type corresponding to
+     PROTOTYPE, and `#f' if not.
+
+ - Function: make-uniform-array PROTOTYPE BOUND1 BOUND2 ...
+     Creates and returns a uniform array of type corresponding to
+     PROTOTYPE that has as many dimensions as there are BOUNDs and
+     fills it with PROTOTYPE.
+
+ - Function: array-prototype ARRAY
+     Returns an object that would produce an array of the same type as
+     ARRAY, if used as the PROTOTYPE for `make-uniform-array'.
+
+ - Function: list->uniform-array RANK PROT LST
+ - Function: list->uniform-vector PROT LST
+     Returns a uniform array of the type indicated by prototype PROT
+     with elements the same as those of LST.  Elements must be of the
+     appropriate type, no coercions are done.
+
+ - Function: uniform-vector-fill! UVE FILL
+     Stores FILL in every element of UVE.  The value returned is
+     unspecified.
+
+ - Function: uniform-vector-length UVE
+     Returns the number of elements in UVE.
+
+ - Function: dimensions->uniform-array DIMS PROTOTYPE FILL
+ - Function: dimensions->uniform-array DIMS PROTOTYPE
+ - Function: make-uniform-vector LENGTH PROTOTYPE FILL
+ - Function: make-uniform-vector LENGTH PROTOTYPE
+     Creates and returns a uniform array or vector of type
+     corresponding to PROTOTYPE with dimensions DIMS or length LENGTH.
+     If the FILL argument is supplied, the returned array is filled with
+     this value.
+
+ - Function: uniform-array-read! URA
+ - Function: uniform-array-read! URA PORT
+ - Function: uniform-vector-read! UVE
+ - Function: uniform-vector-read! UVE PORT
+     Attempts to read all elements of URA, in lexicographic order, as
+     binary objects from PORT.  If an end of file is encountered during
+     uniform-array-read! the objects up to that point only are put into
+     URA (starting at the beginning) and the remainder of the array is
+     unchanged.
+
+     `uniform-array-read!' returns the number of objects read.  PORT
+     may be omitted, in which case it defaults to the value returned by
+     `(current-input-port)'.
+
+ - Function: uniform-array-write URA
+ - Function: uniform-array-write URA PORT
+ - Function: uniform-vector-write UVE
+ - Function: uniform-vector-write UVE PORT
+     Writes all elements of URA as binary objects to PORT. The number
+     of objects actually written is returned. PORT may be omitted, in
+     which case it defaults to the value returned by
+     `(current-output-port)'.
+
+
+File: guile.info,  Node: Bit Vectors,  Prev: Uniform Array,  Up: Arrays
+
+Bit Vectors
+===========
+
+Bit vectors can be written and read as a sequence of `0's and `1's
+prefixed by `#*'.
+
+     #b(#f #f #f #t #f #t #f) => #*0001010
+
+Some of these operations will eventually be generalized to other
+uniform-arrays.
+
+ - Function: bit-count BOOL BV
+     Returns the number occurrences of BOOL in BV.
+
+ - Function: bit-position BOOL BV K
+     Returns the minimum index of an occurrence of BOOL in BV which is
+     at least K.  If no BOOL occurs within the specified range `#f' is
+     returned.
+
+ - Function: bit-invert! BV
+     Modifies BV by replacing each element with its negation.
+
+ - Function: bit-set*! BV UVE BOOL
+     If uve is a bit-vector BV and uve must be of the same length.  If
+     BOOL is `#t', uve is OR'ed into BV; If BOOL is `#f', the inversion
+     of uve is AND'ed into BV.
+
+     If uve is a unsigned integer vector all the elements of uve must be
+     between 0 and the `LENGTH' of BV.  The bits of BV corresponding to
+     the indexes in uve are set to BOOL.
+
+     The return value is unspecified.
+
+ - Function: bit-count* BV UVE BOOL
+     Returns
+          (bit-count (bit-set*! (if bool bv (bit-invert! bv)) uve #t) #t).
+     BV is not modified.
+
+
+File: guile.info,  Node: Object Properties,  Next: Low-Level Syntax Extensions,  Prev: Arrays,  Up: Top
+
+Object Properties
+*****************
+
+  The system maintains an assoc list of properties associated with every
+object in the system.   A property list is protected by the object it is
+for;  if that object is garbage collected, then the property list may
+be as well.
+
+ - Function: object-properties OBJ
+ - Function: set-object-properties OBJ ALIST
+     Return (perhaps setting) the properties of OBJ.
+
+ - Function: object-property OBJ KEY
+ - Function: set-object-property OBJ KEY VAL
+     Return (perhaps setting) a specific property of OBJ.
+
+  [Interface bug:  there should be a second level of interface in which
+the user provides a "property table" that is possibly private.]
+
+
+File: guile.info,  Node: Low-Level Syntax Extensions,  Next: Time,  Prev: Object Properties,  Up: Top
+
+Low-Level Syntax Extensions
+***************************
+
+  Normally when you define a function, arguments passed to that function
+are evaluated and the function itself has no access to the lexical
+environment of the caller.
+
+  Three low-level hooks provide a way to define functions that violate
+these rules, taking arguments unevaluated, and gaining access to the
+lexical environment of the caller.
+
+  To use any of these syntactic extension mechanisms you must define a
+procedure of two arguments, an expression and an environment:
+
+  An "environment" is a list of "environment frames".  There are 2
+types of environment frames:
+
+`((lambda (variable1 ...) ...) value1 ...)'
+`(let ((variable1 value1) (variable2 value2) ...) ...)'
+`(letrec ((variable1 value1)  ...) ...)'
+     result in a single enviroment frame:
+          ((variable1 ...) value1 ...)
+
+`(let ((variable1 value1)) ...)'
+`(let* ((variable1 value1) ...) ...)'
+     result in an environment frame for each variable:
+          (variable1 . value1) (variable2 .  value2) ...
+
+  [Warning: the interface to run-time local environments is subject to
+change.  A more abstract interface should be provided.
+
+  Low-level macros thwart non-trivial compilation.]
+
+ - Function: procedure->syntax PROC
+     Convert PROC into "syntax".
+
+     PROC should take an expression and an environment.
+
+     When the syntax object is applied, the expression containing it
+     and the active environment are passed to PROC.  The value returned
+     from PROC becomes the value of the expression.
+
+ - Function: procedure->macro PROC
+     Convert PROC into a "macro".
+
+     PROC should take an expression and an environment.
+
+     When the macro object is applied, the expression containing it and
+     the active environment are passed to PROC.  The value returned from
+     PROC is evaluated in the callers lexical environment and to
+     produce the value of the expression.
+
+ - Function: procedure->memoizing-macro PROC
+     Convert PROC into a "memoizing macro".
+
+     PROC should take an expression and an environment.
+
+     PROC should take an expression and an environment.
+
+     When the macro object is applied, the expression containing it and
+     the active environment are passed to PROC.
+
+     The first time that occurs, the value returned from PROC replaces
+     the source-expression that called the macro.
+
+     That time and thereafter the expansion is evaluated normally.
+
+
+File: guile.info,  Node: Time,  Next: GC,  Prev: Low-Level Syntax Extensions,  Up: Top
+
+Time
+****
+
+ - Constant: internal-time-units-per-second
+     Is the integer number of internal time units in a second.
+
+ - Function: get-internal-run-time
+     Returns the integer run time in internal time units from an
+     unspecified starting time.  The difference of two calls to
+     `get-internal-run-time' divided by
+     `internal-time-units-per-second' will give elapsed run time in
+     seconds.
+
+ - Function: get-internal-real-time
+     Returns the integer time in internal time units from an unspecified
+     starting time.  The difference of two calls to
+     `get-internal-real-time' divided by
+     `interal-time-units-per-second' will give elapsed real time in
+     seconds.
+
+ - Function: current-time
+     Returns the time since 00:00:00 GMT, January 1, 1970, measured in
+     seconds.  *Note current-time: (slib)Time.  `current-time' is used
+     in *Note Time: (slib)Time.
+
+
+File: guile.info,  Node: GC,  Next: Dynamic Roots,  Prev: Time,  Up: Top
+
+GC
+**
+
+ - Function: gc
+     Scans all of SCM objects and reclaims for further use those that
+     are no longer accessible.
+
+ - Function: gc-stats
+     Returns an association list of statistics about Guile's current
+     use of storage.
+
+ - Function: object-address OBJ
+     Return an integer that for the lifetime of OBJ is uniquely
+     returned by this function for OBJ
+
+
+File: guile.info,  Node: Dynamic Roots,  Next: System Exceptions,  Prev: GC,  Up: Top
+
+Dynamic Roots
+*************
+
+  A "dynamic root" is a root frame of Scheme evaluation.  The top-level
+repl, for example, is an instance of a dynamic root.
+
+  Each dynamic root has its own chain of dynamic-wind information.  Each
+has its own set of continuations, jump-buffers, and pending CATCH
+statements which are inaccessible from the dynamic scope of any other
+dynamic root.
+
+  In a thread-based system, each thread has its own dynamic root.
+Therefore, continuations created by one thread may not be invoked by
+another.
+
+  Even in a single-threaded system, it is sometimes useful to create a
+new dynamic root.  For example, if you want to apply a procedure, but to
+not allow that procedure to capture the current continuation, calling
+the procedure under a new dynamic root will do the job.
+
+ - Function: call-with-dynamic-root THUNK HANDLER
+     Evaluate (THUNK) in a new dynamic context, returning its value.
+
+     If an error occurs during evaluation, apply HANDLER to the
+     arguments to the throw, just as `throw' would.  If this happens,
+     HANDLER is called outside the scope of the new root - it is called
+     in the same dynamic context in which `call-with-dynamic-root' was
+     evaluated.
+
+     If THUNK captures a continuation, the continuation is rooted at
+     the call to THUNK.  In particular, the call to
+     `call-with-dynamic-root' is not captured.  Therefore,
+     `call-with-dynamic-root' always returns at most one time.
+
+     Before calling THUNK, the dynamic-wind chain is un-wound back to
+     the root and a new chain started for THUNK.  Therefore, this call
+     may not do what you expect:
+
+          ;; Almost certainly a bug:
+          (call-with-output-to-port
+           some-port
+          
+           (lambda ()
+             (call-with-dynamic-root
+              (lambda ()
+                (display 'fnord)
+                (newline))
+              (lambda (errcode) errcode))))
+
+     The problem is, on what port will `fnord\n' be displayed?  You
+     might expect that because of the `call-with-input-from-port' that
+     it will be displayed on the port bound to `some-port'.  But it
+     probably won't - before evaluating the thunk, dynamic winds are
+     unwound, including those created by `call-with-input-from-port'.
+     So, the standard output port will have been re-set to its default
+     value before `display' is evaluated.
+
+     (This function was added to Guile mostly to help calls to
+     functions in C libraries that can not tolerate non-local exits or
+     calls that return multiple times.  If such functions call back to
+     the interpreter, it should be under a new dynamic root.)
+
+ - Function: dynamic-root
+     Return an object representing the current dynamic root.
+
+     These objects are only useful for comparison using `eq?'.  They
+     are currently represented as numbers, but your code should in no
+     way depend on this.
+
+ - Function: quit &opt EXIT_VAL
+ - Function: restart
+ - Function: abort
+     Throw back to the error handler of the current dynamic root.
+
+     These call the error handler with the values bound to `repl-quit',
+     `repl-abort' and `repl-restart', respectively.
+
+     If integer EXIT_VAL is specified and if Guile is being used
+     stand-alone and if quit is called from the initial dynamic-root,
+     EXIT_VAL becomes the exit status of the Guile process and the
+     process exits.
+
+ - Constant: repl-quit
+ - Constant: repl-abort
+ - Constant: repl-restart
+     Possible values passed to the error proc of a dynamic root.
+
+
+File: guile.info,  Node: System Exceptions,  Next: Libc procedures,  Prev: Dynamic Roots,  Up: Top
+
+System Exceptions
+*****************
+
+  These two expressions are equivalent:
+
+     (error arg ...)
+     
+     (throw 'error arg ...)
+
+  The following are the names of excpetions that may be thrown by the
+interpreter itself.
+
+     ARGn		"Wrong type argument"
+     ARG1		"Wrong type argument in position 1"
+     ARG2		"Wrong type argument in position 2"
+     ARG3		"Wrong type argument in position 3"
+     ARG4	        "Wrong type argument in position 4"
+     ARG5		"Wrong type argument in position 5"
+     WNA		"Wrong number of arguments"
+     OVFLOW		"Numerical overflow"
+     OUTOFRANGE	"Argument out of range"
+     NALLOC		"Could not allocate"
+     HUP_SIGNAL	"hang-up"
+     INT_SIGNAL	"user interrupt"
+     FPE_SIGNAL	"arithmetic error"
+     BUS_SIGNAL	"bus error"
+     SEGV_SIGNAL	"segmentation violation"
+     ALRM_SIGNAL	"alarm"
+     
+     read-sharp-error
+
+
+File: guile.info,  Node: Libc procedures,  Next: Procedure and Macro Index,  Prev: System Exceptions,  Up: Top
+
+Libc procedures
+***************
+
+  [This section is under construction.]
+
+ - Function: software-type, 0, 0, 0
+
+ - Function: getenv, 1, 0, 0
+
+ - Function: system, 1, 0, 0
+
+ - Function: tmpnam
+ - Function: %delete-file FILE-NAME
+

@@ -1,0 +1,330 @@
+
+
+
+
+
+
+
+
+
+
+	     The LINUX User-Space NFS Server(1)
+
+			Version 2.2
+
+
+
+		     November 15, 1996
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+____________________
+
+1. This	 is a rewrite of the original README file (which you
+   can now find in README.HISTORIC).
+
+
+
+
+
+
+
+			    - 1 -
+
+
+
+1.  Overview
+
+This package contains all necessary programs  to  make	your
+Linux  machine	act  as	 an  NFS server, being an NFS daemon
+(rpc.nfsd), a mount daemon (rpc.mountd), optionally, the uid
+mapping	 daemon	 (rpc.ugidd), and the showmount utility.  It
+was originally developed by Mark Shand, and further enhanced
+by  Donald  Becker,  Rick Sladkey, Orest Zborowski, Fred van
+Kempen, and Olaf Kirch.
+
+Unlike other NFS daemons, the Linux nfsd  runs	entirely  in
+user  space.   This  makes  it	a  tad slower than other NFS
+implementations, and also makes it hard to support a  couple
+of  UNIX file system features supported by other nfsd imple-
+mentations, especially several concurrent server  processes.
+
+
+2.  Building and installing unfsd
+
+To  compile  and  install  the programs in this package, you
+first have to run the BUILD script. It will ask you a couple
+of questions about your preferred configuration. It tries to
+be helpful by informing you about why it  asking  you  which
+question, but a brief overview may be useful nevertheless:
+
+uid/gid mapping: Occasionally,	you  will  want to serve NFS
+     clients whose assignment of uids and gids to user names
+     differs  from  that  on  the  client. The unfsd package
+     offers you a mechanism to dynamically map the  client's
+     uid  space	 to that of the server, and vice versa. This
+     is achieved by running  the  rpc.ugidd  daemon  on	 the
+     client  machine,  and instructing the server machine to
+     use it to map the client's credentials presented to the
+     server in an NFS call, and remap file owner information
+     in all NFS replies.
+
+     While this is convenient, it also presents	 a  security
+     problem because rpc.ugidd can be abused by attackers to
+     obtain a list  of	valid  user  names  for	 the  client
+     machine.  This  can  be helped somewhat by making ugidd
+     check  the	  requester's	IP   address   against	 the
+     hosts.allow  and hosts.deny files also used by the tcpd
+     wrapper program.
+
+     Therefore, the BUILD script asks you about whether	 you
+     want  to  use  ugidd at all, and if you do, whether you
+     wish to protect it using the host access control files.
+     Note that you still have to configure access control as
+     described below.
+
+     If you do enable host access  checking  for  rpc.ugidd,
+     the  BUILD script will try to locate libwrap.a which is
+     needed for this. This library is part  of	Wietse	Ven-
+     ema's  TCP	 wrapper  package.  BUILD  looks  in several
+
+
+
+
+
+
+
+
+			    - 2 -
+
+
+
+     standard locations such as /usr/lib.  If  it  does	 not
+     find  the	library	 (e.g.	because you keep it in weird
+     places like /usr/i486-linux/lib), it will ask  you	 for
+     its full path name.
+
+     If	 you  disable  ugidd support, the daemon will not be
+     compiled, and the manpage will not be installed.
+
+file access control: For security reasons, mountd  and	nfsd
+     make  sure	 that  vital  files such as /etc/exports are
+     owned by the  correct  user  and  have  an	 appropriate
+     access  mode.  BUILD  will ask you which user and group
+     should  own  exports.   By	 default,   this   will	  be
+     root/root.
+
+mount request logging: If you enable this option, rpc.mountd
+     will log all attempts to mount a directory via NFS from
+     your server machine. This is very helpful in monitoring
+     NFS server usage, and for catching attempts at attcking
+     your machine via NFS.
+
+     When  enabled,  mountd  will  log	all successful mount
+     attempts to syslog's daemon facility at  level  notice.
+     Failed mount attempts are logged at level warning.
+
+After completing these questions, BUILD will run a configure
+script to detect certain system capabilities. This will take
+a  while on your first attempt. Repeated invocations of con-
+figure will run a lot faster  because  the  results  of	 the
+tests  are  cached.  If	 you  want to start out with a fresh
+build on a different release of Linux, you should make	sure
+to  get	 rid  of  these cached values by running `make dist-
+clean' first.
+
+You can then compile  and  install  nfsd  by  typing  `make'
+and/or	(as root) `make install.' This will also install the
+manual pages.
+
+
+3.  Configuring nfsd
+
+To turn your Linux box into an NFS server, you have to start
+the  following programs from /etc/rc.d/rc.inet2 (or wherever
+your favorite  Linux  distribution  starts  network  daemons
+from):
+
+   * rpc.portmap
+
+   * rpc.mountd
+
+   * rpc.nfsd
+
+   * rpc.ugidd (optional)
+
+
+
+
+
+
+
+
+
+			    - 3 -
+
+
+
+   * rpc.pcnfsd (optional, not contained in this package)
+
+To  make  directories  available to NFS clients, you have to
+enter them in your exports file along with the hosts allowed
+to  mount  them.   The list of options and a sample file are
+given in the exports(5) manual page (and the whole topic  is
+covered	 quite	extensively in the Linux Network Administra-
+tor's Guide anyway), so I will not  discuss  this  here.  If
+somebody  feels	 like  filling	in  the	 missing parts here,
+please send me the diffs.
+
+
+4.  Configuring rpc.ugidd access control
+
+To protect rpc.ugidd from unauthorized access, you just have
+to  add	 lines	to  /etc/hosts.allow  and/or /etc/hosts.deny
+detailing which NFS servers that are allowed to	 access	 it.
+If  your  NFS  server  has the IP address 193.175.30.33, you
+would add the following to hosts.allow:
+
+     # Allow ugidd access only to NFS server
+     ugidd: 193.175.30.33
+
+
+5.  Common Problems (a.k.a. Dependencies)
+
+   * Root squashing is enabled by default, which means	that
+     requests  from  the  root	user  are treated as if they
+     originated from the nobody user. If you  want  root  on
+     the  NFS  client  to  be able to access files with full
+     prvilege, you have to add no_root_squash to the  option
+     list in /etc/exports.
+
+   * The  most	specific  entry	 applies.  This means if you
+     export both /usr and /usr/local to a  client,  and	 the
+     client  mounts  /usr  from	 the server, the options for
+     /usr/local will still apply when the client accesses
+
+   * Wildcards in client names only do not match dots.	This
+     means that the entry *.foo.com only matches hosts named
+     joe.foo.com etc, but  not	joe.sales.foo.com.  You	 may
+     call  this a bug (and I may replace the current pattern
+     matching code with wildmat if there is enough  demand).
+
+   * Changes  to  the  exports file do not take effect until
+     both nfsd and mountd have re-read the file. You  either
+     have  to  kill  both  daemons and restart them, or send
+     them a HUP signal:
+
+     # killall -HUP rpc.mountd rpc.nfsd
+
+   * NFS operation between two	Linux  boxes  can  be  quite
+     slow.  There are a number of reasons for this, only one
+     of which is that unfsd runs  in  user  space.   Another
+
+
+
+
+
+
+
+
+			    - 4 -
+
+
+
+     (and  much	 worse) problem is that the Linux NFS client
+     code currently does no proper caching,  read-ahead	 and
+     write-behind  of  NFS data.  This problem can be helped
+     by increasing the RPC transfer size on  the  client  by
+     adding  the `rsize=8192,wsize=8192' mount options. This
+     will at least improve throughput when reading or  writ-
+     ing large files. You are still in a lose-lose situation
+     when applications write data line by line	or  with  no
+     output buffering at all.
+
+
+6.  Copyright
+
+Much  of  the code in this package was originally written by
+Mark Shand, and is placed under the following copyright:
+
+   This software may be used for any purpose  provided
+   the	above copyright notice is retained. It is sup-
+   plied  as  is,  with	 no  warranties	 expressed  or
+   implied.
+
+Other code, especially that written by Rick Sladkey and some
+replacement routines included from the GNU libc, are covered
+by  the	 GNU  General Public License, version 2, or (at your
+option) any later version.
+
+
+7.  Bug Reports
+
+If you think you have encountered a bug in nfsd	 or  any  of
+the  other  programs  in  this	package,  please  follow the
+instructions in the file BUGS.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

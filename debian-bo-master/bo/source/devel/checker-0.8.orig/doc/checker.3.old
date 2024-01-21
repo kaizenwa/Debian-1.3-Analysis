@@ -1,0 +1,321 @@
+.\" Copyright (c) 1993 Tristan Gingold
+.\" See section COPYING for conditions for redistribution
+.\"
+.\" Man for Checker V0.1
+.\" Man V0.1
+.TH Checker 3 "26aug1993"
+.SH NAME
+Checker  \- robust malloc and garbage collector.
+.SH WARNING
+.nf
+.B This manual is not up to date!!!
+.SH SYNOPSIS
+.nf
+.B #include <malloc.h>
+.B __ptr_t malloc(size_t __size);
+.B void free(__ptr_t __ptr);
+.B __ptr_t realloc(__ptr_t __ptr, size_t __size);
+.B __ptr_t calloc(size_t __nmemb, size_t __size);
+.B __ptr_t memalign(size_t __alignment, size_t __size);
+.B __ptr_t valloc(size_t __size);
+.B void chkr_garbage_detector();
+.B void chkr_evol_detector();
+.B void __chkr_dump_frag();
+.B void __chkr_dump_free();
+.B void __chkr_dump_block(const size_t block);
+.B void __chkr_check_intern();
+.B void __chkr_show_busy();
+.B extern int chkr_errno;
+.B extern int chkr_show_err_flag;
+.B "extern const char * const chkr_errlist[];"
+.B "void (*__chkr_trap) (const int header, const char *, ...);"
+.fi
+.SH INTRODUCTION
+.B Checker
+is a robust 
+.B malloc, free,
+etc, with a garbage collector. So, it must be used in place of your standard 
+malloc. It can be also a simple
+.B malloc
+package, according to the option while compiling.  Using 
+.B Checker
+is simple: compile it, and link it with your program. If your program has no
+memory error, you can't see the difference. but if your program handle
+incorrectly 
+.B malloc, free, realloc Checker
+will immediately warn you. Checker warns you when:
+.TP 5
+o You call free or realloc before malloc
+.TP 5
+o You try to free a free zone
+.TP 5
+o You call free with a different address
+.PP
+Futhermore, Checker malloc try to be the most secure as possible: If you
+alloc a zone, then free it, alloc another zone of the same size, refreeing
+the first zone produce, in some case, a warning.
+.br
+Using the garbage detector is non-automatic -- you must call it by
+hand.  This can be done easily with your debugger.
+
+.SH DESCRIPTION
+.B __ptr_t
+is defined as
+.B void *
+on ANSI-C compiler and as
+.B char *
+on K&R compiler.
+.PP
+.B size_t 
+is defined by
+.B sys/types.h
+often as
+.B long
+.PP
+.B malloc()
+alloc __size bytes of memory. If no memory is available, malloc returns 
+.B NULL
+otherwise, it returns a pointer at the first bytes of allocated memory.
+Some versions of malloc() return more memory than requested.  When using Checker,
+your programs are not allowed to exploit this feature.
+.br
+malloc(0) returns 
+.B NULL
+.PP
+.B free()
+frees memory allocated by
+.B malloc()
+.PP
+.B realloc()
+changes the size of a zone allocated by malloc.  It returns a pointer to the
+new zone, which can be different from the old one.  In this case, realloc
+copies the memory from the old zone.
+.br
+If 
+.B __ptr
+is
+.B NULL
+the behavior of
+.B realloc
+is the same than
+.B malloc
+.br
+If 
+.B __size
+is 0, realloc free the memory and returns
+.B NULL
+.PP
+.B realloc()
+allocates
+.B nmemb
+elements of
+.B __size
+bytes. The zone is initialized with 0.
+.br
+.B realloc()
+is often used like this: ptr = (int*)realloc(n, sizeof(int));
+.PP
+.B memalign
+allocates 
+.B __size
+bytes. The address of the zone is a multiple of 
+.B __alignment
+The memory can be freed by 
+.B free()
+.PP
+.B valloc()
+allocates
+.B __size
+bytes. The zone begin on a page.
+.PP
+.B chkr_garbage_detector()
+shows all leaks found in memory. This function can be call at any time.
+.PP
+.B chkr_evol_detector()
+shows all
+.I new
+leaks found in memory, after the last detection.
+.B __chkr_dump_frag()
+displays the fragment table. Useful only when debugging.
+.PP
+.B __chkr_dump_free()
+displays all free zone. Useful only when debugging.
+.PP
+.B __chkr_dump_block()
+displays the state of the block block. Useful only when debugging.
+.PP
+.B __chkr_check_intern()
+perfoms a check of internal tables and displays errors. This function
+doesn't check features better than CHECKER level. Not really useful for the
+final user.
+.PP
+.B __chkr_show_busy()
+shows all busy blocks. Useful only when debugging.
+.PP
+.B chkr_errno
+contains the error number. Errors can appear while calling 
+.B free, malloc ...
+Because some functions don't return anything (e.g.
+.B free
+) this is not always useful.
+.PP
+.B chkr_show_err_flag
+is a boolean value. When it is different from
+.B NULL
+Checker is allowed to display messages while an error occurs.
+.PP
+.B chkr_errlist[]
+contains strings describing each error.
+.PP
+.B (*__chkr_trap)()
+is a pointer at a function used by Checker to print all message. So you can
+redefine it. It uses the same format that 
+.B printf
+except the first argument.
+.br
+.B header
+is a boolean value, which tell if a header must be printed.  The header can
+inform the user that the following output is from 
+.B Checker
+and not from the program.
+.br
+
+.SH USAGE
+Suppose you want to use 
+.B foo.o
+(it can be a list of object files) with Checker. You have just to link:
+.br
+.B cc foo.o -o foo -lchecker -lyour_library -static
+.br
+That's all.
+.PP
+Using the garbage collector is a little more difficult. You must run your
+program under a debugger, such as
+.B gdb
+.br
+$ gdb foo
+.br
+(gdb) run
+.br
+.I "Your program is running and you interrupt it with ^C"
+.br
+(gdb) call chkr_evol_detector()
+.br
+.I or
+.br
+(gdb) call chkr_garbage_collector()
+
+.SH "OUTPUT MESSAGE"
+All message are printed with the hook-function
+.B __chkr_trap()
+.br
+A warning is: (the first tab isn't displayed)
+.nf
+        From mallocdebug:
+                Try to free a free block        <- warning message
+        From mallocdebug:
+                Stack frames are:               <- where the error occurs
+                 pc=0x0000045d in main() at try.c:97
+                 pc=0x0000002a in _entry() at /usr/lib/crt0.o:0
+                    ^               ^             ^           ^
+the instruction     |               |             |           |
+  pointer  ---------|               |             |           |
+function name ----------------------|             |           |
+file where the function is written ---------------|           |
+line where the error occurs ----------------------------------|
+.fi
+The PC value is always correct.
+If function name or file name is "Unknown", Checker doesn't know it.
+If line number is 0, Checker doesn't know it.
+
+Checker may have insufficient information because:
+.TP 5
+o Symbol table doesn't exist ( programm striped, or linked with ld -s)
+.TP 5
+o Checker can't find the full path of the program: either the
+argv[0] is bad, or the file isn't accessible
+.TP 5
+o Symbol table isn't complete. To get line numbers, you must compile as you
+would for the debugger (with the -g option).
+.PP
+
+
+In this example, free was called two times. This is made by a program such as
+.nf
+main()
+{
+ char *addr;
+ addr = (char*)malloc(10);
+ free(addr);
+ free(addr); /* Here a warning is generated */
+}
+.fi
+From the stack frames, we know that the program begins with _entry(),
+defined in /usr/lib/crt0.o, _entry() calls main(), which is defined in
+the try.c file, and the second free() is made at line 97.
+Note that the file name is often a .c file, without the full path. If the .c
+file is unknown, Checker shows the .o file.
+.PP
+Checker implements a garbage detectors, which can be called in the program
+or by a debuger, such as 
+.B gdb
+.br
+The garbage detector displays all the family of memory leaks (or leaks),
+with the functions which called malloc.
+.br
+An example of display is: (The first tab has been added)
+.nf
+        From mallocdebug:
+                There are 2 leaks
+                Leaks use 32560 bytes (31 Kb) / 116 Kb.
+                So, 27.41% of the memory is lost.
+        From mallocdebug:
+                Checker found 20 * 128 bytes.
+                 pc=0x000021c0 in malloc() at malloc.c:410
+                 pc=0x000000ce in multiple_alloc() at try_detector.c:23
+                 pc=0x000002df in main() at try_detector.c:63
+                 pc=0x0000002a in _entry() at /usr/lib/crt0.o:0
+        From mallocdebug:
+                Checker found 5 * 6000 bytes.
+                 pc=0x000021c0 in malloc() at malloc.c:410
+                 pc=0x000000ce in multiple_alloc() at try_detector.c:23
+                 pc=0x000002ee in main() at try_detector.c:64
+                 pc=0x0000002a in _entry() at /usr/lib/crt0.o:0
+.fi
+Informations are rather obvious. When you read " Garbages found 20 * 128
+bytes.", this means that there are 20 leaks of 128 bytes. Those 20 leaks
+have been allocated by the same way.
+
+.SH AUTHOR
+Tristan Gingold
+.SH "SEE ALSO"
+.IR getpagesize(2), 
+.IR brk(2),
+.IR sbrk(2),
+.IR morecore(3),
+.IR printf(3).
+.SH BUGS
+Checker works fully only on linux. You must compile your program with statis
+library, because the shared library defined another data segment, unknown to
+Checker: it can know the begin but not the end.
+.br
+Checker must be linked with object file that use the frame pointer. So don't
+compile your sources (or libraries) with 
+.B -fomit-frame-pointer
+.SH COPYING
+Copyright (c) 1993 Tristan Gingold
+.PP
+Permission is granted to make and distribute verbatim copies of
+this manual provided the copyright notice and this permission notice
+are preserved on all copies.
+.PP
+Permission is granted to copy and distribute modified versions of this
+manual under the conditions for verbatim copying, provided that the
+entire resulting derived work is distributed under the terms of a
+permission notice identical to this one.
+.PP
+Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions, except that this permission notice may be included in
+translations approved by the Free Software Foundation instead of in
+the original English.

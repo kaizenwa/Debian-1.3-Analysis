@@ -1,0 +1,667 @@
+#if never: This file is used to create a Makefile by configure with the
+#if never: following syntax rules:
+#if never:      1. A line beginning with #if <condition>: is included only if
+#if never: 	   the <condition> is true.
+#if never:	2. A section between #if <condition> and #endif <condition>
+#if never:	   pairs will only be accepted only if <condition> is true.
+#if never:	3. A <*=*> conditions can not be nested inside each other's
+#if never:	   sections.
+#if never:	4. All other section types can be nested.
+#if never:	5. If a condition isn't defined, the respective lines will be
+#if never:         always be skipped.
+#if never:	6. @variable@ indicates a value will be inserted.
+#if never:
+#if never: The following conditions are defined:
+#if never:	shlib=OS, static=OS, shlib=any, static=any,
+#if never:      socks, !socks, no_clients, !no_clients, root, !root,
+#if never:	one_client, !one_client, no_clients, !no_clients, wrap, !wrap
+#if never:
+
+# Term program makefile for @OS@
+# valid targets are:
+#	all linecheck termtest clean binclean realclean ...
+#	bin install.bin install.share install.net
+#	lib install.lib
+#if shlib=any: #	shlib install.shlib
+
+SRCDIR=@srcdir@
+VPATH=@srcdir@
+PWD=@workdir@
+SHELL=/bin/sh
+
+# Note: If you change the version #, you must "make realclean"
+VERSION_MAJOR = 2
+VERSION_MINOR = 3
+PATCH_LEVEL   = 5
+PATCH_NAME    = .5
+VERSION_NUM   = @version_num@
+
+CC=@cc@
+CPP=@cpp@
+
+# ADDFLAGS=-DNO_LOOPBACK keep "termnet" from connecting to localhost.
+# ADDFLAGS=-DUSE_IDENT allows term to use identd to find out who is connecting.
+ADDFLAGS =
+#if shlib=linux: # XFLAGS are used for the shared libraries only.
+#if shlib=linux: XFLAGS=-fomit-frame-pointer
+
+CFLAGS = @debugflags@ @osflags@ $(ADDFLAGS) \
+#if socks: 	-Dconnect=Rconnect -Dgetsockname=Rgetsockname \
+#if socks: 	-Daccept=Raccept -Dlisten=Rlisten -Dselect=Rselect \
+#if socks: 	-Dbind=Rbind -Drcmd=Rrcmd -DSOCKS \
+	-DSHAREDIR='"$(SHAREDIR)"' -DVERSION=$(VERSION_NUM)
+
+AR		= @ar@
+RANLIB		= @ranlib@
+AS		= as
+CHGRP		= chgrp term
+CHMOD		= chmod
+CP		= cp
+LN		= ln
+RM		= rm -f
+RMDIR		= rmdir
+MKDIR		= mkdir
+MV		= mv
+NM		= nm
+SED		= sed
+STRIP		= @strip@
+SHAREDIR        = $(prefix)@sharedir@
+BINDIR          = $(prefix)@bindir@
+LIBDIR          = $(prefix)@libdir@
+INCDIR          = $(prefix)@incdir@
+MANDIR          = $(prefix)@mandir@
+OSLIBS          = $(prefix)@libs@
+SOCKLIBS	= @sockslib@
+LIBS		= $(TERMNETLIB) $(OSLIBS) $(SOCKLIBS)
+LINKFLAGS	= @oslink@
+USRTMP		= /usr/tmp
+
+#
+# Change this if yours is different.
+#
+CURSES= -ltermcap
+
+#if static=any:    TERMNETDEP=libtermnet.a
+#if static=any:    TERMNETLIB=$(TERMNETDEP)
+#if shlib=linux:   TERMNETDEP=$(PWD)/shared/libtermnet.sa
+#if shlib=linux:   TERMNETLIB=$(TERMNETDEP)
+#if shlib=sun:     TERMNETDEP=libtermnet.so.$(VERSION_MAJOR).$(VERSION_MINOR)
+#if shlib=sun:     TERMNETLIB=-L. -L$(LIBDIR) -ltermnet
+#if shlib=sol2:    TERMNETDEP=libtermnet.so.$(VERSION_MAJOR)
+#if shlib=sol2:    TERMNETLIB=-L. -R$(LIBDIR) -ltermnet
+#if shlib=netbsd:  TERMNETDEP=libtermnet.so.$(VERSION_MAJOR).$(VERSION_MINOR)
+#if shlib=netbsd:  TERMNETLIB=-L. -L$(LIBDIR) -ltermnet
+#if wrap:          TERMNETDEP += termwrap.so
+
+TERMOBJS=main.o serial.o misc.o do_link.o pty.o compress.o \
+		meta.o statistics.o sevenbit.o
+
+CLIENTOBJS=utils.o client.o termnet.o terminal.o do_select.o sockets.o \
+		do_connect.o term_getopt.o term_putenv.o term_herror.o \
+		spipe.o term_spair.o checksum.o host_lookup.o
+
+WRAPOBJS = termwrapin.o termwrapout.o
+
+MANPAGES=term.1 termrc.1 term_clients.1 term_setup.1 termtest.1 linecheck.1
+
+#if !one_client
+LINKS = trdated
+LINK_FROM = trdate
+CLIENTS = tdownload tudpredir tmon tshutdown \
+	trsh tupload tredir txconn trdate
+#endif !one_client
+
+#if one_client
+LINK_FROM = trsh
+CLIENTS = trsh
+LINKS = tdownload tudpredir tmon tshutdown \
+	trdated tupload tredir txconn trdate
+#endif one_client
+
+#if !no_clients: PROGS = term $(CLIENTS) linecheck
+#if no_clients:  PROGS = term linecheck
+#if wrap:        SCRIPTS = termwrap
+
+#if one_client
+LINKOBJS = term_clients.o trdate.o download.o \
+ 	upload.o udpredir.o tmon.o shutdown.o \
+ 	trshell.o xconn.o tcpredir.o
+#endif one_client
+
+#if no_clients: all: bin libtermnet.a
+#if !no_clients: all: bin $(LINKS) libtermnet.a
+
+help:
+	@echo "To install, make one of the following:"
+	@echo "  install - binaries, dynamic and static library, include file"
+	@echo "  install.bin - binaries"
+	@echo "  install.share - binaries in shared mode"
+#if static=any: 	@echo "  install.lib - static library"
+#if shlib=linux: 	@echo "  install.lib - static library"
+#if shlib=any:  	@echo "  install.shlib - dynamic link library"
+	@echo "  install.include - include file"
+	@echo "  install.man - manual pages"
+	@echo "  install.net - full networking flag"
+
+install: @install_shlib@ install.bin install.lib
+
+install.bin: all
+	if [ ! -d $(BINDIR) ] ; then $(MKDIR) $(BINDIR); else true; fi
+#if !no_clients: 	cd $(BINDIR); $(RM) $(LINKS); true
+	cd $(BINDIR); for i in $(PROGS) $(SCRIPTS) $(LINKS); do \
+		if [ -f $$i ]; then $(MV) $$i $$i.old ; fi ; \
+	done; true
+	for i in $(PROGS) $(SCRIPTS); do \
+		$(CP) $$i $(BINDIR)/. ; \
+		$(CHMOD) 755 $(BINDIR)/$$i ; \
+	done
+	for i in $(PROGS); do \
+		$(STRIP) $(BINDIR)/$$i ; \
+	done
+#if !no_clients
+	cd $(BINDIR); for i in $(LINKS); do \
+		$(LN) -s ./$(LINK_FROM) $$i ; \
+	done; true
+#endif !no_clients
+	if [ ! -d $(LIBDIR) ] ; then $(MKDIR) $(LIBDIR); else true; fi
+
+install.lib: libtermnet.a install.include
+	$(CP) ./libtermnet.a $(LIBDIR)
+	cd $(LIBDIR);$(RANLIB) libtermnet.a; true
+
+install.net installnet: install
+	if [ ! -d $(SHAREDIR) ] ; then $(MKDIR) $(SHAREDIR); else true; fi
+	echo "# This file activates full term networking" > $(SHAREDIR)/termnet
+	if [ ! -f $(SHAREDIR)/hosts.term ] ; then \
+		echo 127.0.0.254 remotehost > /etc/hosts.term ; \
+	fi ; true
+#if root
+	if [ ! -f /etc/hosts ] ; then \
+		echo 127.0.0.1 localhost `hostname` > /etc/hosts ; \
+	fi ; true
+#endif root
+
+install.include:
+	if [ ! -d $(INCDIR) ]; then $(MKDIR) $(INCDIR); else true; fi
+	$(CP) termnet.h $(INCDIR)/.
+#if root: 	$(CHMOD) 644 $(INCDIR)/termnet.h
+
+
+install.share installshare share: install
+	cd $(BINDIR) ; \
+	for i in $(PROGS) \
+#if shlib=sol2: 	$(SCRIPTS) \
+	; do \
+#if root:		$(CHGRP) $$i ; \
+		$(CHMOD) @setid@ $$i ; \
+	done
+	if [ ! -d $(SHAREDIR) ] ; then $(MKDIR) $(SHAREDIR); else true; fi
+#if !root
+	$(CHMOD) 0755 $(SHAREDIR)
+	if [ ! -d $(SHAREDIR)/tmp ] ; then $(MKDIR) $(SHAREDIR)/tmp; else true; fi
+	$(CHMOD) 755 $(SHAREDIR)/tmp ; true
+#endif !root
+#if root
+	$(CHGRP) $(SHAREDIR)
+	$(CHMOD) 0775 $(SHAREDIR)
+	if [ -d $(SHAREDIR)/tmp ] ; then \
+		$(MV) $(SHAREDIR)/tmp $(SHAREDIR)/tmp.old ; \
+		$(RM) -r $(SHAREDIR)/tmp.old ; \
+	fi; true
+	$(LN) -s $(USRTMP) $(SHAREDIR)/tmp; true
+#endif root
+	if [ ! -d $(SHAREDIR)/.term ]; then \
+		 $(LN) -s $(SHAREDIR)/tmp/private $(SHAREDIR)/.term ; \
+	fi; true
+
+install.man installman: $(MANPAGES)
+	if [ ! -d $(MANDIR) ]; then $(MKDIR) $(MANDIR); else true; fi
+	cd $(SRCDIR); for i in *.1; do \
+		$(CP) $$i $(MANDIR)/.; \
+#if root: 		$(CHMOD) 644 $(MANDIR)/$$i; \
+	done
+#if !no_clients: 	for i in $(CLIENTS) $(LINKS); do \
+#if !no_clients: 		echo ".so man1/term_clients.1" > $(MANDIR)/$$i.1; \
+#if root: 		$(CHMOD) 644 $(MANDIR)/$$i.1; \
+	done
+
+# The next two targets are only used by GNU Make, as far as I know.
+# They automatically rebuild Makefile and config.status when necessary.
+
+Makefile: Makefile.in Makefile.depend.in config.status
+	./config.status
+	@echo ' '
+	@echo "If this message appears recursively, your make command is broken."
+	@echo "In that case, please upgrade your version of make."
+	@echo ' '
+
+config.status: configure
+	@echo "Updating Makefile with a new ./configure script."
+	./configure
+	@echo "YOU WILL NEED TO RE-RUN 'make'."
+	@echo ' '
+	@echo "The following error is normal:"
+	@false
+
+Makefile.depend:
+
+#-----------------------------------------------------------------
+# if your make complains about not know how to make .o files, you
+# may need to uncomment following two lines.. (for gnu make).
+#%.o: %.c
+#	$(CC) $(CFLAGS) -c $< -o $@
+#     --- or following 5 lines ------
+#.SUFFIXES
+#.SUFFIXES:  .o .c
+#
+#.c.o:
+#	$(CC) $(CFLAGS) -c $< -o $@
+#-----------------------------------------------------------------
+
+libtermnet.a: $(CLIENTOBJS)
+	$(RM) libtermnet.a
+	$(AR) libtermnet.a $(CLIENTOBJS)
+	$(RANLIB) libtermnet.a
+
+bin: $(PROGS) $(SCRIPTS)
+
+termtest: $(TERMNETDEP) termtest.o
+	$(CC) $(LINKFLAGS) $(NOPAG) -o termtest termtest.o $(LIBS)
+
+term: $(TERMNETDEP) $(TERMOBJS)
+	$(CC) $(LINKFLAGS) -o term $(TERMOBJS) $(LIBS)
+
+termwrap: termwrap.sh
+	$(CP) $(SRCDIR)/termwrap.sh termwrap
+	$(CHMOD) 0755 termwrap
+
+$(LINKS): $(LINK_FROM)
+	for i in $(LINKS); do \
+		$(RM) $$i ; \
+		$(LN) -s ./$(LINK_FROM) $$i ; \
+	done
+
+linecheck: $(TERMNETDEP) linecheck.o freqtest.o
+	$(CC) $(LINKFLAGS) $(NOPAG) -o linecheck linecheck.o freqtest.o $(LIBS)
+
+#if one_client
+$(LINK_FROM): $(TERMNETDEP) $(LINKOBJS)
+	$(CC) $(LINKFLAGS) $(NOPAG) -o $(LINK_FROM) $(LINKOBJS) $(CURSES) $(LIBS)
+#endif one_client
+#if !one_client
+trsh: $(TERMNETDEP) trshell.o
+	$(CC) $(LINKFLAGS) $(NOPAG) -o trsh trshell.o $(LIBS)
+
+tupload: $(TERMNETDEP) upload.o
+	$(CC) $(LINKFLAGS) $(NOPAG) -o tupload upload.o $(LIBS)
+
+tdownload: $(TERMNETDEP) download.o
+	$(CC) $(LINKFLAGS) $(NOPAG) -o tdownload download.o $(LIBS)
+
+tredir: $(TERMNETDEP) tcpredir.o
+	$(CC) $(LINKFLAGS) $(NOPAG) -o tredir tcpredir.o $(LIBS)
+
+tudpredir: $(TERMNETDEP) udpredir.o
+	$(CC) $(LINKFLAGS) $(NOPAG) -o tudpredir udpredir.o $(LIBS)
+
+txconn: $(TERMNETDEP) xconn.o
+	$(CC) $(LINKFLAGS) $(NOPAG) -o txconn xconn.o $(LIBS)
+
+tshutdown: $(TERMNETDEP) shutdown.o
+	$(CC) $(LINKFLAGS) $(NOPAG) -o tshutdown shutdown.o $(LIBS)
+
+tmon: $(TERMNETDEP) tmon.o
+	$(CC) $(LINKFLAGS) $(NOPAG) -o tmon tmon.o $(CURSES) $(LIBS)
+
+trdate: $(TERMNETDEP) trdate.o
+	$(CC) $(LINKFLAGS) $(NOPAG) -o trdate trdate.o $(CURSES) $(LIBS)
+#endif !one_client
+
+tags:
+	etags *.h *.c
+
+
+clean:
+	$(RM) *.o lib*.a lib*.sa lib*.so.* lib*.so core compress.debug *.out *~
+#if shlib=any
+	$(RM) shared/*
+#if shlib=linux: 	$(RM) @jump_dir@/jump.log @jump_dir@/_*
+#if wrap:       	$(RM) sharedwrap/* termwrap.so
+#endif shlib=any
+
+
+realclean: clean
+	$(RM) $(PROGS) $(SCRIPTS) $(LINKS) freqtest termtest 1 TAGS tags
+	$(RM) *.log; true
+#if shlib=any
+	$(RM) -r shared
+#if shlib=linux: 	$(RM) -r @jump_dir@/jump.import
+#if wrap:       	$(RM) -r sharedwrap
+#endif shlib=any
+
+depend:
+	echo '### Dependencies' > Makefile.depend
+	for i in `cd $(SRCDIR); echo *.c`; do \
+		if [ -s $$i ]; then \
+			echo $$i; \
+			(cd $(SRCDIR); gcc -E -MM $$i) >> Makefile.depend ; \
+		fi; \
+	done
+	./config.status
+
+
+#if shlib=any: ###### This text is all the @OS@ specific shared library stuff ####
+#if shlib=any: LDCONFIG	= @ldconfig@
+
+#if shlib=linux
+#######   This is the linux shared library rules  #######
+
+SHLIBOBJS=$(PWD)/shared/utils.o $(PWD)/shared/client.o \
+                $(PWD)/shared/termnet.o $(PWD)/shared/terminal.o \
+                $(PWD)/shared/do_select.o $(PWD)/shared/sockets.o \
+                $(PWD)/shared/do_connect.o $(PWD)/shared/spipe.o \
+                $(PWD)/shared/term_getopt.o $(PWD)/shared/term_putenv.o \
+                $(PWD)/shared/term_herror.o $(PWD)/shared/term_spair.o \
+                $(PWD)/shared/checksum.o $(PWD)/shared/host_lookup.o
+
+DLLBIN  = @dllbin@
+DLLAS   = @dllas@
+MKIMAGE	= $(DLLBIN)mkimage -f
+MKSTUBS	= $(DLLBIN)mkstubs
+GETVARS	= $(DLLBIN)getvars
+GETFUNCS = $(DLLBIN)getfuncs
+GETSIZE = $(DLLBIN)getsize
+VERIFY	= $(DLLBIN)verify-shlib
+
+VERSION=$(VERSION_MAJOR).$(VERSION_MINOR).$(PATCH_LEVEL)
+# When you change the following #'s you need to increase the
+# major version # of the library.  I really don't care about
+# lookup table speeds, so I made these large defaults.
+ADDRESS=0x66000000
+JUMPSIZE=0x1000    # allows 1000 functions.
+GOTSIZE=0x4000     # allows 16k (16 x 1024 arrays) of variables
+JUMP_DIR=@jump_dir@
+JUMP_LIB=@jump_lib@
+NOPAG=-N -s
+
+clientobjs: $(SHLIBOBJS)
+
+%.o: %.s
+	$(AS) -o $@ $<
+	if ( $(MV) $@ . ) ; then \
+		JUMP_DIR=$(JUMP_DIR) JUMP_LIB=$(JUMP_LIB) \
+		$(DLLAS) -o $@ $< ; \
+	fi
+
+$(PWD)/shared/%.s: %.c
+	@if [ ! -d shared ] ; then $(MKDIR) shared ; else true ; fi
+	$(CC) -S $(CFLAGS) $(XFLAGS) -o $@ $<
+
+$(JUMP_DIR)/jump.import: /usr/lib/libc.sa
+	$(NM) --no-cplus -o /usr/lib/libc.sa | \
+		$(SED) -n '/__GOT__/s/__GOT_//p' > $(JUMP_DIR)/jump.import
+
+$(PWD)/shared/libtermnet.so.$(VERSION): $(JUMP_DIR)/jump.import $(SHLIBOBJS)
+	@if [ -f $(JUMP_DIR)/jump.log ]; then \
+		echo "*** WARNING: $(JUMP_DIR)/jump.log exists!" >&2; \
+		echo ">>> HINT: Running 'make jump-update' without interruption" >&2; \
+		echo ">>>       may be easier than manually updating " >&2; \
+		exit 1; \
+	fi
+	cd shared; JUMP_DIR=$(JUMP_DIR) $(MKIMAGE) \
+		-l libtermnet -v $(VERSION) -a $(ADDRESS) -j $(JUMPSIZE) \
+		-g $(GOTSIZE) -- $(CLIENTOBJS) `gcc -print-libgcc-file-name` -lc
+	cd shared;v=$(VERSION);cp libtermnet.so.$$v libtermnet.so.$$v.new
+	cd shared;v=$(VERSION);mv libtermnet.so.$$v.new libtermnet.so.$$v
+
+
+shlib $(PWD)/shared/libtermnet.sa: $(PWD)/shared/libtermnet.so.$(VERSION)
+	cd shared; JUMP_DIR=$(JUMP_DIR) $(MKSTUBS) \
+		-l libtermnet -v $(VERSION) -a $(ADDRESS) -j $(JUMPSIZE) \
+		-g $(GOTSIZE) -- libtermnet
+
+install.shlib install-shlib: $(PWD)/shared/libtermnet.sa \
+		$(PWD)/shared/libtermnet.so.$(VERSION) install.include
+	if [ ! -d $(LIBDIR) ] ; then $(MKDIR) $(LIBDIR); else true; fi
+	$(CP) -pf shared/libtermnet.sa shared/libtermnet.so.$(VERSION) \
+		$(LIBDIR)/.
+#if root
+	$(CHMOD) 644 $(LIBDIR)/libtermnet.sa
+	$(CHMOD) 755 $(LIBDIR)/libtermnet.so.$(VERSION)
+	$(LDCONFIG)
+#endif root
+#if !root
+	$(LN) -sf libtermnet.so.$(VERSION) $(LIBDIR)/libtermnet.so.$(VERSION_MAJOR)
+	@echo "In order for your term binaries to work you will need to" >&2
+	@echo "add export LD_LIBRARY_PATH='$(LIBDIR)' to your ~/.profile" >&2
+	@echo "and add setenv LD_LIBRARY_PATH '$(LIBDIR)' to your ~/.login" >&2
+	@echo "Then logout, and login again." >&2
+#endif !root
+
+# jump-update by Davor Jadrijevic, <davor%emard.uucp@ds5000.irb.hr>
+# modified by Bill C. Riemers to use $(JUMP_DIR).new
+
+jump.update jump-update: $(JUMP_DIR)/jump.log
+	$(RM) -r $(JUMP_DIR).new
+	$(CP) -a $(JUMP_DIR) $(JUMP_DIR).new
+	cat $(JUMP_DIR).new/jump.vars >> $(JUMP_DIR).new/jump.funcs
+	cat $(JUMP_DIR).new/jump.log >> $(JUMP_DIR).new/jump.funcs
+	$(MV) $(JUMP_DIR).new/jump.funcs $(JUMP_DIR).new/jump.log
+	cd $(JUMP_DIR).new; JUMP_DIR=$(JUMP_DIR).new $(GETVARS)
+	cd $(JUMP_DIR).new; JUMP_DIR=$(JUMP_DIR).new $(GETFUNCS)
+	$(RM) $(JUMP_DIR).new/jump.log $(JUMP_DIR).new/*.s
+	$(MAKE) JUMP_DIR=$(JUMP_DIR).new clean $(CLIENTOBJS)
+	cd $(JUMP_DIR).new; JUMP_DIR=$(JUMP_DIR).new $(GETSIZE)>jump.vars.min
+	if [ ! -s $(JUMP_DIR).new/jump.funcs ] ; then \
+		echo "Error updating jump/jump.funcs"; exit 1; \
+	elif [ `wc -l < $(JUMP_DIR).new/jump.funcs` -lt \
+		`wc -l < $(JUMP_DIR)/jump.funcs` ] ; then \
+		echo "Error updating jump/jump.funcs"; exit 1; \
+	fi;
+	if [ ! -s $(JUMP_DIR).new/jump.vars ] ; then \
+		echo "Error updating jump/jump.vars"; false; \
+	elif [ `wc -l < $(JUMP_DIR).new/jump.vars` -lt \
+		`wc -l < $(JUMP_DIR)/jump.vars` ] ; then \
+		echo "Error updating jump/jump.vars"; false; \
+	fi;
+	$(CP) -f $(JUMP_DIR).new/* $(JUMP_DIR)/.
+	$(RM) -r $(JUMP_DIR).new $(JUMP_DIR)/jump.log
+	@if [ -s $(JUMP_DIR).new/jump.vars.min ] ; then \
+		echo ">>> HINT: 'jump/jump.vars.min' is generated." >&2; \
+		echo ">>> HINT: Extend it if needed and overwrite 'jump/jump.vars'" >&2; \
+		echo ">>> HINT: Then 'make' again" >&2; \
+	else \
+		$(RM) $(JUMP_DIR)/jump.vars.min; \
+	fi
+
+# I'm not sure why we want these, but here they are. (bcr)
+clean.bin:
+	$(RM) $(PROGS) $(SCRIPTS)
+
+bin.static static.bin: libtermnet.a
+	$(MAKE) TERMNETDEP=libtermnet.a TERMNETLIB=libtermnet.a bin
+
+install.bin.static: bin.static install.bin
+
+#endif shlib=linux
+
+#if shlib=sun
+#######   This is the sun shared library rules  #######
+# If you want to use /usr/lang/acc instead, use -pic not -fpic
+
+VERSION=$(VERSION_MAJOR).$(VERSION_MINOR)
+
+libtermnet.so.$(VERSION): $(CLIENTOBJS)
+	cd shared; ld -assert pure-text $(CLIENTOBJS)
+	mv shared/a.out libtermnet.so.$(VERSION)
+
+shlib: libtermnet.so.$(VERSION)
+
+$(CLIENTOBJS):
+	@if [ ! -d shared ]; then $(MKDIR) shared; else true; fi
+	$(CC) -c $(CFLAGS) $(SRCDIR)/$*.c
+	$(CC) -fpic -o shared/$*.o -c $(CFLAGS) $(SRCDIR)/$*.c
+
+install.shlib install-shlib: libtermnet.so.$(VERSION) install.include
+	if [ ! -d $(LIBDIR) ]; then $(MKDIR) $(LIBDIR); else true; fi
+	$(RM) $(LIBDIR)/libtermnet.so.$(VERSION)
+	$(CP) libtermnet.so.$(VERSION) $(LIBDIR)/.
+#if root: 	$(CHMOD) 755 $(LIBDIR)/libtermnet.so.$(VERSION)
+#if root: 	$(LDCONFIG)
+#endif shlib=sun
+
+#if shlib=netbsd
+#######   This is the netbsd shared library rules  #######
+VERSION=$(VERSION_MAJOR).$(VERSION_MINOR)
+
+libtermnet.so.$(VERSION): $(CLIENTOBJS)
+	cd shared; ld -Bshareable -Bforcearchive $(CLIENTOBJS)
+	mv shared/a.out libtermnet.so.$(VERSION)
+
+shlib: libtermnet.so.$(VERSION)
+
+$(CLIENTOBJS):
+	@if [ ! -d shared ]; then $(MKDIR) shared; fi
+	$(CC) -c $(CFLAGS) $(SRCDIR)/$*.c
+	$(CC) -fpic -o shared/$*.o -c $(CFLAGS) $(SRCDIR)/$*.c
+
+install.shlib install-shlib: libtermnet.so.$(VERSION) install.include
+	if [ ! -d $(LIBDIR) ] ; then $(MKDIR) $(LIBDIR); else true; fi
+	$(RM) $(LIBDIR)/libtermnet.so.$(VERSION)
+	$(CP) libtermnet.so.$(VERSION) $(LIBDIR)/.
+#if root: 	$(CHMOD) 755 $(LIBDIR)/libtermnet.so.$(VERSION)
+#if root: 	$(LDCONFIG)
+#endif shlib=netbsd
+
+
+#if shlib=sol2
+#######   This is the sol2 shared library rules  #######
+# FLAG FOR POSITION INDEPENDENT CODE:
+#   for cc use -K PIC
+#   for gcc use -fpic
+PICFLAGS = -fpic
+
+#if wrap:  shlib: libtermnet.so.$(VERSION_MAJOR) termwrap.so
+#if !wrap: shlib: libtermnet.so.$(VERSION_MAJOR)
+
+libtermnet.so.$(VERSION_MAJOR): $(CLIENTOBJS)
+	cd shared; ld -G -z text -h libtermnet.so.$(VERSION_MAJOR) \
+		-o libtermnet.so.$(VERSION_MAJOR) $(CLIENTOBJS) -lsocket -lnsl
+	mv shared/libtermnet.so.$(VERSION_MAJOR) libtermnet.so.$(VERSION_MAJOR)
+	$(RM) libtermnet.so
+	ln -s libtermnet.so.$(VERSION_MAJOR) libtermnet.so
+
+
+$(CLIENTOBJS):
+	@if [ ! -d shared ]; then $(MKDIR) shared; else true; fi
+	$(CC) -c $(CFLAGS) $(SRCDIR)/$*.c
+	$(CC) -c $(CFLAGS) $(PICFLAGS) -o shared/$*.o $(SRCDIR)/$*.c
+#if wrap
+	@if [ ! -d sharedwrap ]; then $(MKDIR) sharedwrap; else true; fi
+	$(CC) -c $(CFLAGS) -DTERMWRAP $(PICFLAGS) -o sharedwrap/$*.o $(SRCDIR)/$*.c
+
+$(WRAPOBJS):
+	@if [ ! -d sharedwrap ]; then $(MKDIR) sharedwrap; else true; fi
+	$(CC) -c $(CFLAGS) $(PICFLAGS) -o sharedwrap/$*.o $(SRCDIR)/$*.c
+	$(RM) $*.o
+	ln -s sharedwrap/$*.o $*.o
+
+termwrap.so: $(CLIENTOBJS) $(WRAPOBJS)
+	cd sharedwrap; ld -G -z text -h termwrap.so \
+		-o termwrap.so $(CLIENTOBJS) $(WRAPOBJS)
+	mv sharedwrap/termwrap.so termwrap.so
+#endif wrap
+
+install.shlib install-shlib: shlib install.include
+	if [ ! -d $(LIBDIR) ]; then $(MKDIR) $(LIBDIR); else true; fi
+	$(RM) $(LIBDIR)/libtermnet.so.$(VERSION_MAJOR) $(LIBDIR)/libtermnet.so
+	$(CP) libtermnet.so.$(VERSION_MAJOR) $(LIBDIR)/.
+	cd $(LIBDIR); ln -s libtermnet.so.$(VERSION_MAJOR) libtermnet.so
+	$(CHMOD) 755 $(LIBDIR)/libtermnet.so.$(VERSION_MAJOR)
+#if wrap
+	$(RM) $(LIBDIR)/termwrap.so
+	$(CP) termwrap.so $(LIBDIR)/.
+	$(CHMOD) 755 $(LIBDIR)/termwrap.so
+#endif wrap
+#endif shlib=sol2
+
+#######################################################################
+# The following targets are mostly for my personal use. I use them to
+# update the version of term when I am developing.
+#
+
+VERSION_NAME = term-$(VERSION_MAJOR).$(VERSION_MINOR)$(PATCH_NAME)
+ARCHIVE = /user/bcr/term/$(VERSION_NAME)
+ALPHA_DIR = /opt/ftp/pub/bcr/term/ALPHA
+BETA_DIR = /opt/ftp/pub/bcr/term
+
+distclean: realclean
+	$(RM) config.status Makefile
+	$(RM) `find . -name \*.orig`; true
+	$(RM) `find . -name \*.rej`; true
+	@echo 'all install clean depend config.status config: configure' > Makefile
+	@echo '		./configure' >> Makefile
+	@echo '		@echo "YOU WILL NEED TO RE-RUN 'make'."' >> Makefile
+	@echo '		@echo " "' >> Makefile
+	@echo '		@echo "The following error is normal:"' >> Makefile
+	@echo '		@false' >> Makefile
+
+rcs_extract:
+	co -q`expr $(VERSION_MAJOR) \* 100 + $(VERSION_MINOR)`.$(PATCH_LEVEL) \
+	  `find . -name \*,v -print | sed 's/,v$$//'`; true
+	$(CHMOD) ugo+x configure
+
+rcs_purge: rcs_extract
+	rcs -o`expr $(VERSION_MAJOR) \* 100 + $(VERSION_MINOR)`.$(PATCH_LEVEL) \
+	  `find . -name \*,v -print | sed 's/,v$$//'`
+
+rcs_ver: distclean rcs_extract
+	rcs -U `find . -name \*,v -print`
+	yes|tr y .|ci -f`expr $(VERSION_MAJOR) \* 100 + $(VERSION_MINOR)`.$(PATCH_LEVEL) \
+	  -n`echo term-$(VERSION_MAJOR).$(VERSION_MINOR)$(PATCH_NAME)|tr . _` \
+	  `find . -type f -not -name \*,v -not -name \*.gz -not -name Makefile -print`
+	co -q`expr $(VERSION_MAJOR) \* 100 + $(VERSION_MINOR)`.$(PATCH_LEVEL) \
+	  `find . -name \*,v -print | sed 's/,v$$//'`
+	$(CHMOD) ugo+x configure
+
+rcs_tar: distclean rcs_extract
+	$(RM) /tmp/$(VERSION_NAME)
+	$(LN) -s `pwd` /tmp/$(VERSION_NAME)
+	cd /tmp ; \
+	  find $(VERSION_NAME) -follow -type f -not -empty -not -name \*,v -print | \
+	  sort -u | tar Tcvvfz - $(ARCHIVE).tar.gz
+
+rcs_patch: distclean rcs_extract
+	$(RM) /tmp/$(VERSION_NAME)
+	$(LN) -s `pwd` /tmp/$(VERSION_NAME)
+	if [ $(PATCH_LEVEL) -gt 0 ] ; then \
+	  (cd /tmp; version_name=$(VERSION_NAME); rcsdiff \
+	  -u -r`expr $(VERSION_MAJOR) \* 100 + $(VERSION_MINOR)`.`expr $(PATCH_LEVEL) - 1` \
+	  `find $$version_name -follow -type f -not -name \*,v -not -name \*.gz -not -name Makefile -print` \
+	  | gzip -c ) > $(ARCHIVE).patch.gz ; \
+	  if [ $(PATCH_LEVEL) -le 50 ] ; then \
+		$(CP) $(ARCHIVE).patch.gz $(SRCDIR)/patches/. ; \
+	  else true; fi; \
+	else true; fi
+
+rcs_update: rcs_ver rcs_patch rcs_tar
+	$(RM) /tmp/$(VERSION_NAME)
+	$(LN) -s `pwd` /tmp/$(VERSION_NAME)
+	cd /tmp; if [ $(PATCH_LEVEL) -gt 50 ] ; then \
+	  tupload -fvvr $(ARCHIVE).*.gz $(ALPHA_DIR) ; \
+	else \
+	  tupload -fvvr $(ARCHIVE).*.gz $(BETA_DIR) ; \
+	fi
+	cd /tmp; $(CHMOD) ugo-w $(ARCHIVE).*.gz
+
+rcs_remote: rcs_tar
+	$(RM) /tmp/$(VERSION_NAME)
+	$(LN) -s `pwd` /tmp/$(VERSION_NAME)
+	cd /tmp; tupload -fvvr $(ARCHIVE).tar.gz /tmp
+	trsh -s 'cd /tmp;zcat $(VERSION_NAME).tar.gz|tar xvvf -'
+	trsh -s 'cd /tmp/$(VERSION_NAME);./configure --user;make install'
+
+rcs_spell: distclean rcs_extract
+	ispell -p $(HOME)/.term_dict `find . -type f -not -name \*,v -not -name \*.gz`
+
+

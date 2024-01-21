@@ -1,0 +1,154 @@
+*** Makefile.in.orig	Sun Jan 19 17:32:15 1997
+--- Makefile.in	Sun Jan 19 19:29:12 1997
+***************
+*** 331,337 ****
+  GNAT_RTL_WIN32_OBJS = win_task-errors.o win_task-synchronization.o \
+    win_task-threads.o win_task.o
+  
+! GNAT_RTL_COMMON_OBJS =\
+   ada.o      \
+   calendar.o \
+   gnat.o     \
+--- 331,340 ----
+  GNAT_RTL_WIN32_OBJS = win_task-errors.o win_task-synchronization.o \
+    win_task-threads.o win_task.o
+  
+! GNAT_RTL_ALT_OBJS =\
+!  s-tasqup.o
+! 
+! GNAT_RTL_BASE_OBJS =\
+   ada.o      \
+   calendar.o \
+   gnat.o     \
+***************
+*** 444,450 ****
+  \
+   i-c.o      \
+   i-cexten.o \
+-  i-cobol.o  \
+   i-cpp.o    \
+   i-cstrea.o \
+   i-cstrin.o \
+--- 447,452 ----
+***************
+*** 566,572 ****
+   s-tasoli.o \
+   s-taspda.o \
+   s-tasque.o \
+-  s-tasqup.o \
+   s-tasren.o \
+   s-tassta.o \
+   s-tastim.o \
+--- 568,573 ----
+***************
+*** 605,610 ****
+--- 606,613 ----
+   a-intnam.o \
+   s-interr.o 
+  
++ GNAT_RTL_COMMON_OBJS = $(GNAT_RTL_BASE_OBJS) $(GNAT_RTL_ALT_OBJS)
++ 
+  ADA_INCLUDE_SRCS =\
+   ada.ads calendar.ads directio.ads gnat.ads interfac.ads ioexcept.ads \
+   machcode.ads text_io.ads unchconv.ads unchdeal.ads unchdeal.adb      \
+***************
+*** 689,699 ****
+  install-gnatlib: ../stamp-gnatlib
+  	rm -rf $(ADA_RTL_OBJ_DIR)
+  	-mkdir $(ADA_RTL_OBJ_DIR)
+! 	(cd rts; \
+! 	  for f in *$(objext) *.ali; do \
+! 	    cp -p $$f $(ADA_RTL_OBJ_DIR)/$$f; \
+! 	    chmod a-x $(ADA_RTL_OBJ_DIR)/$$f; \
+! 	  done)
+  	(cd rts; \
+  	  for f in *.a ; do \
+  	    cp -p $$f $(libsubdir)/$$f; \
+--- 692,716 ----
+  install-gnatlib: ../stamp-gnatlib
+  	rm -rf $(ADA_RTL_OBJ_DIR)
+  	-mkdir $(ADA_RTL_OBJ_DIR)
+! 	case $(target) in *86*-linux*)\
+! 	  (cd rts; \
+! 	    for f in $(GNAT_RTL_ALT_OBJS) *.ali; do \
+! 	      cp -p $$f $(ADA_RTL_OBJ_DIR)/$$f; \
+! 	      chmod a-x $(ADA_RTL_OBJ_DIR)/$$f; \
+! 	    done;\
+! 	    for f in libgnat.so.*; do \
+! 	      cp -p $$f /usr/lib/;\
+! 	      ln -sf /usr/lib/$$f $(libsubdir)/libgnat.so;\
+! 	    done);\
+! 	;;\
+! 	*)\
+! 	  (cd rts; \
+! 	    for f in *$(objext) *.ali; do \
+! 	      cp -p $$f $(ADA_RTL_OBJ_DIR)/$$f; \
+! 	      chmod a-x $(ADA_RTL_OBJ_DIR)/$$f; \
+! 	    done);\
+! 	;;\
+! 	esac
+  	(cd rts; \
+  	  for f in *.a ; do \
+  	    cp -p $$f $(libsubdir)/$$f; \
+***************
+*** 837,849 ****
+  	         	ADAFLAGS="$(GNATLIBFLAGS)"\
+                          CFLAGS="$(GNATLIBCFLAGS)" \
+  	         	-f ../Makefile $(GNAT_RTL_OLD_OBJS) ;; \
+  		sparc-sun-sunos4*      |\
+  		sparc-sun-solaris2*    |\
+  		sparc-sun-solaris5*    |\
+  		ppc-mac-machten        |\
+  		*-*-rtems* | *-rtems*  |\
+  		*-go32-msdos | *-go32  |\
+-                 *86*-linux*            |\
+                  *)		       \
+                  \
+  		 $(MAKE)  CC="../../xgcc -B../../" \
+--- 854,872 ----
+  	         	ADAFLAGS="$(GNATLIBFLAGS)"\
+                          CFLAGS="$(GNATLIBCFLAGS)" \
+  	         	-f ../Makefile $(GNAT_RTL_OLD_OBJS) ;; \
++                 *86*-linux*)            \
++ 		\
++ 		 $(MAKE)  CC="../../xgcc -B../../" \
++ 	         	ADAFLAGS="$(GNATLIBFLAGS)"\
++                         CFLAGS="$(GNATLIBCFLAGS)" \
++ 	        -f ../Makefile shared-gnatlib ;; \
++ 		\
+  		sparc-sun-sunos4*      |\
+  		sparc-sun-solaris2*    |\
+  		sparc-sun-solaris5*    |\
+  		ppc-mac-machten        |\
+  		*-*-rtems* | *-rtems*  |\
+  		*-go32-msdos | *-go32  |\
+                  *)		       \
+                  \
+  		 $(MAKE)  CC="../../xgcc -B../../" \
+***************
+*** 855,861 ****
+  	 if [ $$? -eq 0 ]; then touch ../stamp-gnatlib; fi \
+  	) 
+  
+! 
+  # .s files for cross-building
+  gnat-cross: force
+  	make $(GNAT1_ADA_OBJS) CC="gcc -Bstage1/" CFLAGS="-S -gnatp" \
+--- 878,894 ----
+  	 if [ $$? -eq 0 ]; then touch ../stamp-gnatlib; fi \
+  	) 
+  
+! shared-gnatlib: $(GNAT_RTL_NEW_OBJS)
+! 	v=`grep Gnat_Version_String ../gnatvsn.ads` ; \
+! 	v=`echo $$v|awk '{gsub(/\"\;*/,"",$$0);print $$6}'` ; \
+! 	$(CC) -shared -o libgnat.so.$$v -Wl,-soname,libgnat.so \
+! 		$(GNAT_RTL_BASE_OBJS) $(GNAT_RTL_NEW_OBJS) $(LIBGNAT_OBJS) \
+! 		-lpthreads -lm
+! 	-rm -f libgnat.a
+! 	$(AR) rc libgnat.a \
+! 		$(GNAT_RTL_BASE_OBJS) $(GNAT_RTL_NEW_OBJS) $(LIBGNAT_OBJS)
+! 	-if $(RANLIB_TEST) ; then $(RANLIB) libgnat.a ; fi
+!   
+  # .s files for cross-building
+  gnat-cross: force
+  	make $(GNAT1_ADA_OBJS) CC="gcc -Bstage1/" CFLAGS="-S -gnatp" \

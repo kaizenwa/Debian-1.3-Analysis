@@ -1,0 +1,370 @@
+.de F
+.B
+.if !"\\$1"" \&\\$1 \\$2 \\$3 \\$4 \\$5 \\$6
+..
+.de L
+.B
+.if !"\\$1"" \&\\$1 \\$2 \\$3 \\$4 \\$5 \\$6
+..
+.de FR
+.BR "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6"
+..
+.de LR
+.BR "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6"
+..
+.de CW
+.ft B
+..
+.\" This is gross but it avoids relying on internal implementation details
+.\" of the -man macros.
+.de TF
+.IP "" \w'\fB\\$1\ \ \fP'u
+.PD0
+..
+.de EX
+.CW
+.nf
+..
+.de EE
+.fi
+..
+.\" delete above this point if your system has F, L, FR, LR, CW and TF macros
+.TH TEXT 3
+.SH NAME
+textalloc, textfree, texthit, textinsert, textinsertchar, textselect, texthighlight, textdelete, textset, textfill, textshow, textjump, textsetrects, textscroll, textsnarf, textpaste, doubleclick, texttoutf, utftotext \- graphical text management routines
+.SH SYNOPSIS
+.nf
+.B
+#include <u.h>
+.B
+#include <libc.h>
+.B
+#include <libg.h>
+.B
+#include <frame.h>
+.B
+#include <text.h>
+.ta \w'\fLulong   'u +2c
+.PP
+.B
+Text	*textalloc(Bitmap *b, Rectangle r, Font *font);
+.PP
+.B
+void	textfree(Text *text);
+.PP
+.B
+void	texthit(Text *t, Event *e, ulong key);
+.PP
+.B
+void	textinsert(Text *t, Rune *r0, Rune *r1, ulong p);
+.PP
+.B
+void	textinsertchar(Text *t, uchar *c0, uchar *c1, ulong p);
+.PP
+.B
+void	textselect(Text *t, Mouse *m);
+.PP
+.B
+void	texthighlight(Text *t, ulong p0, ulong p1, Fcode fc);
+.PP
+.B
+void	textdelete(Text *t, ulong p0, ulong p1);
+.PP
+.B
+void	textset(Text *t, ulong p);
+.PP
+.B
+void	textfill(Text *t);
+.PP
+.B
+void	textshow(Text *t, ulong p, ulong scroll);
+.PP
+.B
+void	textjump(Text *t, int n);
+.PP
+.B
+void	textsetrects(Text *t, Rectangle r, Bitmap *b);
+.PP
+.B
+void	textscroll(Text *t, int buttons);
+.PP
+.B
+void	textsnarf(Text *t, ulong p0, ulong p1);
+.PP
+.B
+void	textpaste(Text *t, ulong p0, ulong p1);
+.PP
+.B
+void	doubleclick(Text *t, ulong p0);
+.PP
+.B
+ulong	texttoutf(char *, Rune *, Rune *);
+.PP
+.B
+ulong	utftotext(Rune *, char *, char *);
+.SH DESCRIPTION
+The text library provides a wrapper for the frame routines (see
+.IR frame (3)).
+It supports areas of editable text in a single font very similar
+to
+.IR sam (1)
+or
+.IR 8\(12 (1)
+windows.
+The same restrictions apply to
+.I texts
+as to
+.IR frames .
+The graphics library must have been initialised with the appropriate
+init calls before using these routines.
+.PP
+The user-visible data structure, a
+.BR Text,
+is defined in
+.BR <text.h> :
+.IP
+.EX
+.ta 6n +\w'Rectangle 'u +\w'alloced, length;   'u
+typedef struct Text Text;
+struct Text
+{
+	Rectangle	r;	/* the Rectangle for the text */
+	Bitmap	*b;	/* on which text appears */
+	Frame	f;	/* a frame for display */
+	Rune	*text;	/* the text */
+	ulong	alloced, length;	/* memory bookkeeping */
+	ulong	base, end;	/* visible text */
+	ulong	p0, p1;	/* selection */
+	ulong	pout;	/* pointer */
+	ulong	pmark;	/* mark */
+	uchar	modified;	/* modification flag */
+	uchar	scrolling;	/* is this a scrolling window? */
+	Scroll	*scroll;	/* Scroll bar for this text */
+	Rune	*snarfed;	/* snarf buffer */
+	ulong	snarflen;
+	void	*data;	/* user data area */
+};
+.EE
+Alloced and length are internal variables representing the current
+length of the text and the amount of memory currently allocated.
+.PP
+.I
+Textalloc
+creates a new
+.B Text
+in
+.B Rectangle
+.I r
+on
+.B Bitmap
+.I b
+and returns a pointer to this new structure.
+The function
+.I texthit
+will process events and provides a simple editable text frame with
+a scroll bar and cut, snarf, and paste functions.
+.I Textfree
+frees the resources used by its argument
+.BR text .
+.PP
+.I Textinsert
+is analagous to
+.I frinsert
+and inserts into the
+.B text
+starting at rune index
+.I p
+the runes between
+.I r0
+and
+.IR r1.
+.I Textinsertchar
+performs similarly but takes two character pointers.
+.PP
+.I Textselect
+tracks the mouse to select a contiguous string of text in the
+.BR Frame .
+When called, mouse button 1 should be depressed.
+It will return when the button is released and will set
+.IB t ->p0
+and
+.IB t ->p1
+to the selected range of text.
+.I Texthighlight
+modifies the display of selected text and allows strings of text
+to be selected.
+.I Texthighlight
+modifies
+.I p0
+and
+.I p1
+in the
+.B Text
+structure.
+As with
+.I frselect
+the user must provide
+.I frgetmouse
+to provide mouse events (see
+.IR frinit (3)).
+The relevant
+.B Mouse
+structure is the one passed to
+.I textselect
+or when
+.I texthit
+is used, the
+.B Mouse
+structure which is part of the
+.B Event
+structure passed as the second parameter.
+.PP
+.I Textdelete
+deletes the text between rune indices
+.I p0
+and
+.IR p1 .
+.PP
+.I Textset
+sets the rune index of the first rune displayed in the frame
+.BR base .
+.PP
+.I Textshow
+ensures the rune index
+.I p
+is visible within the frame.
+If
+.I p
+is not visible within the frame then if
+.I scroll
+is non zero, the
+.B base
+of the text is set so that the rune index
+.I p
+appears three lines from the top (or bottom if it was past the
+end of this visible section) of the frame.
+.PP
+.I Textjump
+moves the initial rune index,
+.BR base ,
+.I n
+lines on in the text.
+This routine will jump at most one frame-full.
+.PP
+.I Textsetrects
+changes the
+.B Bitmap
+and/or the
+.B Rectangle
+used to display the text.
+.PP
+.I Textscroll
+is used to scroll the text.
+If the
+.I button
+argument is 1, then
+.I textscroll
+will scroll back according to the value of
+.I n
+in the embedded
+.I scroll
+structure.
+If
+.I button
+is 2, then
+.I n
+is interpreted as a rune index and used to set the base of the
+displayed text to the beginning of the line containing that rune.
+If
+.I Button
+is 3, then
+.I textscroll
+will scroll forward according to the value of
+.IR n .
+Thus this is a common way to handle scrolling
+.EX
+.ta 4m +4m +4m
+	Text	*text;
+	Event	*e;
+
+	if (ptinrect(e->mouse.xy, text->scroll->r))
+	{
+		if (scrollhit(text->scroll, e))
+			textscroll(text, text->scroll->buttons);
+	}
+.EE
+.PP
+.I Textsnarf
+and
+.I textpaste
+manipulate the snarf buffer of
+.IR t .
+.I Textsnarf
+copies the text between rune indices
+.I p0
+and
+.I p1
+into the snarf buffer of
+.IR t .
+.I Textpaste
+replaces the text between rune indices
+.I p0
+and
+.I p1
+with the text currently in the snarf buffer of
+.IR t .
+.I P0
+may equal
+.I p1
+in which case
+.I textpaste
+inserts the contents of the snarf buffer at
+.IR p0 .
+.PP
+.I Doubleclick
+should be called in response to a double click at
+.I p0
+in a
+.B Text
+and modifies
+.IB t ->p0
+and
+.IB t ->p1
+in an appropriate fashion.
+.I Texthighlight
+should be called after
+.I doubleclick
+in order to have the selection highlighted on the screen.
+.PP
+.I Texttoutf
+and
+.I utftotext
+are routines convert from Rune strings to utf encoded strings
+and vice versa.
+.I Texttoutf
+converts the Runes between
+.I r1
+and
+.I r2
+and stores them in memory starting at
+.IR s .
+Enough memory must have been allocated to receive the new string.
+.I Utftotext
+converts the characters between
+.I s1
+and
+.I s2
+and stores them in memory starting at
+.IR r .
+Enough memory must have been allocated to receive the new Runes.
+.I Texttoutf
+and
+.I utftotext
+return the number of characters involved in the conversion.
+.SH SEE ALSO
+.IR bitblt (3),
+.IR graphics (3),
+.IR event (3),
+.IR frame (3),
+.IR rune (3),
+.IR utf (4).

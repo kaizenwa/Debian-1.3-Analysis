@@ -1,0 +1,65 @@
+
+dnl Configure.in for the sample gpm client.
+
+dnl This configure.in is meant to be run with autoconf-2.0.
+dnl 1.x will complain
+
+AC_INIT(rmev.c)
+AC_PROG_CC
+AC_PROG_CPP
+
+CFLAGS="-O"
+LIBS=""
+
+dnl
+dnl look for libgpm.a; if found assume to have <gpm.h> as well
+dnl the function looked for assures a recent enough version
+dnl
+AC_CHECK_LIB(gpm, Gpm_Repeat,[
+
+	GPMXTERM=""
+	LIBS="$LIBS -lgpm"],[
+
+	GPMXTERM="gpm-xterm.o"
+	if test "`uname`" = Linux
+	  then AC_MSG_WARN("libgpm.a is missing or older than 0.18")
+	fi
+	])
+dnl
+dnl add the extra object if it is needed (noilibgpm is there)
+dnl
+AC_SUBST(GPMXTERM)
+
+dnl ###################### The following is independent of gpm
+dnl
+dnl look for libncurses (prefer it, if possible)
+dnl
+AC_CHECK_LIB(ncurses,raw,[
+	LIBS="$LIBS -lncurses"
+	CFLAGS="$CFLAGS -DHAVE_NCURSES_H"
+	look_for_ncursesh=yes
+],[
+	LIBS="$LIBS -lcurses"])
+
+dnl
+dnl and now look for <ncurses.h>
+dnl
+if test x$look_for_ncursesh = xyes
+  then
+  AC_MSG_CHECKING(for location of <ncurses.h>)
+
+  for dir in /usr/include /usr/include/ncurses \
+             /usr/local/include /usr/local/include/ncurses
+    do if test -f $dir/ncurses.h
+      then CFLAGS="$CFLAGS -I$dir"; ncurses_found=yes; break
+      fi
+    done
+  
+  if test x$ncurses_found = xyes
+  then AC_MSG_RESULT($dir)
+  else AC_MSG_ERROR(can't find ncurses.h)
+  fi
+fi
+
+AC_OUTPUT(Makefile)
+

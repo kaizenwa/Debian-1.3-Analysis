@@ -1,0 +1,722 @@
+This is Info file w3.info, produced by Makeinfo-1.55 from the input
+file w3.txi.
+
+   This file documents the Emacs-w3 World Wide Web browser.
+
+   Copyright (C) 1993, 1994, 1995 William M. Perry
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+
+File: w3.info,  Node: Data Structures,  Next: Miscellaneous Functions,  Prev: Global Variables,  Up: Programming Interface
+
+Data Structures
+===============
+
+   Form objects are used to store information about a FORM data entry
+area.
+  1. `'w3form'
+
+  2. A cons pair of (METHOD . URL), where METHOD specifies what method
+     to use to retrieve the form when it is submitted (e.g., `GET') and
+     URL is a fully specified URL pointing at where to submit the FORM
+     data to.
+
+  3. The type of input area this is.  (e.g., `CHECKBOX' or `RADIO')
+
+  4. The name of the input tag.  This is used when sending the form to
+     the server, so that the server can tell what data is what.
+
+  5. The default value of the input area.  Gotten from the INPUT tag at
+     creation time.
+
+  6. The current value of the input area.
+
+  7. Whether the item is checked or not.  Only used for RADIO or
+     CHECKBOX items.
+
+  8. The size (in characters) of the input area.  Not used for CHECKBOX,
+     RADIO, or TEXTAREA input areas.
+
+  9. The maximum length of the input.  Only used for TEXT or PASSWORD
+     input areas.
+
+ 10. The form that this input area belongs to.  Each form in the same
+     buffer has a unique identifier assigned when the document is
+     parsed.  It is used when the form is submitted to get only the
+     data for the correct form.
+
+ 11. A list of strings that represent the choices for this input area.
+     Only used for SELECT tags.
+
+ 12. A string or `nil', specifying the ID attribute on this input tag.
+
+   A new development in the World Wide Web is the concept of collapsible
+areas of text.  If a zone controls one of these regions, it is marked
+with the w3expandlist property.  The format of this structure is:
+
+  1. `'w3expandlist'
+
+  2. A marker representing the start of the hidden text as a buffer
+     position.
+
+  3. A marker representing the end of the hidden text as a buffer
+     position.
+
+   A zone with the w3graphic property is a link to an inlined image's
+source file.
+  1. `'w3graphic'
+
+  2. The full URL of the inlined image.  This is only ever returned if
+     the inlined image is the only extent under point, or
+     `w3-follow-inlined-image' is invoked.
+
+   A zone with the w3 property is a full-fledged hypertext link to
+another document.
+  1. `'w3'
+
+  2. The ID attribute of this link.  Used for resolving references to
+     specific points within a document (e.g., `file.html#sectionA'.
+
+  3. The HREF attribute of this link.  This is a fully specified URL
+     pointing at a network resource.  All relative directory references
+     should have been removed before being stored in this structure.
+
+  4. The text between the <A> and </A> tags.  This is used to build
+     menus or to get the text of a link without doing a
+     buffer-substring.
+
+  5. The URN attribute of this link.  Currently not used for anything,
+     waiting for the URN specification to be hammered out.
+
+  6. The REL attribute of this link.  Specifies the links relevance to
+     the current document.
+
+  7. The REV attribute of this link.  Specifies the current documents
+     relevance to the link.
+
+  8. The METHODS attribute, which tells what methods can be used on this
+     link.  (e.g., `GET, HEAD, PUT'.
+
+
+File: w3.info,  Node: Miscellaneous Functions,  Next: MIME functions,  Prev: Data Structures,  Up: Programming Interface
+
+Miscellaneous Functions
+=======================
+
+   I have done quite a bit of work trying to make a clean interface to
+the internals of Emacs-w3.  Here is a list of functions that you can
+use to take advantage of the World Wide Web.
+
+`url-clear-tmp-buffer'
+     Sets the current buffer to be `url-working-buffer', creating it if
+     necessary, and erase it.  This should usually be called before
+     retrieving URLs.
+
+`w3-convert-html-to-latex'
+     Takes a buffer of HTML markup (which should be in
+     `w3-working-buffer'), and convert it into LaTeX.  This is an
+     adaptation of the simple sed scripts from Cern.  Does as good a
+     job as the html2latex program, and I usually prefer its formatting
+     over html2latex's.
+
+`w3-fetch'
+     This function takes a URL as its only argument. It then attempts to
+     retrieve the URL.  For example: `(w3-fetch
+     "http://cs.indiana.edu/")' would retrieve the Indiana University
+     CS home page and parse it as HTML.
+
+`w3-fix-entities-in-string'
+     This function takes a string, and removes all HTML[+] entity
+     references from it, replacing them with the correct character(s).
+     It consults the variable `w3-html-entities' for the entity names
+     and translations.  For example, `(w3-fix-entities-in-string
+     "&gt;testing&lt;&amp;")' would return `">testing<&"'.
+
+`url-generate-new-buffer-name'
+     This function takes a string, and returns the first unique buffer
+     name using that string as a base.  For example
+     `(url-generate-new-buffer-name "new-buff")' would return
+     `"new-buff<1>"' if buffer `new-buff' already existed.
+
+`url-generate-unique-filename'
+     This functions returns a string that represents a unique filename
+     in the /tmp directory.  For example,
+     `(url-generate-unique-filename)' would return
+     `"/tmp/url-tmp129440"'.  The filename is arrived at by using a
+     unique prefix (url-tmp), the uid of the current user (12944 in my
+     case), and a number that is incremented if a file already exists.
+
+`url-buffer-visiting (url)'
+     Return the name of a buffer (if any) that is visiting URL.
+
+`url-create-mime-request (fname ref-url)'
+     Create a MIME request for the file fname.  The Referer: field of
+     the HTTP/1.0 request is set to the value of ref-url if necessary.
+     Returns a string that can be sent to an HTTP server.  The request
+     uses several variables that control how the request looks.
+
+     If the value of `url-request-extra-headers' is non-`nil', then it
+     is used as extra MIME headers when an HTTP/1.0 request is created.
+
+`url-get-url-at-point'
+     This function returns the url at a point specified by an optional
+     argument.  If no argument is given to the function (point) is used.
+     Tries to find the url closest to that point, but does not change
+     the users position in the buffer.  Has a preference for looking
+     backward when not directly on a URL.
+
+`url-hexify-string'
+     This function takes a string and replaces any characters that are
+     not acceptable in a URL with the "escaped" encoding that is
+     standard for URLs (replaces the character with a % followed by the
+     hexadecimal representation of the ASCII value of the character).
+     For example, `(url-hexify-string "this is a test")' would return
+     `"this%20is%20a%20test"'.
+
+`url-open-stream'
+     This function takes the same parameters as `open-network-stream',
+     and functions similarly.  It takes a process name, a buffer name,
+     a host name, and a port number or server name.  It attempts to
+     open a network connection to the remote host on the specified
+     port/service name, with output going to the buffer.  It returns
+     the process object that is the network connection.
+
+`url-retrieve'
+     This function takes 3 arguments, a URL, a method type, and a data
+     block.  It then attempts to retrieve the URL using the specified
+     method, using data (if any) as the body of the MIME request.  For
+     example: `(url-retrieve "http://cs.indiana.edu/")' would retrieve
+     the Computer Science home page from Indiana University.  This
+     function does no parsing of the retrieved page, and leaves you in
+     the buffer containing the document you requested.  Any HTTP/1.0
+     redirection/authorization is done before this function exits.
+
+`url-unhex-string'
+     This is the opposite of `w3-hexify-string'.  It removes any %XXX
+     encoded characters in a string.  For example `(url-unhex-string
+     "this%20is%20a%20test")' would return `"this is a test"'.
+
+`w3-view-this-url'
+     This function returns the URL of the zone under point (if no zone
+     is under point, then it returns `nil').  If the optional argument
+     is `nil', then the URL is also displayed in the minibuffer.
+
+`url-view-url'
+     This function returns the URL of current document.  If the optional
+     argument is `nil', then the URL is also displayed in the
+     minibuffer.
+
+
+File: w3.info,  Node: MIME functions,  Next: Concept Index,  Prev: Miscellaneous Functions,  Up: Programming Interface
+
+MIME Functions
+==============
+
+`mm-compose-type(TYPE)'
+     Compose a body section of MIME-type TYPE.  This uses the compose
+     field of a mailcap entry to generate the data, and returns a
+     string that contains the data, with a correct content-type header.
+
+`mm-extension-to-mime(EXTN)'
+     Return the MIME content-type of the file extension EXTN
+
+`mm-mime-info(ST ND REQUEST)'
+     Get the mime viewer command for a specific MIME type.  If ST is a
+     number, then the MIME type is the `buffer-substring' between ST
+     and ND, otherwise ST should be a string specifying the MIME type
+     and associated data.  Returns `nil' if the specified type is not
+     found.
+
+     Expects a complete content-type header line as its argument.  This
+     can be simple like text/html, or complex like text/plain;
+     charset=blah; foo=bar
+
+     Third argument REQUEST specifies what information to return.  If
+     it is `nil' or the empty string, the viewer (second field of the
+     mailcap entry) is returned.  If it is a string, then the mailcap
+     field corresponding to that string is returned (print,
+     description, whatever).  If a number, then all the information for
+     this specific viewer is returned.
+
+`mm-parse-mailcap(FILE)'
+     Parse the mailcap file specified by FILE.
+
+`mm-parse-mailcaps(PATH)'
+     Parse the default mailcap files.  Optional argument PATH specifies
+     a UNIX-style path of where to find the mailcap files.  This
+     function must be run before the rest of the mm-* functions.
+
+`mm-parse-mimetype-file(FILE)'
+     Parse out a mime-types file specified by FILE.
+
+`mm-parse-mimetypes(PATH)'
+     Parse the default mimetypes files.  Optional argument PATH
+     specifies a UNIX-style path of where to find the mimetypes files.
+
+
+File: w3.info,  Node: Concept Index,  Next: Key Index,  Prev: MIME functions,  Up: Top
+
+Concept Index
+*************
+
+* Menu:
+
+* 16-Bit Windows:                       16-Bit Windows.
+* 32-Bit Windows:                       32-Bit Windows.
+* <style>:                              Style Sheets.
+* Alternate caching method:             Disk Caching.
+* Amiga:                                Amiga.
+* Annotations:                          Annotations.
+* ASK blocks:                           General Formatting.
+* Authentication, Basic:                Basic.
+* Authentication, Digest:               Digest.
+* Authentication, PEM:                  PGP/PEM.
+* Authentication, PGP:                  PGP/PEM.
+* AXP-VMS:                              VMS.
+* Bad HTML:                             Debugging HTML.
+* Broken SUN libc:                      Firewalls.
+* Browsing with no network connection:  Disk Caching.
+* Cache cleaning:                       Disk Caching.
+* Cache only mode:                      Disk Caching.
+* Caching:                              Disk Caching.
+* Caching options:                      Disk Caching.
+* Can't resolve hostnames:              Firewalls.
+* Chicago:                              32-Bit Windows.
+* Cleaning the cache:                   Disk Caching.
+* Clearing the cache:                   Disk Caching.
+* Colors:                               Controlling Formatting.
+* Commodore:                            Amiga.
+* Completion of URLs:                   Global History.
+* Connections hanging with XEmacs & solaris: Firewalls.
+* Creating an HTTP request:             Miscellaneous Functions.
+* Creating w3-emacs19-hack-XXX functions: Smart terminals.
+* Customizing formatting:               Controlling Formatting.
+* Debugging:                            Debugging HTML.
+* Delaying inlined animations:          Inlined images.
+* Delaying inlined images:              Inlined images.
+* Depth-first search:                   Searching.
+* Digital VMS:                          VMS.
+* Disk Cache:                           Disk Caching.
+* DOS:                                  MS-DOS.
+* Downloading multiple files:           General Formatting.
+* DSSSL:                                Style Sheets.
+* DSSSL-lite:                           Style Sheets.
+* Easter Eggs:                          Markup Languages Supported.
+* Emacs 19.22 on terminals:             Smart terminals.
+* Encryption:                           PGP/PEM.
+* Experimental style sheet mechanism:   Style Sheets.
+* Export Restrictions:                  SSL.
+* Exportability:                        SSL.
+* Faulty hostname resolvers:            Firewalls.
+* Firewalls:                            Firewalls.
+* Fluff:                                Markup Languages Supported.
+* Fonts:                                Controlling Formatting.
+* Formatting control:                   Style Sheets.
+* Forms based searching:                Basic Setup.
+* FTP'ing multiple files:               General Formatting.
+* Gag Puke Retch:                       SSL.
+* Gates Bill:                           Markup Languages Supported.
+* Gateways:                             Firewalls.
+* GNUS:                                 Interfacing to Mail/News.
+* Gopher and MIME:                      Mapping gopher types to MIME types.
+* Gopher types:                         Mapping gopher types to MIME types.
+* Gopher+:                              Gopher Plus Support.
+* Gopher+:                              General Formatting.
+* Gopher+:                              Basic Setup.
+* Group Annotations:                    Group Annotations.
+* Hair-pulling gateway-headaches:       Firewalls.
+* Highlighting on new terminals:        Smart terminals.
+* Highlighting on terminals:            Smart terminals.
+* History Lists:                        Session History.
+* Hooks:                                Hooks.
+* Host-based gateways:                  Firewalls.
+* HTML 3.0:                             Markup Languages Supported.
+* HTTP/1.0 Authentication:              PGP/PEM.
+* HTTP/1.0 Authentication:              SSL.
+* HTTP/1.0 Authentication:              Digest.
+* HTTP/1.0 Authentication:              Basic.
+* Images:                               Inlined images.
+* Indentation:                          General Formatting.
+* Inlined animations:                   Inlined images.
+* Inlined images:                       Inlined images.
+* Inlined MPEGs:                        Inlined images.
+* Interfacing to Mail/News:             Interfacing to Mail/News.
+* Internals of Emacs-w3:                Programming Interface.
+* Invalid HTML:                         Debugging HTML.
+* ISINDEX handling:                     Basic Setup.
+* ITAR must die:                        PGP/PEM.
+* Layout control:                       Style Sheets.
+* Limiting the size of the cache:       Disk Caching.
+* Loading delayed images:               Inlined images.
+* Loading delayed movies:               Inlined images.
+* Look and Feel:                        Style Sheets.
+* Macintosh:                            Macintosh.
+* Macintrash:                           Macintosh.
+* Mailcrypt:                            PGP/PEM.
+* Microsloth:                           32-Bit Windows.
+* Microsloth:                           16-Bit Windows.
+* Microsloth:                           MS-DOS.
+* MIME and Gopher:                      Mapping gopher types to MIME types.
+* mime-types file:                      Adding MIME types based on file extensions.
+* Movies:                               Inlined images.
+* MPEGs:                                Inlined images.
+* MPEGs:                                Inlined images.
+* MS-DOG:                               MS-DOS.
+* MS-DOS:                               MS-DOS.
+* Netless browsing:                     Disk Caching.
+* Netpbm:                               Inlined images.
+* Network Protocols:                    Supported Protocols.
+* Newsgroups:                           More Help.
+* NeXTstep resources:                   Graphics workstations.
+* Non-Unix Operating Systems:           Non-Unix Operating Systems.
+* NSA freaks:                           PGP/PEM.
+* OS/2:                                 OS/2.
+* Paranoia:                             Security.
+* Pbmplus:                              Inlined images.
+* Persistent Cache:                     Disk Caching.
+* Personal Annotations:                 Personal Annotations.
+* PGP:                                  PGP/PEM.
+* Pomp & Circumstance:                  Markup Languages Supported.
+* Pretty Good Privacy:                  PGP/PEM.
+* Protocols Supported:                  Supported Protocols.
+* Public Key Cryptography:              PGP/PEM.
+* Public Key Cryptography:              PGP/PEM.
+* Recursive searching:                  Searching.
+* Relevant Newsgroups:                  More Help.
+* Relying on cache:                     Disk Caching.
+* Retrieving Emacs-w3:                  Setting Up.
+* RIPEM:                                PGP/PEM.
+* RMAIL:                                Interfacing to Mail/News.
+* Searching more than one node:         Searching.
+* Searching with forms:                 Basic Setup.
+* Secure Sockets Layer:                 SSL.
+* Security:                             PGP/PEM.
+* Security:                             Security.
+* Security, Basic:                      Basic.
+* Security, Digest:                     PGP/PEM.
+* Security, Digest:                     SSL.
+* Security, Digest:                     Digest.
+* Setting Up Emacs-w3:                  Setting Up.
+* Solaris networking problems:          Firewalls.
+* Specifying Fonts:                     Controlling Formatting.
+* SSL:                                  SSL.
+* Standalone mode:                      Disk Caching.
+* Stupid export restrictions:           PGP/PEM.
+* Style sheets:                         Style Sheets.
+* Support:                              More Help.
+* Support your local crypto-anarchist:  PGP/PEM.
+* Supported Protocols:                  Supported Protocols.
+* System 7:                             Macintosh.
+* TERM:                                 Firewalls.
+* Text highlighting on terminals:       Smart terminals.
+* Turning on caching:                   Disk Caching.
+* Usefulness of global history:         Global History.
+* Using Emacs-w3 from your own programs: Programming Interface.
+* Using Emacs-w3 with GNUS:             Interfacing to Mail/News.
+* Using Emacs-w3 with RMAIL:            Interfacing to Mail/News.
+* Using Emacs-w3 with VM:               Interfacing to Mail/News.
+* VAX-VMS:                              VMS.
+* VM:                                   Interfacing to Mail/News.
+* VMS:                                  VMS.
+* VTx00 terminals:                      Smart terminals.
+* Warp:                                 OS/2.
+* Windows '95:                          32-Bit Windows.
+* Windows (16-Bit):                     16-Bit Windows.
+* Windows (32-Bit):                     32-Bit Windows.
+* Windows For Workgroups:               16-Bit Windows.
+* World Wide Web:                       Introduction.
+* XEmacs & Solaris network problems:    Firewalls.
+* Xresources:                           Graphics workstations.
+* Yogsothoth:                           Markup Languages Supported.
+
+
+File: w3.info,  Node: Key Index,  Next: Command Index,  Prev: Concept Index,  Up: Top
+
+Key Index
+*********
+
+* Menu:
+
+* <:                                    Movement.
+* >:                                    Movement.
+* a:                                    Hotlist Handling.
+* B:                                    Action.
+* b:                                    Movement.
+* button2:                              Action.
+* C-button2:                            Action.
+* C-c C-b:                              Action.
+* C-k:                                  Information.
+* C-o:                                  Action.
+* d:                                    Hotlist Handling.
+* DEL:                                  Movement.
+* F:                                    Action.
+* f:                                    Movement.
+* g:                                    Action.
+* H:                                    Hotlist Handling.
+* H:                                    Movement.
+* h:                                    Movement.
+* H:                                    Movement.
+* I:                                    Information.
+* i:                                    Information.
+* K:                                    Information.
+* k:                                    Information.
+* l:                                    Action.
+* m:                                    Action.
+* m:                                    Movement.
+* M-M:                                  Miscellaneous.
+* M-m:                                  Miscellaneous.
+* M-return:                             Action.
+* M-s:                                  Action.
+* M-tab:                                Miscellaneous.
+* M-x w3-hotlist-refresh:               Hotlist Handling.
+* M-x w3-insert-formatted-url:          Miscellaneous.
+* n:                                    Movement.
+* o:                                    Action.
+* P:                                    Miscellaneous.
+* p:                                    Miscellaneous.
+* P:                                    Action.
+* p:                                    Action.
+* Q:                                    Action.
+* q:                                    Action.
+* r:                                    Action.
+* return:                               Action.
+* S:                                    Information.
+* s:                                    Information.
+* Shift-TAB:                            Movement.
+* SPC:                                  Movement.
+* TAB:                                  Movement.
+* U:                                    Miscellaneous.
+* V:                                    Information.
+* v:                                    Information.
+
+
+File: w3.info,  Node: Command Index,  Next: Variable Index,  Prev: Key Index,  Up: Top
+
+Command Index
+*************
+
+* Menu:
+
+* lpr-buffer:                           Miscellaneous.
+* mm-parse-mimetypes:                   Adding MIME types based on file extensions.
+* scroll-down:                          Movement.
+* scroll-up:                            Movement.
+* system-name:                          Basic Setup.
+* url-buffer-visiting:                  Miscellaneous Functions.
+* url-clear-tmp-buffer:                 Miscellaneous Functions.
+* url-create-mime-request:              Miscellaneous Functions.
+* url-generate-new-buffer-name:         Miscellaneous Functions.
+* url-generate-unique-filename:         Miscellaneous Functions.
+* url-get-url-at-point:                 Miscellaneous Functions.
+* url-hexify-string:                    Miscellaneous Functions.
+* url-open-stream:                      Miscellaneous Functions.
+* url-retrieve:                         Miscellaneous Functions.
+* url-unhex-string:                     Miscellaneous Functions.
+* url-view-url:                         Miscellaneous Functions.
+* url-view-url:                         Information.
+* user-real-login-name:                 Basic Setup.
+* w3-add-personal-annotation:           Personal Annotations.
+* w3-add-zone:                          Generalized ZONES.
+* w3-all-zones:                         Generalized ZONES.
+* w3-back-link:                         Movement.
+* w3-backward-in-history:               Session History.
+* w3-backward-in-history:               Action.
+* w3-complete-link:                     Action.
+* w3-complete-link:                     Movement.
+* w3-convert-html-to-latex:             Miscellaneous Functions.
+* w3-delete-personal-annotation:        Personal Annotations.
+* w3-delete-zone:                       Generalized ZONES.
+* w3-document-information:              Information.
+* w3-document-information-this-url:     Information.
+* w3-emacs19-hack-TERMINAL:             Smart terminals.
+* w3-emacs19-unhack-faces:              Smart terminals.
+* w3-end-of-document:                   Movement.
+* w3-fetch:                             Miscellaneous Functions.
+* w3-fetch:                             Session History.
+* w3-fetch:                             Action.
+* w3-fix-entities-in-string:            Miscellaneous Functions.
+* w3-follow-inlined-image:              Data Structures.
+* w3-follow-inlined-image:              Action.
+* w3-follow-link:                       Action.
+* w3-follow-mouse:                      Action.
+* w3-forward-in-history:                Session History.
+* w3-forward-in-history:                Action.
+* w3-forward-link:                      Movement.
+* w3-goto-last-buffer:                  Action.
+* w3-hide-zone:                         Generalized ZONES.
+* w3-hotlist-add-document:              Hotlist Handling.
+* w3-hotlist-delete:                    Hotlist Handling.
+* w3-hotlist-refresh:                   Hotlist Handling.
+* w3-hotlist-rename-entry:              Hotlist Handling.
+* w3-import-netscape-bookmarks:         Hotlist Handling.
+* w3-insert-formatted-url:              Miscellaneous.
+* w3-insert-this-url:                   Miscellaneous.
+* w3-leave-buffer:                      Action.
+* w3-load-delayed-images:               Inlined images.
+* w3-load-delayed-mpegs:                Inlined images.
+* w3-mail-current-document:             Miscellaneous.
+* w3-mail-document-under-point:         Miscellaneous.
+* w3-open-local:                        Action.
+* w3-print-this-url:                    Miscellaneous.
+* w3-print-this-url:                    Action.
+* w3-print-url-under-point:             Miscellaneous.
+* w3-print-url-under-point:             Action.
+* w3-quit:                              Action.
+* w3-reload-document:                   Action.
+* w3-save-this-url:                     Information.
+* w3-save-url:                          Information.
+* w3-search:                            Action.
+* w3-show-history:                      Session History.
+* w3-show-history-list:                 Action.
+* w3-show-hotlist:                      Hotlist Handling.
+* w3-show-hotlist:                      Movement.
+* w3-source-document:                   Information.
+* w3-source-document-at-point:          Information.
+* w3-start-of-document:                 Movement.
+* w3-unhide-zone:                       Generalized ZONES.
+* w3-upcase-region:                     Character based terminals.
+* w3-use-hotlist:                       Hotlist Handling.
+* w3-use-hotlist:                       Movement.
+* w3-use-links:                         Miscellaneous.
+* w3-view-this-url:                     Miscellaneous Functions.
+* w3-view-this-url:                     Information.
+* w3-zone-at:                           Generalized ZONES.
+* w3-zone-data:                         Generalized ZONES.
+* w3-zone-data:                         Generalized ZONES.
+* w3-zone-end:                          Generalized ZONES.
+* w3-zone-eq:                           Generalized ZONES.
+* w3-zone-hidden-p:                     Generalized ZONES.
+* w3-zone-start:                        Generalized ZONES.
+* window-width:                         Basic Setup.
+
+
+File: w3.info,  Node: Variable Index,  Prev: Command Index,  Up: Top
+
+Variable Index
+**************
+
+* Menu:
+
+* fill-column:                          General Formatting.
+* lpr-command:                          Miscellaneous.
+* lpr-switches:                         Miscellaneous.
+* mm-content-transfer-encodings:        Other Variables.
+* mm-mime-data:                         Specifying Viewers.
+* mm-mime-extensions:                   Adding MIME types based on file extensions.
+* ssl-program-name:                     SSL.
+* url-automatic-caching:                Disk Caching.
+* url-bad-port-list:                    Basic Setup.
+* url-be-asynchronous:                  Basic Setup.
+* url-confirmation-func:                Basic Setup.
+* url-current-file:                     Global Variables.
+* url-current-mime-headers:             Global Variables.
+* url-current-port:                     Global Variables.
+* url-current-server:                   Miscellaneous Functions.
+* url-current-server:                   Global Variables.
+* url-current-type:                     Global Variables.
+* url-forms-based-ftp:                  General Formatting.
+* url-gateway-connect-program:          Firewalls.
+* url-gateway-handholding-login-regexp: Firewalls.
+* url-gateway-handholding-password-regexp: Firewalls.
+* url-gateway-host:                     Firewalls.
+* url-gateway-host-password:            Firewalls.
+* url-gateway-host-program:             Firewalls.
+* url-gateway-host-program-ready-regexp: Firewalls.
+* url-gateway-host-prompt-pattern:      Firewalls.
+* url-gateway-host-username:            Firewalls.
+* url-gateway-local-host-regexp:        Firewalls.
+* url-gateway-method:                   Firewalls.
+* url-gateway-program-interactive:      Firewalls.
+* url-gateway-telnet-program:           Firewalls.
+* url-gateway-telnet-ready-regexp:      Firewalls.
+* url-global-history-file:              Global History.
+* url-global-history-file:              Basic Setup.
+* url-gopher-to-mime:                   Mapping gopher types to MIME types.
+* url-keep-history:                     Global History.
+* url-keep-history:                     Session History.
+* url-mime-accept-string:               Miscellaneous Functions.
+* url-passwd-entry-func:                Other Variables.
+* url-personal-mail-address:            Basic Setup.
+* url-pgp/pem-entity:                   Basic Setup.
+* url-request-data:                     Miscellaneous Functions.
+* url-request-extra-headers:            Miscellaneous Functions.
+* url-request-method:                   Miscellaneous Functions.
+* url-show-status:                      Other Variables.
+* url-standalone-mode:                  Disk Caching.
+* url-uncompressor-alist:               Other Variables.
+* url-use-hypertext-dired:              General Formatting.
+* url-use-hypertext-dired:              Action.
+* url-use-hypertext-gopher:             Basic Setup.
+* url-wais-gateway-port:                Native WAIS Support.
+* url-wais-gateway-port:                Basic Setup.
+* url-wais-gateway-server:              Native WAIS Support.
+* url-wais-gateway-server:              Basic Setup.
+* url-waisq-prog:                       Other Variables.
+* url-waisq-prog:                       Native WAIS Support.
+* url-working-buffer:                   Miscellaneous Functions.
+* url-xterm-command:                    Basic Setup.
+* w3-allow-searching-of:                Searching.
+* w3-annotation-mode:                   Personal Annotations.
+* w3-color-filter:                      Inlined images.
+* w3-color-max-blue:                    Inlined images.
+* w3-color-max-green:                   Inlined images.
+* w3-color-max-red:                     Inlined images.
+* w3-color-use-reducing:                Inlined images.
+* w3-current-last-buffer:               Global Variables.
+* w3-debug-buffer:                      Debugging HTML.
+* w3-debug-html:                        Debugging HTML.
+* w3-default-action:                    Basic Setup.
+* w3-default-homepage:                  Basic Setup.
+* w3-delay-image-loads:                 Inlined images.
+* w3-delay-image-loads:                 Basic Setup.
+* w3-delay-mpeg-loads:                  Inlined images.
+* w3-delimit-emphasis:                  Character based terminals.
+* w3-delimit-emphasis:                  Basic Setup.
+* w3-delimit-links:                     General Formatting.
+* w3-delimit-links:                     Basic Setup.
+* w3-emacs19-hack-faces-p:              Smart terminals.
+* w3-gopher-labels:                     General Formatting.
+* w3-graphic-converter-alist:           Inlined images.
+* w3-header-chars-assoc:                Character based terminals.
+* w3-horizontal-rule-char:              General Formatting.
+* w3-hotlist-file:                      Hotlist Handling.
+* w3-hotlist-file:                      Hotlist Handling.
+* w3-hotlist-file:                      Hotlist Handling.
+* w3-hotlist-file:                      Hotlist Handling.
+* w3-hotlist-file:                      Basic Setup.
+* w3-html-entities:                     Miscellaneous Functions.
+* w3-html2latex-args:                   Miscellaneous.
+* w3-html2latex-prog:                   Miscellaneous.
+* w3-icon-directory-list:               Other Variables.
+* w3-indent-level:                      General Formatting.
+* w3-keep-history:                      Action.
+* w3-keep-old-buffers:                  Other Variables.
+* w3-latex-docstyle:                    Miscellaneous.
+* w3-link-end-delimiter:                General Formatting.
+* w3-link-start-delimiter:              General Formatting.
+* w3-list-chars-assoc:                  General Formatting.
+* w3-load-hooks:                        Hooks.
+* w3-mpeg-args:                         Inlined images.
+* w3-mpeg-program:                      Inlined images.
+* w3-personal-annotation-directory:     Personal Annotations.
+* w3-personal-annotation-directory:     Basic Setup.
+* w3-print-commnad:                     Miscellaneous.
+* w3-reuse-buffers:                     Other Variables.
+* w3-right-border:                      General Formatting.
+* w3-right-border:                      Basic Setup.
+* w3-running-epoch:                     Global Variables.
+* w3-running-FSF19:                     Global Variables.
+* w3-running-xemacs:                    Global Variables.
+* w3-show-headers:                      Other Variables.
+* w3-show-status:                       Other Variables.
+* w3-style-chars-assoc:                 Character based terminals.
+* w3-style-chars-assoc:                 Basic Setup.
+* w3-track-mouse:                       Basic Setup.
+* w3-use-forms-index:                   Basic Setup.
+* w3-use-html2latex:                    Miscellaneous.
+* w3-use-hypertext-gopher:              General Formatting.
+
+

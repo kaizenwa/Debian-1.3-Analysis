@@ -1,0 +1,57 @@
+Here is a description of the changes I've made to term for use on SCO 
+UNIX.  There is a suggested change to the term protocol below.
+
+1. SCO UNIX does not support UNIX domain sockets.  The UNIX domain
+   sockets used for the term server/client communications have
+   been replaced with either TCP/IP sockets or streams pipes.
+
+   a) TCP/IP sockets.  These are enabled by defining NO_UNIX_DOMAIN
+      and not defining STREAMS_PIPE.  The server establishes a socket
+      and writes the port number to $HOME/.term/socket.  Clients
+      read that file to get the port number, and then connect to
+      that port on localhost.
+
+   b) Streams pipes are enabled by setting defining both NO_UNIX_DOMAIN
+      and STREAMS_PIPE.  This uses the SCO X server IPC connection
+      protocol to connect.  The server opens /dev/X#S (where # is
+      the display number).  Clients open /dev/X#R and write a dummy
+      byte to initiate a connection.  The server then creates an
+      appropriate streams pipe (/dev/spx) and sends the file 
+      descriptor to the client.  (See spipe.c)
+
+      Creating a named streams pipe requires root access on SCO.  In
+      order to avoid that, term is prepared to "borrow" an X server
+      local connection.  If you set TERM_BORROWED_DISPLAY_NUMBER to
+      an integer, the server and clients will use that X server
+      local connection as their IPC channel.  (The variable must
+      be set for both the server and the clients).  If the variable
+      is not set, the TCP/IP method will be used.
+
+2) SCO UNIX uses streams pipes to talk to the X server.  (See above
+   for a brief description of the protocol).  Rather than replace the
+   code in the term server that opens a UNIX domain socket, I extended
+   the protocol with a C_X_SERVER request.  This request causes the
+   remote term server to establish a connection to its X server
+   (as specified by its DISPLAY variable).
+
+   Note that this makes SCO term software incompatible (with respect
+   to txconn) with other versions, since the other end will either send
+   the wrong request (C_SOCKET rather than C_X_SERVER) or the other
+   term server won't recognise C_X_SERVER).
+
+   I would like to suggest that you modify your protocol so that xconn
+   always sends C_X_SERVER, and all term servers react to that by
+   setting up the appropriate connection.  It also seems to me most
+   sensible that the DISPLAY variable for the term server connecting
+   to the X server should drive which X server to connect to.  I
+   haven't done this, the code for ifdef'd under X_STREAMS_PIPE.
+
+
+3) Much of the code in spipe.c is borrowed from SCO's X server or X client
+   library.  It is freely redistributable as long as the copyright notice
+   remains intact (see spipe.c for details).  Don't yell at us if it doesn't
+   work.
+
+Tom Kelly
+tom@sco.com
+3 April 1994

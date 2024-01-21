@@ -1,0 +1,383 @@
+.\" Copyright (c) 1996, 1997 Peter Fox <fox@roestock.demon.co.uk>
+.\" This program is distributed according to the Gnu General Public License.
+.\" See the file COPYING in the isapnptools source distribution.
+.\"
+.\" $Id: isapnp.conf.5,v 0.0 1997/01/09 22:55:23 fox Exp $
+.\"
+.TH ISAPNP.CONF 5 "9 Jan 1997" "isapnptools"
+.SH NAME
+isapnp.conf \- File format used by isapnp.
+.SH SYNOPSIS
+\fB/etc/isapnp.conf\fP
+.SH DESCRIPTION
+The \fBisapnp.conf\fP file is a configuration file for \fBisapnp\fP.
+
+\fBisapnp.conf\fP provides instructions for isapnp. This includes
+how to identify the cards present, and configuration information for
+each one.
+.SH "FILE FORMAT"
+The file consists of comments and instructions.
+
+Comments start with a \fI#\fP character, and continue to
+the end of the line.
+
+Instructions consist of keywords and parameters, enclosed
+in pairs of parentheses, with nesting as appropriate to show
+context. For example:
+
+ (ISOLATE)
+ (CONFIGURE DFX0000/1493 (LD 0 (IO 0 (BASE 0x3e8)) (ACT Y)))
+
+Instructions can be spread across many lines, and include
+comments if required.
+.SH SECTIONS
+The file conceptually has three sections:
+.TP
+Initialisation
+Which is the set of keywords associated with identifying the
+Plug-and-Play cards. These usually come at the beginning
+of the configuration file.
+.TP
+Configuration
+Which is the set of keywords used to select a card and write
+values to its configuration registers.
+.TP
+Tidy up
+Which is the set of keywords used to finish the Plug and Play
+configuration process.
+.PP
+There are also some keywords for debugging purposes.
+.SH INITIALISATION
+There are two ways to initialise the configuration
+mechanism, corresponding to using \fBpnpdump\fP with
+and without the two optional parameters.
+.TP
+BIOS does ISOLATION
+This method assumes the BIOS has already carried out the isolation
+process, and allocated Card Select Numbers (CSNs) to each card.
+
+The configuration file specifies the number of cards and the readport
+address, and then \fBisapnp\fP reads the serial identifier from
+the beginning of the resource data to find out the identity of each card.
+
+A configuration file using this method will start like:
+
+ (READPORT 0x3bb)
+ (CSN 2)
+ (IDENTIFY *)
+
+Using this method, and PEEK instructions instead of the configuration
+setting instructions, it is possible to examine the configuration of the
+Plug-and-Play cards, without upsetting normal system operation.
+This can be useful for example to check how the BIOS has configured the
+hardware. (If you want to get really fancy, you could pipe the output
+through a script to configure the kernel driver(s) to match).
+
+Note that some cards appear to be broken in that they don't follow the
+requirement in the second paragraph of section 4.5 of the PnP ISA Spec.
+(They start returning resource data immediately when entering the
+\fIConfig\fP state from the \fISleep\fP state, rather than the 9 byte
+serial identifier).
+These cards may not be able to use this method.
+.TP
+\fBisapnp\fP does ISOLATION
+With this method, \fBisapnp\fP carries out the isolation process.
+This will be required for example on those systems without a Plug and Play
+BIOS, or with a broken BIOS.
+
+The configuration file simply includes the line
+
+  (ISOLATE)
+
+which will scan for a suitable readport address and identify all the devices.
+You may still want to include (IDENTIFY *) however, as it will printout
+the names of the devices found.  Putting a (READPORT xxx) before the (ISOLATE)
+will prevent the scanning process.
+.SH CONFIGURATION
+This is the core of the process. For each card to be configured (not all
+need to be), it is first selected using the CONFIGURE keyword.  (Cards
+can be selected using the CSN keyword, but the CSN numbers will change
+when Plug and Play cards are added and removed, which could result in
+configuration register settings going to the wrong card).
+
+After this, each logical device on the card is selected in turn using
+the LD keyword.  The registers for that device are programmed using the
+IO, INT, DMA, MEM keywords and their subwords. Finally the logical
+device is enabled using the ACT keyword.
+
+For debugging purposes, or to access non-standard configuration
+registers, the REG keyword may be used to directly access the
+configuration registers by address.
+
+A couple of examples of this part of the configuration file look like
+this:
+
+  # Card 1: (serial identifier 13 0e 1e 37 b4 19 01 89 14)
+  # EDI0119 Serial No 236861364 [checksum 13]
+  # Version 1.0, Vendor version 1.0
+  # ANSI string -->PLUG & PLAY ETHERNET CARD<--
+  # Logical device id EDI0119
+  #     Device support I/O range check register
+  (CONFIGURE EDI0119/236861364 (LD 0
+  #     Compatible device id PNP80d6
+  #     Logical device decodes 10 bit IO address lines
+  #         Minimum IO base address 0x0240
+  #         Maximum IO base address 0x03e0
+  #         IO base alignment 32 bytes
+  #         Number of IO addresses required: 32
+  (IO 0 (BASE 0x0340))
+  #     IRQ 3, 4, 5, 9, 10, 11, 12 or 15.
+  #         High true, edge sensitive interrupt
+  (INT 0 (IRQ 10 (MODE +E)))
+  #     Memory is non-writeable (ROM)
+  #     Memory is non-cacheable
+  #     Memory decode supports high address
+  #     memory is 8-bit only
+  #     memory is shadowable
+  #     memory is an expansion ROM
+  #     Minimum memory base address 0x0c0000
+  #     Maximum memory base address 0x0dc000
+  #     Range base alignment mask 0xff4000 bytes
+  #     Range length 16384 bytes
+  # Choose UPPER = Range, or UPPER = Upper limit to suit hardware
+  # (MEM 0 (BASE 0x0c0000) (MODE bu) (UPPER 0x0c4000))
+  # (MEM 0 (BASE 0x0c0000) (MODE br) (UPPER 0x004000))
+  (ACT Y)))
+  # End tag... Checksum 0x00 (OK)
+
+  (CONFIGURE DFX0000/1493 (LD 0 (IO 0 (BASE 0x3e8)) (INT 0 (IRQ 12 (MODE +E))) (ACT Y)))
+.SH "TIDY UP"
+This is just the keyword WAITFORKEY, which returns the Plug and Play
+configuration mechanism to the \fIWait for Key\fP state.
+
+The configuration file thus ends with
+
+  (WAITFORKEY)
+.SH "LIST OF KEYWORDS"
+The following is a complete list of the keywords, showing the heirarchy
+of validity.
+
+  CONFIGURE (or CSN)
+    LD
+      ACT
+      DMA
+        CHANNEL
+        PEEK
+      INT
+        IRQ
+          MODE
+        PEEK
+      IO
+        BASE
+      PEEK
+      MEM
+        BASE
+        MODE
+        PEEK
+        UPPER
+      REG
+        PEEK
+        POKE
+  DEBUG
+  IDENTIFY
+  ISOLATE
+  IGNORECRC
+  READPORT
+  WAITFORKEY
+
+.SH KEYWORDS
+In alphabetical order.
+The ... in the parentheses implies that the instruction is merely a selector
+of some sort, and further instructions are required to do something useful.
+.TP
+\fB(ACT \fIarg\fP)\fP
+Context: within (LD ...).
+.br
+\fIarg\fP can be \fIY\fP or \fIN\fP.
+\fIY\fP will cause the logical device to be activated and respond to accesses.
+\fIN\fP will cause the logical device to be deactivated and isolated from the bus.
+.TP
+\fB(BASE \fIarg\fP)\fP
+Context: within (IO ...) or (MEM ...).
+.br
+\fIarg\fP specifies the base address of the region.
+Prefix a hex address with \fI0x\fP.
+.TP
+\fB(CHANNEL \fIarg\fP)\fP
+Context: within (DMA ...).
+.br
+\fIarg\fP specifies the DMA channel to use.
+Valid settings are 0..7.
+Channel 4 means no DMA used.
+Channels 0..3 are for 8 bit DMA,
+Channels 5..7 are for 16 bit DMA.
+.TP
+\fB(CONFIGURE \fIarg\fP ...)\fP
+Context: Global.
+.br
+\fIarg\fP specifies the card Vendor Id and serial number in the form
+[A-Z][A-Z][A-Z][0-9A-F][0-9A-F][0-9A-F][0-9A-F]/-*[1-9][0-9]*. For
+example "DFX0000/1493". The serial number \fI-1\fP implies that the
+device does not have a serial number; in this case, only one card
+can of this type can be supported in the system. Some cards appear
+to include an underscore character as one of the initial three
+letters of the Vendor ID, this is outside the specification, though
+supported.
+.TP
+\fB(CSN \fIarg\fP ...)\fP
+Context: Global.
+.br
+\fIarg\fP specifies the Card Select Number of the card to select
+for access. \fBisapnp\fP assumes you know what you are doing
+if you use this instruction, and will assume the card exists (and
+all the cards with lower CSNs). \fIarg\fP must be in the range
+1..32, this is a compiled in limit.
+.TP
+\fB(DEBUG)\fP
+Context: Global.
+.br
+This turns on debugging immediately. Diagnostic messages will
+be produced as soon as this instruction is read in.
+.TP
+\fB(DMA \fIarg\fP ...)\fP
+Context: within (LD ...).
+.br
+\fIarg\fP specifies the DMA register to configure, in the range 0..1.
+Each logical device can use up to 2 DMA channels.
+.TP
+\fB(IDENTIFY \fIarg\fP)\fP
+Context: Global.
+.br
+\fIarg\fP specifies the Card Select Number of the card to identify.
+Identification consists of reading the card's resource data, updating
+internal tables so that \fBCONFIGURE\fP can find the card, and printing
+the results. \fIarg\fP must be in the range of valid CSNs (ie number
+of boards found), or can be specified as \fI*\fP to operate on each
+card in turn.
+.TP
+\fB(IGNORECRC)\fP
+Context: Global.
+.br
+Normally, cards which have a CRC error during the reading of the
+serial identifier in the isolation process are not counted.
+Setting this flag means they will be counted anyway.
+This must therefore come before \fBISOLATE\fP if it is to
+have any effect.
+.TP
+\fB(INT \fIarg\fP ...)\fP
+Context: within (LD ...).
+.br
+\fIarg\fP specifies the INT register set to configure, in the range 0..1.
+Each logical device can use up to two interrupt lines.
+.TP
+\fB(IO \fIarg\fP ...)\fP
+Context: within (LD ...).
+.br
+\fIarg\fP specifies the IO register set to configure, in the range 0..7.
+Each logical device can use up to eight IO regions. Note that there is
+no means to specify the size of the IO region, unlike MEMory regions.
+The size of the IO region can be found by examining the output of
+\fBpnpdump\fP.
+.TP
+\fB(IRQ \fIarg\fP ...)\fP
+Context: within (INT ...).
+.br
+\fIarg\fP specifies the interrupt line to use for the interrupt, in the
+range 0..15. No interrupt is specified using 0. To use interrupts a
+value in the range 1..15 must be specified. Note that not all interrupt
+lines are connected, so the resource data must be consulted to get a
+list of valid settings.
+.TP
+\fB(ISOLATE)\fP
+Context: Global.
+.br
+This carries out the full isolation protocol. First it disables
+all the Plug and Play devices, then isolates them one by one, allocating
+each one a Card Select Number. If a \fBREADPORT\fP hasn't already
+been specified, it will also search for a valid readport address.
+.TP
+\fB(LD \fIarg\fP ...)\fP
+Context: within (CONFIGURE ...) or (CSN ...).
+.br
+\fIarg\fP specifies the logical device to configure, in the range 0..n,
+where n is one less than the number of logical devices on the card.
+After setting the register to select the logical device, it is read
+back and checked; an error is generated if there is a mismatch.
+The number of logical devices on a card can be found by examining the
+output of \fBpnpdump\fP.
+.TP
+\fB(MEM \fIarg\fP ...)\fP
+Context: within (LD ...).
+.br
+\fIarg\fP specifies the memory register set to configure, in the range 0..3.
+The memory register sets are the normal range (24 bit addresses).
+Each logical device can support up to 4 memory regions.
+There is no direct support for the 32 bit memory descriptors, though \fBPOKE\fP
+could be used if required.
+.TP
+\fB(MODE \fIarg\fP)\fP
+Context: within (IRQ ...) or (MEM ...).
+.br
+Within \fBIRQ\fP, \fIarg\fP specifies the interrupt line polarity and sensitivity
+using two characters [+-][EL] for [positive|negative][Edge|Level] sensitivity.
+In most ISA situations this will be \fI+E\fP.
+
+Within \fBMEM\fP, \fIarg\fP specifies memory width and the meaning of the value
+written to the \fBUPPER\fP register. \fIarg\fP is of the form [BW][RU] for
+[Byte|Word][Range|Upper]. Note that often these values cannot be set, but they are
+checked with the hardware value and an error is generated if they don't match.
+.TP
+\fB(PEEK)\fP
+Context: within most register access keywords.
+.br
+This instruction causes the register value to be read and a suitable
+message output to stdout.
+.TP
+\fB(POKE \fIarg\fP)\fP
+Context: within (REG ...).
+.br
+\fIarg\fP specifies the value to write to the selected register in the
+range 0..255.
+.TP
+\fB(READPORT \fIarg\fP)\fP
+Context: Global.
+.br
+\fIarg\fP specifies the address of the readport register to use in
+the range 0x203..0x3ff. The bottom two bits are set to ensure the
+port is on the correct address boundary.
+This should be the first instruction if used (except perhaps for DEBUG).
+.TP
+\fB(REG \fIarg\fP ...)\fP
+Context: within (LD ...).
+.br
+\fIarg\fP specifies the address of the register to configure, in the range 0..255.
+This may be used to access the various reserved and vendor defined registers on
+a logical device.
+.TP
+\fB(UPPER \fIarg\fP)\fP
+Context: within (MEM ...).
+.br
+\fIarg\fP specifies the memory range the device can use. The value is either
+an upper address, or a range (offset) value, depending on the device.
+Consult the resource data as dumped by \fBpnpdump\fP to find out what the
+device supports.
+.TP
+\fB(WAITFORKEY)\fP
+Context: Global.
+.br
+Returns all cards to the \fIWait for Key\fP state, as required by the
+specification.
+.SH AUTHOR
+\fBisapnp.conf\fP has been written by Peter Fox <fox@roestock.demon.co.uk>,
+the creator and maintainer of isapnptools.
+.SH AVAILABILITY
+The latest version of the sources may be obtained by ftp from
+ftp://ftp.demon.co.uk/pub/unix/linux/utils
+.br
+Or follow the pointer from my web page at
+http://www.roestock.demon.co.uk/
+.SH REFERENCES
+Plug and Play ISA Specification, Version 1.0a, May 5, 1994.
+Available from ftp://ftp.microsoft.com/developer/drg/Plug-and-Play/Pnpspecs
+.SH "SEE ALSO"
+pnpdump(8), isapnp(8)

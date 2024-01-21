@@ -1,0 +1,448 @@
+.\" Marcus J. Ranum, 1993
+.\" Copyright (C) Trusted Information Systems, Inc.
+.\" All rights reserved
+.TH AUTHD 8 "3 September 1993"
+.SH NAME
+authsrv - network authentication third-party daemon
+.SH SYNOPSIS
+.B authsrv
+\[invoked via inetd\]
+.SH DESCRIPTION
+.IX  "auth daemon"  ""  "\fLauthsrv\fP \(em authentication daemon"
+.LP
+.B authsrv
+serves as a simple third-party authentication server, and as
+middleware to give a unified interface to multiple forms of
+authentication such as passwords, one-time passwords, and token
+authentication systems. 
+.B authsrv
+maintains a database of user
+and group records, with a simple administrative interface that
+permits an authenticated administrator to manage user records
+locally or over a network.
+.B authsrv
+maintains extensive logs of transactions, authentication
+failures and successes, and all changes to its database.
+.B authsrv
+additionally can be configured to perform basic security
+operations such as disabling user accounts automatically
+when there are more than a set number of failed login
+attempts.
+.PP
+Since many commercial products for authentication include their
+own programming interface, it is cumbersome to simultaneously
+support multiple forms of authentication within a single piece of
+software.
+.B authsrv
+multiplexes authentication schemes and uses a simple protocol
+with the client software, permitting administrators to easily
+add or drop authentication schemes without having to modify
+client code.
+Currently
+.B authsrv
+contains support for Digital Pathways' Secure Net Key, Security
+Dynamics' SecurID, Bellcore's S/Key, and plaintext passwords.
+.PP
+.B authsrv's
+basic authentication protocol uses ASCII text, with newline
+indicating the end of a line. When a client connects to the
+authentication server, it issues a request to authenticate
+a user:
+.sp
+.I authorize userID
+.br
+.I authenticate userID
+.sp
+To which the server will respond with one of two options:
+.sp
+.I password
+.br
+.I challenge challengestring
+.sp
+The client program should prompt the user for a (non-echoing)
+password if it recieves the "password" response, or it should
+prompt the user with the returned challenge string if it
+recieves the "challenge" response. The client program should
+forward the user's password or challenge response in the form
+of:
+.sp
+.I response responsestring
+.sp
+to which the server will either respond "ok" or with an
+arbitrary text string that should be returned to the user.
+In some cases, the server may respond with "ok" followed
+by additional text on the same line. In this case, the
+additional text may contain information of interest
+to the user (e.g.: "ok Change your password soon")
+.PP
+.B authsrv
+can also be invoked from the terminal directly for
+administrative purposes. If it is invoked from a
+terminal with the current user-id being 0 ("root")
+it will automatically grant administrative privileges
+to the session. This is based on the pragmatic
+realization that if someone has system privileges
+on the host serving the authentication database,
+they already effectively have administrative privileges.
+.PP
+Generally,
+.B authsrv
+is designed to run on a secured system that is relatively
+restricted to users. In a firewall environment, the firewall
+bastion host itself is a good candidate, since typically
+the bastion host is secured, and is where the client software
+that uses
+.B authsrv
+is running. To ease administration,
+.B authsrv
+can be managed remotely using a client program
+.B authsrv
+with optional DES-encrypted communications between the client
+and server.
+.SH GROUPS AND USERS
+.B authsrv
+has a notion of groups and users. Each user may be assigned
+to a group, consisting of a short arbitrary string name. There
+are two levels of permissions in
+.B authsrv,
+administrator, and group administrator. A group administrator
+can create, enable, disable, and delete users from that group,
+but may not create additional group administrators or groups.
+The overall administrator may create new groups (by simply
+assigning someone to a group that previously did not exist)
+and may hand out group administration privileges. This provides
+a very flexible management environment, in which a variety
+of management schemes can be implemented. To implement a
+monolithic management scheme, simply create several
+administrators and have them manage the database. To implement
+a hierarchical management scheme, create several group administrators
+and let each manage a group separately. One may, optionally, delete
+the administrator user-id and perform all operations at a group
+level, creating new groups by running
+.B authsrv
+in administrator mode on the system where the database
+resides.
+.SH OPTIONS
+.LP
+.B authsrv
+takes no command line options, reading its configuration
+information from the firewall toolkit configuration
+file
+.B netperm-table(5)
+All configuration rules in
+.B netperm-table
+for application "authsrv" are read, and the following clauses
+and parameters are recognized:
+.TP
+.B database pathname
+Specifies the pathname of the
+.B authsrv
+database. The database is stored as a
+.I dbm(3)
+file with a third file used for locking. If the software
+is built with a compiled-in database name, this option need
+not be set, otherwise it is mandatory.
+.TP
+.B nobogus true
+indicates that
+.B authsrv
+should return "user-friendly" error messages when users
+attempt to authenticate and fail. The default message is
+to simply respond, "Permission Denied." or to return a
+bogus challenge. If nobogus is set, attempts to log in
+will return more explicit error messages. Sites that are
+concerned about attempts to probe their authentication
+server should leave this option disabled.
+.TP
+.B badsleep seconds
+establishes a "sleep time" for repeated bad logins. If a
+user attempts to authenticate 5 times and fails, their
+user record is marked as suspicious, and they cannot log
+in again. If the
+.B badsleep
+value is set, the user may attempt to log in again after
+that many seconds has expired. If the
+.B badsleep
+value is 0, users may attempt (and fail) to log in as many
+times as they would like. The default value is to effectively
+disable the account until an administrator re-enables it
+manually.
+.TP
+.B userid name
+specify the userid that
+.B authsrv
+should run under. The name can be either a name from the
+password database, or a numeric user-ID.
+.TP
+.B hosts host-pattern [key]
+specifies that
+.B authsrv
+should permit the named host or addresses to use the service.
+Hosts that do not have a matching entry are denied use of
+the service.
+If the optional
+.B key
+is specified, and the software is compiled with DES-encrypted
+communications, all traffic with that client will be encrypted
+and decrypted with the specified key.
+.SH COMMANDS
+.TP
+.B authorize username
+.br
+implements the first part of the authentication sequence. If
+the
+.B authorize
+command is issued once a user has already authenticated to the
+authentication server, their current authentication is cleared.
+.TP
+.B response <text>
+.br
+implements the second part of the authentication sequence. This
+is returned in response to a
+.B password
+or
+.B challenge
+query from the authentication server.
+.TP
+.B quit
+or
+.B exit
+.br
+disconnects from the authentication server.
+.TP
+.B display username
+.br
+displays the status, authentication protocol, and last login of
+the specified user. Before the authentication server permits the
+use of this command, the user must first be authenticated to
+the server as the administrator, or the group administrator of
+the group to which the user belongs.
+.TP
+.B adduser username [longname]
+.br
+adds a user to the authentication database. Before the authentication
+server permits the use of this command, the user must first be
+authenticated to the server as the administrator or as a group
+administrator. If the user is a group administrator, the newly
+created user is automatically initialized as a member of that
+group. When a user is added, they are initially disabled. If a
+long name is provided, it will be stored in the database. Long
+names should be quoted if they contain white space, I.e.:
+.sp
+.I adduser mjr 
+"Marcus J. Ranum"
+.sp
+.TP
+.B deluser username
+.br
+deletes the specified user from the authentication database. Before
+using this command, the user must first be authenticated to the
+server as the administrator or group administrator of the group
+to which the user being deleted belongs.
+.TP
+.B enable username
+or
+.B disable username
+.br
+enables or disabled the specified user's account for login.
+Before using this command, the user must first be authenticated to
+the server as the administrator or group administrator of the group
+to which the user being enabled or disabled belongs.
+.TP
+.B password [username] text
+.br
+sets the password for the current user. If an optional username is
+given and the authenticated user is the administrator or group
+administrator, the password for the specified user is changed. The
+.B password
+command is polymorphic depending on the user's speciified authentication
+protocol. For example, if the user's authentication protocol is
+plaintext passwords, it will update the plaintext password. If the
+authentication protocol is SecurID with PINs, it will update the
+PIN.
+.TP
+.B proto user protoname
+.br
+sets the authentication protocol for the specified user to the named
+protocol. Available protocols will depend on the compiled-in support
+within
+.B authsrv.
+in order to change a user's authentication protocol, one must be
+authenticated to the server either as the administrator or group
+administrator of the user's group.
+.TP
+.B group user groupname
+.br
+sets the specified user's group. In order to use this command,
+one must first be authenticated to the server as the administrator.
+Group administrators do not have the power to "adopt" members.
+.TP
+.B wiz user
+or
+.B unwiz user
+.br
+sets of unsets the group administrator flag on the specified user.
+In order to issue this command, one must be authenticated to the
+server as the administrator.
+.TP
+.B superwiz user
+sets the specified user as a global administrator. This command
+should only be used with deliberation, as generally the group
+mechanism is powerful enough that global administrative privileges
+are seldom used.
+.TP
+.B list [group]
+lists all users that are known to the system, or the members of
+the specified group. Group administrators may list their own
+groups, but not the entire database. The listing displays a
+several fields, including:
+.IP
+.B user
+The login ID of the user.
+.IP
+.B group
+The group membership of the user. If none is listed, the user is
+in no group.
+.IP
+.B longname
+The user's full name. This may be left blank.
+.IP
+.B status
+Contains codes indicating the user's status. If marked "y" it
+indicates the user is enabled and may log in. If marked "n" the
+user's login is disabled. If marked "b" the users, login is
+temporarily disabled due to too many bad login attempts. Users
+flagged with a "W" have the administrator bit set; users flagged
+with a "G" have the group administrator bit set.
+.IP
+.B proto
+indicates the form of authentication in use for the login.
+.IP
+.B lastj
+indicates the time of the last login attempt, whether successful
+or not.
+.TP
+.B ?
+or
+.B help
+.br
+list a short synopsis of available commands.
+.IP
+.B operation user username service dest [other tokens] [time low# high#]
+.br
+determines if the named user is allowed to perform the specified service. The
+service could be any one of the application gateway service proxied such as
+telnet-gw, ftp-gw or rlogin-gw. The destination is any valid IP domain. The
+optional tokens are matched as wildcards to permit a proxy to specify more
+detailed operations. If a matching rule is found the appropriate response is
+returned to the client. If no match is found a message indicating that no match
+was found is returned to the client program.
+.B Example:
+.br
+operation user mjr telnet-gw relay.tis.com
+.br
+operation user mjr ftp-gw relay.tis.com put
+.br
+Operation rules are stored in
+.B netperm-table.
+For each user/group the name is specified followed by the service
+destination [optional tokens] [time start end]. The user/group field indicates
+whether the record is for a user or a group. The name is either the username
+or the group name. The service can be and service specified by the proxy
+(usually ftp-gw, tn-gw, rlogin-gw, etc). The destination can be any valid
+domain name. The optional tokens are checked for a match, permitting a proxy
+to send a very specific operation check to the authentication server. The time
+field is optional and must be specified time start_time end_time. Where
+start_time and end_time can be in the range 00:00 23:59
+.in 0
+.B Example:
+.br
+authsrv permit-operation user mjr telnet-gw relay.tis.com time 08:00 17:00
+.br
+authsrv deny-operation user mjr telnet-gw relay.tis.com time 17:01 07:59
+.br
+authsrv permit-operation group admin telnet-gw * time 08:00 17:00
+.br
+authsrv deny-operation user mjr telnet-gw relay.tis.com time 17:01 07:59
+.br
+authsrv permit-operation group admin telnet-gw *.com
+.br
+authsrv deny-operation group admin ftp-gw *.com put time 00:00 23:59
+.br
+.SH INSTALLATION
+.LP
+To install
+.B authsrv,
+configure the
+.B database 
+option in
+.B netperm-table,
+and initialize the database. To initialize the database,
+su to root, and run
+.B authsrv at the command line, then issue the following
+commands:
+.sp
+.nf
+.na
+#
+# authsrv
+
+-administrator mode-
+authsrv# list
+Report for users in database
+user       group      longname        ok?  proto      last
+----       -----      --------        ---  -----      ----
+authsrv# adduser admin 'Auth DBA'
+ok - user added initially disabled
+authsrv# ena admin
+enabled
+authsrv# proto admin Snk
+changed
+authsrv# pass '160 270 203 065 022 034 232 162' admin
+Secret key changed
+authsrv# list
+Report for users in database
+user       group      longname        ok?  proto      last
+----       -----      --------        ---  -----      ----
+admin                 Auth DBA        ena  Snk        never                   
+authsrv# quit
+#
+.fi
+.ad
+.PP
+In the example above, the administrator account is established,
+then enabled, a protocol is assigned, and the initial password
+is set. The format of the set password will depend on the
+authentication protocol used for the record; in this example,
+the administrator record is using a SecureNet Key, so the
+password record consists of the shared secret key used by
+the device. 
+.PP
+Once the database is initialized, add necessary
+.B hosts
+entries to
+.B netperm-table,
+and install
+.B authsrv
+in
+.B inetd.conf
+then restart
+.B inetd.
+Verify that
+.B authsrv
+is running by telnetting to the service port.
+.PP
+Ensure that the database is protected against casual perusal by
+checking its file permissions.
+.SH FILES
+.SH SEE ALSO
+.BR netperm-table (5)
+.BR authmgr (8)
+.SH BUGS
+.PP
+The protocol should use
+.I authenticate userID
+instead of
+.I authorize userID
+This is left for backwards compatibility with an earlier version
+of a similar program.

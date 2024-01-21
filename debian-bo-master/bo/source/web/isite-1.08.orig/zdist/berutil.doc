@@ -1,0 +1,486 @@
+
+OCLC has chosen not to use an ASN.1 compiler in its ASN.1 activities.
+These activities include ASN.1 encoding of z39.50, DBI (an internal variant
+on z39.50) and ASN.1 encoding of all database records, including MARC records.
+Strictly speaking, OCLC does not use ASN.1 internally, other than as a
+language for communicating record specifications to programmers.  However,
+all the records mentioned above are encoded using the Basic Encoding Rules
+and are manipulable by the BER decoders of ASN.1 compilers.
+
+We have chosen to represent the BER records internally as a tree structure of
+linked lists that describe the parts of the BER record.  We believe that this
+hierarchical structure fully represents the complexity of record encodable
+with the BER.
+
+The nodes in this tree structure contain the BER tag, class, form and
+either a pointer to data or a pointer to the next node down in the
+hierarchy, depending on whether the form was primitive or constructed.  We
+often use a picture of this tree structure for describing the syntax of the
+record being encoded, rather than using ASN.1.  For instance, the
+DeleteResultSetRequest is described in ASN.1 as:
+     DeleteResultSetRequest ::=
+	SEQUENCE
+	  {referenceId                  ReferenceId OPTIONAL,
+	  deleteSetFunction        [32] IMPLICIT INTEGER
+					     {DeleteSpecificSet (0),
+					     deleteAllSets      (1)}
+	  resultSetId                   ResultSetId OPTIONAL}
+
+with appropriate definitions for the non-terminals given somewhere else.
+We describe the same thing with the following picture:
+
+DeleteResultSetRequest [26]
+	  |
+     [ReferenceId [2]] --- deleteSetFunction [32] --- [resultSetId [31]]
+	     |
+	OCTETSTRING
+
+with appropriate descriptions of the values that the leaves in the tree can
+take.  We do not make any claims that this is better than ASN.1, it's just
+that it maps directly into the tree structure that gets mapped into and out
+of the BER records.
+
+What we lose by using our own internal syntax is the use of a Presentation
+Layer produced by someone else.  This means that currently those things
+that could be done by the Presentation layer are done by the application.
+This includes integer byte ordering, characterset translation and BER
+encoding.  While this could be a major loss, is hasn't been one so far and
+we haven't heard of any real Presentation layers that do all the things
+promised anyway.
+
+We have a library of utilities for manipulating the tree structures (called
+data_directories or just dirs) and for putting data into and getting data
+out of the tree structures.  Examples showing how these utilities can be used
+are at the end of this document.  A description of the utilities follows.
+
+Before compiling the BER utilities, you must either edit berutil.h or
+include portinfo.h.  portinfo.h is a file used here at OCLC and contains
+information particular to the platform that the code is being compiled on,
+such as byte ordering and character set.  For non-OCLC sites, just define
+NATIVE_ORDER in berutil.h.  It can be define as HIGHTOLOW, LOWTOHIGH or
+PDP_ORDER.  
+
+You should include <stdio.h> before including "berutil.h".
+
+In addition, the macro COPY may want to be redefined from memcpy to bcopy 
+in some UNIX environments.
+
+In addition, you will probably want to add -Dfar="" to your cc command or
+    #define far
+to berutil.h, if you aren't compiling in the DOS environment.
+
+
+The BER utilities:
+
+long asm_rec(dir, buffer)  /* assemble a BER record into a buffer */
+    DATA_DIR *dir;    /* pointer to directory */
+    CHAR     *buffer; /* pointer to buffer to hold BER record */
+
+returns: the length of the BER record;
+NOTE: rec_len() MUST be called immediately before calling asm_rec().
+rec_len() sets information in the DATA_DIR's that is critical to asm_rec().
+
+
+long asn1len(ber_record)  /* find the length of a BER record */
+    CHAR* ber_record;     /* pointer to BER record */
+
+returns: the length of the BER record
+
+
+int bld_dir(ber_record, dir)  /* builds a directory for a BER record */
+    CHAR     *ber_record;     /* pointer to BER record */
+    DATA_DIR *dir;            /* pointer to directory created by */
+			      /* dalloc() or dmake() */
+
+returns: 1 if successful, 0 if failed.
+
+
+CHAR *bld_rec(dir, len)  /* builds a ber_record from a directory */
+    DATA_DIR *dir;       /* pointer to directory */
+    long     *len;       /* pointer to long to contain length of */
+			 /* created record */
+
+returns: pointer to malloced BER record if successful, NULL if failed.
+Note:    The BER record should be freed later.
+
+
+DATA_DIR *daddbits(parent, fldid,  /* add a leaf node to a directory */
+		   class, s)       /* which contains a BITSTRING */
+    DATA_DIR *parent;              /* pointer to parent node */
+    unsigned fldid;                /* tag to be assigned to new node */
+    CHAR     class;                /* class to be assigned to new node */
+    char     *s;                   /* pointer to char string containing */
+				   /* array of bits. */
+
+returns: pointer to new node if successful, NULL if failed.
+Note: Any of the characters '1', 'y', 'Y', 't', or 'T' get a 1 in the encoded
+bitstring.  Any other characters get a 0.
+
+
+DATA_DIR *daddchar(parent, fldid,    /* add a leaf node to a directory */
+		   class, ptr, len)  /* with character data */
+    DATA_DIR *parent;                /* pointer to parent node */
+    unsigned fldid;                  /* tag to be assigned to new node */
+    CHAR     class;                  /* class to be assigned to new node */
+    CHAR     *ptr;                   /* pointer to character data */
+    long     len;                    /* length of character data */
+
+returns: pointer to new node if successful, NULL if failed.
+
+
+DATA_DIR *dadddir(parent, newdir)  /* attach one directory to another */
+    DATA_DIR *parent;              /* pointer to parent node */
+    DATA_DIR *newdir;              /* pointer to directory to be added */
+
+returns: pointer to newdir if successful, NULL if failed.
+
+
+DATA_DIR *daddnum(parent, fldid,   /* add a leaf node to the directory */
+		  class, ptr, len) /* with INTEGER data */
+    DATA_DIR *parent;              /* pointer to parent node */
+    unsigned fldid;                /* tag to be assigned to new node */
+    CHAR     class;                /* class to be assigned to new node */
+    CHAR     *ptr;                 /* pointer to INTEGER cast as char* */
+    int      len;                  /* length of INTEGER */               
+
+returns: pointer to new node if successful, NULL if failed.
+
+
+DATA_DIR *daddoid(parent, fldid,   /* add a leaf node to a directory */
+		   class, s)       /* which contains an OID */
+    DATA_DIR *parent;              /* pointer to parent node */
+    unsigned fldid;                /* tag to be assigned to new node */
+    CHAR     class;                /* class to be assigned to new node */
+    char     *s;                   /* pointer to char string containing */
+				   /* human readable OID */
+
+returns: pointer to new node if successful, NULL if failed.
+
+
+DATA_DIR *daddtag(parent fldid, /* add a non-leaf node to a */
+		  class)        /* directory */
+    DATA_DIR *parent;           /* pointer to parent node */
+    unsigned fldid;             /* tag to be assigned to new node */  
+    CHAR     class;             /* class to be assigned to new node */
+
+returns: pointer to new node if successful, NULL if failed.
+
+
+DATA_DIR *dalloc(numdirs)  /* alloc a directory with */
+			   /* numdirs nodes initially */
+    int numdirs;           /* size of initial directory */
+			   /* and size growth increment */
+
+returns: pointer to empty directory if successful, NULL if failed.
+	 should be dfreed later.
+
+
+int ddeldir(node)    /* remove a node and its children from a directory */
+    DATA_DIR *node;  /* pointer to node to be removed */
+
+returns: 1 if successful, 0 if failed.
+
+
+int dfree(dir)      /* free a directory created by dalloc() or dmake() */
+    DATA_DIR *node; /* pointer to any node in directory to be freed */
+
+returns: 1 if successful or 0 if failed.
+
+
+char *dgetbits(dir)  /* get a BITSTRING from a leaf node */
+    DATA_DIR *node;  /* pointer to node containing BITSTRING data */
+
+returns: character string with 'y' for 1 bits and 'n' for 0 bits.
+Note: character string will be free automatically when the dir is freed or
+reused.  You should copy it if you want it to last longer.
+
+
+long dgetnum(node)   /* get an INTEGER from a leaf node */
+    DATA_DIR *node;  /* pointer to node containing INTEGER data */
+
+returns: value of INTEGER data.  Undefined if not a leaf node or if leaf
+	 node doesn't contain INTEGER data.
+
+
+char *dgetoid(dir)   /* get a human readable OID from a leaf node */
+    DATA_DIR *node;  /* pointer to node containing OID data */
+
+returns: character string with human readable OID.
+Note: character string will be free automatically when the dir is freed or
+reused.  You should copy it if you want it to last longer.
+
+
+DATA_DIR *dinit(dir, fldid,  /* initialize or reinitialize the root node */
+		class)       /* of a directory and free any extents */
+    DATA_DIR *dir;           /* pointer to directory created by dalloc() */
+			     /* or dmake() */
+    unsigned fldid;          /* tag to be assigned to root node */
+    CHAR     class;          /* class to be assigned to root node */
+
+returns: pointer to root node if successful, NULL if failed.
+
+
+DATA_DIR *dinstag(dir, fldid, class)  
+			     /* insert a new tag before an existing dir and */
+			     /* all its siblings */
+    DATA_DIR *dir;           /* pointer to directory to get new parent */
+    unsigned fldid;          /* tag to be assigned to new parent */
+    CHAR     class;          /* class to be assigned to new parent */
+
+returns: pointer to new parent if successful, NULL if failed.
+
+
+DATA_DIR *dmake(fldid, class,   /* combines dalloc() and dinit() */
+		numdirs)        /* into one call */
+    unsigned fldid;             /* tag to be assigned to root node */
+    CHAR     class;             /* class to be assigned to root node */
+    int      numdirs;           /* size of initial directory */
+				/* and size growth increment */
+
+returns: pointer to initialized directory if successful, NULL if failed.
+	 Should be dfreed later.
+
+
+CHAR *dmalloc(dir, len)  /* malloc memory that will be freed automatically */
+			 /* when the dfree(), dinit() or bld_dir() are */
+			 /* later used on the dir */
+    DATA_DIR *dir;       /* dir that the memory is to be associated with */
+    int       len;       /* length of memory to be malloced */
+
+returns: pointer to malloced memory or NULL, if malloc() failed.
+
+
+DATA_DIR *dreplace_num(node,   /* replace an INTEGER value with */
+		       number) /* another INTEGER value */
+    DATA_DIR *node;            /* pointer to leaf node with INTEGER data */
+    long     number;           /* INTEGER value to be added */
+
+returns: pointer to node if successful, NULL if failed.
+
+
+int dtag_found(dir, fldid,  /* checks for existance of a */
+	       class)       /* particular node in a directory */
+    DATA_DIR *dir;          /* pointer to directory to be searched */
+    unsigned fldid;         /* tag of node to be found */
+    CHAR     class;         /* class of node to be found */
+
+returns: 1 if successful, 0 if failed.
+
+
+int get_len(len, ber_record, len)/* get a length directly from a BER record */
+    long  *tag;            /* pointer to long to receive length */
+    CHAR *ber_record;      /* pointer to length portion of a BER record */
+    long  len;             /* length to end of BER record */
+
+returns: length of length portion, or 0 if get_len() failed.
+
+
+int get_tag(tag, ber_record, len)  /* get a tag directly from a BER record */
+    int  *tag;             /* pointer to int to receive tag */
+    CHAR *ber_record;      /* pointer to tag portion of a BER record */
+    long  len;             /* length to end of BER record */
+
+returns: length of tag, or 0 if get_tag() failed.
+
+
+void hex_dir(node, level)  /* produce a formatted hex dump of a */
+			   /* part of a directory to stdout */
+    DATA_DIR *node;        /* first node to be dumped */
+    int      level;        /* logical level of node in tree, */
+			   /* usually 0 */
+
+
+void hex_dirf(node, level, file)  /* produce a formatted hex dump of a */
+			   /* part of a directory to a file */
+    DATA_DIR *node;        /* first node to be dumped */
+    int      level;        /* logical level of node in tree, */
+			   /* usually 0 */
+    FILE     *file;        /* file to receive dump */
+
+
+int IsCompleteBER(ber_record, len, remainder)  /* determine if a complete */
+		       /* BER record has been received */
+    CHAR *ber_record;  /* pointer to BER record */
+    long  len;         /* length of BER record */
+    long *remainder;   /* number of bytes missing from record, or 0 */
+
+returns: TRUE or FALSE.  If FALSE, the remainder will tell you how many bytes
+need to be read.  This value could be 0, which means that the record has an
+indeterminate length or that you haven't even received the length portion of
+the record yet.  How you read the remainder of the record, in this case,
+will depend on the access method.  Best to just read 1 byte at a time until
+IsCompleteBER() tells you that you are done or gives you a definite length to
+read.  If TRUE, *remainder is set to the actual length of the record.
+
+
+long rec_len(dir)  /* returns the length of the BER record that would */
+		   /* be created from the directory */
+    DATA_DIR *dir; /* pointer to any node in the directory */
+
+returns: length of record that would be created by bld_rec().
+
+
+
+
+Example: Create a DBI Begin Session request and get the session id from
+	 the response.
+
+    #include "dbi.h"  /* defines for DBI stuff */
+    #include "berutil.h" /* defines and prototypes for data_dir stuff */
+
+    CHAR     *ber_record;
+    DATA_DIR *dir, *subdir;
+    long     sessid;
+
+    dir=dalloc(10);  /* create directory with room for 10 nodes */
+    dinit(dir, DBI_IN, APPLICATION);  /* initialize as a DBI request */
+    subdir=daddtag(dir, BEGINS, /* add tag indicating */
+		   CONTEXT);    /* Begin Session */
+    daddchar(subdir, BS_USERID, CONTEXT, "ralph" 5);  /* add userid */
+    ber_record=bld_rec(dir);  /* make ber record */
+
+    send_request(ber_record);
+    free(ber_record);
+    get_response(&ber_record);
+
+    if(!bld_dir(ber_record, dir))
+    {
+	puts("unable to process BEGINS response");
+	exit(1);
+    }
+    subdir=dir->ptr.child;  /* skip over the DBI_OUT node */
+    subdir=subdir->ptr.child;  /* skip over BEGINS node */
+    while(subdir)  /* find node with tag==SESSID */
+    {
+	if(subdir->fldid==SESSID)
+	{
+	    sessid=dgetnum(subdir);
+	    break;
+	}
+	subdir=subdir->next;  /* point to sibling of this node */
+    }
+    dfree(dir);
+
+
+
+Example: get a record out of a DBI READ response and generate a hex dump of
+	 it.
+
+    #include "dbi.h"  /* defines for DBI stuff */
+    #include "berutil.h" /* defines and prototypes for data_dir stuff */
+
+    CHAR     *ber_record;
+    DATA_DIR *dir, *subdir;
+
+    get_response(&ber_record);
+    dir=dalloc(20);
+    bld_dir(dir, ber_record);
+    subdir=dir->ptr.child;  /* skip over the DBI_OUT node */
+    subdir=subdir->ptr.child;  /* skip over READ node */
+
+    while(subdir)
+    {
+	if(subdir->fldid==RD_DATAREC)
+	{
+	    bld_dir(dir, subdir->ptr.data);
+	    hex_dir(dir, 0);
+	    break;
+	}
+	subdir=subdir->next;
+    }
+
+
+Example: Create a z39.50 Init Request and check the status in the response
+
+    #include "irp.h"  /* defines for z39.50 stuff */
+    #include "berutil.h" /* defines and prototypes for data_dir stuff */
+
+    CHAR     *ber_record;
+    DATA_DIR *dir, *subdir;
+    long      len;
+
+    static CHAR *protocol_version="yy";  /* versions 1 and 2 */
+    static CHAR *options_supported="yy";
+    static int   preferredMessageSize=1024, maximumMessageSize=4096;
+
+	dir=dmake(IRP_initRequest, CONTEXT, 20);
+    daddnum(dir, IRP_ReferenceId, CONTEXT, (CHAR*)&referenceId, sizeof(long));
+    daddbits(dir, IRP_ProtocolVersion, CONTEXT, "11", 2); /* versions 1 & 2 */
+    daddbits(dir, IRP_Options, CONTEXT, "11", 2);/* search and present only */
+	daddnum(dir, IRP_PreferredMessageSize, CONTEXT,
+	(CHAR*)&preferredMessageSize, sizeof(preferredMessageSize));
+	daddnum(dir, IRP_MaximumRecordSize, CONTEXT,
+		(CHAR*)&maximumRecordSize, sizeof(maximumRecordSize));
+    daddchar(dir, IRP_ImplementationId, CONTEXT, "1991", 4);
+    daddchar(dir, IRP_ImplementationName, CONTEXT, "OCLC IRP API", 12);
+    daddchar(dir, IRP_ImplementationVersion, CONTEXT, "1.0", 3);
+
+	ber_record=bld_rec(dir, &len);
+    send_request(ber_record);
+    free(ber_record);
+    get_response(&ber_record);
+
+    if(!bld_dir(&ber_record, dir))
+	return NULL;
+	for(subdir=dir->ptr.child; subdir; subdir=subdir->next)
+	switch(subdir->fldid)
+	{
+		    case IRP_result:
+		return dgetnum (subdir);
+			    break;
+		}
+
+
+
+Example:  Read a BER record from stdin.
+
+    #include <stdio.h>
+    #include "berutil.h"
+
+    char ber_record[32000];
+    long len, remainder, tlen;
+
+    len=fread(ber_record, 1, 6, stdin);
+    if(len)
+	while(!IsCompleteBER(ber_record, len, &remainder))
+	{
+	    tlen=fread(ber_record, 1, remainder?remainder:1, stdin);
+	    if(!tlen)  /* read failed? */
+		break;
+	    len+=tlen;
+	}
+    if(!len)
+	/* do something clever */
+
+
+
+Example:  This is a tricky one, but it's very useful.  The idea is to provide
+an alternative to bld_rec() for building the BER record.  The reason is that
+the BER record is often only part of a record being built for inclusion in a
+package to be given to telecom and the BER record gets headers and trailers.
+If you use bld_rec(), it will allocate space for the record and build the
+record and then you'll have to move the BER record over to the area where
+your telecom message is being built.  I hate moving data unnecessarily.  A
+preferable method would be to find out how big the BER record is going to be
+and then malloc an area big enough for the record plus header and trailer and
+then build the record at some offset into the malloced area.
+
+    #include "berutil.h" /* defines and prototypes for data_dir stuff */
+
+    CHAR     *ber_record;
+    DATA_DIR *dir;
+    long     header_size=13, len, trailer_size=4;
+
+    /* find out how big the record is */
+    len=rec_len(dir)+header_size+trailer_size;
+
+    /* allocate space for the record */
+    ber_record=malloc((unsigned)(len));
+
+    /* pull the pieces of the record together */
+    asm_rec(dir, ber_record+header_size);
+
+There's one critical part here:
+    rec_len() MUST be called before asm_rec(), even if you know how big
+	the BER record is going to be.  This is because rec_len() sets
+	values in the directory structure that are used by asm_rec().

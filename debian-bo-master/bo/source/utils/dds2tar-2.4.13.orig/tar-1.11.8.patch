@@ -1,0 +1,513 @@
+diff -ru tar-1.11.8/lib/rx.h tar-1.11.8.1/lib/rx.h
+--- tar-1.11.8/lib/rx.h	Fri May  5 14:17:10 1995
++++ tar-1.11.8.1/lib/rx.h	Fri May  5 14:17:10 1995
+@@ -1382,7 +1382,7 @@
+ 
+ /* If this bit is set, then `{...}' defines an interval, and \{ and \}
+      are literals.
+-  If not smt, then `\{...\}' defines an interval.  */
++  If not set, then `\{...\}' defines an interval.  */
+ #define RE_NO_BK_BRACES (RE_NEWLINE_ALT << 1)
+ 
+ /* If this bit is set, (...) defines a group, and \( and \) are literals.
+diff -ru tar-1.11.8/src/buffer.c tar-1.11.8.1/src/buffer.c
+--- tar-1.11.8/src/buffer.c	Mon May 29 02:26:27 1995
++++ tar-1.11.8.1/src/buffer.c	Mon Feb  5 20:20:19 1996
+@@ -46,6 +46,7 @@
+ /* Where we write messages (standard messages, not errors) to.  Stdout
+    unless we're writing a pipe, in which case stderr.  */
+ FILE *stdlis;
++FILE *stdrec;
+ 
+ #define	STDIN	0		/* standard input  file descriptor */
+ #define	STDOUT	1		/* standard output file descriptor */
+@@ -77,7 +78,7 @@
+ static int childpid = 0;
+ 
+ /* Record number of the start of this block of records  */
+-long baserec;
++long baserec = 0 ;
+ 
+ /* Error recovery stuff  */
+ static int r_error_count;
+@@ -520,11 +521,64 @@
+ void
+ open_archive (int reading)
+ {
+-  stdlis = flag_exstdout ? stderr : stdout;
++  time_t start_time = time(0) ;
++  stdrec = stdlis = flag_exstdout ? stderr : stdout;
++  if ( record_file_name != NULL )
++    {
++#define INSERT_TIMESTAMP
++#ifdef INSERT_TIMESTAMP
++      /*
++       * A record-file name with '%T' will be expanded with a decimal
++       * value for the timestamp of the archive. This is the time value
++       * stored in the label record.
++       * If you are using only one computer, this should be a unique number.
++       * You are able to create different rec-files for all your archives,
++       * as well as finding the index of your archive in a reliable way.
++       *
++       * Another way would be to let us set the timestamp by another option.
++       * tar --timestamp <ts-number> ...
++       */
++      char rfn[256];
++      if ( reading == 0 ) {
++        char*p= record_file_name ;
++        int i = 0 ;
++        int n;
++        while ( p[0] != '\0' ) {
++          if ( p[0] == '%' && p[1] == 'T' ) {
++            /* i += */ sprintf(rfn+i,"%d",start_time);
++            i = strlen(rfn) ;
++            p += 2 ;
++          } else { rfn[i++] = *p++ ; }
++        }
++        rfn[i] = '\0' ;
++      } else strcpy(rfn,record_file_name);
++#else
++      char*rfn=record_file_name;
++#endif
++      if ( ( stdrec = fopen(rfn,"w")) == NULL )
++        {
++          fprintf(stdlis,"Cannot open %s.\n",record_file_name);
++          exit(1);
++        }
++    }
++
+ 
+   if (blocksize == 0)
+     ERROR ((TAREXIT_FAILURE, 0, _("Invalid value for blocksize")));
+ 
++  if ( ( flag_sayblock ) && ( flag_volhdr ) )
++    {
++      fprintf(stdrec,
++        "loc             timestamp is %d \n",
++        start_time);
++    }
++  if ( flag_sayblock && (blocksize != 10240) )
++    {
++      fprintf(stdrec,
++        "loc             block length is %d bytes = %d * 512 bytes \n",
++        blocksize,blocksize>>9);
++    }
++
+   if (archive_names == 0)
+     ERROR ((TAREXIT_FAILURE, 0,
+ 	    _("No archive name given, what should I do?")));
+@@ -618,6 +672,38 @@
+   setmode (archive, O_BINARY);
+ #endif
+ 
++#if defined(MTIOCGET)
++  /* Prints the file number of the archive */
++  if ( flag_sayblock )
++    {
++      struct mtget get ;
++      int i ;
++      i = ioctl(archive,MTIOCGET,&get);
++      if (( i == 0 ) && ( get.mt_fileno >= 0 ))
++        {
++          fprintf(stdrec,
++            "loc             number of the file is %d \n",
++            get.mt_fileno );
++        }
++    }
++#endif
++
++#if defined(MTIOCPOS)
++  /* Prints the tape block number on every Linux SCSI-device */
++  if ( flag_sayblock )
++    {
++      struct mtpos pos ;
++      int i ;
++      i = ioctl(archive,MTIOCPOS,&pos);
++      if ( i == 0 )
++        {
++          fprintf(stdrec,
++            "loc             number of the first block is %d\n",
++            pos.mt_blkno );
++        }
++    }
++#endif
++
+   if (reading)
+     {
+       ar_last = ar_block;	/* set up for 1st block = # 0 */
+@@ -666,7 +752,7 @@
+       assign_string (&current_file_name, ar_block->header.arch_name);
+ 
+       ar_block->header.linkflag = LF_VOLHDR;
+-      to_oct (time (0), 1 + 12, ar_block->header.mtime);
++      to_oct (start_time , 1 + 12, ar_block->header.mtime);
+       finish_header (ar_block);
+ #if 0
+       ar_record++;
+@@ -727,7 +813,7 @@
+   if (err != blocksize && !flag_multivol)
+     writeerror (err);
+   else if (flag_totals)
+-    tot_written += blocksize;
++    tot_written += blocking;
+ 
+   if (err > 0)
+     bytes_written += err;
+@@ -816,7 +902,7 @@
+   if (err != blocksize)
+     writeerror (err);
+   else if (flag_totals)
+-    tot_written += blocksize;
++    tot_written += blocking;
+ 
+ 
+   bytes_written = blocksize;
+diff -ru tar-1.11.8/src/create.c tar-1.11.8.1/src/create.c
+--- tar-1.11.8/src/create.c	Sat Jun 17 23:08:13 1995
++++ tar-1.11.8.1/src/create.c	Sun Dec  1 01:55:08 1996
+@@ -315,7 +315,10 @@
+   to_oct ((long) sum, 8, header->header.chksum);
+   header->header.chksum[6] = '\0';	/* zap the space */
+ 
+-  userec (header);
++  /* print header first to get the same output with 'tar -tvR'
++   * and 'tar -cvR'
++   */
++  /* userec (header); */
+ 
+   if (flag_verbose)
+     {
+@@ -327,6 +330,8 @@
+       head_standard = flag_standard;
+       print_header ();
+     }
++
++  userec (header) ;
+ 
+   return;
+ }
+diff -ru tar-1.11.8/src/extract.c tar-1.11.8.1/src/extract.c
+--- tar-1.11.8/src/extract.c	Sun Jun 11 15:40:21 1995
++++ tar-1.11.8.1/src/extract.c	Sun Dec  1 01:55:28 1996
+@@ -684,6 +684,7 @@
+     case LF_LONGNAME:
+     case LF_LONGLINK:
+       ERROR ((0, 0, _("Visible long name error")));
++      print_header();
+       skip_file ((long) hstat.st_size);
+       break;
+     }
+diff -ru tar-1.11.8/src/list.c tar-1.11.8.1/src/list.c
+--- tar-1.11.8/src/list.c	Wed May  3 05:28:17 1995
++++ tar-1.11.8.1/src/list.c	Sun Dec  1 16:22:12 1996
+@@ -200,7 +200,7 @@
+ 	  if (written > size)
+ 	    written = size;
+ 	  errno = 0;
+-	  check = fwrite (data, sizeof (char), written, stdlis);
++	  check = fwrite (data, sizeof (char), written, stdrec);
+ 	  userec ((union record *) (data + written - 1));
+ 	  if (check != written)
+ 	    {
+@@ -213,8 +213,8 @@
+       if (flag_multivol)
+ 	assign_string (&save_name, NULL);
+       saverec (NULL);		/* unsave it */
+-      fputc ('\n', stdlis);
+-      fflush (stdlis);
++      fputc ('\n', stdrec);
++      fflush (stdrec);
+       return;
+ 
+     }
+@@ -353,6 +353,8 @@
+ 	  longp = ((header->header.linkflag == LF_LONGNAME)
+ 		   ? &next_long_name
+ 		   : &next_long_link);
++	  assign_string (&current_file_name, header->header.arch_name);
++          print_header();
+ 
+ 	  userec (header);
+ 	  if (*longp)
+@@ -533,9 +535,9 @@
+   char *name;
+ 
+   if (flag_sayblock)
+-    fprintf (stdlis, _("rec %10ld: "), baserec + (ar_record - ar_block));
++    fprintf (stdrec, _("rec %10ld: "), baserec + (ar_record - ar_block));
+ #if 0
+-  annofile (stdlis, (char *) NULL);
++  annofile (stdrec, (char *) NULL);
+ #endif
+ 
+   if (flag_verbose <= 1)
+@@ -547,11 +549,11 @@
+ 
+       if (quoted_name)
+ 	{
+-	  fprintf (stdlis, "%s\n", quoted_name);
++	  fprintf (stdrec, "%s\n", quoted_name);
+ 	  free (quoted_name);
+ 	}
+       else
+-	fprintf (stdlis, "%s\n", current_file_name);
++	fprintf (stdrec, "%s\n", current_file_name);
+     }
+   else
+     {
+@@ -562,6 +564,11 @@
+       switch (head->header.linkflag)
+ 	{
+ 	case LF_VOLHDR:
++          /* dirty bug fix to display the header processing
++           * tar cvvf /dev/null --label 'hello world' blah...
++           * J"org Weule weule@cs.uni-duesseldorf.de
++           */
++          hstat.st_mtime = from_oct(1 + 12 , head->header.mtime);
+ 	  modes[0] = 'V';
+ 	  break;
+ 
+@@ -574,8 +581,13 @@
+ 	  break;
+ 
+ 	case LF_LONGNAME:
++	  /*ERROR ((0, 0, _("Visible longname error")));*/
++	  modes[0] = 'L';
++	  break;
++
+ 	case LF_LONGLINK:
+-	  ERROR ((0, 0, _("Visible longname error")));
++	  /*ERROR ((0, 0, _("Visible longname error")));*/
++	  modes[0] = 'K';
+ 	  break;
+ 
+ 	case LF_SPARSE:
+@@ -663,18 +675,18 @@
+       if (pad > ugswidth)
+ 	ugswidth = pad;
+ 
+-      fprintf (stdlis, "%s %s/%s %*s%s %s %s",
++      fprintf (stdrec, "%s %s/%s %*s%s %s %s",
+ 	       modes, user, group, ugswidth - pad, "",
+ 	       size, timestamp + 4, timestamp + 20);
+ 
+       name = quote_copy_string (current_file_name);
+       if (name)
+ 	{
+-	  fprintf (stdlis, " %s", name);
++	  fprintf (stdrec, " %s", name);
+ 	  free (name);
+ 	}
+       else
+-	fprintf (stdlis, " %s", current_file_name);
++	fprintf (stdrec, " %s", current_file_name);
+ 
+       switch (head->header.linkflag)
+ 	{
+@@ -682,26 +694,26 @@
+ 	  name = quote_copy_string (current_link_name);
+ 	  if (name)
+ 	    {
+-	      fprintf (stdlis, " -> %s\n", name);
++	      fprintf (stdrec, " -> %s\n", name);
+ 	      free (name);
+ 	    }
+ 	  else
+-	    fprintf (stdlis, " -> %s\n", current_link_name);
++	    fprintf (stdrec, " -> %s\n", current_link_name);
+ 	  break;
+ 
+ 	case LF_LINK:
+ 	  name = quote_copy_string (current_link_name);
+ 	  if (name)
+ 	    {
+-	      fprintf (stdlis, _(" link to %s\n"), name);
++	      fprintf (stdrec, _(" link to %s\n"), name);
+ 	      free (name);
+ 	    }
+ 	  else
+-	    fprintf (stdlis, _(" link to %s\n"), current_link_name);
++	    fprintf (stdrec, _(" link to %s\n"), current_link_name);
+ 	  break;
+ 
+ 	default:
+-	  fprintf (stdlis, _(" unknown file type `%c'\n"),
++	  fprintf (stdrec, _(" unknown file type `%c'\n"),
+ 		   head->header.linkflag);
+ 	  break;
+ 
+@@ -714,24 +726,32 @@
+ 	case LF_FIFO:
+ 	case LF_CONTIG:
+ 	case LF_DUMPDIR:
+-	  putc ('\n', stdlis);
++	  putc ('\n', stdrec);
++	  break;
++
++	case LF_LONGNAME:
++	  fprintf (stdrec, _("--Long Name--\n"));
++	  break;
++
++	case LF_LONGLINK:
++	  fprintf (stdrec, _("--Long Link--\n"));
+ 	  break;
+ 
+ 	case LF_VOLHDR:
+-	  fprintf (stdlis, _("--Volume Header--\n"));
++	  fprintf (stdrec, _("--Volume Header--\n"));
+ 	  break;
+ 
+ 	case LF_MULTIVOL:
+-	  fprintf (stdlis, _("--Continued at byte %ld--\n"),
++	  fprintf (stdrec, _("--Continued at byte %ld--\n"),
+ 		   from_oct (1 + 12, head->header.offset));
+ 	  break;
+ 
+ 	case LF_NAMES:
+-	  fprintf (stdlis, _("--Mangled file names--\n"));
++	  fprintf (stdrec, _("--Mangled file names--\n"));
+ 	  break;
+ 	}
+     }
+-  fflush (stdlis);
++  fflush (stdrec);
+ }
+ 
+ /*--------------------------------------------------------------.
+@@ -753,9 +773,9 @@
+       demode ((unsigned) mode, modes + 1);
+ 
+       if (flag_sayblock)
+-	fprintf (stdlis, _("rec %10ld: "), baserec + (ar_record - ar_block));
++	fprintf (stdrec, _("rec %10ld: "), baserec + (ar_record - ar_block));
+ #if 0
+-      annofile (stdlis, (char *) NULL);
++      annofile (stdrec, (char *) NULL);
+ #endif
+       name = quote_copy_string (pathname);
+       if (!name)
+diff -ru tar-1.11.8/src/tar.c tar-1.11.8.1/src/tar.c
+--- tar-1.11.8/src/tar.c	Sat Jun 17 22:48:32 1995
++++ tar-1.11.8.1/src/tar.c	Mon Apr  8 16:54:08 1996
+@@ -860,6 +860,7 @@
+ #define OPTION_VOLNO_FILE	15
+ #define OPTION_COMPRESS_PROG	16
+ #define OPTION_RSH_COMMAND	17
++#define OPTION_RECORD_FILE      18
+ 
+ /* Some cleanup is made in GNU tar long options.  Using old names will send
+    a warning to stderr.  */
+@@ -925,6 +926,7 @@
+   {"preserve-permissions", no_argument, NULL, 'p'},
+   {"read-full-blocks", no_argument, NULL, 'B'},
+   {"record-number", no_argument, NULL, 'R'},
++  {"record-file", required_argument, NULL, OPTION_RECORD_FILE},
+   {"remove-files", no_argument, &flag_remove_files, 1},
+   {"rsh-command", required_argument, NULL, OPTION_RSH_COMMAND},
+   {"same-order", no_argument, NULL, 's'},
+@@ -1059,6 +1061,7 @@
+       --checkpoint      print directory names while reading the archive\n\
+       --totals          print total bytes written while creating archive\n\
+   -R, --record-number   show record number within archive with each message\n\
++      --record-file     print the record information to file, enable -R\n\
+   -w, --interactive     ask for confirmation for every action\n\
+       --confirmation    same as -w\n"),
+ 	     stdout);
+@@ -1212,6 +1215,11 @@
+ 	flag_rsh_command = optarg;
+ 	break;
+ 
++      case OPTION_RECORD_FILE:
++        record_file_name = optarg ;
++        flag_sayblock++;         /* Print block #s for debug */
++        break;
++
+       case 'g':
+ 	/* We are making a GNU dump; save directories at the beginning
+ 	   of the archive, and include in each directory its contents.  */
+@@ -1626,9 +1634,42 @@
+       break;
+ 
+     case COMMAND_CREATE:
++/*
++ * Comment the next line out if you have problems. Joerg Weule
++ */
++#define PRINT_TROUPUT
++#ifdef PRINT_TROUPUT
++      start_time = time(0);
++      create_archive ();
++      if (flag_totals) {
++	time_t end_time = time(0);
++	double sec = end_time - start_time ;
++	double t = ((double)tot_written) * RECORDSIZE ;
++	fprintf (stderr, _("Total bytes written: %.0f"),t);
++	if ( t >= 1e9 ) fprintf(stderr, _(" (%3.1f Gb)"),t/1e9 ); else
++	if ( t >= 1e6 ) fprintf(stderr, _(" (%3.1f Mb)"),t/1e6 ); else
++	if ( t >= 1024 ) fprintf(stderr, _(" (%3.1f Kb)"),t/1024 );
++	fprintf(stderr,"\n");
++	if ( sec > 0.1 ){
++	  long s, m, h = sec ;
++          m = h ;
++	  h /= 3600 ;
++          m -= h * 3600 ;
++          s = m ;
++          m /= 60 ;
++          s -= m / 60 ;
++	  fprintf (stderr, _("Elapsed time: %02d:%02d:%02d, %g sec\n"), h,m,s,sec);
++	  if ( !flag_multivol)
++	    fprintf (stderr, _("Throughput per second: %.0fKb/sec\n"),
++	      t/sec/1024);
++	}
++      }
++#else
+       create_archive ();
+       if (flag_totals)
+-	fprintf (stderr, _("Total bytes written: %d\n"), tot_written);
++	fprintf (stderr, _("Total bytes written: %g\n")),
++          ((double)tot_written) * RECORDSIZE );
++#endif
+       break;
+ 
+     case COMMAND_EXTRACT:
+diff -ru tar-1.11.8/src/tar.h tar-1.11.8.1/src/tar.h
+--- tar-1.11.8/src/tar.h	Sat Jun 17 20:36:49 1995
++++ tar-1.11.8.1/src/tar.h	Mon Feb  5 20:19:19 1996
+@@ -183,6 +183,9 @@
+     int numbytes;
+   };
+ 
++/* Time of writing.  */
++GLOBAL time_t start_time;
++
+ /* Start of block of archive.  */
+ GLOBAL union record *ar_block;
+ 
+@@ -207,6 +210,9 @@
+ /* File containing names to work on.  */
+ GLOBAL const char *namefile_name;
+ 
++/* File to write record information to. */
++GLOBAL char *record_file_name;
++
+ /* \n or \0.  */
+ GLOBAL char filename_terminator;
+ 
+@@ -219,8 +225,8 @@
+ /* Initial size of the sparsearray.  */
+ GLOBAL int sp_array_size;
+ 
+-/* Total written to output.  */
+-GLOBAL int tot_written;
++/* Total written to output in records.  */
++GLOBAL long int tot_written;
+ 
+ /* Compiled regex for extract label.  */
+ GLOBAL struct re_pattern_buffer *label_pattern;
+@@ -338,6 +344,7 @@
+ 
+ extern long baserec;
+ extern FILE *stdlis;
++extern FILE *stdrec;
+ extern char *save_name;
+ extern long save_sizeleft;
+ extern long save_totsize;

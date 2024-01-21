@@ -1,0 +1,95 @@
+# @(#)Makefile	1.2	ULTRIX	6/29/84
+#
+# mille bourne game makefile
+#
+# @(#)Makefile	1.7 (Berkeley) 8/14/83
+#
+DESTROOT=
+HEADERS=mille.h
+CFILES=	comp.c end.c extern.c init.c mille.c misc.c move.c print.c \
+	roll.c save.c types.c varpush.c ui.c drawcard.c animate.c 
+OBJS=	comp.o end.o extern.o init.o mille.o misc.o move.o print.o \
+	roll.o save.o types.o varpush.o ui.o drawcard.o animate.o 
+POBJS=	comp.po end.po extern.po init.po mille.po misc.po move.po \
+	roll.po print.po save.po types.po varpush.po ui.po drawcard.po animate.po
+CRL=	
+L=	control/control.a cards/cardlib.a -lX11 -lm
+LIBS=	${CRL} ${L}
+DEFS=	
+CFLAGS=	-g ${DEFS} -I/usr/local/pkg/X11/include -L/usr/local/pkg/X11/lib
+BINDIR=	${DESTROOT}/usr/games
+.SUFFIXES: .po .i
+.PRECIOUS: cards/cardlib.a control/control.a
+
+.c.po:
+	rm -f x.c ; ln $*.c x.c
+	${CC} ${CFLAGS} -p -c x.c
+	mv x.o $*.po
+
+.c.i:
+	${CC} ${CFLAGS} -P $*.c
+
+xmille: ${OBJS} ${CRL} control/control.a cards/cardlib.a
+	${CC} -o $@ ${CFLAGS} ${OBJS} ${LIBS}
+
+mille: ${OBJS} ${CRL}
+	${CC} ${CFLAGS} -o mille ${OBJS} ${LIBS}
+
+control/control.a: always
+	cd control; make control.a
+
+cards/cardlib.a: always
+	cd cards; make cardlib.a
+
+always:
+
+install: mille
+	install -c -s mille ${BINDIR}
+
+pmb: ${POBJS} ../pcrlib
+	${CC} ${CFLAGS} -p -o pmb ${POBJS} ../pcrlib -ltermlib
+
+mille.po: mille.c
+	rm -f x.c ; ln mille.c x.c
+	${CC} ${CFLAGS} -DPROF -p -c x.c
+	mv x.o mille.po
+
+table: table.o extern.o
+	${CC} ${CFLAGS} -i -o table table.o extern.o
+
+animate.o ui.o: ui.h
+
+readdump: readdump.o extern.o varpush.o
+	${CC} ${CFLAGS} -i -o readdump readdump.o extern.o varpush.o
+
+ctags:
+	ctags ${HEADERS} ${CFILES}
+	ed - tags < :ctfix
+	sort tags -o tags
+
+lint:
+	lint -hxb ${DEFS} ${CFILES} ${L} > lint.out
+
+mille.ar:
+	ar ruv mille.ar Makefile tags ${HEADERS} ${CFILES}
+
+tar:
+	tar rvf /dev/rmt0 Makefile tags :ctfix ${HEADERS} ${CFILES}
+
+lpr:
+	pr Makefile ${HEADERS} ${CFILES} tags | lpr ; lpq
+
+clean:
+	rm -f ${OBJS} ${POBJS} core ? a.out mille
+
+clobber: clean
+	rm -f *.[ch] Makefile
+
+sccsinfo:
+	sccs info
+
+sccsget:
+	sccs get SCCS
+
+.DEFAULT:
+	sccs get $<

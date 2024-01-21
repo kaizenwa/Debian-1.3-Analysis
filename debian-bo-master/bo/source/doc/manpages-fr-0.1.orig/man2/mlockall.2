@@ -1,0 +1,147 @@
+.\" Hey Emacs! This file is -*- nroff -*- source.
+.\"
+.\" 1995-11-26  Markus Kuhn <mskuhn@cip.informatik.uni-erlangen.de>
+.\"      First version written
+.\"
+.\" Traduction  11/10/1996 Christophe BLAESS (ccb@club-internet.fr)
+.\" 
+.TH MLOCKALL 2 "11 Octobre 1996" "Linux 1.3.43" "Manuel du programmeur Linux"
+.SH NOM
+mlockall \- Desactive la pagination pour le processus appelant.
+.SH SYNOPSIS
+.nf
+.B #include <sys/mman.h>
+.sp
+\fBint mlockall(int \fIflags\fB);
+.fi
+.SH DESCRIPTION
+.B mlockall
+desactive la pagination (paging) pour toutes les pages representees
+dans l'espace d'adressage du processus appelant.
+Ceci inclut les pages de code, de donnees, et le segment de pile,
+tout autant que les bibliotheques partagees, l'espace utilisateur
+dans le noyau, la memoire partagee et les fichiers projetes en
+memoire.
+
+Quand l'appel systeme
+.B mlockall
+reussit, on a l'assurance que toutes les pages concernees
+resident en memoire vive (RAM) et y
+resteront jusqu'a un deverrouillage par la fonction
+.B munlock
+ou
+.B munlockall
+ou encore jusqu'a ce que le processus se termine ou demarre
+un programme avec
+.BR exec .
+
+Les processus fils n'heritent pas du verrouillage des pages
+a travers un
+.BR fork .
+
+Il y a deux domaines principaux d'applications au verrouillage
+de pages : les algorithmes en temps reel, et le traitement
+de donnees confidentielles.
+Les applications temps reel reclament un comportement temporel
+deterministe, et la pagination est, avec l'ordonnancement, une
+cause majeure de delais imprevus.
+Ces algorithmes basculent habituellement sur un
+comportement d'ordonnancement temps reel avec
+.BR sched_setscheduler.
+
+Les logiciels de cryptographie manipulent souvent quelques
+octets hautement confidentiels, comme des mots de passe ou
+des cles privees. A cause de la pagination ces donnees secretes
+risquent d'etre transferees sur un support physique ou elles
+pourraient etre lues par un ennemi longtemps apres que le
+logiciel se soit termine.
+
+Neanmoins pour les applications securisees, seule une petite
+partie de la memoire doit etre verrouillee, pour laquelle la
+fonction
+.B mlock
+est parfaitement appropriee.
+
+Le parametre
+.I flags
+est constitue par un
+.I OU logique
+( | ) entre les constantes symboliques suivantes :
+.TP 1.2i
+.B MCL_CURRENT
+Verrouiller toutes les pages correspondant actuellement a l'espace
+d'adressage du processus.
+.TP
+.B MCL_FUTUR
+Verrouiller toutes les pages qui seront dans l'espace d'adressage
+du processus dans le futur. Ceci concerne par exemple les nouvelles
+pages reclamees par un agrandissement de la pile ou du tas, autant
+que des nouveaux fichier representes en memoire, ou de nouvelles
+regions de memoire partagee.
+.PP
+Si
+.B MCL_FUTURE
+a ete reclame, et que le nombre de pages verrouillees
+excede la limite maximale, l'appel systeme ayant entraine le
+depassement echouera avec une erreur
+.BR ENOMEM.
+Si le probleme se pose a cause de l'expansion de la pile, le noyau
+empechera l'agrandissement de celle-ci et declenchera un signal
+.BR SIGSEGV.
+
+Les processus temps\-reel doivent reserver suffisament de pages
+avant d'entrer dans des portions critiques, pour eviter tout
+declenchement de faute de page.
+Ceci peut etre effectue simplement en appelant une fonction
+reclamant une variable automatique suffisamment grande, et qui
+ecrit dans cette variable de maniere a allouer ces pages pour
+la pile.
+L'ecriture dans la variable garantit qu'il ne se produira meme pas
+de faute de page de copie\-sur\-ecriture durant l'execution de la 
+section critique.
+
+Il n'y a pas d'empilement des verrouillages memoire, ce qui
+signifie qu'une page verrouillee plusieurs fois par
+.B mlock
+ou
+.B mlockall
+sera liberee en un seul appel a
+.B munlock
+pour la zone memoire correspondante ou par un appel a
+.BR munlockall.
+
+
+Les pages qui sont verrouillees par plusieurs zones, ou
+par plusieurs processus restent en memoire vive tant qu'il
+y a au moins un processus ou une zone qui les verrouille.
+
+Sur les systemes POSIX ou
+.B mlockall
+et
+.B munlockall
+sont disponibles, la constante symbolique
+.B _POSIX_MEMLOCK
+est definie dans <unistd.h>
+.SH "VALEUR RENVOYEE"
+.B mlockall
+renvoie 0 si il reussit, ou \-1 s'il echoue, auquel cas
+.I errno
+contient le code d'erreur.
+.SH ERREURS
+.TP 0.8i
+.B ENOMEM
+Le processus a depasse le nombre maximal de page verrouillees.
+.TP
+.B EPERM
+L'appelant n'a pas les privileges appropries, seul le Super\-User 
+peut verrouiller des pages.
+.TP
+.B EINVAL
+Un attribut inconnu a ete speccifie.
+.SH STANDARDS
+POSIX.1b, SVR4
+.SH "VOIR AUSSI"
+.BR munlockall(2) ,
+.BR mlock(2) , 
+and
+.BR munlock(2) .

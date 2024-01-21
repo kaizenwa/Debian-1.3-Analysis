@@ -1,0 +1,187 @@
+#!/bin/sh
+
+# Prepare some kind of boot medium for Debian
+# Experimental Script
+# Christoph Lameter, 4. Oktober 1996
+# Bernd Eckenfels, Sat, 26 Oct 1996 04:38:03 +0200
+#  - added some sanity
+# Bernd Eckenfels, Thu, 21 Nov 1996 00:50:18 +0100
+#  - syslinux adds $SIZE
+
+KERNEL=/vmlinuz
+ROOTIMAGE=root.bin
+DEV=/dev/fd0
+FILE=debinst
+SIZE=1440
+
+LIB=/usr/lib/mkrboot
+
+if [ "$1" = "" ]; then
+	cat <<EOF
+mkrboot - Make a root/boot bootup disk for installation
+-------------------------------------------------------
+mkrboot <method> [ <linux-kernel > [ <root-image> [ <device> [ <size> ]]]]
+
+Methods available:
+
+loadlin	-> Generates .zip-file to be used to boot from dos
+kernel	-> Generates boot/rootdisk using the builtin kernel loader
+fdos	-> Generates boot/rootdisk using fdos+loadlin
+lilo	-> Generates boot/rootdisk for lilo
+syslinux -> Generates boot/rootdisk for syslinux
+
+EOF
+	exit 1
+fi
+
+if [ "$2" ]; then
+	KERNEL=$2
+fi
+
+if [ "$3" ]; then
+	ROOTIMAGE=$3
+fi
+
+if [ "$4" ]; then
+	DEV=$4
+fi
+
+if [ "$5" ]; then
+	SIZE=$5
+fi
+
+if [ ! -f $KERNEL ]; then
+	echo "mkrboot: ERROR: Kernel $KERNEL not found"
+	exit 1
+fi
+
+if [ ! -f $ROOTIMAGE ]; then
+	echo "mkrboot: ERROR: Rootimage $ROOTIMAGE not found"
+	exit 1
+fi
+
+KERNEL_SIZE=`du $KERNEL |awk '{ print $1; }'`
+ROOT_SIZE=`du $ROOTIMAGE |awk '{ print $1; }'`
+echo "Kernel Size=$KERNEL_SIZE k, Root System Size=$ROOT_SIZE k"
+
+if [ "$1" = "loadlin" ]; then
+	if [ ! -d /usr/lib/loadlin ]; then
+		echo "mkrboot: ERROR: no loadlin found!"
+		exit 1
+	fi
+	if [ $DEV != "/dev/fd0" ]; then
+		$FILE=$DEV
+	fi
+	echo "Generating ${FILE}.zip to be used under DOS/Windows"
+	# Prepare archive
+	rm $FILE.zip 2>/dev/null
+	set -e
+	mkdir /tmp/$$
+	cp $ROOTIMAGE /tmp/$$/root.bin
+	cp $KERNEL /tmp/$$/linux
+	cp $LIB/loadlin/* /tmp/$$
+	# Prepare linux kernel
+	/usr/sbin/rdev /tmp/$$/linux /dev/ram0
+	/usr/sbin/ramsize /tmp/$$/linux 0
+	unix2dos /tmp/$$/*.bat
+	zip -j $FILE /tmp/$$/{linux,root.bin,install.bat} /usr/lib/loadlin/loadlin.exe >/dev/null
+	echo "$FILE.zip preparation finished. Size=`du $FILE.zip|awk '{ print $1 }'`k."
+	rm -rf /tmp/$$
+	exit 0
+fi
+
+if [ "$1" = "kernel" ]; then
+	set -e
+	echo "Generating Bootdisk using Kernel Bootsector"
+	cat $KERNEL >$DEV
+	dd if=$ROOTIMAGE of=$DEV bs=1k seek=$KERNEL_SIZE 2>/dev/null
+	/usr/sbin/rdev $DEV /dev/fd0
+	# Boot from Ramdisk without prompting at offset
+	/usr/sbin/ramsize $DEV `expr 16384 + $KERNEL_SIZE`
+	echo "Bootdisk preparation finished. Used \
+`expr $KERNEL_SIZE + $ROOT_SIZE`k of the available $SIZE k.\
+ `expr $SIZE - $KERNEL_SIZE - $ROOT_SIZE`k free"
+	exit 0
+fi
+
+if [ "$1" = "fdos" ]; then
+	set -e
+	if [ ! -d /usr/fdos ]; then
+		echo "mkrboot: ERROR: no fdos package found!"
+		exit 1
+	fi
+	if [ ! -f /usr/lib/loadlin/loadlin.exe ]; then
+		echo "mkrboot: ERROR: loadlin.exe for fdos needed!"
+		exit 1
+	fi
+	if [ ! -f /usr/fdos/boot-fdos${SIZE}.gz ]; then
+		echo "mkrboot: ERROR: no fdos image for size $SIZE found!"
+		exit 1
+	fi
+	echo "Setting up a bootable disk with FreeDOS ..."
+	zcat /usr/fdos/boot-fdos${SIZE}.gz >$DEV
+	mount -tmsdos $DEV /mnt
+	echo "Copying files ..."
+	cp  $LIB/fdos/* /mnt
+	unix2dos /mnt/*.bat
+	cp /usr/lib/loadlin/loadlin.exe /mnt
+	cp $KERNEL /mnt/LINUX
+	cp $ROOTIMAGE /mnt/ROOT.BIN
+	/usr/sbin/rdev /mnt/LINUX /dev/ram0
+	/usr/sbin/ramsize /mnt/LINUX 0
+	FREE=`df /mnt|awk '/mnt/ { print $4; }'`
+	umount /mnt
+	echo "Bootdisk preparation finished. $FREE k still available"
+	exit 0
+fi
+
+if [ "$1" = "lilo" ]; then
+	if [ ! -x /sbin/lilo ]; then
+		echo "mkrboot: ERROR: no lilo found!"
+		exit 1
+	fi	
+	set -e
+	echo "Making Minix FS ..."
+	mkfs.minix -n14 $DEV $SIZE >/dev/null
+	mount -tminix $DEV /mnt
+	echo "Copying files ..."
+	cp $KERNEL /mnt/linux
+	cp $ROOTIMAGE /mnt/root.bin
+	cp /boot/boot.b /mnt
+	echo "Making disk bootable"
+	rdev /mnt/linux /dev/ram0
+	ramsize /mnt/linux 0
+	lilo -C - -b $DEV -i /mnt/boot.b -c -m /mnt/map <$LIB/lilo/lilo.conf >/dev/null
+	FREE=`df /mnt|awk '/mnt/ { print $4; }'`
+	umount /mnt
+	echo "Bootdisk preparation finished. $FREE k still available."
+	exit 0
+fi
+
+if [ "$1" = "syslinux" ]; then
+	if [ ! -d /usr/lib/syslinux ]; then
+		echo mkrboot: ERROR: no syslinux package found!
+		exit 1
+	fi
+	if [ ! -r /usr/lib/syslinux/img${SIZE}k.gz ]; then
+		echo mkrboot: ERROR: no syslinux image for size $SIZE found!
+		exit 1
+	fi
+	zcat /usr/lib/syslinux/img${SIZE}.gz >$DEV
+	sync
+	mount -tmsdos $DEV /mnt
+	echo "Copying files ..."
+	cp -v $LIB/syslinux/* /mnt
+	cp /usr/lib/syslinux/syslinux.exe /mnt
+	unix2dos /mnt/*.txt /mnt/*.cfg
+	cp $KERNEL /mnt/LINUX
+	cp $ROOTIMAGE /mnt/ROOT.BIN
+	/usr/sbin/rdev /mnt/LINUX /dev/ram0
+	/usr/sbin/ramsize /mnt/LINUX 0
+	FREE=`df /mnt|awk '/mnt/ { print $4; }'`
+	umount /mnt
+	echo "Bootdisk preparation finished. $FREE k still available"
+	exit 0
+fi
+
+echo "Sorry that method is not implemented yet"

@@ -1,0 +1,722 @@
+#! /bin/sh
+
+# ppd-inst.sh: smart (well, nearly) installation of PPD files.
+#
+# Yves Arrouye <Yves.Arrouye@marin.fdn.fr>, 1995-1996.
+
+# @warning@
+
+names_size=auto		# Change if needed to long or short (if set to
+			# auto, this script will try to guess the correct
+			# length).
+
+subst_rev_string=0	# You should not change that to one. Its effect
+			# is to replace the PSVersion property of the
+			# PPD files to match your version of Ghostscript.
+			# This is bad as you can end up generating files
+			# with a version number greater than the one really
+			# needed.
+
+# Don't change!
+
+me=`basename $0`
+
+sedscript=/tmp/$me.$$.sed
+psfile=/tmp/$me.$$.ps
+tmpdest=/tmp/$me.$$.tmp
+
+trap "rm -f $sedscript $psfile $tmpdest; >&2 echo Interrupted..."
+
+usage() {
+    >&2 echo "usage: $me [ --dontlocalize ] [ --dontchange ] [ -l, --locales localespath ] [ -v, --verbose ] [ -p, --paper papersize ] [ -t, --testdir test-dir ] [ -d, --destdir install-dir ] ppd-file ..."
+    exit 1
+}
+
+while test $# -ne 0
+do
+    case "$1" in
+	-v|--verbose)
+	    verbose=y
+	    ;;
+	-p|--paper)
+	    test $# -gt 1 || usage
+	    paper="`uppername $2`"
+	    shift
+	    ;;
+	-d|--destdir)
+	    test $# -gt 1 || usage
+	    where="$2"
+	    shift
+	    ;;
+	-l|--locales)
+	    test $# -gt 1 || usage
+	    locales="$2"
+	    shift
+	    ;;
+	-t|--testdir)
+	    test $# -gt 1 || usage
+	    tdir="$2"
+	    shift
+	    ;;
+	--dontlocalize)
+	    dontlocalize=y
+	    ;;
+	--dontchange)
+	    dontchange=y
+	    ;;
+	-*)
+	    usage
+	    ;;
+	*)
+	    files="$files $1"
+	    ;;
+    esac
+    shift
+done
+
+if [ -z "$files" ]
+then
+    usage
+fi
+
+#
+
+which() {
+    prog=$1
+    save_ifs="$IFS"; IFS=:
+    set - ..:$PATH
+    for d
+    do
+	if [ -f $d/$prog ]
+	then
+	    echo $d/$prog
+	    break
+	fi
+    done
+    IFS="$save_ifs"
+    unset save_ifs prog
+}
+
+dirname() {
+     _dir=`echo $1 | sed 's,/[^/]*,,'`
+    if [ "$_dir" = "$1" ]
+    then
+	echo .
+    else
+	echo $_dir
+    fi
+}
+
+makeppddirs() {
+    mkppddir=`which mkppddir`
+ 
+    if [ ! -z "$mkppddir" ]
+    then
+	for d in $ppddirs
+	do
+	    $mkppddir "$d"
+	done
+    fi
+}
+
+#
+
+if [ ! -z "$dontchange" ]
+then
+    for f in $files
+    do
+	dir="`dirname $f`"
+	if [ "`echo \"$ppddirs\" | grep \" $dir \"`" = "" ]
+	then
+	    ppddirs="$ppddirs $dir"
+	fi
+    done
+    makeppddirs
+    exit 0
+fi
+
+nextstep=0
+
+uname=`which uname`
+if [ ! -z "$uname" ]
+then
+    case "`uname -s | tr '[a-z]' '[A-Z]'`" in
+        *NEXT*)
+	    nextstep=1;;
+    esac
+else
+    hostinfo=`which hostinfo`
+    if [ ! -z "$hostinfo" ]
+    then
+	if [ ! -z "`hostinfo | grep -i next`" ]
+	then
+	    nextstep=1
+	fi
+    fi
+fi
+
+ppdname() {
+    if [ "$1" = "-b" ]
+    then
+	_base=yes
+	shift
+    fi
+    for i
+    do
+	if [ ! -z "$_base" ]
+	then
+	    basename "$i" .ppd | sed -e 's,^[0-9],_,' -e 's,[^A-Za-z0-9],_,g'
+	else
+	    echo "$i" | sed -e 's,[ .],_,g' -e 's,/,%,g'
+	fi
+    done
+    unset _base
+}
+
+uppername() {
+    for i
+    do
+	case "$i" in
+	    ??) echo $i | tr '[a-z]' '[A-Z]'
+		;;
+	    *)
+		echo `echo $i | sed 's/^\(.\).*$/\1/' | tr '[a-z]' '[A-Z]'``
+	    	    echo $i | sed 's/^.//' | tr '[A-Z]' '[a-z]'`
+		;;
+	esac
+    done
+}
+
+papersubst() {
+    kind=`basename "$2" .ppd`
+    from=`dirname "$2"`
+    if [ ! -z "$psplpr" ]
+    then
+        for p in `(PPDPATH=${from}:${PPDPATH}; export PPDPATH; $psplpr -z -k $kind | awk '
+/^\*PageSize$/	{ pgseen = 1; next; }
+pgseen && /^\*/	{ exit; }
+pgseen > 1	{ print; }
+pgseen		{ ++pgseen; }
+')`
+        do
+	    if [ "$p" = "$1" ]
+	    then
+	        subst=$p
+	        break
+	    else
+	        hashpagesize=yes
+	    fi
+        done
+    else
+	subst="$1"
+    fi
+    if [ ! -z "$subst" ]
+    then
+	sed -e 's,^\(\*Default.*: \)Letter$,\1'"$subst"',' \
+	    <$3 >$tmpdest
+        test -s $tmpdest && rm -f $3 && cp $tmpdest $3 && rm -f $tmpdest
+    else
+	if [ ! -z "$haspagesize" ]
+	then
+	    >&2 echo $me: cannot substitute default paper size \`$1\' in \`"$2"\'
+	fi
+    fi
+    unset kind subst
+}
+
+mkdirs() {
+    for i
+    do
+	case "$i" in
+	    /*)
+		root=;;
+	    *)
+		root=.;;
+	esac
+	for p in `echo "$i" | sed 's,/, ,g'`
+	do
+	    if test -d "$i"
+	    then
+		break
+	    fi
+	    if test ! -d $root/$p
+	    then
+		mkdir $root/$p || break
+	    fi
+	    root=$root/$p
+	done
+    done
+}
+
+gsdevice() {
+    _gsdev=`grep '^\*% GhostscriptDevice:' $dest`
+    if [ ! -z "$_gsdev" ]
+    then
+        _dev=`echo $_gsdev |
+	    sed 's/^\*% GhostscriptDevice: \(.*[^ 	]\)[ 	]*/\1/'`
+
+    	if [ "$_dev" =  "$_gsdev" ]
+	then
+	    _dev=unknown
+	fi
+	echo $_dev
+    fi
+}
+
+# @begin-papersize@
+
+papersize_ps=papersize.ps
+
+gspapersize() {
+    gs -q -sDEVICE="$1" $papersize_ps
+}
+
+# @end-papersize@
+
+localesrc() {
+    if [ $nextstep -eq 1 ]
+    then
+	case $1 in
+	    French*) echo fr;;
+	    English*) echo en;;
+	    German*) echo de;;
+	    Italian*) echo it;;
+	    Spanish*) echo es;;
+	    Swedish*) echo sv;;
+	esac
+    else
+	echo $1
+    fi
+}
+
+localedest() {
+    if [ $nextstep -eq 1 ]
+    then
+	case $1 in
+	    fr*) echo French.lproj;;
+	    en*) echo English.lproj;;
+	    de*) echo German.lproj;;
+	    it*) echo Italian.lproj;;
+	    es*) echo Spanish.lproj;;
+	    sv*) echo Swedish.lproj;;
+	esac
+    else
+	echo $1
+    fi
+}
+
+# @begin-localize@
+
+localelist() {
+    find locale -type d -print | grep -v '^locale$'
+}
+
+localetranslated() {
+    if [ -f locale/"$1"/ppd-chg.sed ]
+    then
+	echo "$1"
+    fi
+}
+
+localesubst() {
+    if [ -f locale/$1/ppd-chg.sed ]
+    then
+	sed -f locale/$1/ppd-chg.sed <"$2"
+    fi
+}
+
+# @end-localize@
+
+localeok() {
+    _loc="$1"
+
+    _theloc="`localetranslated \"$_loc\"`"
+    if [ ! -z "$_theloc" ]
+    then
+	echo "$_theloc"
+    fi
+
+    if [ -z "$_theloc" ]
+    then
+    	_newloc="`echo \"$_loc\" | sed 's/,..*$//'`"
+        if [ "$_newloc" != "$_loc" ]
+    	then
+	    _loc="$_newloc"
+    	    _theloc="`localetranslated \"$_loc\"`"
+            if [ ! -z "$_theloc" ]
+            then
+	    	echo "$_theloc"
+	    fi
+        fi
+    fi
+
+    if [ -z "$_theloc" ]
+    then
+        _newloc="`echo \"$_loc\" | sed 's/\...*$//'`"
+        if [ "$_newloc" != "$_loc" ]
+    	then
+	    _loc="$_newloc"
+    	    _theloc="`localetranslated \"$_loc\"`"
+            if [ ! -z "$_theloc" ]
+            then
+	    	echo "$_theloc"
+	    fi
+        fi
+    fi
+
+    if [ -z "$_theloc" ]
+    then
+        _newloc="`echo \"$_loc\" | sed 's/_[A-Z][A-Z]$//'`"
+        if [ "$_newloc" != "$_loc" ]
+    	then
+	    _loc="$_newloc"
+    	    _theloc="`localetranslated \"$_loc\"`"
+            if [ ! -z "$_theloc" ]
+            then
+	    	echo "$_theloc"
+	    fi
+        fi
+    fi
+
+    unset _loc _newloc _theloc
+}
+
+#
+
+if [ -z "$where" ]
+then
+    if [ $nextstep -eq 1 ]
+    then
+    	where=/LocalLibrary/PrinterTypes
+    else
+        where=/usr/local/share/ppd
+    fi
+fi
+
+if [ -z "$locales" ]
+then
+if [ $nextstep -eq 1 ]
+then
+    nslocales=" English.lproj "
+    others="`2>/dev/null cd /NextLibrary/Receipts && ls -d *Essential*`"
+    if [ ! -z "$others" ]
+    then
+	for o in $others
+	do
+	    nslocales="$nslocales `echo $o | sed 's/Essential.*//'`"
+	done
+    fi
+    for n in $nslocales
+    do
+	locales="$locales `localesrc $n`"
+    done
+else
+    : ${locales:=" $LANGUAGE "}
+    : ${locales:=" $LC_ALL "}
+    : ${locales:=" $LC_MESSAGES "}
+    : ${locales:=" $LANG "}
+
+    if [ -z "$LINGUAS" ]
+    then
+    locale=`which locale`
+    if [ -z "$locale" ]
+    then
+    for d in /usr/share /usr/lib /usr/local/share /usr/local/lib
+    do
+        if [ -d $d/locale ]
+        then
+	    localesdirs="`(2>/dev/null cd $d/locale && ls -d *)`"
+	    if [ ! -z "$localesdirs" ]
+	    then
+	        for l in $localesdirs
+	        do
+		    if [ "`echo \"$locales\" | grep \" $l \"`" = "" ]
+		    then
+	                locales="$locales $l "
+		    fi
+	        done
+	    fi
+        fi
+    done
+    else
+	for l in `$locale -a | grep -v '^POSIX$' | grep -v '^C$'`
+        do
+	    if [ "`echo \"$locales\" | grep \" $l \"`" = "" ]
+	    then
+                locales="$locales $l "
+	    fi
+        done
+    fi
+    else
+	locales="$LINGUAS"
+    fi
+fi
+
+for l in $locales
+do
+    cl="`localeok $l`"
+    if [ "$cl" != '' -a "`echo \"$uselocales\" | grep \" $cl \"`" = "" ]
+    then
+	uselocales="$uselocales $cl "
+    fi
+done
+
+locales="$uselocales"
+
+fi
+
+#
+
+for l in $locales
+do
+    l=`localedest "$l"`
+    if [ ! -d "$where/$l" ]
+    then
+        if 2>/dev/null mkdirs "$where/$l"
+        then
+	    :
+        else
+	    >&2 echo $me: cannot create \`$where/$l\'
+	    exit 2
+	fi
+    fi
+done
+
+# Determine names size.
+
+: ${tdir:=$where}
+
+if [ "$names_size" != long -a "$names_size" != short ]
+then
+    if [ ! -d $tdir ]
+    then
+	names_size=long
+    else
+        touch $tdir/___this_is_a_long_name
+        if [ `ls $tdir/___this_is_a_long_name` = $tdir/___this_is_a_long_name ]
+        then
+	    names_size=long
+        else
+	    names_size=short
+	fi
+    fi
+    rm -f $tdir/___this_is_a_long_name
+fi
+
+# Build rename `table'.
+
+rm -f $sedscript
+
+for ppd in $files
+do
+    if [ ! -r $ppd ]
+    then
+	>&2 echo $me: cannot open \`$ppd\'
+	exit 2
+    fi
+
+    if [ $names_size = long ]
+    then
+        name=`grep '^\*ModelName:' $ppd | sed 's/.*"\(.*\)".*/\1/'`
+        if [ -z "$name" ]
+        then
+    	    name=`grep '^\*Product:' $ppd | sed 's/.*(\(.*\)).*/\1/'`
+    	    if [ -z "$name" ]
+	    then
+		name=`grep '^\*NickName:' $ppd | sed 's/.*(\(.*\)).*/\1/'`
+		if [ -z "$name" ]
+		then
+		    name=`grep '^\*ShortNickName:' $ppd | sed 's/.*(\(.*\)).*/\1/'`
+		else
+	            name=`basename $ppd .ppd`
+		fi
+	    fi
+        fi
+    else
+	name=`basename $ppd .ppd`
+    fi
+    name=`ppdname "$name"`
+    pcname=`grep '^\*PCFileName:' $ppd | sed 's/.*"\(.*\)".*/\1/'`
+    if [ -z "$pcname" ]
+    then
+	pcname=`basename $ppd .ppd | tr '[A-Z]' '[a-z]'`
+    else
+	pcname=`echo $pcname | tr '[A-Z]' '[a-z]' | sed 's/\.ppd$//'`
+    fi
+    altpcname=`echo $pcname | tr '[a-z]' '[A-Z]'`
+
+    eval "file_`ppdname -b "$ppd"`=$name"
+
+    echo "s/^\(\*Include:\)[ 	][ 	]*\"$pcname\"/\\1 \"$name\"/" >>$sedscript
+    echo "s/^\(\*Include:\)[ 	][ 	]*\"$altpcname\"/\\1 \"$name\"/" >>$sedscript
+done
+
+psplpr=`which psplpr`
+
+# If we have gs, get its version/revision once just in case.
+
+gs=`which gs`
+
+if [ ! -z "$gs" ]
+then
+    cat <<EOF >$psfile
+statusdict begin
+version print (.) print revision ==
+end
+EOF
+    revstr="`2>/dev/null $gs -dNODISPLAY -q - <$psfile`"
+    if [ ! -z "$revstr" ]
+    then
+        revision=`echo $revstr | sed 's/\..*//'`
+        version=`echo $revstr | sed 's/.*\.//'`
+
+        revision=`expr 0$revision + 0`
+        version=`expr 0$version + 0`
+
+        if [ $subst_rev_string -eq 1 ]
+        then
+            echo 's/^\(\*PSVersion: \)"(.*)"/\1'$revstr'/' >>$sedscript
+        fi
+    fi
+    rm -f $psfile
+fi
+
+for ppd in $files
+do
+    pname=`ppdname -b "$ppd"`
+    if [ ! -z "$dontlocalize" ]
+    then
+        # The code that follows is used to determine if a file is localized,
+        # in which case no localization will happen.
+        case "$ppd" in
+    	    ??/*.ppd|??_??/*.ppd|??.*/*.ppd|??_??.*/*.ppd|??,*/*.ppd|??_??,*/*.ppd|??_??.*,*/*.ppd)
+	        thelocales="`echo \"$ppd\" | sed 's,/.*$,,'`"
+	        ;;
+    	    */??/*.ppd|*/??_??/*.ppd|*/??.*/*.ppd|*/??_??.*/*.ppd|*/??,*/*.ppd|*/??_??,*/*.ppd|*/??_??.*,*/*.ppd)
+	        thelocales="`echo \"$ppd\" | sed 's,.*/\(.*\)/.*$,\1,'`"
+	        ;;
+	    *)
+	        thelocales="$locales"
+        esac
+    else
+        thelocales="$locales"
+    fi
+
+bad=0
+
+for locale in $thelocales
+do
+    dest=$where/`localedest $locale`/`eval echo '$file_'$pname`.ppd
+    if [ "`echo \"$installedppds\" | grep \" $dest \"`" = "" ]
+    then
+	installedppds="$installedppds $dest "
+    if (localesubst $locale $ppd | sed -f $sedscript >$tmpdest) && test "`head -1 $tmpdest`" != "" && (2>/dev/null rm -f $dest) && cp $tmpdest $dest && rm -f $tmpdest
+    then
+        if [ ! -z "$verbose" ]
+        then
+    	    echo $dest
+        fi
+
+	dir="`dirname $dest`"
+	if [ "`echo \"$ppddirs\" | grep \" $dir \"`" = "" ]
+	then
+	    ppddirs="$ppddirs $dir"
+	fi
+
+	device="`gsdevice $dest`"
+
+    	if [ "$paper" != "" -o "$device" != "" ]
+    	then
+	    if [ "`egrep 'DefaultPage(Size|Region):' \"$ppd\"`" != "" ]
+	    then
+	    	if [ ! -z "$paper" ]
+	        then
+                    papersubst "$paper" $ppd $dest
+	        else
+		    	if [ "$device" = unknown ]
+		    	then
+        		    >&2 echo $me: cannot determine gs device for \`$dest\', no paper size substitution
+		    	else
+			    if [ "$device" != unspecified ]
+			    then
+				case "$device" in
+				    *default)
+					devname="$device"
+					device=nullpage
+					devname="$devname ($device)"
+					;;
+				    *)
+					devname="$device"
+					;;
+				esac
+				if [ -z "$gs" ]
+				then
+				    if [ -z "$nogssaid" ]
+				    then
+					>&2 echo $me: gs not found, cannot use it to determine default paper sizes
+					nogssaid=y
+				    fi
+				else
+			            devpaper=`gspapersize $device`
+			            if [ -z "$devpaper" ]
+			            then
+        		                >&2 echo $me: cannot determine default paper size for device \`$device\'
+			            else
+					if [ -z "$psplpr" ]
+					then
+				    	    if [ -z "$nopsplprsaid" ]
+				    	    then
+						>&2 echo $me: psplpr not found, cannot use it to check paper sizes
+						nopsplprsaid=y
+					    fi
+					fi
+			                papersubst "`uppername $devpaper`" $ppd $dest
+				    fi
+			        fi
+			    fi
+		    fi
+		fi
+	    fi
+	fi
+        if [ ! -z "$revstr" -a "`gsdevice $dest`" != " " ]
+        then
+    	    instrev="`grep '^*PSVersion: \"([0-9]' $dest`"
+	    if [ ! -z "$instrev" ]
+	    then
+	        instrevision=`echo $instrev | sed 's/.*(\([0-9]*\)\..*/\1/'`
+	        instversion=`echo $instrev | sed 's/.*\.\([0-9]*\)).*/\1/'`
+    
+    	        instrevision=`expr 0$instrevision + 0`
+    	        instversion=`expr 0$instversion + 0`
+    
+	        if [ $instrevision -gt $revision ]
+	        then
+		    >&2 echo "$me: \`$pname' (\`$dest') asks for PostScript" \
+		         "revision $instrevision, current is $revision"
+		    bad=1
+	        fi
+	        if [ $instversion -gt $version ]
+	        then
+		    >&2 echo "$me: \`$pname' (\`$dest') asks for Ghostscript" \
+		        "version $instversion, current is $version"
+		    bad=1
+	        fi
+	    fi
+        fi
+    else
+	>&2 echo "$me: error trying to install \`$dest'"
+    fi
+    fi
+done
+done
+
+if [ 0$bad -eq 1 ]
+then
+    >&2 echo "$me: please consider updating your Ghostscript interpreter"
+fi
+
+rm -f $sedscript
+rm -f $psfile $tmpdest
+
+makeppddirs
+

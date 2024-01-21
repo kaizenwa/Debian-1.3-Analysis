@@ -1,0 +1,144 @@
+This file is an attempt to explain the internals of the FreeType rasterizer.
+This component has quite general purpose and could easily be integrated to
+other programs since it does not depend on other components of the FreeType
+library (but still under the current license).
+
+--------------------------------------------------------------------
+
+              HOWs and WHYs of the FreeType rasterizer
+
+                          by David Turner
+
+
+  I. Introduction
+
+ II. Requirements
+
+III. Raster Design
+
+ IV. Gray-Levels Support
+
+
+
+I. Introduction:
+
+  In publishing, all shapes are commonly described by a vectorial
+  representation, made of line segments and arcs, rather than stored in one
+  or several bitmaps (one for each size). This technique allows very easy
+  manipulation of the shape (scaling, rotation, sheering, etc.) and takes
+  much less memory. However, most typical computer devices like video
+  screens and printers still need a bitmap representation to correctly
+  display and/or print the shape.
+
+  A rasterizer is a function library which is in charge of converting these
+  vectorial representations into bitmaps, taking some parameters like point
+  size and device resolution.
+
+  The FreeType rasterizer manages the rendering of the glyphs that are found
+  in TrueType font files. Its input is a description of the glyph to draw in
+  the current bitmap. Additionally, it will execute the associated
+  instruction stream if necessary to get the right hints for the particular
+  glyph. The rasterizer is the last link in the chain that leads to the
+  rendering of a single glyph into a bitmap, and it provides drop-out
+  control, as defined by the TrueType specs.
+
+II. Requirements:
+
+  We will assume that all scaling/rotating/hinting/whatever have been
+  already done. The glyph is thus described, as in the TrueType spec, by a
+  list of of point coordinates, as well as a list of flags used to delimit
+  segments and arcs.
+
+  More precisely:
+
+   - All point coordinates are in the 26.6 fixed float format as defined by
+     the specification. The orientation used is:
+
+       ^ y
+       |         reference orientation
+       |
+       *----> x
+     0
+
+     This means that the 'distance' between two neighbouring pixels is 64.
+
+
+   - Before any rendering, the target bitmap must be specified in a call to
+     'Init_Rasterizer'. The bitmap is described by a record wich gives its
+     dimensions as well as its own orientation, known as the bitmap's
+     'flow':
+
+     A TT_Flow_Up means that the bitmap follows the reference orientation.
+     It's first byte belongs to the bitmap's lowest row.
+
+     A TT_Flow_Down means that the bitmap follows the opposite vertical
+     orientation. It's first byte belongs to the bitmap's top row (which is
+     the orientation of the Video RAM on the PC).
+
+     In each byte of the bitmap, bit 7 points to the leftmost pixel, and bit
+     0 to its rightmost. We will add support to the opposite horizontal
+     layout later if needed.
+
+     For gray-level support, the pixmap should have one byte per pixel.
+
+
+   - A glyph is usually made of several contours. A contour is simply a
+     closed curve that delimits an outer or inner region of the glyph. A
+     contour is described by a series of successive points in the points
+     table. A contour is defined to the rasterizer by an end index. The
+     contour is made of the curve described by all the points that lie
+     between the last contour's endpoint's successor and the end index
+     (including it). The two extreme points are joined by the rasterizer to
+     close the contour's curve.
+
+     Coords  (xx,xx)  (xx,xx)  (xx,xx)  (xx,xx)  (xx,xx)  (xx,xx)  (xx,xx)  
+
+     Point #    0        1        2        3        4        5        6
+
+     Contours  \____________________________/     \_____________________/
+     
+     Endpoints              3                               6
+
+     Range                0..3                            4..6
+
+     Each point of the coordinate table has an associated flag that
+     indicates whether it is "on" or "off" the curve. Two successive "on"
+     points indicate a line segment joining the two points.
+
+     One "off" point between two "on" points indicates a second degree
+     Bezier parametric arc, defined by these three points (the "off" point
+     being the control point, and the "on" ones the start and end points).
+     
+     Finally, two successive "off" points forces the rasterizer to create an
+     "on" point between them while rendering, at their exact middle. This
+     greatly facilitates the definition of successive Bezier arcs.
+
+
+                                        *            # on
+                                                     * off
+                                     __---__
+        #-__                      _--       -_
+            --__                _-            -
+                --__           #               \ 
+                    --__                        #
+                        -#
+                                 Two "on" points
+           Two "on" points     and one "off" point
+                                  between them
+
+                      *
+        #            __      Two "on" points with two "off"
+         \          -  -     points between them. The point
+          \        /    \    marked '0' is the middle of the
+           -      0      \   "off" points, and is a 'virtual'
+            -_  _-       #   "on" point where the curve passes.
+              --             It does not appear in the point
+              *              list.
+
+
+     The FreeType rasterizer, as intended to render TrueType glyphs, does
+     not support third order Beziers usually found in Type 1 fonts. Type 1
+     support may lead to further development of the engine.
+
+
+--- document not finished yet ---

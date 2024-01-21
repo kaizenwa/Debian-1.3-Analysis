@@ -1,0 +1,118 @@
+*** sys/i386/include/soundcard.h.ORIG	Sat Sep 21 14:58:23 1996
+--- sys/i386/include/soundcard.h	Thu Nov 14 21:18:43 1996
+***************
+*** 68,73 ****
+--- 68,75 ----
+  #ifdef PC98
+  #define SNDCARD_PCM86     	19
+  #endif
++ #define SNDCARD_AWE32           20
++ 
+  
+  /***********************************
+   * IOCTL Commands for /dev/sequencer
+***************
+*** 497,502 ****
+--- 499,505 ----
+  #define FM_TYPE_OPL3			0x01
+  
+  #define SAMPLE_TYPE_GUS			0x10
++ #define SAMPLE_TYPE_AWE32		0x20
+  
+  		int	perc_mode;	/* No longer supported */
+  		int	nr_voices;
+*** sys/i386/isa/sound/dev_table.h.ORIG	Wed Oct 30 22:39:16 1996
+--- sys/i386/isa/sound/dev_table.h	Thu Nov 14 21:08:23 1996
+***************
+*** 280,285 ****
+--- 280,288 ----
+  #ifndef EXCLUDE_AUDIO
+  		{SNDCARD_SB16,	"SoundBlaster16",	sb16_dsp_init, sb16_dsp_detect},
+  #endif
++ #ifndef EXCLUDE_AWE32
++ 		{SNDCARD_AWE32,	"AWE32 Synth",	attach_awe_obsolete, probe_awe_obsolete},
++ #endif
+  #ifndef EXCLUDE_MIDI
+  		{SNDCARD_SB16MIDI,"SB16 MIDI",	attach_sb16midi, probe_sb16midi},
+  #endif
+***************
+*** 376,381 ****
+--- 379,387 ----
+  #endif
+  #ifndef EXCLUDE_MIDI
+  		{SNDCARD_SB16MIDI,{SB16MIDI_BASE, SBC_IRQ, 0}, SND_DEFAULT_ENABLE},
++ #endif
++ #ifndef EXCLUDE_AWE32
++ 		{SNDCARD_AWE32,{AWE32_BASE, 0, 0}, SND_DEFAULT_ENABLE},
+  #endif
+  #endif
+  
+*** sys/i386/isa/sound/local.h.ORIG	Wed Oct 30 22:39:18 1996
+--- sys/i386/isa/sound/local.h	Thu Nov 14 21:26:37 1996
+***************
+*** 72,77 ****
+--- 72,82 ----
+  #define EXCLUDE_SB16MIDI
+  #endif
+  
++ #include "awe.h"
++ #if NAWE == 0 && !defined(EXCLUDE_AWE32)
++ #define EXCLUDE_AWE32
++ #endif
++ 
+  #include "pas.h"
+  #if NPAS == 0 && !defined(EXCLUDE_PAS)
+  #define EXCLUDE_PAS
+*** sys/i386/isa/sound/sound_calls.h.ORIG	Wed Oct 30 22:39:20 1996
+--- sys/i386/isa/sound/sound_calls.h	Thu Nov 14 21:09:58 1996
+***************
+*** 152,157 ****
+--- 152,161 ----
+  long attach_adlib_card(long mem_start, struct address_info *hw_config);
+  int probe_adlib(struct address_info *hw_config);
+  
++ /* from awe_wave.c */
++ long attach_awe_obsolete(long mem_start, struct address_info *hw_config);
++ int probe_awe_obsolete(struct address_info *hw_config);
++ 
+  /*	From pas_card.c	*/
+  long attach_pas_card(long mem_start, struct address_info *hw_config);
+  int probe_pas(struct address_info *hw_config);
+*** sys/i386/isa/sound/sound_config.h.ORIG	Wed Oct 30 22:39:21 1996
+--- sys/i386/isa/sound/sound_config.h	Thu Nov 14 21:13:13 1996
+***************
+*** 118,123 ****
+--- 118,127 ----
+  #endif
+  #endif
+  
++ #ifndef AWE32_BASE
++ #define AWE32_BASE	0x620   /* Default = 0x620-3, 0xA20-3, 0xE20-3 */
++ #endif
++ 
+  #ifndef PAS_BASE
+  #define PAS_BASE	0x388
+  #endif
+*** sys/i386/isa/sound/soundcard.c.ORIG	Sat Nov  9 21:09:58 1996
+--- sys/i386/isa/sound/soundcard.c	Thu Nov 14 21:16:00 1996
+***************
+*** 84,89 ****
+--- 84,90 ----
+  struct isa_driver sbdriver	= {sndprobe, sndattach, "sb"};
+  struct isa_driver sbxvidriver	= {sndprobe, sndattach, "sbxvi"};
+  struct isa_driver sbmididriver	= {sndprobe, sndattach, "sbmidi"};
++ struct isa_driver awedriver	= {sndprobe, sndattach, "awe"};
+  struct isa_driver pasdriver	= {sndprobe, sndattach, "pas"};
+  struct isa_driver mpudriver	= {sndprobe, sndattach, "mpu"};
+  struct isa_driver gusdriver	= {sndprobe, sndattach, "gus"};
+***************
+*** 271,276 ****
+--- 272,279 ----
+      return(SNDCARD_SB16);
+    else if(driver == &sbmididriver)
+      return(SNDCARD_SB16MIDI);
++   else if(driver == &awedriver)
++     return(SNDCARD_AWE32);
+    else if(driver == &uartdriver)
+      return(SNDCARD_UART6850);
+    else if(driver == &gusdriver)

@@ -1,0 +1,81 @@
+#!/usr/bin/make -f
+# Sample debian.rules file - for GNU Hello (1.3).
+# Copyright 1994,1995 by Ian Jackson.
+# I hereby give you perpetual unlimited permission to copy,
+# modify and relicense this file, provided that you do not remove
+# my name from the file itself.  (I assert my moral right of
+# paternity under the Copyright, Designs and Patents Act 1988.)
+
+package	:= infocom
+version	:= 4.01pl2
+debian	:= 4
+arch	:= $(shell dpkg --print-architecture)
+
+
+# The next section may have to be extensively modified
+
+build:
+	$(checkdir)
+	-rm -f *.o
+	$(MAKE) bsd_ansic CFLAGS=-O2 LDFLAGS=-s
+	mv infocom infocoma
+	-rm -f *.o
+	$(MAKE) bsd_curses CFLAGS=-O2 LDFLAGS=-s
+	strip infocom infocoma
+	$(MAKE) .infocomrc
+	touch build
+
+clean:
+	$(checkdir)
+	-rm -f build infocom infocoma
+	-$(MAKE) -i clean
+	-rm -rf debian-tmp *~
+
+binary:		checkroot build
+	-rm -rf debian-tmp
+	mkdir -p debian-tmp/DEBIAN
+	sed -e 's/=V/$(version)/; s/=D/$(debian)/; s/=A/$(arch)/' debian.control >debian-tmp/DEBIAN/control
+	mkdir -p debian-tmp/usr/games
+	install -m755 infocom infocoma debian-tmp/usr/games
+	mkdir -p debian-tmp/usr/doc/copyright
+	install -m444 debian.README debian-tmp/usr/doc/copyright/$(package)
+	mkdir -p debian-tmp/usr/doc
+	install -m444 README debian-tmp/usr/doc/$(package)
+	mkdir -p debian-tmp/usr/lib/games/infocom
+	install -m444 .infocomrc debian-tmp/usr/lib/games/infocom/user.infocomrc
+	-chmod 444 *.z?
+	-cp *.z? debian-tmp/usr/lib/games/infocom
+	strip debian-tmp/usr/games/*
+	chown -R root.root debian-tmp
+	chmod -R go=rX debian-tmp
+	dpkg --build debian-tmp
+	mv debian-tmp.deb ../$(package)_$(version)-$(debian)_$(arch).deb
+	rm -rf debian-tmp
+
+define checkdir
+	test -f $(package).c
+endef
+
+# Below here is fairly generic really
+
+source:		clean
+	-mv *.z? /tmp
+	chmod +x debian.rules
+	cd .. && \
+	tar cf $(package)_$(version)-$(debian).tar $(package)-$(version) && \
+	gzip -9vf $(package)_$(version)-$(debian).tar
+	-mv /tmp/*.z? .
+ 
+diff:		clean
+	-mv *.z? /tmp
+	cd .. && \
+	(diff -ruN $(package)-$(version).orig $(package)-$(version) \
+	 >$(package)_$(version)-$(debian).diff; [ $$? = 1 ]) && \
+	gzip -9vf $(package)_$(version)-$(debian).diff
+	-mv /tmp/*.z? .
+
+checkroot:
+	$(checkdir)
+	test root = "`whoami`"
+
+.PHONY: binary source diff clean checkroot

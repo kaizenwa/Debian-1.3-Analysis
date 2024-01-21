@@ -1,0 +1,158 @@
+
+		    =================================
+		    termwrap.so dynamic shared object
+		    =================================
+
+                      *** Only for Solaris 2.x ***
+
+
+Two line description:
+  It uses the cool Solaris dynamic linking facilities to allow networking
+  programs to use TERM without having to be recompiled or changed at all.
+
+
+HOW TO USE IT
+=============
+
+  Any networking program which could be ported to use TERM by including
+  "termnet.h" and linking with libtermnet.a can be used "as is" with
+  termwrap.so. Programs which I have verified include:
+
+     Solaris's telnet
+     Solaris's finger
+     xarchie from ftp.x.org
+
+  When libtermnet.a matures and supports a more complete set of networking
+  functions, other programs like Netscape and Solaris's FTP will also
+  work (magically, without recompilation, of course :-)
+
+
+  Once TERM is installed and running, simply do:
+
+     termwrap program args_to_program
+
+     eg: termwrap telnet some_remote_hostname
+
+  (If you installed TERM into a non-standard place you will need to set the
+   TERMWRAP environment variable to the location of termwrap.so first).
+
+  "termwrap" executes "program" under TERM mode. It simply sets LD_PRELOAD
+  to the termwrap.so dynamic shared object, then exec's "program".
+
+  If TERM was installed in "shared mode" (eg: make installshare), then
+  "termwrap" will have been installed setgid and you will get TERM shared
+  mode, just as if you'd recompiled "program" with libtermnet.a and changed
+  its modes to setgid term.
+
+  Note that setuid and setgid programs cannot work with termwrap.so
+  because LD_PRELOAD is ignored for such programs. "rlogin" is an example
+  of such a program.
+
+
+
+ERRORS
+======
+  If, when you run a program under termwrap, you get errors such as:
+
+     ld.so.1: program: fatal: relocation error: symbol not found: h_errno:
+     referenced in /usr/local/lib/termwrap.so
+
+  then "program" is not a networking program (it is not linked with libsocket
+  and libnsl). Such programs cannot support TERM.
+
+  If the program appears to start up correctly, but does not work properly,
+  or core dumps, or seems to be confused, or simply doesn't work at all,
+  then it probably uses networking functions which libtermnet doesn't
+  emulate. Such a program couldn't be ported by using "termnet.h" and
+  lintermnet.a, and therefore cannot be used with termwrap. An example of
+  such a program is netscape. It runs, and seems to be ok, but it can't
+  find any hosts over the TERM connection. Obviously it uses some functions
+  which libtermnet.a doesn't emulate... perhaps from libresolv? Similarly,
+  Solaris's FTP seems to work correctly during the login process etc, but
+  cannot "see" any files at the remote site... See Term.HOWTO for a list of
+  alternative programs you might consider using instead.
+
+
+
+HOW IT WORKS
+============
+
+termwrap.so has three parts:
+
+  termwrapin.c
+  ============
+   A set of functions with identical names to those in libsocket and libnsl.
+   These pass control to the libtermnet functions term_* (just as if
+   they had been defined using termnet.h).
+
+  termwrapout.c
+  =============
+   A set of functions which match the above functions but have "x__"
+   prepended to their names. These functions do interposing using dlsym().
+   They call functions with same names as the ones defined in termwrapin.c,
+   but NOT THOSE FUNCTIONS. Instead, they call the "real" functions in 
+   libsocket/libnsl. (For a description of interposing, see the Solaris 
+   Linker & Libraries Answerbook).
+
+  the files which make up libtermnet
+  ==================================
+   these provide the term_* emulation functions.
+
+
+In summary, here is what happens:
+
+   NORMAL NETWORKING PROGRAM (NO TERM)
+   ===================================
+
+       program calls networking function
+                    |
+                    V
+       libsocket or libnsl performs networking function
+
+
+   NETWORKING PROGRAM WHEN LD_PRELOAD=/usr/local/lib/termwrap.so
+   =============================================================
+
+       program calls networking function
+                    |
+                    V
+       termwrap.so(termwrapin.c) intercepts function because of LD_PRELOAD,
+       and calls term_*
+                    |
+                    V
+       term_* does the actual talking to term by calling x__* funcs.
+                    |    |    |
+                    V    V    V
+       x__* (in termwrapout.c) uses dlsym(RTLD_NEXT,"*") to find the
+       real socket function which libtermnet thought it was calling
+       and calls that. Ta Da!
+
+
+As a picture it would look like this:
+
+                	    networking program
+                	     V             ^
+                	     V             ^
+	    +----------------V-------------^-----------+
+	    | termwrapin.c   V             ^           |
+	    +----------------V-------------^-----------+
+	    |                                          |
+	    |                  libtermnet              |
+	    |                                          |
+	    +------------------V-^-V-^-V-^-------------+
+	    | termwrapout.c    V ^ V ^ V ^             |
+	    +------------------V-^-V-^-V-^-------------+
+	                       V ^ V ^ V ^
+	                       V ^ V ^ V ^
+                        libsocket and libnsl
+
+        	   Time ----> ----> ----> ----> ---->
+
+
+If after all that explaining I've only managed to confuse you, check out
+the section on "Interposing" in the "Solaris Linker & Libraries Answerbook".
+
+Feel free to email me if you have any questions...
+
+
+JASON PATTERSON (jasonp@fit.qut.edu.au)

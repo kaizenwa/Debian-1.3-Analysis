@@ -1,0 +1,1272 @@
+# compose.tk - a support file for TkMail (accessed through tclIndex)
+#	       commands for composing and sending mail
+#
+# $Header: /u/ra/raines/cvs/tk/tkmail2/compose.tk,v 1.13 1995/12/14 00:49:36 raines Exp $
+# if $mfp(debug) {puts stderr "compose.tk sourced"}
+
+proc mfv:record-mesg { tw sendto filelist lvar } {
+  # record message in text widget <tw> from <sendto> in folder <file>
+  global mf mfp 
+
+  upvar $lvar reclist
+
+  if {[lempty $filelist]} {return 1}
+
+  set sendto [mfv_util simplify $sendto]
+  if {[regexp {[^, <>@]+@*[^, <>@]*} $sendto res]} {
+    set sendto $res
+  }
+
+  if {[catch {set date [exec date "+%a %h %d %T 19%y"]} res]} {
+    mfv:error-mesg $res 
+    return 1
+  }
+
+  # IF YOUR MAILER STORES MESSAGE WITH DIFFERENT FIRST LINE, YOU WILL
+  # NEED TO HACK THE LINES BELOW
+  if $mf(compose-fcc-swap) {
+    $tw insert 1.0 "From: $sendto\n"
+  } else {
+    $tw insert 1.0 "From: $mfp(user)@$mfp(hostname)\n"
+  }
+  $tw insert 1.0 "From $mfp(user)@$mfp(hostname) $date\n"
+
+  # just in case
+  $tw insert end \n
+
+  foreach file $filelist {
+    set file [string trim $file]
+
+    while {[string length $file]} {
+      set notnew [file exists $file]
+      if [file isdirectory $file] {
+	set mfp(last-error) "$file is a directory"
+	set stat 1
+      } else {
+	if {[mfv:ask-create $file -master [winfo toplevel $tw] -askf 0]} {
+	  set stat [mfv:text-to-folder $tw $file]
+	} else { set file {}; break }
+      }
+      if {$stat} {
+	eval $mf(viewer-beep-error)
+	set file [ut:getstr -prompt "ERROR: $mfp(last-error)\n\nEnter new filename:" \
+		  -default $file -oklabel Record -nolabel Skip]
+      } else break
+    }
+
+    if [lempty $file] continue
+    if {!$notnew} {mfv:add-recent $file}
+    lappend reclist $file
+  }
+  
+  # remove the lines we added
+  $tw delete 1.0 "2.0 lineend+1c"
+  $tw delete end
+
+  tkTextUndoSetup $tw
+  return 0
+}
+
+proc mfv:save-last { mfc } {
+  global mf mfp
+  if {$mf(compose-save-send) && !$mfp($mfc,saved)} {
+    $mfp(savesendtxt) delete 1.0 end
+    mfv:copy-text-withtags $mfc.comp.txt $mfp(savesendtxt)
+    set mfp(savesendto) [$mfc.to.ent get]
+    set mfp(savesendsubj) [$mfc.subj.ent get]
+    set mfp(savesendcc) [$mfc.cc.ent get]
+    set mfp(savesendbcc) [$mfc.bcc.ent get]
+    set mfp(savesendsign) $mfp($mfc,needsig)
+    set mfp($mfc,saved) 1
+  }
+}
+
+proc mfv:restore-last { mfc } {
+  global mf mfp
+  set txt $mfc.comp.txt
+  bind $txt.line <Destroy> {}
+  $txt delete 1.0 end
+  mfv:copy-text-withtags $mfp(savesendtxt) $txt
+  mfv:entry-set $mfp(savesendto) $mfc.to.ent
+  mfv:entry-set $mfp(savesendsubj) $mfc.subj.ent
+  mfv:entry-set $mfp(savesendcc) $mfc.cc.ent
+  mfv:entry-set $mfp(savesendbcc) $mfc.bcc.ent
+  set mfp($mfc,needsig) $mfp(savesendsign)
+  $txt mark set insert headerend
+  after idle mfv:restore-header-line $txt
+}
+
+proc mfv:forward { top type } {
+  # forward message displayed in viewer <top>
+  # see mfv:compose for <type> description
+  global mf mfp
+
+  set savestrip $mf(insert-strip)
+  set mf(insert-strip) 0
+  set cursubj {}
+  set cursubj [mfv:viewer-get-field $top subject]
+  if {![string match {*[Ff][Ww][Dd]*} [string range $cursubj 0 3]]} {
+    set cursubj "(fwd) $cursubj"
+  }
+
+  set mfc [mfv:compose -subject $cursubj -incmesg $type -viewer $top \
+	       -cite $mf(insert-forward-format) -forward 1]
+  $mfc.comp.txt yview 1.0
+
+  set mf(insert-strip) $savestrip
+  return $mfc
+}
+
+proc mfv:reply { top type {all 0} } {
+  # reply to message displayed in viewer <top>
+  # see mfv:compose for <type> description
+  global mf mfp
+  
+  set tw $top.$mfp(mesg)
+ 
+  set curfrom [mfv:get-from $tw 0]
+  set cursubj ""
+  set curto ""
+  set curcc ""
+  set mesgid ""
+  set cursubj [mfv:viewer-get-field $top subject]
+
+  if {$all} {
+    set curcc [mfv:viewer-get-field $top cc]
+    set curto [mfv:viewer-get-field $top to]
+    if {![string length $curcc]} { 
+      set curcc $curto 
+    } elseif {[string length $curto]} {
+      append curcc ", $curto" 
+    }
+    set mfp(add-alt) [mfv:get-from $tw]
+    set curcc [mfv:parse-addresses $curcc mfv:remove-alternates]
+    set mfp(add-alt) {}
+    regsub -all ",\[ \t]*," $curcc {,} curcc
+  }
+
+  set mesgid [mfv:viewer-get-field $top message-id]
+  if {![lempty $mesgid]} {
+    set mesgid "In-Reply-To: $mesgid"
+  }
+
+  if {[string match {[Rr][Ee]:} [string range $cursubj 0 2]]} {
+    return [mfv:compose -sendto $curfrom -subject $cursubj \
+		-curcc $curcc -incmesg $type -viewer $top -headers $mesgid \
+		-cite $mf(insert-cite-format)]
+  } else {
+    return [mfv:compose -sendto $curfrom -subject "Re: $cursubj" \
+		-curcc $curcc -incmesg $type -viewer $top -headers $mesgid \
+		-cite $mf(insert-cite-format)]
+  }
+}
+
+proc mfv:insert-multi-mesg { viewer mesg tw prefix cite} {
+  # prompt for messages to insert in text widget <tw> from folder <mfile>
+  # with default <mesg> and <prefix>
+  global mf mfp
+
+  if {![winfo exists $viewer]} {
+    set viewer $mfp(curtop)
+  }
+  keylget mfp($viewer) file mfile
+
+  return [mfv:insert-mesg $mfile [ut:getstr -prompt {Message numbers to insert:} \
+				      -default $mesg] $tw $prefix $cite]
+}
+
+proc mfv:insert-current-mesg {tw prefix {cite ""}} {
+  global mf mfp
+
+  if {![winfo exists $mfp(curview)]} {
+    set mfp(curview) $mfp(curtop)
+  }
+  keylget mfp($mfp(curview)) curnum mesg
+  keylget mfp($mfp(curview)) file mfile
+
+  set mfc [winfo toplevel $tw]
+  if {$mfp($mfc,mime-compose)} {
+    mfv:mime-attach $mfc message rfc822 {} 7bit {} {}
+    return [mfv:insert-mesg $mfile $mesg $tw {} {}]
+  } else {
+    return [mfv:insert-mesg $mfile $mesg $tw $prefix $cite]
+  }
+}
+
+proc mfv:insert-mesg {mfile mesgs tw prefix {cite ""}} {
+  # insert messages in list <mesgs> from folder <mfile> into text widget <tw>
+  # with <prefix> and citation <cite>
+  global mf mfp
+  
+  set top [winfo toplevel $tw]
+  if {![string length $mesgs]} {return 1}
+  if {[file size $mfile] == 0} {
+    mfv:error-mesg "$mfile is empty" $top
+    return 1
+  } 
+
+  set fid [mfv_util folderid $mfile]
+  if [lempty $fid] {
+    mfv:error-mesg "$mfile is no longer an open folder" $top
+    return 1
+  }
+
+  set dostrip $mf(insert-strip)
+  if $mf(mime-parse) { set dostrip 0 }
+  set domime $mf(mime-parse)
+  set mf(mime-parse) 0
+
+  foreach msg $mesgs {
+    if {![$fid message exists $msg]} continue
+    if {![lempty $cite]} {
+      mfv_set sumformat $cite
+      set intro [$fid message summary $msg]
+      mfv_set sumformat "%1S%3n $mf(headlist-format)"
+      tkTextInsert $tw insert "$intro\n"
+    }
+    
+    if [string length $prefix] {
+      if !$dostrip {
+	tkTextInsert $tw insert \
+	    [mfv:insert-prefix [$fid message headers $msg] $prefix]
+	tkTextInsert $tw insert $prefix\n
+      }
+      tkTextInsert $tw insert [mfv:insert-prefix [$fid message body $msg] $prefix]
+    } else {
+      if !$dostrip {
+	tkTextInsert $tw insert [eval "$fid message headers $msg full"]
+	tkTextInsert $tw insert \n
+      }
+      tkTextInsert $tw insert [$fid message body $msg]
+    }
+  }
+  set mf(mime-parse) $domime
+
+  focus $tw
+  $tw yview "insert-5l"
+  return 0
+}
+
+proc mfv:insert-set { fs } {
+  global mf mfp
+
+  set mfp(ins_compress) 0
+  set mfp(ins_encode) 0
+  set mfp(ins_prefix) 0
+
+  frame $fs.ins
+  checkbutton $fs.ins.encode -text "Uuencode" -variable mfp(ins_encode) \
+      -command {if {$mfp(ins_compress) && !$mfp(ins_encode)} {set mfp(ins_compress) 0}}
+  checkbutton $fs.ins.compress -text "Zip/compress" -variable mfp(ins_compress) \
+      -command {if {!$mfp(ins_encode) && $mfp(ins_compress)} {set mfp(ins_encode) 1}}
+  checkbutton $fs.ins.prefix -text "Prefix" -variable mfp(ins_prefix)
+  
+  mfv:bind-menu-key $fs.file.eframe.entry u "$fs.ins.encode invoke"
+  mfv:bind-menu-key $fs.file.eframe.entry z "$fs.ins.compress invoke"
+  mfv:bind-menu-key $fs.file.eframe.entry p "$fs.ins.prefix invoke"
+  
+  pack $fs.ins.encode $fs.ins.compress $fs.ins.prefix -side left -fill x
+  pack $fs.ins -after $fs.file -side top -padx 10
+}
+
+proc mfv:insert-file { filename tw } {
+  # insert into text widget <tw> contents of file <filename>
+  global mf mfp
+  
+  if {![string length $filename]} {return 1}
+  
+  if {![file readable $filename]} {
+    mfv:error-mesg "File $filename does not exist or is not readable." $mfp(curtop)
+    return 1
+  }
+  
+  if {$mfp(ins_encode) && $mfp(ins_compress)} {
+    set cmd "exec cat $filename | $mf(insert-compress) | \
+  	$mf(insert-encoder) [exec basename $filename].$mf(insert-compress-suffix)"
+  } elseif {$mfp(ins_encode)} {
+    set cmd "exec $mf(insert-encoder) $filename [exec basename $filename]"
+  } else {
+    set cmd "exec cat $filename"
+  }
+  
+  if {$mfp(ins_prefix)} {
+    tkTextInsert $tw insert [mfv:insert-prefix "[eval $cmd]\n"]
+  } else {
+    tkTextInsert $tw insert "[eval $cmd]\n"
+  }
+  focus $tw
+  $tw yview -pickplace insert
+  return 0
+}
+
+proc mfv:alt-edit { mfc } {
+  # run alternate editor for compose widget <mfc>
+  global mf mfp
+  
+  set tw $mfc.comp.txt
+  if [catch "$tw index $tw.line" ndx] {
+    mfv:error-mesg "Cannot find header separation line. Aborting"
+    return
+  }
+
+  if [llength [set attachrng [$tw tag ranges attachedfile]]] {
+    if ![ut:getok -master $mfc -prompt \
+	    "Special MIME inserts will be lost. Continue?"] { return }
+  }
+
+  set tfile [tmpfile tkmail $mf(mail-tmpdir)]
+  if {![regsub -all {%F} $mf(compose-alt-editor) "$tfile" tcmd]} {
+    set tcmd "$mf(compose-alt-editor) $tfile"
+  }
+  
+  if {[catch {open $tfile w} tfid]} {
+    mfv:error-mesg "Cannot open temp file $tfile\n$tfid" $mfc
+    return 1
+  }
+  puts $tfid [$tw get "$ndx +1 line linestart" end]
+  catch {close $tfid}
+  
+  set cmd "exec $mfp(tkmaillib)/altedit.tk \\\{[winfo name .]\\\} \
+      $mfc $tfile {$tcmd} &"
+  if {[catch $cmd res]} {
+    mfv:error-mesg $res $mfc
+    return 1
+  }
+
+  $tw configure -state disabled
+  foreach w [winfo children $mfc.menu] { $w configure -state disabled }
+  foreach w [winfo children $mfc.bb] { $w configure -state disabled }
+  $mfc.bb.alt configure -state normal -text "Finished AltEdit" \
+      -command "mfv:alt-edit-finish $mfc $tfile"
+  set mfp($mfc,altedit) 1
+
+  return 0
+}
+
+proc mfv:alt-edit-finish { mfc tfile } {
+  # finish running alternate editor for compose widget <mfc> loading contents
+  # of file <tfile> into text widget
+  global mf mfp
+  
+  if {!$mfp($mfc,altedit)} {return 1}
+  
+  $mfc.comp.txt configure -state normal
+  foreach w [winfo children $mfc.menu] { $w configure -state normal }
+  foreach w [winfo children $mfc.bb] { $w configure -state normal }
+  $mfc.bb.alt configure -text "Alternate Editor" \
+      -command "mfv:alt-edit $mfc"
+  
+  if [catch "$mfc.comp.txt index $mfc.comp.txt.line" ndx] {
+    mfv:error-mesg "Cannot find header separation line. Aborting"
+    return
+  }
+  set ndx [$mfc.comp.txt index "$ndx +1 line linestart"]
+
+  if {[catch {open $tfile r} tfid]} {
+    mfv:error-mesg "Cannot open temp file $tfile\n$tfid" $mfc
+    return 1
+  }
+
+  $mfc.comp.txt delete $ndx end
+  $mfc.comp.txt insert $ndx [read $tfid]
+  tkTextUndoSetup $mfc.comp.txt
+  catch {close $tfid}
+  set mfp($mfc,altedit) 0
+  
+  set cmd {exec rm $tfile}
+  if {[catch $cmd res]} {
+    mfv:error-mesg {$res} $mfc
+    return 1
+  }
+  return 0
+}
+
+proc mfv:toggle-cc { mfc } {
+  # toggle display of CC: and BCC: fields in compose widget <mfc>
+  global mf mfp
+  
+  if {$mfp($mfc,showcc)} {
+    pack $mfc.cc $mfc.bcc -after $mfc.subj -side top -fill x
+  } else {
+    pack unpack $mfc.cc
+    pack unpack $mfc.bcc
+  }
+}
+
+proc mfv:toggle-fcc { mfc } {
+  # toggle display of FCC: field in compose widget <mfc>
+  global mf mfp
+  
+  if {$mfp($mfc,showfcc)} {
+    pack $mfc.fcc -before $mfc.comp -side top -fill x
+  } else {
+    pack unpack $mfc.fcc
+  }
+}
+
+proc mfv:send-mesg-priv { mfc } {
+  # send message in compose window <mfc>
+  global mf mfp env
+
+  if {$mfp($mfc,needsig) && $mf(insert-always-sign)} { 
+    mfv:compose-sign $mfc 0 
+  }
+
+  set tw $mfp(tmptxt)
+  mfv:copy-text-withtags $mfc.comp.txt $tw
+
+  while {[llength [set attachrng [$tw tag ranges attachedfile]]]} {
+    set start [lindex $attachrng 0]
+    set stop [lindex $attachrng 1]
+    set str [$tw get $start $stop]
+    $tw mark set insert $start
+    if {[regexp {FILE \(([a-zA-Z0-9-]+)\): (.+) *$} $str \
+	     trash enc filename]} {
+      set cmd {}
+      set enc [string tolower $enc]
+      set filename [string trim $filename]
+      switch -regexp $enc {
+	{^7bit$|^8bit$|^binary$} {
+	  set tfile {}
+	}
+	{^base64$|^quoted-printable$} {
+	  if [catch {set fid [open $filename r]} res] {
+	    mfv:error-mesg "Cannot open $filename for reading:\n$res" $mfc
+	    return 1
+	  }
+	  set tfile [tmpfile tkmail $mf(mail-tmpdir)]
+	  if [catch {set tfid [open $tfile w]} res] {
+	    mfv:error-mesg "Cannot open $tfile for writing:\n$res" $mfc
+	    return 1
+	  }
+	  mfv_util encode $enc $fid $tfid
+	  close $fid
+	  close $tfid
+	  set filename $tfile 
+	}
+	default {
+	  mfv:error-mesg "Don't understand $enc encoding" $mfc
+	  return 1
+	}
+      }
+      if {[catch {set fid [open $filename r]} res]} {
+	mfv:error-mesg "Cannot open $filename for reading:\n$res" $mfc
+	return 1
+      }      
+      $tw insert "$stop lineend +1c" [read $fid]
+      if {[string length [set res [close $fid]]]} {
+	mfv:error-mesg $res $mfc
+	return 1
+      }
+      $tw delete $start $stop
+      if [string length $tfile] {catch {rm -rf $tfile}}
+    } else {
+      mfv:error-mesg "Can't parse $str for encoding and filename" $mfc
+      return 1
+    }
+  }
+  
+  # delete separator header bar
+  $tw delete "headerend linestart" "headerend lineend"
+
+  # check if there are any headers in text widget and
+  # insert a blank line if not
+  set line [$tw get 1.0 "1.0 lineend"]
+  if {![lempty $line] && ![regexp {^[!-~]*:[ -~]*} $line trash]} {
+    $tw insert 1.0 "\n"
+  }
+  
+  set sendto [$mfc.to.ent get]
+  set sendto [mfv:parse-addresses $sendto mfv:expand-aliases]
+  if {![string length $sendto]} {
+    mfv:error-mesg "No address given to send to!" $mfc
+    return 1
+  }
+  set subject [$mfc.subj.ent get]
+  if {$mf(compose-require-subject) && ![string length $subject]} {
+    mfv:error-mesg "No subject given!" $mfc
+    return 1
+  }
+  
+  set mesgid [mfv_util mesgid]
+  $tw insert 1.0 "Message-Id: $mesgid\n"
+
+  if {$mfp($mfc,showcc)} {
+    set sendbcc [$mfc.bcc.ent get]
+    if {[string length $sendbcc]} {
+      set sendbcc [mfv:parse-addresses $sendbcc mfv:expand-aliases]
+      $tw insert 1.0 "Bcc: $sendbcc\n"
+    }
+    set sendcc [$mfc.cc.ent get]
+    if {[string length $sendcc]} {
+      set sendcc [mfv:parse-addresses $sendcc mfv:expand-aliases]
+      foreach addr $mf(compose-alternates) {
+	regsub -all $addr $sendcc { } sendcc
+      }
+      $tw insert 1.0 "Cc: $sendcc\n"
+    }
+  } else { set sendcc {}; set sendbcc {} }
+  
+  set fromline [string trim $mf(compose-from-field)]
+  if {[string length $fromline]} {
+    $tw insert 1.0 "From: $fromline\n"
+  }
+
+  $tw insert 1.0 "Subject: $subject\nTo: $sendto\n"
+
+  set sendfcc {}
+  if {$mfp($mfc,showfcc)} { set sendfcc [$mfc.fcc.ent get] }
+
+  mfv:run-hook mfv:send-hook $tw $subject $sendto $sendcc $sendbcc $sendfcc $mesgid
+
+  # record before send since we want to run send in "background"
+  set reclist {}
+  if {$mfp($mfc,showfcc)} {
+    mfv:record-mesg $tw $sendto [split [$mfc.fcc.ent get] ,] reclist
+  }
+
+  if {[mfv:mail-send $tw]} {
+    mfv:error-mesg $mfp(last-error) $mfc
+    return 1
+  }
+
+  set lmsg "Mail sent to $sendto"
+  if [llength $reclist] {append lmsg ": recorded in [join $reclist ,]"}
+  mfv:log-mesg $mfp($mfc,viewer) $lmsg
+
+  return 0
+}
+
+proc mfv:send-mesg { mfc {doexit 1}} {
+  # send message in compose window <mfc>
+  global mf mfp env
+
+  if [catch "$mfc.comp.txt index $mfc.comp.txt.line" ndx] {
+    mfv:error-mesg {I cannot find the bar that separates headers from body.
+Place insert cursor on first line of body and then press Okay.} $mfc
+    $mfc.comp.txt mark set headerend "insert linestart -1c"
+  } else {
+    $mfc.comp.txt mark set headerend $ndx
+  }
+
+  mfv:save-last $mfc
+
+  if [mfv:send-mesg-priv $mfc] {
+    set mfp($mfc,saved) 0
+    return 1
+  }
+
+  if {$doexit} {
+    mfv:cancel-mesg $mfc {}
+  } else {
+    mfv:restore-last $mfc
+    set mfp($mfc,saved) 0
+    $mfc.to.ent delete 0 end
+    $mfc.cc.ent delete 0 end
+    $mfc.bcc.ent delete 0 end
+  }
+
+  return 0
+}
+
+proc mfv:cancel-mesg { mfc {msg def} } {
+  # cancel sending of message in compose window <mfc> giving <msg> as reason
+  global mf mfp env
+  
+  if $mfp(trap-exit) return
+
+  mfv:save-last $mfc
+
+  if {$msg == "def"} { set msg "Compose cancelled to [$mfc.to.ent get]"}
+  if {[string length $msg]} { mfv:log-mesg $mfp($mfc,viewer) $msg }
+
+  tkTextUndoSetup $mfc.comp.txt
+  destroy $mfc
+  if {$mfp(curtop) == $mfc} {set mfp(curtop) $mfp(curview)}
+  foreach sw $mfp($mfc,subwins) {
+    tkTextUndoSetup $sw.txt
+    destroy $sw
+    if {$mfp(curtop) == $sw} {set mfp(curtop) $mfp(curview)}
+  }
+
+  catch {exec rm -f $env(HOME)/letter$mfc}
+  
+  focus $mfp(curview).$mfp(mesg)
+  return 1
+}
+
+# expand aliases in entry fields of compose to real addresses
+proc mfv:expand-compose { mfc } {
+  # expand aliases in fields of compose window <mfc>
+  global mf mfp
+  
+  mfv:entry-set [mfv:parse-addresses [$mfc.to.ent get] mfv:expand-aliases] $mfc.to.ent
+  mfv:entry-set [mfv:parse-addresses [$mfc.cc.ent get] mfv:expand-aliases] $mfc.cc.ent
+  mfv:entry-set [mfv:parse-addresses [$mfc.bcc.ent get] mfv:expand-aliases] $mfc.bcc.ent
+}
+
+proc mfv:remove-alternates { addrspec } {
+  global mf mfp
+
+  foreach addr [concat $mf(compose-alternates) $mfp(add-alt)] {
+    set address [mfv_util simplify  $addrspec]
+    if {[regexp {<([^, <>]+)>} $address trash res]} {
+      set address $res
+    }
+    set address [string trim $address]
+    if {[regexp "^$addr$" $address]} { return "" }
+  }
+  return $addrspec
+}
+
+proc mfv:expand-aliases { addrspec } {
+  # expand aliases in address list <addrspec>
+  global mf mfp
+  
+  set addrspec [string trim $addrspec]
+  
+  set addrs ""
+  foreach address [split $addrspec ,] {
+    if {[string trim $address] == ""} continue
+
+    if {[regexp {[^-0-9@%!&$^?/+=~a-zA-Z_. ]} $address]} {
+      # do not expand lists with invalid characters
+      if $mfp(debug) {
+	# puts stderr "WARNING: skipping alias expansion on \"$address\" due to invalid characters"
+      }
+      append addrs " $address,"
+
+    } else {
+      set address [mfv_util simplify  $address]
+      foreach alias [split $address " \t"] {
+	if {[string trim $alias] == ""} continue
+
+	if {$mf(mail-alias-case)} {
+	  set ndx [lsearch $mfp(aliasnames) $alias]
+	} else {
+	  set ndx [lsearch [string tolower $mfp(aliasnames)] \
+		       [string tolower $alias]]
+	}
+	if {$ndx > -1} {
+	  # if an alias found, expand it too
+	  append addrs " [mfv:parse-addresses \
+			     [lindex $mfp(aliasaddr) $ndx] mfv:expand-aliases],"
+	} else {
+	  # apply possible post-fixes
+	  if {$mf(compose-addr-postfix) != ""} {
+	    if {[string first "@" $alias] == -1} {
+	      set alias $alias$mf(compose-addr-postfix)
+	    }
+	  }
+	  append addrs " $alias,"
+	}
+      }
+    }
+  }
+
+  return [string trim $addrs { ,}]
+}
+
+proc mfv:parse-addresses { addrlist parser } {
+  # parse <addrlist> into individual address specs and send them to
+  # <parser> for special processing and rebuild the list
+  
+  set final ""
+  set addr ""
+  
+  set mode norm
+  set nest 0
+  set group 0
+  set ndx 0
+  while { $ndx < [string length $addrlist] } {
+    
+    set chr [string index $addrlist $ndx]
+    set nextchr [string index $addrlist [expr $ndx+1]]
+    
+    if {![string compare $chr \n] || ![string compare $chr \t]} {
+      # replace newline and tab characters with spaces
+      set chr " "
+    } elseif {![string compare $chr {(}] && [lsearch {norm comm} $mode] > -1} {
+      # start of comment
+      set mode comm ; incr nest
+    } elseif {![string compare $chr {)}] && [lsearch {norm comm} $mode] > -1} {
+      # end of comment
+      incr nest -1
+      if {[string compare $mode comm] || $nest < 0} {
+	mfv:error-mesg "Error parsing address list. Parenthesis don't match."
+	return $addrlist
+      }
+      if {$nest == 0} {set mode norm}
+    } elseif {![string compare $chr {"}] && ![string compare $mode norm]} {
+       # start of quoted string
+       set mode quot
+    } elseif {![string compare $chr {"}] && ![string compare $mode quot]} {
+      # end of quoted string
+      set mode norm
+    } elseif {![string compare $chr "\\"]} {
+      # escaped character
+      incr ndx
+      if {![string compare $mode norm] || $ndx >= [string length $addrlist]} {
+	mfv:error-mesg "Error parsing address list. Invalid backslash."
+	return $addrlist
+      }
+      append addr $chr
+      set chr [string index $addrlist $ndx]
+    } elseif {![string compare $chr {:}] && ![string compare $nextchr {:}]} {
+      append addr ::
+      incr ndx 2
+      continue
+    } elseif {![string compare $chr {:}] && ![string compare $mode norm]} {
+      # if a group specification, just copy to final and start on next addr
+      incr group
+      append final "$addr$chr"
+      set addr ""
+      incr ndx
+      continue
+    } elseif {![string compare $chr {;}] && ![string compare $mode norm]} {
+      # if at end of group specifiaction and thus an addr specification
+      if {!$group} {
+	mfv:error-mesg "Error parsing address list. Too many semi-colons."
+	return $addrlist
+      }
+      incr group -1
+      set addr [$parser $addr]
+      append final " $addr$chr"
+      set addr ""
+      incr ndx
+      continue
+    } elseif {![string compare $chr {,}] && ![string compare $mode norm]} {
+      # if at end of addr specification
+      set addr [$parser $addr]
+      if {[string length $addr]} {
+	append final " $addr$chr"
+      }
+      set addr ""
+      incr ndx
+      continue
+    }
+    
+    
+    # add char to addr specification
+    append addr $chr
+    incr ndx
+  }
+  
+  # if at end of list, assume end of addr spec
+  if {[string compare $mode norm]} {
+    mfv:error-mesg "Error parsing address list. Premature end of comment or quote."
+    return $addrlist
+  }
+  if {$group} {
+    mfv:error-mesg "Error parsing address list. Premature end of group."
+    return $addrlist
+  }
+  set addr [$parser $addr]
+  set final [string trim "$final $addr"]
+  
+  return $final
+}
+
+proc mfv:entry-set { str ew } {
+  # set contents of entry widget <ew> to <str>
+  $ew delete 0 end
+  $ew insert insert $str
+}
+
+proc mfv:entry-set-fcc { str ew } {
+  # set contents of FCC: entry widget <ew> to <str>
+  if {![regexp {,$} [string trim [$ew get]]]} {
+    $ew delete 0 end
+  } else {$ew insert end " "}
+  $ew insert end $str
+}
+
+proc mfv:entry-set-win { tw ew } {
+  # set contents of entry widget <ew> to contents of text widget <tw>
+  # new lines are replaced by spaces
+  global mf mfp
+  
+  set txt [$tw get 1.0 end]
+  regsub -all \n $txt { } txt
+  mfv:entry-set $txt $ew
+
+  # close simpletext
+  return 0
+}
+
+proc mfv:expand-win { tw } {
+  # expand aliases found in text widget <tw>
+  global mf mfp
+  
+  set txt [$tw get 1.0 end]
+  regsub -all \n $txt { } txt
+  $tw delete 1.0 end
+  $tw insert 1.0 [mfv:parse-addresses $txt mfv:expand-aliases]
+
+  # keep simpletext
+  return 0
+}
+
+proc mfv:entry-edit { ew } {
+  # edit contents of entry widget <ew> in a text widget
+  global mf mfp
+  
+  set btnlist [list [list Expand mfv:expand-win %W.txt] \
+		   [list Accept mfv:entry-set-win %W.txt $ew] \
+		   [list Cancel]]
+  set w [ut:simpletext -title "Header Field Edit ($ew)" \
+	    -master [winfo toplevel $ew] \
+	    -buttons $btnlist -text [$ew get]]
+  bind $w <FocusIn> {global mfp; set mfp(curtop) %W}
+}
+
+proc mfv:compose-sign { mfc chk } {
+  global mf mfp
+
+  # set insert to end of text buffer. User can reset it in hook
+  $mfc.comp.txt mark set insert end
+
+  if {[string range $mf(insert-signature) 0 0] == "@"} {
+    set sigproc [string range $mf(insert-signature) 1 end]
+    if [catch {set sigfile [$sigproc $mfc]} res] {
+      mfv:error-mesg $res $mfc
+      set sigfile {}
+    }
+  } else {
+    set sigfile $mf(insert-signature)
+  }
+  if [lempty $sigfile] return
+
+  set signed 0
+  set errmsg "Error getting signature from $sigfile"
+  if {[file readable $sigfile]} {
+    if {$mfp($mfc,mime)} {
+      mfv:mime-attach $mfc text plain charset=us-ascii
+    } else {
+      tkTextInsert $mfc.comp.txt insert "\n$mf(insert-prefix-sig)"
+    }
+    if {[mfv:file-to-text $sigfile $mfc.comp.txt insert]} {
+      append errmsg ": $mfp(last-error)"
+    } else {
+      set signed 1
+      set mfp($mfc,needsig) 0
+      pack forget $mfc.bb.sign
+    }
+  }
+  if {$chk && !$signed} { 
+    mfv:error-mesg $errmsg $mfc
+  }
+}
+
+proc mfv:compose-get-field { mfc entry } {
+  set entry [string tolower $entry]
+  if {$entry == "subject"} { set entry subj }
+  set res [$mfc.$entry.ent get]
+  if {[string length $res]} {
+    return [mfv:parse-addresses $res mfv:expand-aliases]
+  }
+  return {}
+}
+
+proc mfv:reset-fcc { mfc } {
+  global mf mfp
+
+  if {[string range $mf(compose-fcc-folder) 0 0] == "@"} {
+    set fccproc [string range $mf(compose-fcc-folder) 1 end]
+    if [catch {set val [$fccproc $mfc]} res] {
+      mfv:error-mesg $res $mfc
+      set val {}
+    }
+  } else {
+    set val [$mfc.fcc.ent get]
+    if ![string length $val] {
+      set val $mf(compose-fcc-folder)
+    }
+  }
+
+  $mfc.fcc.ent delete 0 end
+  $mfc.fcc.ent insert end $val
+}
+
+proc mfv:mail-send { tw {start 1.0} {stop end} } {
+  global mf mfp
+
+  set cmd {exec $mf(mail-deliver) << \[$tw get $start $stop\] &}
+  if {[catch "eval $cmd" res]} {
+    set mfp(last-error) $res
+    return 255
+  } else {
+    pdebug "Deliver output: $res"
+  }
+  return 0
+}
+
+proc mfv:restore-header-line {tw} {
+  if ![winfo exists $tw] return
+  if ![winfo exists $tw.line] {
+    frame $tw.line -relief sunken -height 8 \
+	-width [expr [winfo width $tw]-20] -bd 2
+    $tw window create insert -window $tw.line
+    $tw insert insert "\n"
+    $tw mark set headerend $tw.line
+    bind $tw.line <Destroy> \
+      "after idle mfv:restore-header-line $tw"
+  }
+}
+
+proc mfv:write-compose {mfc filename} {
+  global mfp
+
+  if ![string length $filename] return
+  if [string length [mfv_util folderid $filename]] {
+    mfv:error-mesg "Cannot write message to open folder. Use FCC." $mfc
+  }
+
+  $mfp(tmptxt) delete 1.0 end
+  $mfp(tmptxt) insert end "To: [$mfc.to.ent get]\n"
+  $mfp(tmptxt) insert end "Subject: [$mfc.subj.ent get]\n"
+  if [string length [set cc [$mfc.cc.ent get]]] {
+    $mfp(tmptxt) insert end "Cc: $cc\n"
+  }
+  if [string length [set bcc [$mfc.bcc.ent get]]] {
+    $mfp(tmptxt) insert end "Bcc: $bcc\n"
+  }
+  $mfp(tmptxt) insert end [$mfc.comp.txt get 1.0 end]
+
+  mfv:text-to-file $mfp(tmptxt) $filename
+}
+
+proc mfv:compose { args } {
+  # Create a compose window for writing and sending mail
+  # sendto: address for To: field
+  # subject: text for Subject: field
+  # mesg: number of message that was selected when compose called
+  # headers: headers to put into text
+  # curcc: addresses for Cc: field
+  # incmesg: 0, insert only default headers and signature; 
+  #          1, insert current mesg; 2, insert contents of mfp(tmptxt)
+  #          3, insert current mesg w/o prefix; 4, no insertion whatsoever
+  # cite: sprintf-style to put at top of mesg insertion
+  global mf mfp tkBind
+ 
+  j:parse_args { {sendto ""} {subject ""} {mesg ""} {headers ""} \
+		     {curcc ""} {incmesg 0} {viewer ""} {cite ""} {forward 0}}
+ 
+  if {![string length $viewer]} { set viewer $mfp(curtop) }
+  keylget mfp($viewer) file curfile 
+  if {![string length $mesg]} { keylget mfp($viewer) curnum mesg }
+
+  set cnt 0
+  while {[winfo exists .mfc${cnt}]} {incr cnt}
+  set mfc .mfc${cnt}
+  set mfp($mfc,subwins) {}
+  set mfp($mfc,altedit) 0
+  set mfp($mfc,viewer) $viewer
+  set mfp($mfc,mime) 0
+  set mfp($mfc,mime-compose) $mf(mime-compose)
+  set mfp($mfc,needsig) 1
+  set mfp($mfc,fixed) $mf(disp-default-fixed)
+  set mfp($mfc,revvid) 0
+  set mfp($mfc,saved) 0
+  set tw $mfc.comp.txt
+
+  toplevel $mfc -class MailCompose
+  wm withdraw $mfc
+  if {[file exists $mf(compose-icon-bitmap)]} {
+    wm iconbitmap $mfc "@$mf(compose-icon-bitmap)"
+  }
+  wm iconname $mfc "Compose"
+  wm title $mfc "Compose ($mfc)"
+  wm geometry $mfc [string trim $mf(compose-geom)]
+  wm minsize $mfc 300 300
+  wm protocol $mfc WM_DELETE_WINDOW "mfv:cancel-mesg $mfc"
+  bind $mfc <FocusIn> {global mfp; set mfp(curtop) %W}
+  bind $mfc <Visibility> {global mfp; set mfp(curtop) %W}
+  
+  frame $mfc.menu -relief raised -bd 2
+  menubutton $mfc.menu.file -text {File} -menu $mfc.menu.file.m
+  menubutton $mfc.menu.edit -text {Edit} -menu $mfc.menu.edit.m
+  menubutton $mfc.menu.opt  -text {Options} -menu $mfc.menu.opt.m
+  
+  menu $mfc.menu.file.m
+  $mfc.menu.file.m add command -label {Insert File . . .} -accelerator {[i]} -underline 0 \
+      -command "mfv:insert-file \[mfv:get-filename -master $mfc -callback mfv:insert-set\] $tw"
+  $mfc.menu.file.m add command -label {Insert Messages . . .} -underline 7 \
+      -accelerator {[m]} -command "mfv:insert-multi-mesg $viewer $mesg $tw {$mf(insert-prefix)} {$cite}"
+  $mfc.menu.file.m add command -label {Mime Attach . . .} -underline 5 \
+      -command "mfv:mime-attach-select $mfc"
+  $mfc.menu.file.m add command -label {UNIX Pipe Mesg . . .} \
+      -command "mfv:pipe $mfc mesg $tw 0" -underline 5
+  $mfc.menu.file.m add command -label {Write . . .} -underline 0 \
+      -command "mfv:write-compose $mfc \[mfv:get-filename -master $mfc\]"
+  $mfc.menu.file.m add separator
+  $mfc.menu.file.m add command -label {Send} -accelerator {[s]} \
+      -command "mfv:send-mesg $mfc 1" -underline 0 
+  $mfc.menu.file.m add command -label {Cancel} -accelerator {[q]} \
+      -command "mfv:cancel-mesg $mfc" -underline 0
+  $mfc.menu.file.m add separator
+  $mfc.menu.file.m add command -label {Alternate Editor} -accelerator {[t]} \
+      -command "mfv:alt-edit $mfc" -underline 2
+  
+  menu $mfc.menu.edit.m
+  $mfc.menu.edit.m add command -label {Cut} -underline 2 \
+      -command "mfv:edit-op Cut"
+  $mfc.menu.edit.m add command -label {Copy} -underline 0 \
+      -command "mfv:edit-op Copy"
+  $mfc.menu.edit.m add command -label {Paste} -underline 0 \
+      -command "mfv:edit-op YankPop"
+  $mfc.menu.edit.m add separator
+  $mfc.menu.edit.m add command -label {Search . . .} -underline 0 \
+      -command "mfv:search-prompt $mfc"
+  $mfc.menu.edit.m add command -label {Search Again} -underline 7 \
+      -command "mfv:search $mfc ${mfc}_search"
+  $mfc.menu.edit.m add separator
+  $mfc.menu.edit.m add command -label {Expand Aliases} -accelerator {[e]} \
+      -command "mfv:expand-compose $mfc" -underline 0
+  if {$mf(ispell-present)} {
+    $mfc.menu.edit.m add command -label {Ispell}  -accelerator {[l]} -underline 0 \
+	-command "mfv:ispell-text $tw \[$tw index $tw.line\]"
+	
+  }
+  $mfc.menu.edit.m add command -label {TCL Evaluate X Sel} \
+      -command "mfv:tcl-eval-sel" -underline 5
+  $mfc.menu.edit.m add command -label {UNIX Pipe X Sel . . .} \
+      -command "mfv:pipe $mfc xsel $tw 0"
+  
+  menu $mfc.menu.opt.m
+  $mfc.menu.opt.m add checkbutton -label "Show Cc/Bcc" -accelerator {[b]} \
+      -variable mfp($mfc,showcc) -command "mfv:toggle-cc $mfc" -underline 8
+  if {[string length $mf(compose-fcc-folder)] && 
+      !($forward && !$mf(compose-fcc-forward))} {
+    set mfp($mfc,showfcc) 1
+  } else {
+    set mfp($mfc,showfcc) 0
+  }
+  $mfc.menu.opt.m add checkbutton -label "Show Fcc" -accelerator {[r]} \
+      -variable mfp($mfc,showfcc) -command "mfv:toggle-fcc $mfc" -underline 5
+  $mfc.menu.opt.m add checkbutton -label "Fixed-spaced font" -underline 2 \
+      -variable mfp($mfc,fixed) \
+      -command "mfv:toggle-fixed-font $mfc $tw"
+  $mfc.menu.opt.m add checkbutton -label "Reverse Video" -underline 2 \
+      -variable mfp($mfc,revvid) \
+      -command "mfv:toggle-video $tw"
+  $mfc.menu.opt.m add checkbutton -label "MIME mode" -underline 0 \
+      -variable mfc($mfc,mime-compose)
+  
+  if {!$tkBind(emacs)} {
+    $mfc.menu.edit.m entryconfigure {Cut} -accelerator {[x]}
+    $mfc.menu.edit.m entryconfigure {Copy} -accelerator {[c]}
+    $mfc.menu.edit.m entryconfigure {Paste} -accelerator {[v]}
+    $mfc.menu.edit.m entryconfigure {Search . . .} -accelerator {[f]}
+    $mfc.menu.edit.m entryconfigure {Search Again} -accelerator {[g]}
+  }
+
+  pack $mfc.menu.file $mfc.menu.edit $mfc.menu.opt -side left
+  
+  frame $mfc.to
+  label $mfc.to.lbl -text "To:" -width 8 -anchor w
+  entry $mfc.to.ent -relief sunken
+  button $mfc.to.btn -bitmap @$mfp(tkmaillib)/pen.xbm -width 25 \
+      -command "mfv:entry-edit $mfc.to.ent" -takefocus 0
+  pack $mfc.to.lbl -side left
+  pack $mfc.to.ent -side left -pady 3 -expand true -fill x -ipady 2
+  pack $mfc.to.btn -side left -padx 8
+  $mfc.to.ent insert end [mfv:parse-addresses $sendto mfv:expand-aliases]
+  bind $mfc.to.ent <FocusOut> "mfv:reset-fcc $mfc"
+
+  frame $mfc.subj
+  label $mfc.subj.lbl -text "Subject:" -width 8 -anchor w
+  entry $mfc.subj.ent -relief sunken
+  button $mfc.subj.btn -bitmap @$mfp(tkmaillib)/pen.xbm -width 25 -takefocus 0
+  pack $mfc.subj.lbl -side left
+  pack $mfc.subj.ent -side left -pady 3 -expand true -fill x -ipady 2
+  pack $mfc.subj.btn -side left -padx 8
+  $mfc.subj.ent insert end $subject
+  bind $mfc.subj.ent <FocusOut> "mfv:reset-fcc $mfc"
+  
+  set mfp($mfc,showcc) [expr "$mf(compose-show-cc) || [string length $curcc]"]
+  
+  frame $mfc.cc
+  label $mfc.cc.lbl -text "Cc:" -width 8 -anchor w
+  entry $mfc.cc.ent -relief sunken
+  button $mfc.cc.btn -bitmap @$mfp(tkmaillib)/pen.xbm -width 25 \
+      -command "mfv:entry-edit $mfc.cc.ent" -takefocus 0
+  pack $mfc.cc.lbl -side left
+  pack $mfc.cc.ent -side left -pady 3 -expand true -fill x -ipady 2
+  pack $mfc.cc.btn -side left -padx 8
+  $mfc.cc.ent insert end [mfv:parse-addresses $curcc mfv:expand-aliases]
+  bind $mfc.cc.ent <FocusOut> "mfv:reset-fcc $mfc"
+  
+  frame $mfc.bcc
+  label $mfc.bcc.lbl -text "Bcc:" -width 8 -anchor w
+  entry $mfc.bcc.ent -relief sunken
+  button $mfc.bcc.btn -bitmap @$mfp(tkmaillib)/pen.xbm -width 25 \
+      -command "mfv:entry-edit $mfc.bcc.ent" -takefocus 0
+  pack $mfc.bcc.lbl -side left
+  pack $mfc.bcc.ent -side left -pady 3 -expand true -fill x -ipady 2
+  pack $mfc.bcc.btn -side left -padx 8
+  bind $mfc.bcc.ent <FocusOut> "mfv:reset-fcc $mfc"
+  
+  frame $mfc.fcc
+  label $mfc.fcc.lbl -text "Fcc:" -width 8 -anchor w
+  entry $mfc.fcc.ent -relief sunken
+  button $mfc.fcc.btn -bitmap @$mfp(tkmaillib)/list.xbm -width 25 -takefocus 0 \
+      -command "mfv:entry-set-fcc \[mfv:get-filename -master $mfc\] $mfc.fcc.ent"
+  pack $mfc.fcc.lbl -side left
+  pack $mfc.fcc.ent -side left -pady 3 -expand true -fill x -ipady 2
+  pack $mfc.fcc.btn -side left -padx 8
+
+  foreach field {to subj cc bcc fcc} {
+    bind $mfc.$field.btn <ButtonRelease-3> "tkButtonUp3 %W; $mfc.$field.ent delete 0 end"
+    bind $mfc.$field.ent <Return> "focus \[tk_focusNext %W\]; bindtags %W; break"
+    bind $mfc.$field.ent <Shift-Return> "focus \[tk_focusPrev %W\]; break"
+  }
+
+  frame $mfc.comp
+  text $tw -yscroll "$mfc.comp.yscroll set" \
+      -relief sunken -bd 2 -wrap none -xscroll "$mfc.hbar.xscroll set"
+  $mfc.comp.txt configure -font [lindex [$viewer.$mfp(mesg) configure -font] 4]
+  scrollbar $mfc.comp.yscroll -command "$mfc.comp.txt yview" -relief raised
+  frame $mfc.hbar
+  scrollbar $mfc.hbar.xscroll -command "$mfc.comp.txt xview" \
+      -relief raised -orient horizontal
+  button $mfc.hbar.spacer -width [$mfc.comp.yscroll cget -width] \
+      -image blank -relief flat -borderwidth 0 -state disabled
+  
+  if {$mf(disp-left-scroll)} { set sside left } { set sside right }
+  pack $mfc.comp.yscroll -side $sside -fill y
+  pack $mfc.comp.txt -side left -expand true -fill both
+  pack $mfc.hbar.spacer -side $sside
+  pack $mfc.hbar.xscroll -side $sside -expand true -fill x
+  
+  frame $mfc.bb
+  button $mfc.bb.mesg -text "Insert Message" \
+      -command "mfv:insert-current-mesg $tw {$mf(insert-prefix)} {$cite}"
+  bind $mfc.bb.mesg <ButtonRelease-2> \
+      "tkButtonUp3 %W; mfv:insert-mesg $curfile $mesg $tw {} {$cite}"
+  bind $mfc.bb.mesg <ButtonRelease-3> \
+      "tkButtonUp3 %W; mfv:insert-mesg $curfile $mesg $tw {$mf(insert-prefix)} {$cite}"
+  button $mfc.bb.file -text "Insert File" -command "$mfc.menu.file.m invoke {Insert File*}"
+  button $mfc.bb.alt -text "Alt Editor" -command "$mfc.menu.file.m invoke {Alt*}"
+  button $mfc.bb.sign -text "Sign" -command "mfv:compose-sign $mfc 1"
+  bind $mfc.bb.sign <ButtonRelease-3> \
+      "tkButtonUp3 %W; global mfp; set mfp($mfc,needsig) 0; pack forget $mfc.bb.sign"
+  button $mfc.bb.send -text "Send" -command "$mfc.menu.file.m invoke {Send}"
+  bind $mfc.bb.send <ButtonRelease-3> "tkButtonUp3 %W; mfv:send-mesg $mfc 0"
+  button $mfc.bb.cancel -text "Cancel" -command "$mfc.menu.file.m invoke {Cancel}"
+  
+  pack $mfc.bb.mesg $mfc.bb.file $mfc.bb.alt $mfc.bb.sign \
+      $mfc.bb.send $mfc.bb.cancel -side left -expand true -fill both
+  
+  pack $mfc.menu $mfc.to $mfc.subj -side top -fill x
+  pack $mfc.bb -side bottom -fill x
+  pack $mfc.hbar -side bottom -fill x
+  pack $mfc.comp -side bottom -expand true -fill both
+  
+  if {$mfp($mfc,showcc)} {
+    pack $mfc.cc $mfc.bcc -after $mfc.subj -side top -fill x
+  }
+  if {$mfp($mfc,showfcc)} {
+    pack $mfc.fcc -before $mfc.comp -side top -fill x
+  }
+
+  if {$tkBind(emacs)} {
+
+    tkBindAttachMesgBuffer $tw [tkBindCreateMesgBuffer $mfc.mbuf]
+    $mfc.mbuf configure -bd 2 -relief groove
+    pack $mfc.mbuf -after $mfc.bb -side bottom -fill x -padx 5 -pady 2
+
+    foreach wdgt {comp.txt to.ent subj.ent cc.ent bcc.ent fcc.ent} {
+      mfv:bind-menu-key $mfc.$wdgt i "$mfc.menu.file.m invoke {Insert F*}"
+      mfv:bind-menu-key $mfc.$wdgt m "$mfc.menu.file.m invoke {Insert M*}"
+      mfv:bind-menu-key $mfc.$wdgt s "$mfc.menu.file.m invoke {Send}"
+      mfv:bind-menu-key $mfc.$wdgt q "$mfc.menu.file.m invoke {Cancel}"
+      mfv:bind-menu-key $mfc.$wdgt t "$mfc.menu.file.m invoke {Alt*}"
+      mfv:bind-menu-key $mfc.$wdgt e "$mfc.menu.edit.m invoke {Expand*}"
+      mfv:bind-menu-key $mfc.$wdgt l "$mfc.menu.edit.m invoke {Ispell}"
+      mfv:bind-menu-key $mfc.$wdgt b "$mfc.menu.opt.m invoke {Show Cc*}"
+      mfv:bind-menu-key $mfc.$wdgt r "$mfc.menu.opt.m invoke {Show Fcc}"
+    }
+  } else {
+    foreach wdgt {comp.txt to.ent subj.ent cc.ent bcc.ent fcc.ent} {
+      bind $mfc.$wdgt <Control-i> "$mfc.menu.file.m invoke {Insert F*}"
+      bind $mfc.$wdgt <Control-m> "$mfc.menu.file.m invoke {Insert M*}"
+      bind $mfc.$wdgt <Control-s> "$mfc.menu.file.m invoke {Send}"
+      bind $mfc.$wdgt <Control-q> "$mfc.menu.file.m invoke {Cancel}"
+      bind $mfc.$wdgt <Control-t> "$mfc.menu.file.m invoke {Alt*}"
+      bind $mfc.$wdgt <Control-e> "$mfc.menu.edit.m invoke {Expand*}"
+      bind $mfc.$wdgt <Control-l> "$mfc.menu.edit.m invoke {Ispell}"
+      bind $mfc.$wdgt <Control-b> "$mfc.menu.opt.m invoke {Show Cc*}"
+      bind $mfc.$wdgt <Control-r> "$mfc.menu.opt.m invoke {Show Fcc}"
+    }
+  }
+
+  $tw mark set insert 1.0
+  if {[string length $headers]} {$tw insert insert "$headers\n"}
+  frame $tw.line -relief sunken -height 8 \
+      -width 20 -bd 2
+  bind $tw <Configure> {
+    if [winfo exists %W.line] {
+      %W.line configure -width [expr [winfo width %W]-20]
+    }
+  }
+    
+  $tw window create insert -window $tw.line
+  $tw insert insert "\n\n"
+  $tw mark set headerend $tw.line
+  $tw mark set bodystart "insert -1c"
+  bind $tw.line <Destroy> \
+    "after idle mfv:restore-header-line $tw"
+
+  # $tw insert 1.0 "----------ONLY HEADERS ABOVE THIS LINE------------\n\n"
+  # $tw mark set headerend 1.5
+  # $tw mark set bodystart "insert -1c"
+  # if {[string length $headers]} {$tw insert 1.0 "$headers\n"}
+
+  if {$incmesg != 4} {
+    if {$mf(insert-headers) != ""} {
+      $tw insert 1.0 "$mf(insert-headers)\n"
+    }
+    $tw insert end "\n"
+    if {$incmesg==1} {mfv:insert-mesg $curfile $mesg $tw $mf(insert-prefix) $cite}
+    if {$incmesg==2} {
+      $tw insert end "\n[$mfp(tmptxt) get 1.0 end]\n"
+    }
+    if {$incmesg==3 && !$mf(mime-compose)} {
+      mfv:insert-mesg $curfile $mesg $tw {} $cite
+    }
+    set tndx [$tw index end]
+    if {$mf(insert-auto-sign)} { mfv:compose-sign $mfc 0 }
+    $tw mark set insert $tndx
+    if {$incmesg==3 && $mf(mime-compose)} {
+      $tw mark set mimeintro insert
+      mfv:mime-attach $mfc message rfc822 {} 7bit {} {}
+      mfv:insert-mesg $curfile $mesg $tw {} {}
+      $tw mark set insert mimeintro
+    }
+  }
+  $tw insert 1.0 "X-Mailer: TkMail $mfp(version)\n"
+  
+  mfv:expand-compose $mfc
+  mfv:reset-fcc $mfc
+  
+  mfv:run-hook mfv:compose-hook $mfc
+  
+  $tw mark set insert bodystart
+  $tw yview 1.0
+  update idletasks
+  $tw yview -pickplace insert
+  
+  if {[$mfc.to.ent get]==""} {
+    focus $mfc.to.ent
+  } else {
+    focus $tw
+  }
+  
+  if {$mf(compose-alt-auto)} {$mfc.menu.file.m invoke {Alt*}}
+  tkTextUndoSetup $tw
+  wm deiconify $mfc
+  return $mfc
+}
+
+

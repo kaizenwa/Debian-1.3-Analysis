@@ -1,0 +1,675 @@
+# 
+# Copyright (c) 1995 The Regents of the University of California.
+# All rights reserved.
+# 
+# Permission to use, copy, modify, and distribute this software and its
+# documentation for any purpose, without fee, and without written agreement is
+# hereby granted, provided that the above copyright notice and the following
+# two paragraphs appear in all copies of this software.
+# 
+# IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+# DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+# OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+# CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# 
+# THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+# AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+# ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+# PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+# 
+
+#  
+#  $Header: /n/video/199/eyhung/encode/RCS/Makefile,v 1.7 1995/02/02 02:25:51 eyhung Exp $
+# 
+
+##############################################################################
+#
+# Configurable items
+#
+
+################################################################
+# PROFILING # use -pg or -p if and only if you want to profile #
+################################################################
+PROFLAG =
+
+##############
+# JPEG STUFF #
+##############
+JPEG_LIB = jpeg/libjpeg.a
+JPEG_DIR = -Ijpeg
+JPEG_LIB_DIR = -Ljpeg
+MP_JPEG_OBJS = jpeg.o
+MP_JPEG_SRCS = jpeg.c
+
+####################################################################
+# DEBUGGING # use -g if and only if you want to debug, else use -O #
+####################################################################
+#DEBUGFLAG = -g 
+DEBUGFLAG = -O3
+
+###############################################################################
+# MISSING PROTOTYES # use -DMISSING_PROTOS if your standard headers are wrong #
+###############################################################################
+PROTOFLAG = 
+#PROTOFLAG = -DMISSING_PROTOS
+
+#################
+# INCLUDE FILES # 
+#################
+INCLUDEDIR = -Iheaders -I/usr/include $(JPEG_DIR)
+
+############################################################################
+# LIBRARIES # specify library directories; need jpg lib and maybe pbm	   #
+############################################################################
+#LIBDIRS = -L$(PBMLIBDIR) $(JPEG_LIB_DIR)
+LIBDIRS = $(JPEG_LIB_DIR)
+
+#####################################################################
+# COMPILER # specify compiler; should be ANSI-compliant if possible #
+#####################################################################
+CC = gcc
+
+################################################
+# MAKE # command to use for the "make" command #
+################################################
+MAKE = make
+
+###################################################
+# COMPILER FLAGS # modify for different compilers #
+###################################################
+# use -DLONG_32 iff
+#	1) long's are 32 bits and
+#	2) int's are not
+#
+# if you don't have <netinet/in.h> then you must define one of the following
+#     -DFORCE_BIG_ENDIAN
+#     -DFORCE_LITTLE_ENDIAN
+#
+# if you are using a non-ANSI compiler, then use:
+#	-DNON_ANSI_COMPILER
+#
+# one other option:
+#	-DHEINOUS_DEBUG_MODE
+#
+# listed below are some suggested CFLAG lines for various compilers
+# 
+
+#	gcc
+CFLAGS	      =  $(INCLUDEDIR) $(DEBUGFLAG) -Wall -Wmissing-prototypes $(PROFLAG) $(PROTOFLAG)
+
+#	gcc-strict
+#CFLAGS	      =  $(INCLUDEDIR) $(DEBUGFLAG) -pedantic -Wall -Waggregate-return -Wtraditional -Wshadow -Wpointer-arith -Wno-parentheses -Wwrite-strings -Wconversion -Wcast-qual -Wcast-align -Wnested-externs -Wuninitialized -Wmissing-prototypes $(PROFLAG) $(PROTOFLAG)
+
+#	SUN cc
+#CFLAGS = $(INCLUDEDIR) $(DEBUGFLAG) $(PROFLAG) $(PROTOFLAG) -DNON_ANSI_COMPILER
+
+#	HP cc
+#CFLAGS = $(INCLUDEDIR) $(DEBUGFLAG) $(PROFLAG) $(PROTOFLAG) -DNON_ANSI_COMPILER
+
+#	HP gcc
+#CFLAGS = $(INCLUDEDIR) $(DEBUGFLAG) $(PROFLAG)
+
+#	DEC ALPHA cc
+#CFLAGS = $(INCLUDEDIR) -Olimit 1200 $(DEBUGFLAG) $(PROFLAG) $(PROTOFLAG)
+
+#	DEC Ultrix gcc
+#CFLAGS = $(INCLUDEDIR) $(DEBUGFLAG) -Wall -Wmissing-prototypes $(PROFLAG) $(PROTOFLAG) -DMIPS
+
+# 	SGI cc
+#CFLAGS = $(INCLUDEDIR) $(DEBUGFLAG) $(PROFLAG) $(PROTOFLAG) -cckr -DIRIX
+
+#	Intel-based SVR4.0 cc
+#CFLAGS = $(INCLUDEDIR) $(DEBUGFLAG) $(PROFLAG) $(PROTOFLAG) -DLONG_32 -DSVR4 -DSYSV386
+
+#	Intel-based SCO Unix
+#CFLAGS =  $(INCLUDEDIR) $(DEBUGFLAG) $(PROFLAG) $(PROTOFLAG) -Dsco -m486
+
+# linux CFLAGS
+#CFLAGS  = $(INCLUDEDIR) -m486 -fomit-frame-pointer -ffast-math -finline-functions $(DEBUGFLAG) $(PROFLAG) $(PROTOFLAG) -DLONG_32 -DSYSV -DLINUX
+
+#	IBM RS/6000 cc
+#CFLAGS = $(INCLUDEDIR) $(DEBUGFLAG) $(PROFLAG) $(PROTOFLAG)
+
+# DOS
+#CFLAGS        =  $(INCLUDEDIR) $(DEBUGFLAG) -O1 -DSYSV -DFORCE_LITTLE_ENDIAN -w-rvl -w-rch -w-eff -w-ccc -w-par -w-use -w-aus -w-pro $(PROFLAG) $(PROTOFLAG)
+
+
+#########################################################################
+# LIBRARIES # same for most machines; may need to add stuff for sockets #
+#########################################################################
+#	this works for most machines
+LIBS = $(JPEG_LIB) -lm
+
+#	Solaris
+#LIBS = $(JPEG_LIB) -lm -lsocket -lnsl
+
+#	Intel-based SVR4.0
+#LIBS = $(JPEG_LIB) -lm -lsocket -lnsl -lgen
+
+#	Intel-based SCO Unix
+#LIBS = $(JPEG_LIB) -lX11 -lsocket -lmalloc -lPW -lc_s -lm 
+
+
+###############
+# OTHER STUFF #
+###############
+#PURIFY = purify -cache-dir=/tmp
+PURIFY =
+
+#
+# End of configurable options.  Just type make and have fun.
+##############################################################################
+
+MP_BASE_OBJS = mfwddct.o postdct.o huff.o bitio.o mheaders.o
+MP_BASE_SRCS = mfwddct.c postdct.c huff.c bitio.c mheaders.c
+MP_ENCODE_OBJS = iframe.o pframe.o bframe.o psearch.o bsearch.o block.o 
+MP_ENCODE_SRCS = iframe.c pframe.c bframe.c psearch.c bsearch.c block.c 
+MP_OTHER_OBJS = mpeg.o subsample.o param.o rgbtoycc.o \
+	readframe.o combine.o jrevdct.o frame.o fsize.o frametype.o \
+	libpnmrw.o specifics.o rate.o opts.o
+MP_OTHER_SRCS = mpeg.c subsample.c param.c rgbtoycc.c \
+	readframe.c combine.c jrevdct.c frame.c fsize.c frametype.c \
+	libpnmrw.c specifics.c rate.c opts.c
+MP_PARALLEL_OBJS = parallel.o
+MP_PARALLEL_SRCS = parallel.c
+MP_ALL_SRCS = $(MP_BASE_SRCS) $(MP_OTHER_SRCS) $(MP_ENCODE_SRCS) \
+	      $(MP_PARALLEL_SRCS) $(MP_JPEG_SRCS) main.c
+MP_ALL_OBJS = $(MP_BASE_OBJS) $(MP_OTHER_OBJS) $(MP_ENCODE_OBJS) \
+	      $(MP_PARALLEL_OBJS) $(MP_JPEG_OBJS) main.o
+MP_INCLUDE = mproto.h mtypes.h huff.h bitio.h
+MP_MISC = Makefile huff.table parse_huff.pl
+
+all: mpeg_encode
+
+#########
+# TESTS #
+#########
+
+test:
+	rm -f /tmp/ts.stat
+	./mpeg_encode -stat /tmp/ts.stat ./tst/ts.param
+	csh ./tst/diffscript /tmp/ts.stat ./tst/ts.stat /tmp/ts.mpg ./tst/ts.mpg
+
+testd:
+	rm -f /tmp/tsd.stat
+	./mpeg_encode -stat /tmp/tsd.stat ./tst/tsd.param
+	csh ./tst/diffscript /tmp/tsd.stat ./tst/tsd.stat /tmp/tsd.mpg ./tst/tsd.mpg
+
+test_all: test testd
+
+############
+# BINARIES #
+############
+
+mpeg_encode: $(MP_ALL_OBJS) $(JPEG_LIB)
+	$(PURIFY) $(CC) $(CFLAGS) -o $@ $(MP_ALL_OBJS) $(LIBDIRS) $(LIBS)
+	strip mpeg_encode
+
+profile: $(MP_ALL_OBJS)
+	$(PURIFY) $(CC) -Bstatic -pg $(CFLAGS) -o $@ $(MP_ALL_OBJS) $(LIBDIRS) $(LIBS)
+
+#########
+# OTHER #
+#########
+
+# make JPEG compile itself
+jpeg/libjpeg.a:
+	(cd jpeg; $(MAKE) libjpeg.a)
+
+#
+# Perl is necessary if you want to modify the Huffman RLE encoding table.
+#
+PERL = perl
+
+# The following stuff is for the Huffman encoding tables.  It's commented-out
+# because you probably don't want to change this.  If you do, then uncommment
+# it.
+#
+# huff.h: huff.c
+#
+# huff.c: parse_huff.pl huff.table
+# 	$(PERL) parse_huff.pl huff.table
+
+headers.o: headers.c
+	$(CC) $(CFLAGS) -c headers.c
+
+depend: huff.c
+	makedepend -- $(CFLAGS) -- $(MP_ALL_SRCS)
+
+wc:;		wc -l *.[ch] headers/*.h *.pl *.table
+ci:;		ci -l $(MP_ALL_SRCS) $(MP_INCLUDE) $(MP_MISC)
+tags: $(MP_ALL_SRCS)
+	ctags -t $(MP_ALL_SRCS)
+	etags -f TAGS -t $(MP_ALL_SRCS) headers/*.h
+
+new:
+	rm -f *.o core *~ gmon.out
+	$(MAKE) depend
+
+clean:
+	-rm -f *.o core *~ gmon.out
+	$(MAKE) depend
+	-$(MAKE) tags
+
+#
+# WARNING: this assumes you're using GNU indent...
+#
+indent:;	indent -T FILE -T int8 -T int16 -T int32 -T uint8 -T uint16 -T uint32  -T BitBucket -T MpegFrame -T Block -T FlatBlock $(MP_ALL_SRCS)
+
+spotless: 
+	rm -f huff.c huff.h *.pure.a
+	rm -f *.o core *~ gmon.out
+	cd jpeg; make clean
+
+clobber:
+	rm -f *.o core *~ gmon.out
+	cd jpeg; make clean
+	rm -f mpeg_encode parseSchedule
+
+##############################################################################
+# DO NOT DELETE THIS LINE -- make depend depends on it.
+
+mfwddct.o: headers/all.h /usr/include/stdio.h /usr/include/libio.h
+mfwddct.o: /usr/include/_G_config.h /usr/include/stdlib.h
+mfwddct.o: /usr/include/features.h /usr/include/sys/cdefs.h
+mfwddct.o: /usr/include/errno.h /usr/include/linux/errno.h
+mfwddct.o: /usr/include/asm/errno.h /usr/include/alloca.h /usr/include/math.h
+mfwddct.o: /usr/include/huge_val.h /usr/include/endian.h
+mfwddct.o: /usr/include/bytesex.h /usr/include/nan.h /usr/include/values.h
+mfwddct.o: /usr/include/memory.h /usr/include/string.h /usr/include/limits.h
+mfwddct.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+mfwddct.o: /usr/include/posix2_lim.h headers/libpnmrw.h /usr/include/malloc.h
+mfwddct.o: headers/ansi.h headers/general.h headers/dct.h headers/mtypes.h
+mfwddct.o: headers/opts.h
+postdct.o: /usr/include/assert.h headers/all.h /usr/include/stdio.h
+postdct.o: /usr/include/libio.h /usr/include/_G_config.h
+postdct.o: /usr/include/stdlib.h /usr/include/features.h
+postdct.o: /usr/include/sys/cdefs.h /usr/include/errno.h
+postdct.o: /usr/include/linux/errno.h /usr/include/asm/errno.h
+postdct.o: /usr/include/alloca.h /usr/include/math.h /usr/include/huge_val.h
+postdct.o: /usr/include/endian.h /usr/include/bytesex.h /usr/include/nan.h
+postdct.o: /usr/include/values.h /usr/include/memory.h /usr/include/string.h
+postdct.o: /usr/include/limits.h /usr/include/posix1_lim.h
+postdct.o: /usr/include/linux/limits.h /usr/include/posix2_lim.h
+postdct.o: headers/libpnmrw.h /usr/include/malloc.h headers/ansi.h
+postdct.o: headers/general.h headers/mtypes.h headers/dct.h headers/bitio.h
+postdct.o: huff.h headers/postdct.h headers/opts.h
+huff.o: headers/mtypes.h headers/general.h headers/dct.h headers/ansi.h
+huff.o: huff.h
+bitio.o: /usr/include/assert.h headers/all.h /usr/include/stdio.h
+bitio.o: /usr/include/libio.h /usr/include/_G_config.h /usr/include/stdlib.h
+bitio.o: /usr/include/features.h /usr/include/sys/cdefs.h
+bitio.o: /usr/include/errno.h /usr/include/linux/errno.h
+bitio.o: /usr/include/asm/errno.h /usr/include/alloca.h /usr/include/math.h
+bitio.o: /usr/include/huge_val.h /usr/include/endian.h /usr/include/bytesex.h
+bitio.o: /usr/include/nan.h /usr/include/values.h /usr/include/memory.h
+bitio.o: /usr/include/string.h /usr/include/limits.h
+bitio.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+bitio.o: /usr/include/posix2_lim.h headers/libpnmrw.h /usr/include/malloc.h
+bitio.o: headers/ansi.h headers/general.h headers/byteorder.h
+bitio.o: /usr/include/sys/types.h /usr/include/linux/types.h
+bitio.o: /usr/include/asm/types.h /usr/include/netinet/in.h
+bitio.o: /usr/include/sys/socket.h /usr/include/linux/socket.h
+bitio.o: /usr/include/asm/socket.h /usr/include/linux/sockios.h
+bitio.o: /usr/include/linux/uio.h /usr/include/linux/in.h
+bitio.o: /usr/include/asm/byteorder.h headers/bitio.h headers/mtypes.h
+bitio.o: headers/dct.h
+mheaders.o: headers/all.h /usr/include/stdio.h /usr/include/libio.h
+mheaders.o: /usr/include/_G_config.h /usr/include/stdlib.h
+mheaders.o: /usr/include/features.h /usr/include/sys/cdefs.h
+mheaders.o: /usr/include/errno.h /usr/include/linux/errno.h
+mheaders.o: /usr/include/asm/errno.h /usr/include/alloca.h
+mheaders.o: /usr/include/math.h /usr/include/huge_val.h /usr/include/endian.h
+mheaders.o: /usr/include/bytesex.h /usr/include/nan.h /usr/include/values.h
+mheaders.o: /usr/include/memory.h /usr/include/string.h /usr/include/limits.h
+mheaders.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+mheaders.o: /usr/include/posix2_lim.h headers/libpnmrw.h
+mheaders.o: /usr/include/malloc.h headers/ansi.h headers/general.h
+mheaders.o: headers/bitio.h headers/frames.h headers/mtypes.h headers/dct.h
+mheaders.o: headers/mheaders.h headers/frame.h
+mpeg.o: headers/all.h /usr/include/stdio.h /usr/include/libio.h
+mpeg.o: /usr/include/_G_config.h /usr/include/stdlib.h
+mpeg.o: /usr/include/features.h /usr/include/sys/cdefs.h /usr/include/errno.h
+mpeg.o: /usr/include/linux/errno.h /usr/include/asm/errno.h
+mpeg.o: /usr/include/alloca.h /usr/include/math.h /usr/include/huge_val.h
+mpeg.o: /usr/include/endian.h /usr/include/bytesex.h /usr/include/nan.h
+mpeg.o: /usr/include/values.h /usr/include/memory.h /usr/include/string.h
+mpeg.o: /usr/include/limits.h /usr/include/posix1_lim.h
+mpeg.o: /usr/include/linux/limits.h /usr/include/posix2_lim.h
+mpeg.o: headers/libpnmrw.h /usr/include/malloc.h headers/ansi.h
+mpeg.o: headers/general.h /usr/include/time.h /usr/include/unistd.h
+mpeg.o: /usr/include/posix_opt.h /usr/include/gnu/types.h
+mpeg.o: /usr/include/confname.h /usr/include/sys/types.h
+mpeg.o: /usr/include/linux/types.h /usr/include/asm/types.h headers/mtypes.h
+mpeg.o: headers/dct.h headers/frames.h headers/mheaders.h headers/bitio.h
+mpeg.o: headers/frame.h headers/search.h headers/mpeg.h headers/prototypes.h
+mpeg.o: headers/parallel.h headers/param.h headers/readframe.h
+mpeg.o: headers/fsize.h headers/rate.h /usr/include/sys/stat.h
+mpeg.o: /usr/include/linux/stat.h
+subsample.o: headers/all.h /usr/include/stdio.h /usr/include/libio.h
+subsample.o: /usr/include/_G_config.h /usr/include/stdlib.h
+subsample.o: /usr/include/features.h /usr/include/sys/cdefs.h
+subsample.o: /usr/include/errno.h /usr/include/linux/errno.h
+subsample.o: /usr/include/asm/errno.h /usr/include/alloca.h
+subsample.o: /usr/include/math.h /usr/include/huge_val.h
+subsample.o: /usr/include/endian.h /usr/include/bytesex.h /usr/include/nan.h
+subsample.o: /usr/include/values.h /usr/include/memory.h
+subsample.o: /usr/include/string.h /usr/include/limits.h
+subsample.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+subsample.o: /usr/include/posix2_lim.h headers/libpnmrw.h
+subsample.o: /usr/include/malloc.h headers/ansi.h headers/general.h
+subsample.o: headers/mtypes.h headers/dct.h headers/frames.h
+subsample.o: headers/mheaders.h headers/bitio.h headers/frame.h
+subsample.o: headers/prototypes.h
+param.o: headers/all.h /usr/include/stdio.h /usr/include/libio.h
+param.o: /usr/include/_G_config.h /usr/include/stdlib.h
+param.o: /usr/include/features.h /usr/include/sys/cdefs.h
+param.o: /usr/include/errno.h /usr/include/linux/errno.h
+param.o: /usr/include/asm/errno.h /usr/include/alloca.h /usr/include/math.h
+param.o: /usr/include/huge_val.h /usr/include/endian.h /usr/include/bytesex.h
+param.o: /usr/include/nan.h /usr/include/values.h /usr/include/memory.h
+param.o: /usr/include/string.h /usr/include/limits.h
+param.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+param.o: /usr/include/posix2_lim.h headers/libpnmrw.h /usr/include/malloc.h
+param.o: headers/ansi.h headers/general.h headers/mtypes.h headers/dct.h
+param.o: headers/mpeg.h headers/frame.h headers/search.h headers/prototypes.h
+param.o: headers/parallel.h headers/bitio.h headers/param.h
+param.o: headers/readframe.h headers/fsize.h headers/frames.h
+param.o: headers/mheaders.h headers/jpeg.h /usr/include/ctype.h
+param.o: headers/rate.h headers/opts.h
+rgbtoycc.o: headers/all.h /usr/include/stdio.h /usr/include/libio.h
+rgbtoycc.o: /usr/include/_G_config.h /usr/include/stdlib.h
+rgbtoycc.o: /usr/include/features.h /usr/include/sys/cdefs.h
+rgbtoycc.o: /usr/include/errno.h /usr/include/linux/errno.h
+rgbtoycc.o: /usr/include/asm/errno.h /usr/include/alloca.h
+rgbtoycc.o: /usr/include/math.h /usr/include/huge_val.h /usr/include/endian.h
+rgbtoycc.o: /usr/include/bytesex.h /usr/include/nan.h /usr/include/values.h
+rgbtoycc.o: /usr/include/memory.h /usr/include/string.h /usr/include/limits.h
+rgbtoycc.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+rgbtoycc.o: /usr/include/posix2_lim.h headers/libpnmrw.h
+rgbtoycc.o: /usr/include/malloc.h headers/ansi.h headers/general.h
+rgbtoycc.o: headers/frame.h headers/mtypes.h headers/dct.h headers/fsize.h
+rgbtoycc.o: headers/rgbtoycc.h
+readframe.o: headers/all.h /usr/include/stdio.h /usr/include/libio.h
+readframe.o: /usr/include/_G_config.h /usr/include/stdlib.h
+readframe.o: /usr/include/features.h /usr/include/sys/cdefs.h
+readframe.o: /usr/include/errno.h /usr/include/linux/errno.h
+readframe.o: /usr/include/asm/errno.h /usr/include/alloca.h
+readframe.o: /usr/include/math.h /usr/include/huge_val.h
+readframe.o: /usr/include/endian.h /usr/include/bytesex.h /usr/include/nan.h
+readframe.o: /usr/include/values.h /usr/include/memory.h
+readframe.o: /usr/include/string.h /usr/include/limits.h
+readframe.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+readframe.o: /usr/include/posix2_lim.h headers/libpnmrw.h
+readframe.o: /usr/include/malloc.h headers/ansi.h headers/general.h
+readframe.o: /usr/include/time.h /usr/include/ctype.h /usr/include/unistd.h
+readframe.o: /usr/include/posix_opt.h /usr/include/gnu/types.h
+readframe.o: /usr/include/confname.h /usr/include/sys/types.h
+readframe.o: /usr/include/linux/types.h /usr/include/asm/types.h
+readframe.o: headers/mtypes.h headers/dct.h headers/frames.h
+readframe.o: headers/mheaders.h headers/bitio.h headers/frame.h
+readframe.o: headers/prototypes.h headers/parallel.h headers/param.h
+readframe.o: headers/readframe.h headers/fsize.h headers/rgbtoycc.h
+readframe.o: headers/jpeg.h headers/opts.h
+combine.o: headers/all.h /usr/include/stdio.h /usr/include/libio.h
+combine.o: /usr/include/_G_config.h /usr/include/stdlib.h
+combine.o: /usr/include/features.h /usr/include/sys/cdefs.h
+combine.o: /usr/include/errno.h /usr/include/linux/errno.h
+combine.o: /usr/include/asm/errno.h /usr/include/alloca.h /usr/include/math.h
+combine.o: /usr/include/huge_val.h /usr/include/endian.h
+combine.o: /usr/include/bytesex.h /usr/include/nan.h /usr/include/values.h
+combine.o: /usr/include/memory.h /usr/include/string.h /usr/include/limits.h
+combine.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+combine.o: /usr/include/posix2_lim.h headers/libpnmrw.h /usr/include/malloc.h
+combine.o: headers/ansi.h headers/general.h /usr/include/time.h
+combine.o: headers/mtypes.h headers/dct.h headers/frames.h headers/mheaders.h
+combine.o: headers/bitio.h headers/frame.h headers/search.h headers/mpeg.h
+combine.o: headers/prototypes.h headers/parallel.h headers/param.h
+combine.o: headers/readframe.h headers/fsize.h headers/combine.h
+combine.o: /usr/include/unistd.h /usr/include/posix_opt.h
+combine.o: /usr/include/gnu/types.h /usr/include/confname.h
+combine.o: /usr/include/sys/types.h /usr/include/linux/types.h
+combine.o: /usr/include/asm/types.h
+jrevdct.o: /usr/include/memory.h /usr/include/features.h
+jrevdct.o: /usr/include/sys/cdefs.h /usr/include/string.h headers/all.h
+jrevdct.o: /usr/include/stdio.h /usr/include/libio.h /usr/include/_G_config.h
+jrevdct.o: /usr/include/stdlib.h /usr/include/errno.h
+jrevdct.o: /usr/include/linux/errno.h /usr/include/asm/errno.h
+jrevdct.o: /usr/include/alloca.h /usr/include/math.h /usr/include/huge_val.h
+jrevdct.o: /usr/include/endian.h /usr/include/bytesex.h /usr/include/nan.h
+jrevdct.o: /usr/include/values.h /usr/include/limits.h
+jrevdct.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+jrevdct.o: /usr/include/posix2_lim.h headers/libpnmrw.h /usr/include/malloc.h
+jrevdct.o: headers/ansi.h headers/general.h headers/dct.h
+frame.o: headers/all.h /usr/include/stdio.h /usr/include/libio.h
+frame.o: /usr/include/_G_config.h /usr/include/stdlib.h
+frame.o: /usr/include/features.h /usr/include/sys/cdefs.h
+frame.o: /usr/include/errno.h /usr/include/linux/errno.h
+frame.o: /usr/include/asm/errno.h /usr/include/alloca.h /usr/include/math.h
+frame.o: /usr/include/huge_val.h /usr/include/endian.h /usr/include/bytesex.h
+frame.o: /usr/include/nan.h /usr/include/values.h /usr/include/memory.h
+frame.o: /usr/include/string.h /usr/include/limits.h
+frame.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+frame.o: /usr/include/posix2_lim.h headers/libpnmrw.h /usr/include/malloc.h
+frame.o: headers/ansi.h headers/general.h headers/mtypes.h headers/dct.h
+frame.o: headers/frames.h headers/mheaders.h headers/bitio.h headers/frame.h
+frame.o: headers/fsize.h
+fsize.o: headers/all.h /usr/include/stdio.h /usr/include/libio.h
+fsize.o: /usr/include/_G_config.h /usr/include/stdlib.h
+fsize.o: /usr/include/features.h /usr/include/sys/cdefs.h
+fsize.o: /usr/include/errno.h /usr/include/linux/errno.h
+fsize.o: /usr/include/asm/errno.h /usr/include/alloca.h /usr/include/math.h
+fsize.o: /usr/include/huge_val.h /usr/include/endian.h /usr/include/bytesex.h
+fsize.o: /usr/include/nan.h /usr/include/values.h /usr/include/memory.h
+fsize.o: /usr/include/string.h /usr/include/limits.h
+fsize.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+fsize.o: /usr/include/posix2_lim.h headers/libpnmrw.h /usr/include/malloc.h
+fsize.o: headers/ansi.h headers/general.h headers/fsize.h headers/dct.h
+frametype.o: headers/all.h /usr/include/stdio.h /usr/include/libio.h
+frametype.o: /usr/include/_G_config.h /usr/include/stdlib.h
+frametype.o: /usr/include/features.h /usr/include/sys/cdefs.h
+frametype.o: /usr/include/errno.h /usr/include/linux/errno.h
+frametype.o: /usr/include/asm/errno.h /usr/include/alloca.h
+frametype.o: /usr/include/math.h /usr/include/huge_val.h
+frametype.o: /usr/include/endian.h /usr/include/bytesex.h /usr/include/nan.h
+frametype.o: /usr/include/values.h /usr/include/memory.h
+frametype.o: /usr/include/string.h /usr/include/limits.h
+frametype.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+frametype.o: /usr/include/posix2_lim.h headers/libpnmrw.h
+frametype.o: /usr/include/malloc.h headers/ansi.h headers/general.h
+frametype.o: headers/prototypes.h headers/frame.h headers/mtypes.h
+frametype.o: headers/dct.h headers/frames.h headers/mheaders.h
+frametype.o: headers/bitio.h headers/param.h
+libpnmrw.o: /usr/include/stdio.h /usr/include/libio.h
+libpnmrw.o: /usr/include/_G_config.h headers/libpnmrw.h /usr/include/malloc.h
+libpnmrw.o: /usr/include/features.h /usr/include/sys/cdefs.h
+libpnmrw.o: /usr/include/string.h
+specifics.o: headers/all.h /usr/include/stdio.h /usr/include/libio.h
+specifics.o: /usr/include/_G_config.h /usr/include/stdlib.h
+specifics.o: /usr/include/features.h /usr/include/sys/cdefs.h
+specifics.o: /usr/include/errno.h /usr/include/linux/errno.h
+specifics.o: /usr/include/asm/errno.h /usr/include/alloca.h
+specifics.o: /usr/include/math.h /usr/include/huge_val.h
+specifics.o: /usr/include/endian.h /usr/include/bytesex.h /usr/include/nan.h
+specifics.o: /usr/include/values.h /usr/include/memory.h
+specifics.o: /usr/include/string.h /usr/include/limits.h
+specifics.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+specifics.o: /usr/include/posix2_lim.h headers/libpnmrw.h
+specifics.o: /usr/include/malloc.h headers/ansi.h headers/general.h
+specifics.o: headers/mtypes.h headers/dct.h headers/frames.h
+specifics.o: headers/mheaders.h headers/bitio.h headers/frame.h
+specifics.o: headers/fsize.h headers/specifics.h headers/prototypes.h
+rate.o: /usr/include/sys/times.h /usr/include/features.h
+rate.o: /usr/include/sys/cdefs.h /usr/include/sys/types.h
+rate.o: /usr/include/linux/types.h /usr/include/asm/types.h
+rate.o: /usr/include/time.h /usr/include/linux/times.h headers/all.h
+rate.o: /usr/include/stdio.h /usr/include/libio.h /usr/include/_G_config.h
+rate.o: /usr/include/stdlib.h /usr/include/errno.h /usr/include/linux/errno.h
+rate.o: /usr/include/asm/errno.h /usr/include/alloca.h /usr/include/math.h
+rate.o: /usr/include/huge_val.h /usr/include/endian.h /usr/include/bytesex.h
+rate.o: /usr/include/nan.h /usr/include/values.h /usr/include/memory.h
+rate.o: /usr/include/string.h /usr/include/limits.h /usr/include/posix1_lim.h
+rate.o: /usr/include/linux/limits.h /usr/include/posix2_lim.h
+rate.o: headers/libpnmrw.h /usr/include/malloc.h headers/ansi.h
+rate.o: headers/general.h headers/mtypes.h headers/dct.h headers/bitio.h
+rate.o: headers/frames.h headers/mheaders.h headers/frame.h
+rate.o: headers/prototypes.h headers/param.h headers/fsize.h
+rate.o: headers/postdct.h headers/mpeg.h headers/parallel.h headers/rate.h
+opts.o: /usr/include/stdio.h /usr/include/libio.h /usr/include/_G_config.h
+opts.o: /usr/include/string.h /usr/include/features.h
+opts.o: /usr/include/sys/cdefs.h headers/opts.h headers/general.h
+opts.o: headers/ansi.h headers/mtypes.h headers/dct.h /usr/include/malloc.h
+opts.o: /usr/include/math.h /usr/include/huge_val.h /usr/include/endian.h
+opts.o: /usr/include/bytesex.h /usr/include/nan.h /usr/include/values.h
+iframe.o: /usr/include/sys/times.h /usr/include/features.h
+iframe.o: /usr/include/sys/cdefs.h /usr/include/sys/types.h
+iframe.o: /usr/include/linux/types.h /usr/include/asm/types.h
+iframe.o: /usr/include/time.h /usr/include/linux/times.h
+iframe.o: /usr/include/sys/param.h /usr/include/limits.h
+iframe.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+iframe.o: /usr/include/posix2_lim.h /usr/include/linux/param.h
+iframe.o: /usr/include/asm/param.h headers/all.h /usr/include/stdio.h
+iframe.o: /usr/include/libio.h /usr/include/_G_config.h /usr/include/stdlib.h
+iframe.o: /usr/include/errno.h /usr/include/linux/errno.h
+iframe.o: /usr/include/asm/errno.h /usr/include/alloca.h /usr/include/math.h
+iframe.o: /usr/include/huge_val.h /usr/include/endian.h
+iframe.o: /usr/include/bytesex.h /usr/include/nan.h /usr/include/values.h
+iframe.o: /usr/include/memory.h /usr/include/string.h headers/libpnmrw.h
+iframe.o: /usr/include/malloc.h headers/ansi.h headers/general.h
+iframe.o: headers/mtypes.h headers/dct.h headers/frames.h headers/mheaders.h
+iframe.o: headers/bitio.h headers/frame.h headers/prototypes.h headers/mpeg.h
+iframe.o: headers/param.h headers/fsize.h headers/parallel.h
+iframe.o: headers/postdct.h headers/rate.h headers/opts.h
+pframe.o: /usr/include/assert.h /usr/include/sys/param.h
+pframe.o: /usr/include/limits.h /usr/include/features.h
+pframe.o: /usr/include/sys/cdefs.h /usr/include/posix1_lim.h
+pframe.o: /usr/include/linux/limits.h /usr/include/posix2_lim.h
+pframe.o: /usr/include/linux/param.h /usr/include/asm/param.h
+pframe.o: /usr/include/sys/types.h /usr/include/linux/types.h
+pframe.o: /usr/include/asm/types.h headers/all.h /usr/include/stdio.h
+pframe.o: /usr/include/libio.h /usr/include/_G_config.h /usr/include/stdlib.h
+pframe.o: /usr/include/errno.h /usr/include/linux/errno.h
+pframe.o: /usr/include/asm/errno.h /usr/include/alloca.h /usr/include/math.h
+pframe.o: /usr/include/huge_val.h /usr/include/endian.h
+pframe.o: /usr/include/bytesex.h /usr/include/nan.h /usr/include/values.h
+pframe.o: /usr/include/memory.h /usr/include/string.h headers/libpnmrw.h
+pframe.o: /usr/include/malloc.h headers/ansi.h headers/general.h
+pframe.o: headers/mtypes.h headers/dct.h headers/bitio.h headers/frames.h
+pframe.o: headers/mheaders.h headers/frame.h headers/prototypes.h
+pframe.o: headers/param.h headers/fsize.h headers/postdct.h headers/mpeg.h
+pframe.o: headers/parallel.h headers/rate.h headers/opts.h
+bframe.o: headers/all.h /usr/include/stdio.h /usr/include/libio.h
+bframe.o: /usr/include/_G_config.h /usr/include/stdlib.h
+bframe.o: /usr/include/features.h /usr/include/sys/cdefs.h
+bframe.o: /usr/include/errno.h /usr/include/linux/errno.h
+bframe.o: /usr/include/asm/errno.h /usr/include/alloca.h /usr/include/math.h
+bframe.o: /usr/include/huge_val.h /usr/include/endian.h
+bframe.o: /usr/include/bytesex.h /usr/include/nan.h /usr/include/values.h
+bframe.o: /usr/include/memory.h /usr/include/string.h /usr/include/limits.h
+bframe.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+bframe.o: /usr/include/posix2_lim.h headers/libpnmrw.h /usr/include/malloc.h
+bframe.o: headers/ansi.h headers/general.h /usr/include/sys/param.h
+bframe.o: /usr/include/linux/param.h /usr/include/asm/param.h
+bframe.o: /usr/include/sys/types.h /usr/include/linux/types.h
+bframe.o: /usr/include/asm/types.h /usr/include/assert.h headers/mtypes.h
+bframe.o: headers/dct.h headers/bitio.h headers/frames.h headers/mheaders.h
+bframe.o: headers/frame.h headers/prototypes.h headers/fsize.h
+bframe.o: headers/param.h headers/postdct.h headers/rate.h headers/opts.h
+psearch.o: headers/all.h /usr/include/stdio.h /usr/include/libio.h
+psearch.o: /usr/include/_G_config.h /usr/include/stdlib.h
+psearch.o: /usr/include/features.h /usr/include/sys/cdefs.h
+psearch.o: /usr/include/errno.h /usr/include/linux/errno.h
+psearch.o: /usr/include/asm/errno.h /usr/include/alloca.h /usr/include/math.h
+psearch.o: /usr/include/huge_val.h /usr/include/endian.h
+psearch.o: /usr/include/bytesex.h /usr/include/nan.h /usr/include/values.h
+psearch.o: /usr/include/memory.h /usr/include/string.h /usr/include/limits.h
+psearch.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+psearch.o: /usr/include/posix2_lim.h headers/libpnmrw.h /usr/include/malloc.h
+psearch.o: headers/ansi.h headers/general.h headers/mtypes.h headers/dct.h
+psearch.o: headers/frames.h headers/mheaders.h headers/bitio.h
+psearch.o: headers/frame.h headers/search.h headers/prototypes.h
+psearch.o: headers/fsize.h headers/param.h
+bsearch.o: headers/all.h /usr/include/stdio.h /usr/include/libio.h
+bsearch.o: /usr/include/_G_config.h /usr/include/stdlib.h
+bsearch.o: /usr/include/features.h /usr/include/sys/cdefs.h
+bsearch.o: /usr/include/errno.h /usr/include/linux/errno.h
+bsearch.o: /usr/include/asm/errno.h /usr/include/alloca.h /usr/include/math.h
+bsearch.o: /usr/include/huge_val.h /usr/include/endian.h
+bsearch.o: /usr/include/bytesex.h /usr/include/nan.h /usr/include/values.h
+bsearch.o: /usr/include/memory.h /usr/include/string.h /usr/include/limits.h
+bsearch.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+bsearch.o: /usr/include/posix2_lim.h headers/libpnmrw.h /usr/include/malloc.h
+bsearch.o: headers/ansi.h headers/general.h headers/mtypes.h headers/dct.h
+bsearch.o: headers/frames.h headers/mheaders.h headers/bitio.h
+bsearch.o: headers/frame.h headers/search.h headers/fsize.h
+block.o: headers/all.h /usr/include/stdio.h /usr/include/libio.h
+block.o: /usr/include/_G_config.h /usr/include/stdlib.h
+block.o: /usr/include/features.h /usr/include/sys/cdefs.h
+block.o: /usr/include/errno.h /usr/include/linux/errno.h
+block.o: /usr/include/asm/errno.h /usr/include/alloca.h /usr/include/math.h
+block.o: /usr/include/huge_val.h /usr/include/endian.h /usr/include/bytesex.h
+block.o: /usr/include/nan.h /usr/include/values.h /usr/include/memory.h
+block.o: /usr/include/string.h /usr/include/limits.h
+block.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+block.o: /usr/include/posix2_lim.h headers/libpnmrw.h /usr/include/malloc.h
+block.o: headers/ansi.h headers/general.h headers/mtypes.h headers/dct.h
+block.o: headers/frames.h headers/mheaders.h headers/bitio.h headers/frame.h
+block.o: headers/prototypes.h headers/fsize.h headers/opts.h
+block.o: headers/postdct.h
+parallel.o: /usr/include/sys/types.h /usr/include/linux/types.h
+parallel.o: /usr/include/asm/types.h /usr/include/sys/socket.h
+parallel.o: /usr/include/features.h /usr/include/sys/cdefs.h
+parallel.o: /usr/include/linux/socket.h /usr/include/asm/socket.h
+parallel.o: /usr/include/linux/sockios.h /usr/include/linux/uio.h
+parallel.o: /usr/include/sys/times.h /usr/include/time.h
+parallel.o: /usr/include/linux/times.h /usr/include/netinet/in.h
+parallel.o: /usr/include/linux/in.h /usr/include/asm/byteorder.h
+parallel.o: /usr/include/unistd.h /usr/include/posix_opt.h
+parallel.o: /usr/include/gnu/types.h /usr/include/confname.h
+parallel.o: /usr/include/netdb.h /usr/include/paths.h /usr/include/errno.h
+parallel.o: /usr/include/linux/errno.h /usr/include/asm/errno.h
+parallel.o: /usr/include/string.h /usr/include/signal.h
+parallel.o: /usr/include/linux/signal.h /usr/include/asm/signal.h
+parallel.o: headers/all.h /usr/include/stdio.h /usr/include/libio.h
+parallel.o: /usr/include/_G_config.h /usr/include/stdlib.h
+parallel.o: /usr/include/alloca.h /usr/include/math.h /usr/include/huge_val.h
+parallel.o: /usr/include/endian.h /usr/include/bytesex.h /usr/include/nan.h
+parallel.o: /usr/include/values.h /usr/include/memory.h /usr/include/limits.h
+parallel.o: /usr/include/posix1_lim.h /usr/include/linux/limits.h
+parallel.o: /usr/include/posix2_lim.h headers/libpnmrw.h
+parallel.o: /usr/include/malloc.h headers/ansi.h headers/general.h
+parallel.o: headers/param.h headers/mpeg.h headers/mtypes.h headers/dct.h
+parallel.o: headers/frame.h headers/prototypes.h headers/parallel.h
+parallel.o: headers/bitio.h headers/readframe.h headers/fsize.h
+parallel.o: headers/combine.h headers/frames.h headers/mheaders.h
+jpeg.o: /usr/include/stdio.h /usr/include/libio.h /usr/include/_G_config.h
+jpeg.o: headers/all.h /usr/include/stdlib.h /usr/include/features.h
+jpeg.o: /usr/include/sys/cdefs.h /usr/include/errno.h
+jpeg.o: /usr/include/linux/errno.h /usr/include/asm/errno.h
+jpeg.o: /usr/include/alloca.h /usr/include/math.h /usr/include/huge_val.h
+jpeg.o: /usr/include/endian.h /usr/include/bytesex.h /usr/include/nan.h
+jpeg.o: /usr/include/values.h /usr/include/memory.h /usr/include/string.h
+jpeg.o: /usr/include/limits.h /usr/include/posix1_lim.h
+jpeg.o: /usr/include/linux/limits.h /usr/include/posix2_lim.h
+jpeg.o: headers/libpnmrw.h /usr/include/malloc.h headers/ansi.h
+jpeg.o: headers/general.h headers/mtypes.h headers/dct.h headers/frames.h
+jpeg.o: headers/mheaders.h headers/bitio.h headers/frame.h
+jpeg.o: headers/prototypes.h headers/param.h headers/readframe.h
+jpeg.o: headers/fsize.h headers/rgbtoycc.h headers/jpeg.h jpeg/jpeglib.h
+jpeg.o: jpeg/jconfig.h jpeg/jmorecfg.h
+main.o: /usr/include/assert.h headers/all.h /usr/include/stdio.h
+main.o: /usr/include/libio.h /usr/include/_G_config.h /usr/include/stdlib.h
+main.o: /usr/include/features.h /usr/include/sys/cdefs.h /usr/include/errno.h
+main.o: /usr/include/linux/errno.h /usr/include/asm/errno.h
+main.o: /usr/include/alloca.h /usr/include/math.h /usr/include/huge_val.h
+main.o: /usr/include/endian.h /usr/include/bytesex.h /usr/include/nan.h
+main.o: /usr/include/values.h /usr/include/memory.h /usr/include/string.h
+main.o: /usr/include/limits.h /usr/include/posix1_lim.h
+main.o: /usr/include/linux/limits.h /usr/include/posix2_lim.h
+main.o: headers/libpnmrw.h /usr/include/malloc.h headers/ansi.h
+main.o: headers/general.h headers/mtypes.h headers/dct.h headers/mpeg.h
+main.o: headers/frame.h headers/search.h headers/prototypes.h headers/param.h
+main.o: headers/parallel.h headers/bitio.h headers/readframe.h
+main.o: headers/combine.h headers/frames.h headers/mheaders.h headers/jpeg.h
+main.o: headers/specifics.h headers/opts.h /usr/include/time.h

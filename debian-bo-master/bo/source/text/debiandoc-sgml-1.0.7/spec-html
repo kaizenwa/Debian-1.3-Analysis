@@ -1,0 +1,394 @@
+# Hey Emacs !  This is -*- perl -*- source code !
+
+use SGMLS::Refs;
+
+%htmlsani= ('<','lt', '>','gt', '&','amp', '"','quot');
+
+sgml('start', sub {
+    $basename= @ARGV ? $ARGV[0] : ".";
+    if ($basename =~ s,/+$,,) {
+        $rootfile= 'index';
+        $prefix= '';
+        $writesubdir= "$basename/";
+        -d "$writesubdir" || mkdir("$basename",0777) ||
+            die "cannot make subdir \`$basename': $!\n";
+    } else {
+        $rootfile= '';
+        $prefix= "$basename-";
+        $writesubdir= '';
+    }
+});
+
+sgml('end', '');
+
+sgml('start_element', sub {
+    ($element,$event) = @_;
+    my $name= $element->name;
+    my $file= $event->file;
+    my $line= $event->line;
+    warn "unknown element $name at $file:$line\n" unless $unkwarndone{$name}++;
+});
+
+sgml('<DEBIANDOC>','');
+sgml('<NAME>','');
+sgml('<BOOK>','');
+
+sgml('<TITLEPAG>', sub {
+    startfile('');
+});
+
+sgml('</TITLEPAG>', sub {
+    htmlhead($title);
+    output("<h1>".squashmarkup($title)."</h1>\n\n");
+    output("<A name=\"abstract\"><h2>\n".
+           zeronum()."Abstract\n</h2></A>\n\n".
+           $abstract."\n<hr>\n") if defined($abstract);
+});
+
+sub htmlhead {
+    my ($pagetitle)=@_;
+    output("<title>".squashmarkup($pagetitle)."</title>\n");
+    output('<link rev=made href="mailto:'.sani_url($authoremail)."\">\n")
+        if defined($authoremail);
+    output("</head><body>\n");
+}
+
+sgml('<CHAPT>', sub {
+    ($element,$event) = @_;
+    startfile(a('SRID'));
+    $chaptheadnum= a('CHAPT');
+    $chapthname= a('HNAME');
+});
+
+sgml('</CHAPT>', sub {
+    finishfile();
+});
+
+sgml('<HEADING>', sub {
+    if (defined($chaptheadnum)) { push_output('string'); }
+});
+
+sgml('</HEADING>', sub {
+    if (defined($chaptheadnum)) {
+        my $chaptitle= pop_output();
+        htmlhead($title.' - '.squashmarkup($chaptitle));
+        output("<h1>\n".squashmarkup($title.' - '.$chapthname).
+               "<br>\n".squashmarkup($chaptitle)."\n</h1>\n");
+    } else {
+        output($headclose."\n");
+    }
+    $needpara=0;
+});
+
+sgml('<SECT>', sub { sect(2,@_); });
+sgml('<SECT1>', sub { sect(3,@_); });
+sgml('<SECT2>', sub { sect(4,@_); });
+sgml('<SECT3>', sub { sect(5,@_); });
+sgml('<SECT4>', sub { sect(6,@_); });
+
+sub sect {
+    ($hlevel,$element,$event) = @_;
+    output("<hr>\n<A name=\"".a('SRID')."\"><h$hlevel>\n".a('CHAPT').a('SECT').' ');
+    $headclose="\n</h$hlevel></A>";
+    undef $chaptheadnum;
+}
+
+sub hrefopen {
+    output('<A href="');
+    my $rfn= length($_[0]) ? "$prefix$_[0]" : $rootfile;
+    $rfn.= ".html";
+    output($rfn) if $rfn ne $currentfile;
+    output('#'.$_[1]) if length($_[1]);
+    output('"');
+    output(" $_[2]") if length($_[2]);
+    output('>');
+}
+
+sub startfile {
+    $cfilesrid= $_[0];
+    $currentfile= length($cfilesrid) ? "$prefix$cfilesrid" : $rootfile;
+    $currentfile.= ".html";
+    push_output('file',"$writesubdir$currentfile");
+    output("<html><head>\n");
+}
+
+sub finishfile {
+    output("<hr>\n");
+    output("$title\n");
+    if (defined($copyrightsummary)) {
+        output("- ");
+        hrefopen('',"copyright");
+        output($copyrightsummary);
+        output("</A>\n");
+    }
+    output("<br>\n");
+    hrefopen('','toc'); output('Contents</A>');
+    if (defined($abstract)) {
+        output('; '); hrefopen('','abstract'); output('abstract</A>');
+    }
+    if (defined($fchainsrid{$cfilesrid})) {
+        output('; '); hrefopen($fchainsrid{$cfilesrid},''); output('next</A>');
+    }
+    if (defined($bchainsrid{$cfilesrid})) {
+        output('; '); hrefopen($bchainsrid{$cfilesrid},''); output('back</A>');
+    }
+    output(".\n<br>\n");
+    output("<address>");
+    output("$version<br>\n") if length($version);
+    output(join("<br>\n",@authors),"</address>\n</body></html>");
+    pop_output;
+    $cfilesrid= $chaptsrid;
+    undef $ftpsite;
+#    print STDERR "finished file $currentfile\n";
+}
+
+sgml('<MANREF>', sub {
+    ($element,$event) = @_;
+    output('<code>'.a('NAME').'('.a('SECTION').')</code>');
+});
+
+sgml('<QREF>', sub {
+    ($element,$event) = @_;
+    if (a('LEVEL') eq 'CHAPT') { hrefopen(a('SRID'),''); }
+    else { hrefopen(a('CSRID'),a('SRID')); }
+});
+sgml('</QREF>','</A>');
+
+sgml('<REF>', sub {
+    ($element,$event) = @_;
+    my $level= a('LEVEL');
+    if ($level eq 'CHAPT') { hrefopen(a('SRID'),''); }
+    else { hrefopen(a('CSRID'),a('SRID')); }
+    $refhname= a('HNAME');
+});
+
+sgml('</REF>', sub {
+    output(", $refhname</A>");
+});
+
+sgml('<P>', sub {
+    ($element,$event) = @_;
+    output("<P>\n") if $needpara;
+    $needpara=0;
+});
+
+sgml('</P>', sub {
+    $needpara=1;
+});
+
+sub numlevel {
+    my ($d)= @_;
+    return 0 if $d =~ m/^CHAPT/;
+    return $1+1 if $d =~ m/^SECT(\d*)$/;
+    warn "unknown toc detail token \`$d'\n";
+}
+
+sgml('<TOC>', sub {
+    ($element,$event) = @_;
+    output("<A name=\"toc\"><h2>\n".
+           zeronum()."Table of contents\n".
+           "</h2></A>\n".
+           "<ul>\n");
+    $tocdetail= numlevel(a('DETAIL'));
+    $toclevel= 0;
+    undef $chainchapt;
+});
+
+sgml('<TOCENTRY>', sub {
+    ($element,$event) = @_;
+    my $level= numlevel(a('LEVEL'));
+    my $string= a('CHAPT').a('SECT');
+    if ($level>$tocdetail) {
+        push_output('nul'); $tocignore++;
+    } else {
+        if ($toclevel>$level) { output("</ul>\n"x($toclevel-$level)); }
+        elsif ($toclevel<$level) { output("<ul>\n"x($level-$toclevel)); }
+        output('<li>');
+        if (!$level) {
+            $chaptsrid= a('SRID');
+            if (length($chainchapt)) {
+                $fchainsrid{$chainchapt}= $chaptsrid;
+                $bchainsrid{$chaptsrid}= $chainchapt;
+            }
+            $chainchapt= $chaptsrid;
+            hrefopen($chaptsrid);
+            output($string.' ');
+        } else {
+            hrefopen($chaptsrid,a('SRID'));
+            output($string.'</A> ');
+        }
+        $toclevel= $level;
+    }
+});
+
+sgml('</TOCENTRY>', sub {
+    if ($tocignore) {
+        pop_output; $tocignore--;
+    } elsif ($toclevel) {
+        output("\n");
+    } else {
+        output("</A>\n");
+    }
+});
+
+sgml('</TOC>', sub {
+    output("</ul>\n"x($toclevel+1));
+    if (defined($copyright)) {
+        output("<hr><A name=\"copyright\"><h2>".zeronum()."Copyright</h2></A>\n".
+               "$copyrightsummary".
+               "$copyright");
+    }
+    finishfile();
+});
+
+sub zeronum { '0.'.++$czeronum.' '; }
+
+sgml('<AUTHOR>', sub { push_output('string'); $inauthor=1; });
+sgml('</AUTHOR>', sub { push(@authors,pop_output()); $inauthor=0; });
+sgml('<EMAIL>', sub { push_output('string'); $verbatim++; });
+sgml('</EMAIL>', sub {
+    my $tt= pop_output; $verbatim--;
+    $authoremail= $tt if $inauthor && !defined($authoremail);
+    output('<A href="mailto:'.sani_url($tt).'">'.sani_html($tt).'</A>');
+});
+sgml('<TITLE>', sub { push_output('string'); });
+sgml('</TITLE>', sub { $title= pop_output; });
+sgml('<VERSION>', sub { push_output('string'); });
+sgml('</VERSION>', sub { $version= pop_output.''; });
+sgml('<ABSTRACT>', sub { push_output('string'); });
+sgml('</ABSTRACT>', sub { $abstract= pop_output; });
+sgml('<COPYRIGHT>', sub { push_output('string'); });
+sgml('</COPYRIGHT>', sub { $copyright= pop_output; });
+sgml('<COPYRIGHTSUMMARY>', sub { push_output('string'); });
+sgml('</COPYRIGHTSUMMARY>', sub { $copyrightsummary= pop_output; $needpara=1; });
+sgml('<DATE>', sub { chop($date= `date '+%d %B %Y'`); $date =~ s/^0//; odata($date); });
+
+sgml('<FTPSITE>', sub { push_output('string'); $verbatim++; });
+sgml('<FTPPATH>', sub { push_output('string'); $verbatim++ });
+
+sgml('</FTPSITE>', sub {
+    $ftpsite= pop_output; $verbatim--;
+    output('<code>'.sani_html($ftpsite).'</code>');
+});
+
+sgml('</FTPPATH>', sub {
+    my $ftppath= pop_output; $verbatim--;
+    defined($ftpsite) ||
+        print(STDERR "FTPPATH \`$ftppath' without preceding FTPSITE\n");
+    output('<A href="ftp://'.sani_url($ftpsite).sani_url($ftppath).'"><code>'.
+           sani_html($ftppath).
+           '</code></A>');
+});
+
+sgml('<TT>', sub { output('<code>'); $intt++; });
+sgml('</TT>', sub { output('</code>'); $intt--; });
+sgml('<PRGN>','<kbd>');
+sgml('</PRGN>','</kbd>');
+sgml('<EM>','<em>');
+sgml('</EM>','</em>');
+sgml('<VAR>', sub { output($intt ? '</code><var>' : '<var>'); });
+sgml('</VAR>', sub { output($intt ? '</var><code>' : '</var>'); });
+
+sgml('<EXAMPLE>','<pre>');
+sgml('</EXAMPLE>','</pre>');
+
+sgml('<LIST>', sub { startlist('ul','li',@_); });
+sgml('<ENUMLIST>', sub { startlist('ol','li',@_); });
+sgml('<TAGLIST>', sub { startlist('dl','dd',@_); });
+sgml('</LIST>', sub { endlist(); });
+sgml('</ENUMLIST>', sub { endlist(); });
+sgml('</TAGLIST>', sub { endlist(); });
+sgml('<ITEM>', sub { output("<$itemtag>"); $needpara=0; });
+sgml('</ITEM>', sub { output('<p>') if !$lcompact; });
+sgml('<TAG>','<dt>');
+
+sub startlist {
+    push(@listtag,$listtag);
+    push(@itemtag,$itemtag);
+    push(@lcompact,$lcompact);
+    ($listtag,$itemtag,$element,$event) = @_;
+    $lcompact= $element->attribute('COMPACT')->type eq 'TOKEN';
+    output("<$listtag");
+    output(" compact") if $lcompact;
+    output(">\n");
+}
+
+sub endlist {
+    output("</$listtag>\n");
+    $listtag= pop(@listtag);
+    $itemtag= pop(@itemtag);
+}
+
+sgml('<FOOTNOTEREF>', sub {
+    ($element,$event) = @_;
+    my $num= a('NUMBER');
+    hrefopen('footnotes',$num,'name="fr'.$num.'"');
+    output("[$num]</A>");
+});
+
+sgml('<FOOTNOTES>', sub {
+    ($element,$event) = @_;
+    startfile('footnotes');
+    my $subdoctitle= $title." - footnotes";
+    htmlhead($subdoctitle);
+    output("<h1>".squashmarkup($subdoctitle)."</h1>\n");
+});
+
+sgml('cdata', sub { &odata; });
+sgml('sdata', sub { &odata; });
+
+sub odata {
+    ($data,$event) = @_;
+    output($verbatim ? $data: sani_html($data));
+}
+
+sgml('<FOOTNOTEBODY>', sub {
+    ($element,$event) = @_;
+    my $num= a('NUMBER');
+    output('<h2>');
+    hrefopen(a('CSRID'),"fr$num",'name="'.$num.'"');
+    output(a('NUMBER')."</A></h2>\n");
+});
+
+sgml('</FOOTNOTES>', sub {
+    finishfile;
+});
+
+#sub stripws {
+#    my ($in) = @_;
+#print STDERR "stripws\`$in'\n";
+#    $in =~ s/^\s+//; $out =~ s/\s+$//;
+#}
+
+sub a {
+    my $el= $element->attribute($_[0]);
+    return defined($el) ? $el->value : undef;
+}
+
+sub squashmarkup {
+    my ($in) = @_;
+    $in =~ s/\<[^<>]*\>//g;
+    $in;
+}
+
+sub sani_url {
+    my ($in) = @_;
+    my $out='';
+    while ($in =~ m,[^-0-9a-zA-Z./\@],) {
+        $out.= $`. sprintf("%%%02x",unpack("C",$&));
+        $in= $';
+    }
+    $out.= $in;
+    $out;
+}
+
+sub sani_html {
+    my ($in) = @_;
+    my $out='';
+    while ($in =~ m/[<>&"]/) {
+        $out.= $`. '&'. $htmlsani{$&}. ';';
+        $in=$';
+    }
+    $out.= $in;
+    $out;
+}

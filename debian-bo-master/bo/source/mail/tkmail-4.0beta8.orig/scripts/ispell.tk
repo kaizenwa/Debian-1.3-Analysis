@@ -1,0 +1,601 @@
+global tkisp
+set tkisp(ispell_lib) /usr/local/lib.shared/ispell-3.1
+set tkisp(binary) ispell
+set tkisp(version) 4.0beta7
+
+# $Header: /u/ra/raines/cvs/tk/tkmail2/ispell.tk,v 1.2 1995/09/07 16:24:23 raines Exp $
+###########################################################################
+#
+#   TkIspell -- A Tk/Tcl interface to Ispell
+#	    		by Paul Raines (raines@slac.stanford.edu)
+#
+#   Note: this package is known to work only with Ispell Version 3.0.x
+#	If your version of ispell does not output an initial version
+#	line when run as 'ispell -a',  set the global variable
+#	tkisp(have_new) above to 0. Making the wrong choice will make
+#	tkispell lose track of which corrections go for which words.
+#	Just run 'ispell -a' and see if a line is output. Type
+#	^D to quit it.
+#
+#   The ispell packages (3.0.x) can be found at ftp.cs.ucla.edu 
+#   (131.179.128.34) in the pub/ispell directory.
+#
+# INSTALLATION:
+#    (1) edit the variable tkisp(ispell_lib) to reflect the location
+#	of the ispell hash files.
+#    (2) if ispell is not in your path, you can set the full
+#	path using tkisp(binary) above.
+#   Note: using this packages requires that the utils.tk file
+#	has already been sourced.
+#
+# The following routines up to the "END OF ISPELL" message should
+# be useable in almost any Tk app that uses a text widget. Just
+# include a command the runs "tkispell_text textpathname" in your app.
+#
+# Running tkispell_text will bring up a toplevel window with buttons
+# to start, quit, etc.  Help message will appear on bottom line
+# of the window.  You can manually enter a correction in the
+# entry widget and press <Return> to replace it in the text widget.
+# A listbox will show Ispell's guesses.  You can click once on
+# a word to put it in the entry widget or double click to replace.
+#
+# The Settings button will popup a menu for setting the behavior
+# of TkIspell. You can toggle between TeX and normal T/Nroff mode.
+# You can tell TkIspell whether to start at the top of the
+# file or at the cursor. You can set whether a corrected word is
+# corrected automatically throught the rest of the text or not.
+# The defaults are T/Nroff, top, and no automatic correction. It is
+# possible to pass default settings to the tkispell_text procedure.
+# How to do this should be evident to the programmer by looking
+# at the code below. TkIspell doesn't remember settings from call
+# to call.
+#
+# Until you press Start, you can still go back to the text widget
+# and edit text and change the cursor position.
+#
+# To quickly start spell checking from the current cursor
+# position without going through the settings dialog,  press the
+# right mouse button on the Start button.
+#
+# Once you have started spell checking, you will not be able
+# to edit in the text widget or change TkIspell's settings.
+# The Start button becomes a Stop button in order to stop
+# checking before the end of file.  When checking is stopped,
+# you will be asked whether you wish to make your changes
+# permanent. Press OK to accept them or Cancel to undo them.
+# You can also press Quit while spell checking to quickly
+# exit.
+#
+# TODO:
+#   Have a mode to quickly check one word only
+#   Do something about clicking in listbox below last item
+#   Implement a special search/replace mode
+#   Implement a user definables
+#   Add support for ispell 4.0 from GNU
+#
+# COPYRIGHT:
+#	Copyright 1993 by Paul Raines (raines@slac.stanford.edu)
+#
+#	Permission to use, copy, modify, and distribute this
+#	software and its documentation for any purpose and without
+#	fee is hereby granted, provided that the above copyright
+#	notice appear in all copies.  The University of Pennsylvania
+#	makes no representations about the suitability of this
+#	software for any purpose.  It is provided "as is" without
+#	express or implied warranty.
+#
+#
+# DISCLAIMER:
+#	UNDER NO CIRCUMSTANCES WILL THE AUTHOR OF THIS SOFTWARE OR THE
+#	UNIVERSITY OF PENNSYLVANIA BE RESPONSIBLE FOR ANY DIRECT OR
+#	INCIDENTAL DAMAGE ARISING FROM THE USE OF THIS SOFTWARE AND ITS
+#	DOCUMENTATION. THE SOFTWARE HEREIN IS PROVIDED "AS IS" WITH NO
+#	IMPLIED OBLIGATION TO PROVIDE SUPPORT, UPDATES, OR MODIFICATIONS.
+#
+# HISTORY:
+#  v1.0
+#   93-04-22	initial creation
+#
+#  v1.1
+#   93-04-23	corrected first word in file bug
+#		instructed users how to comment out ispell version read
+#		put in a window title
+#		fixed error in case statement
+#
+#  v1.2
+#   93-04-24    added file selection box
+#   93-04-24	removed need for initial file
+#   93-05-03	major change to send text to ispell line by line
+#		Ignore button now disabled when not in middle of checking
+#		tkispell uses own special tag isp_sel in text widget
+#		Added settings popup for TeX, dictionary, start point
+#
+#  v1.3
+#   93-05-13	Added use of message bar for reading/saving files in editor
+#   93-05-14	Renamed all procedures to start with tkisp.
+#		Implemented parsing of first letter of line instead of
+#		just putting a space in front of the line.
+#		Put in Save As button with protection using fileselect and
+#		tkgetokay.
+#		Added new settings menu to replace settings popup.
+#		Added ability to correct occurance of misspelled word
+#		after the first one automatically.
+#		Made Start become a Stop button when running checker.
+#		Added undo ability. To keep it from becoming confused
+#		I had to grab control while spell checking runs.
+#
+#  v1.4
+#   93-05-30    Moved tkisp_ procedures into own file ispell.tk
+#   93-08-16    Added several flush command just in case
+#
+# v1.4 p1
+#   93-09-02    Added tkisp(version) variable
+#		Added toplevel class TkIspell
+#
+# v1.4 p2
+#   93-10-04    changed from putting a space at the beginning of lines with
+#		a special character to using the '^' symbol (thanks to
+#		Rob Malouf)
+#   93-10-07    changed case statement to if..elseif..else to be compatible
+#		with tcl7.0
+#
+# v2.0
+#   94-12-08    Added binary and adj-offset
+#		Changed to new pack command
+#
+# See the tkmail ChangeLog file for further history info
+#
+# Please mail any suggestion, bugs, whines to raines@slac.stanford.edu
+# The lastest version is available by anonymous ftp at
+#	ftp.slac.stanford.edu:software/TkMail/tkispell.tar.gz
+#
+
+# Dynamically determine operation of ispell on first source of library
+set tkisp(have_new) 1
+set tkisp(adj_offset) 1
+set tkisp(heading) "ispell (version unknown)"
+proc tkisp_check_version {} {
+  global tkisp
+  if [catch {exec $tkisp(binary) -a << "!\n^it is wrong to type corectly\n\x04"} res] {
+    error "Cannot execute ispell program: $res"
+  } else {
+    set tkisp(have_new) [expr "[string first @ $res] == 0"]
+    set tkisp(adj_offset) [expr "[string first " 21:" $res] > 0"]
+    if $tkisp(have_new) {
+      set tkisp(heading) [lindex [split $res \n] 0]
+      set tkisp(heading) [string range $tkisp(heading) \
+			      [string first "Isp" $tkisp(heading)] end]
+    } else {
+      set tkisp(heading) "ispell (version unknown)"
+    }
+  }
+}
+
+proc tkisp_get_dict {sp type} {
+    global tkisp
+
+    if {$type=="main"} {
+	set dict [ut:getstr -prompt {Main Dictionary:} \
+	    -default $tkisp(set,dict)]
+	if {![string length $dict]} {return}
+	if {$dict=="default"} {set tkisp(set,dict) default; return}
+    } else {
+	set dict [ut:getstr -prompt {Personal Dictionary:} \
+	    -default $tkisp(set,pdict)]
+	if {[string length $dict]} {set tkisp(set,pdict) $dict}
+	return
+    }
+    if {[tkisp_check_dict $dict]} {
+	set tkisp(set,dict) $dict
+    } else {
+	if {[ut:getok -master $sp \
+		 -prompt "Main Dictionary not found. Use default?"]} {
+	    set tkisp(set,dict) default
+	}
+    }
+}
+
+proc tkisp_check_dict {dict} {
+    global tkisp
+    if {[file exists $dict] || [file exists ${dict}.hash] || \
+	[file exists $tkisp(ispell_lib)/$dict] || \
+	[file exists $tkisp(ispell_lib)/${dict}.hash]} {
+	return 1
+    } else {
+	return 0
+    }
+}
+
+proc tkisp_quit {sp tw} {
+    global tkisp
+
+    if {![winfo exists $tw]} { destroy $sp; return }
+
+    if {$tkisp(running) && [llength $tkisp(undolist)]} {
+	tkisp_at_eof $sp $tw
+    }
+
+    $tw tag delete isp_sel
+    $tw mark unset isp_mark
+    catch "close $tkisp(fid)" res
+    set tkisp(fid) {}
+    destroy $sp
+
+}
+
+proc tkisp_undo_changes {tw} {
+    global tkisp
+
+    foreach uline $tkisp(undolist) {
+	set wstart [lindex $uline 1]
+	$tw insert [lindex $uline 2] [lindex $uline 0]
+	$tw delete $wstart [lindex $uline 2]
+    }
+}
+
+
+proc tkisp_at_eof {sp tw} {
+    global tkisp
+
+    set tkisp(running) 0
+    grab release $sp
+    after 200 $sp.b1.start configure -text Start \
+	-command \"tkisp_start_check $sp $tw\"
+    bind $sp.b1.start <Enter> "[bind Button <Any-Enter>]"
+    bind $sp.b1.start <Enter> "+$sp.hlp configure -text {Start (restart) spell checking}"
+    $sp.b1.set configure -state normal
+    $sp.b2.ignore configure -state disabled
+    $sp.b2.add configure -state disabled
+    $sp.b2.accept configure -state disabled
+    $sp.rf.word configure -state disabled
+    $sp.rf.word delete 0 end
+    $sp.lf.list delete 0 end
+    $tw tag remove isp_sel 0.0 end
+
+    set tmgs "Make changes ([llength $tkisp(undolist)]) to file permanent?"
+    if {[llength $tkisp(undolist)]} {
+	if {![ut:getok -master $sp -prompt $tmgs -nolabel "No"]} {
+	    tkisp_undo_changes $tw
+	}
+    } else {
+      bell
+    }
+    set tkisp(undolist) ""
+    $sp.msg configure -text $tkisp(heading)
+}
+
+# keep moving insertion cursor forward thru words
+# until eof or misspelled word found
+proc tkisp_next_check {sp tw} {
+    global tkisp
+
+    $sp.msg configure -text "Checking..."
+    update idletasks
+    set okay 1
+    set fid $tkisp(fid)
+    $sp.rf.word delete 0 end
+    $sp.lf.list delete 0 end
+    while {$okay} {
+
+        flush stdout
+	flush $fid
+	set cnt [gets $fid line]
+	if {$cnt == 0} {
+	    set okay 1
+	    set lastm [$tw index "isp_mark linestart"]
+	    $tw mark set isp_mark "isp_mark + 1 lines linestart"
+	    if {$lastm ==  [$tw index isp_mark]} {
+		$sp.msg configure -text "End of file"
+		tkisp_at_eof $sp $tw
+		return 0
+	    }
+	    set tkisp(set,repoff) 0
+	    set sline "^[$tw get isp_mark {isp_mark lineend}]"
+	    puts $fid $sline
+	    flush $fid
+	} else {
+	    set okay 0
+	    $sp.msg configure -text "Processing..."
+	    $tw mark set isp_mark "isp_mark linestart"
+	    $tw tag remove isp_sel 0.0 "isp_mark lineend"
+	    set cch [string index $line 0]
+	    if {$cch == "?" || $cch == "&"} {
+		    set word [lindex $line 1]
+		    $sp.msg configure -text "$word not found"
+		    set sstart [expr [string first ":" $line]+2]
+		    foreach wd [split [string range $line $sstart end] ,] {
+		        $sp.lf.list insert end [string trim $wd]
+		    }
+		    set offset [lindex [string range $line 0 [expr $sstart-3]] 3]
+	    } elseif {$cch == "#"} {
+		    set word [lindex $line 1]
+		    $sp.msg configure -text "$word not found. No suggestions"
+		    set offset [lindex $line 2]
+	    } else {
+		    $sp.msg configure -text "Ispell Parse Error($cnt): $line"
+		    return
+	    }
+	    set offset [expr $offset+$tkisp(set,repoff)]
+	    if $tkisp(adj_offset) {incr offset -1}
+	    set wlen [string length $word]
+	    $tw tag add isp_sel "isp_mark + $offset c" \
+		"isp_mark + $offset c + $wlen c"
+	    if {$tkisp(set,crtall)} {
+		set wndx [lsearch $tkisp(crtall,old) $word]
+		if {$wndx!=-1} {
+		    set nword [lindex $tkisp(crtall,new) $wndx]
+		    tkisp_do_replace $tw $nword
+		    $sp.lf.list delete 0 end
+		    set okay 1
+		}
+	    }
+	}
+	$tw yview -pickplace isp_mark
+    }
+}
+
+# copy listbox selection to entry
+proc tkisp_set_replace {sp list y} {
+    $list selection anchor [$list nearest $y]
+    $sp.rf.word delete 0 end
+    set curs [$list curselection]
+    if {[string length $curs]} {$sp.rf.word insert 0 [$list get $curs]}
+}
+
+# replace word in text with string in entry
+proc tkisp_replace_it {sp tw} {
+    global tkisp
+
+    set wd [$sp.rf.word get]
+    if {[string length $wd] == 0} return
+
+    tkisp_do_replace $tw $wd
+
+    tkisp_next_check $sp $tw
+}
+
+# do the actually replacement in the widget
+proc tkisp_do_replace {tw wd} {
+    global tkisp
+
+    set wstart [lindex [$tw tag ranges isp_sel] 0]
+    set wend [lindex [$tw tag ranges isp_sel] 1]
+
+    set owd [$tw get $wstart $wend]
+    $tw insert $wend $wd
+    $tw delete $wstart $wend
+
+    # now the coordinates are all upset, so lets set repoff
+    set tkisp(set,repoff) [expr "$tkisp(set,repoff) + [string length $wd] - \
+	[string length $owd]"]
+
+    if {$tkisp(set,crtall)} {
+	lappend tkisp(crtall,new) $wd
+	lappend tkisp(crtall,old) $owd
+    }
+
+    set wend [$tw index "$wstart + [string length $wd] c"]
+    set tkisp(undolist) [linsert $tkisp(undolist) 0 "$owd $wstart $wend"]
+}
+
+# accept word for rest of document, don't add to dictionary
+proc tkisp_accept_check {sp tw} {
+    global tkisp
+    set wstart [lindex [$tw tag ranges isp_sel] 0]
+    set wend [lindex [$tw tag ranges isp_sel] 1]
+    puts $tkisp(fid) "@[$tw get $wstart $wend]"
+    flush $tkisp(fid)
+}
+
+# accept word for rest of document, add to dictionary
+proc tkisp_add_check {sp tw} {
+    global tkisp
+    set wstart [lindex [$tw tag ranges isp_sel] 0]
+    set wend [lindex [$tw tag ranges isp_sel] 1]
+    puts $tkisp(fid) "*[$tw get $wstart $wend]"
+    flush $tkisp(fid)
+}
+
+# goto beginning of file and start check
+proc tkisp_start_check {sp tw} {
+    global tkisp
+
+    $tw tag remove isp_sel 0.0 end
+    if {$tkisp(set,start)} {
+	$tw mark set isp_mark $tkisp(set,twtop)
+    } else {
+	$tw mark set isp_mark "insert wordstart"
+    }
+
+    set cmd "|$tkisp(binary) -a $tkisp(set,addopts)"
+    if {![string match default $tkisp(set,dict)]} {
+	if {[tkisp_check_dict $tkisp(set,dict)]} {
+	    lappend cmd -d $tkisp(set,dict)
+	} else {
+	    $sp.msg configure -text "$tkisp(set,dict) not found"
+	    return 0
+	}
+    }
+    if {![string match default $tkisp(set,pdict)]} {
+	lappend cmd -p $tkisp(set,pdict)
+    }
+    if {$tkisp(set,tex)} {lappend cmd -t}
+
+    if [string length $tkisp(fid) ] {
+      catch "close $tkisp(fid)" res
+      if {[string length $res]} {puts stderr $res}
+    }
+    set fid [set tkisp(fid) [open $cmd r+]]
+
+    if {$tkisp(have_new)} {
+        flush stdout
+	flush $fid
+	gets $fid line
+    }
+
+    # put ispell in terse mode
+    puts $fid "!"
+    flush $fid
+
+    after 200 grab $sp
+    set tkisp(running) 1
+    after 200 $sp.b1.start configure -text Stop \
+	-command \"tkisp_at_eof $sp $tw\"
+    bind $sp.b1.start <Enter> "[bind Button <Any-Enter>]"
+    bind $sp.b1.start <Enter> "+$sp.hlp configure -text {Stop spell checking}"
+    $sp.b1.set configure -state disabled
+    $sp.b2.ignore configure -state normal
+    $sp.b2.add configure -state normal
+    $sp.b2.accept configure -state normal
+    $sp.rf.word configure -state normal
+
+    # put first line of text on queue
+    set tkisp(set,repoff) 0
+    set sline "^[$tw get isp_mark {isp_mark lineend}]"
+    puts $fid $sline
+    flush $fid
+    tkisp_next_check $sp $tw
+}
+
+# main ispell routine
+proc tkispell_text { tw {dset "default 0 1 default 0 {}"} \
+			 {binary {}} {twtop 1.0}} {
+
+# tw	    - the text widget with text to spell check
+# dset	    - default settings in the ORDER listed below
+# binary    - location of ispell binary
+# twtop	    - location of "top" of text widget
+
+    global tkisp
+    set tkisp(set,dict) [lindex $dset 0]
+    set tkisp(set,tex) [lindex $dset 1]
+    set tkisp(set,start) [lindex $dset 2]
+    set tkisp(set,pdict) [lindex $dset 3]
+    set tkisp(set,crtall) [lindex $dset 4]
+    set tkisp(set,addopts) [lindex $dset 5]
+    set tkisp(set,twtop) $twtop
+
+    if {[string length $binary]} {
+      set tkisp(binary) $binary 
+    }
+    tkisp_check_version
+
+    #non-settables
+    set tkisp(set,repoff) 0
+    set tkisp(undolist) ""
+    set tkisp(crtall,old) ""
+    set tkisp(crtall,new) ""
+    set tkisp(running) 0
+    set tkisp(fid) {}
+
+    set sp .tsw
+    toplevel $sp -class TkIspell
+    wm minsize $sp 100 100
+    wm title $sp "TkIspell $tkisp(version)"
+
+    # create a special tag and mark for ispell
+    $tw tag configure isp_sel -background lightskyblue -relief raised
+    $tw mark set isp_mark 0.0
+
+    message $sp.msg -width 300 -text "$tkisp(heading)"
+    message $sp.hlp -width 300 -text "Put mouse on key for help"
+
+    frame $sp.b1
+    button $sp.b1.start -text Start -command "tkisp_start_check $sp $tw" -width 10
+    button $sp.b1.quit -text Quit -command "tkisp_quit $sp $tw" -width 10
+
+    menubutton $sp.b1.set -text "Settings" -menu $sp.b1.set.menu \
+	-height [$sp.b1.quit cget -height] -width 10 \
+	-relief raised -bd 2 -padx 10p -pady 4p -highlightthickness 2 -anchor c
+
+    menu $sp.b1.set.menu
+    $sp.b1.set.menu add check -label "TeX Mode" -variable tkisp(set,tex)
+    $sp.b1.set.menu add check -label "Start at Top" -variable tkisp(set,start)
+    $sp.b1.set.menu add check -label "Correct All" -variable tkisp(set,crtall)
+    $sp.b1.set.menu add separator
+    $sp.b1.set.menu add command -label "Main Dictionary ..." \
+	-command "tkisp_get_dict $sp main"
+    $sp.b1.set.menu add command -label "Personal Dictionary ..." \
+	-command "tkisp_get_dict $sp pers"
+
+
+    # clicking Start with right button starts checkin at cursor position
+    bind $sp.b1.start <3> "set tkisp(set,start) 0; tkisp_start_check $sp $tw"
+
+    pack $sp.b1.start $sp.b1.set $sp.b1.quit \
+	-side left -padx 2 -pady 2
+
+    frame $sp.b2
+    button $sp.b2.ignore -text Ignore -state disabled \
+	 -command "tkisp_next_check $sp $tw" -width 10
+    button $sp.b2.accept -text Accept -state disabled \
+	 -command "tkisp_accept_check $sp $tw; tkisp_next_check $sp $tw" -width 10
+    button $sp.b2.add -text Add -state disabled \
+	 -command "tkisp_add_check $sp $tw; tkisp_next_check $sp $tw" -width 10
+
+    # help message with mouse entering button
+    # the <Any-Enter>s preserve defaults
+    bind $sp.b1.start <Enter> "[bind Button <Any-Enter>]"
+    bind $sp.b1.start <Enter> "+$sp.hlp configure -text {Start (restart) spell checking}"
+    bind $sp.b1.start <Leave> "[bind Button <Any-Leave>]"
+    bind $sp.b1.start <Leave> "+$sp.hlp configure -text {}"
+    bind $sp.b1.set <Enter> "[bind Menubutton <Any-Enter>]"
+    bind $sp.b1.set <Enter> "+$sp.hlp configure -text {Menu for TkIspell settings}"
+    bind $sp.b1.set <Leave> "[bind Menubutton <Any-Leave>]"
+    bind $sp.b1.set <Leave> "+$sp.hlp configure -text {}"
+    bind $sp.b1.quit <Enter> "[bind Button <Any-Enter>]"
+    bind $sp.b1.quit <Enter> "+$sp.hlp configure -text {Quit spell checker}"
+    bind $sp.b1.quit <Leave> "[bind Button <Any-Leave>]"
+    bind $sp.b1.quit <Leave> "+$sp.hlp configure -text {}"
+    bind $sp.b2.ignore <Enter> "[bind Button <Any-Enter>]"
+    bind $sp.b2.ignore <Enter> "+$sp.hlp configure -text {Ignore this word for now}"
+    bind $sp.b2.ignore <Leave> "[bind Button <Any-Leave>]"
+    bind $sp.b2.ignore <Leave> "+$sp.hlp configure -text {}"
+    bind $sp.b2.accept <Enter> "[bind Button <Any-Enter>]"
+    bind $sp.b2.accept <Enter> "+$sp.hlp configure -text {Accept word for rest of file}"
+    bind $sp.b2.accept <Leave> "[bind Button <Any-Leave>]"
+    bind $sp.b2.accept <Leave> "+$sp.hlp configure -text {}"
+    bind $sp.b2.add <Enter> "[bind Button <Any-Enter>]"
+    bind $sp.b2.add <Enter> "+$sp.hlp configure -text {Insert word in private dictionary}"
+    bind $sp.b2.add <Leave> "[bind Button <Any-Leave>]"
+    bind $sp.b2.add <Leave> "+$sp.hlp configure -text {}"
+
+
+    pack $sp.b2.ignore $sp.b2.accept $sp.b2.add \
+	-side left -padx 2 -pady 2
+
+    frame $sp.rf
+    label $sp.rf.lbl -text "Replace with:"
+    entry $sp.rf.word -relief sunken -state disabled
+    bind $sp.rf.word <Return> "tkisp_replace_it $sp $tw"
+    bind $sp.rf.word <Enter> "+$sp.hlp configure -text {Press <Return> to replace with entry}"
+    bind $sp.rf.word <Leave> "+$sp.hlp configure -text {}"
+
+    pack $sp.rf.lbl -side left
+    pack $sp.rf.word -side left -fill x -expand true -padx 6 -pady 8
+
+    frame $sp.lf
+    scrollbar $sp.lf.yscroll \
+	-command "$sp.lf.list yview" \
+	-relief raised
+    listbox $sp.lf.list \
+	-yscrollcommand "$sp.lf.yscroll set" \
+	-relief raised -selectmode single
+
+    bind $sp.lf.list <1> "tkisp_set_replace $sp %W %y"
+    bind $sp.lf.list <Double-1> "tkisp_set_replace $sp %W %y; tkisp_replace_it $sp $tw"
+    bind $sp.lf.list <Enter> "+$sp.hlp configure -text {Double-click to replace with word}"
+    bind $sp.lf.list <Leave> "+$sp.hlp configure -text {}"
+
+    pack $sp.lf.yscroll -side left -fill y
+    pack $sp.lf.list -side left -expand true -fill both
+
+
+    pack $sp.msg $sp.b1 $sp.b2 $sp.rf -side top -fill x
+    pack $sp.lf -side top -expand true -fill both
+    pack $sp.hlp -side top -fill x
+
+    focus $sp
+
+}
+

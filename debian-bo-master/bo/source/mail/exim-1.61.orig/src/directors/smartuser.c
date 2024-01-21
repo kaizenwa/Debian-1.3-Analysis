@@ -1,0 +1,231 @@
+/*************************************************
+*     Exim - an Internet mail transport agent    *
+*************************************************/
+
+/* Copyright (c) University of Cambridge 1995 - 1997 */
+/* See the file NOTICE for conditions of use and distribution. */
+
+
+#include "../exim.h"
+#include "smartuser.h"
+
+
+
+/* Options specific to the smartuser director. */
+
+optionlist smartuser_director_options[] = {
+  { "new_address", opt_stringptr,
+      (void *)(offsetof(smartuser_director_options_block, new_address)) },
+  { "panic_expansion_fail", opt_bool,
+      (void *)(offsetof(smartuser_director_options_block, panic_expansion_fail)) }
+};
+
+/* Size of the options list. An extern variable has to be used so that its
+address can appear in the tables drtables.c. */
+
+int smartuser_director_options_count =
+  sizeof(smartuser_director_options)/sizeof(optionlist);
+
+/* Default private options block for the smartuser director. */
+
+smartuser_director_options_block smartuser_director_option_defaults = {
+  NULL,         /* new_address */
+  TRUE          /* panic_expansion_fail */
+};
+
+
+
+/*************************************************
+*          Initialization entry point            *
+*************************************************/
+
+/* Called for each instance, after its options have been read, to
+enable consistency checks to be done, or anything else that needs
+to be set up.
+
+Argument: points to the director instance block
+Returns:  nothing
+*/
+
+void
+smartuser_director_init(director_instance *dblock)
+{
+smartuser_director_options_block *ob =
+  (smartuser_director_options_block *)(dblock->options_block);
+
+/* If no transport is specified, a new user *must* be given. */
+
+if (dblock->transport == NULL)
+  {
+  if (ob->new_address == NULL)
+    log_write(0, LOG_PANIC_DIE|LOG_CONFIG2, "%s director:\n  "
+      "neither transport nor new_address specified", dblock->name);
+  }
+
+/* A new address must be fully qualified, but can check here only if
+it isn't going to expand. */
+
+if (ob->new_address != NULL && strchr(ob->new_address, '$') == NULL &&
+  strchr(ob->new_address, '@') == NULL)
+    log_write(0, LOG_PANIC_DIE|LOG_CONFIG2, "%s director:\n  "
+      "new address has no domain", dblock->name);
+}
+
+
+
+/*************************************************
+*              Main entry point                  *
+*************************************************/
+
+/* See local README for interface description. */
+
+int
+smartuser_director_entry(
+  director_instance *dblock,      /* data for this instantiation */
+  address_item *addr,             /* address we are working on */
+  address_item **addr_local,      /* add it to this if it's local */
+  address_item **addr_remote,     /* add it to this if it's remote */
+  address_item **addr_new,        /* put new addresses on here */
+  address_item **addr_succeed,    /* put finished with addresses here */
+  BOOL verify)                    /* TRUE when verifying */
+{
+smartuser_director_options_block *ob =
+  (smartuser_director_options_block *)(dblock->options_block);
+char *new_address = NULL;
+char *errmess = NULL;
+int start, end, domain;
+
+/* Do file existence tests */
+
+switch (match_exists(dblock->require_files))
+  {
+  case FAIL:
+  DEBUG(9) debug_printf("%s director skipped: file existence failure\n",
+    dblock->name);
+  return FAIL;
+
+  case DEFER:
+  addr->message = string_sprintf("file existence defer in %s director: %s",
+    dblock->name, strerror(errno));
+  return DEFER;
+  }
+
+DEBUG(2) debug_printf("%s director called for %s\n", dblock->name, addr->orig);
+
+/* This director always matches the local address. */
+
+addr->director = dblock;
+
+/* If a new address was specified, expand it and check that its syntax is
+valid. */
+
+if (ob->new_address != NULL)
+  {
+  char *raw_new_address = expand_string(ob->new_address);
+
+  /* Expansion failure is either a panic or a director fail, according
+  to an option. A forced fail in the expansion is always soft. */
+
+  if (raw_new_address == NULL)
+    {
+    if (ob->panic_expansion_fail && !expand_string_forcedfail)
+      {
+      log_write(0, LOG_MAIN|LOG_PANIC_DIE, "Expansion of %s in %s director "
+        "failed: %s", ob->new_address, dblock->name, expand_string_message);
+      }
+    else
+      {
+      DEBUG(4) debug_printf("expansion of %s in %s director failed: %s\n",
+        ob->new_address, dblock->name, expand_string_message);
+      DEBUG(2) debug_printf("%s director failed for %s\n", dblock->name,
+        addr->local_part);
+      return FAIL;
+      }
+    }
+
+  /* Malformed new address or domainless address causes freezing */
+
+  new_address = parse_extract_address(raw_new_address, &errmess, &start,
+    &end, &domain, FALSE);
+
+  if (new_address == NULL || domain == 0)
+    {
+    addr->basic_errno = ERRNO_BADADDRESS2;
+    if (errmess == NULL) errmess = "missing domain";
+    addr->message =
+      string_sprintf("<%s> - bad address generated by %s director: %s\n",
+      raw_new_address, dblock->name, errmess);
+    addr->errors_address = errors_address;
+    addr->special_action = SPECIAL_FREEZE;
+    return ERROR;
+    }
+
+  new_address = rewrite_address(new_address, TRUE, FALSE);
+  }
+
+
+/* If a transport is configured, queue the address for that transport,
+changing the address if required. */
+
+if (dblock->transport != NULL)
+  {
+  addr->transport = dblock->transport;
+
+  /* Handle local transport */
+
+  if (addr->transport->info->local)
+    {
+    addr->next = *addr_local;
+    *addr_local = addr;
+    if (new_address != NULL)
+      {
+      addr->local_part = string_copyn(new_address, domain);
+      addr->domain = new_address + domain;
+      }
+    }
+
+  /* Handle remote transport */
+
+  else
+    {
+    addr->next = *addr_remote;
+    *addr_remote = addr;
+    if (new_address != NULL)
+      {
+      addr->local_part = new_address;
+      addr->domain = new_address + domain;
+      }
+    }
+
+  DEBUG(2) debug_printf("  queued for %s transport with local_part: %s\n",
+    dblock->transport->name, addr->local_part);
+  }
+
+/* Otherwise the new_address field must be set (this is checked in the init
+function). Create a new address, copying the parent's errors address and or-ing
+the ignore_error flag, and set the parent's child count. Put the parent onto
+the succeed chain so that any retry item attached to it gets processed. */
+
+else
+  {
+  address_item *new_addr = deliver_make_addr(new_address);
+  new_addr->next = *addr_new;
+  new_addr->errors_address = addr->errors_address;
+  new_addr->ignore_error |= addr->ignore_error;
+  *addr_new = new_addr;
+  new_addr->parent = addr;
+  addr->child_count++;
+  addr->next = *addr_succeed;
+  *addr_succeed = addr;
+
+  DEBUG(2) debug_printf("  generated new address: %s%s%s%s\n",
+    new_addr->orig,
+    (new_addr->errors_address != NULL)? " (errors to " : "",
+    (new_addr->errors_address != NULL)? new_addr->errors_address : "",
+    (new_addr->errors_address != NULL)? ")" : "");
+  }
+
+return OK;
+}
+
+/* End of directors/smartuser.c */

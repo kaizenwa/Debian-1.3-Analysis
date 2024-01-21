@@ -1,0 +1,313 @@
+#! /bin/sh
+#
+# boot		boot-time system configuration.
+#
+# Version:	@(#)boot  2.10  26-Apr-1997  miquels@cistron.nl
+#
+#		Copyright (C) 1994-1997 Debian Association, Inc.
+#		Written by Ian Murdock <imurdock@gnu.ai.mit.edu>
+#		       and Miquel van Smoorenburg <miquels@cistron.nl>
+#
+
+#
+# This script desperately needs to parse a config file
+# (like /etc/default/boot) instead of having to edit it directly!
+#
+
+# Time files in /tmp are kept.
+TMPTIME=0
+# Set to yes if you want sulogin to be spawned on bootup
+SULOGIN=no
+# Set to no if you want to be able to login over telnet/rlogin
+# before system startup is complete (as soon as inetd is started)
+DELAYLOGIN=yes
+# Set GMT="-u" if your system clock is set to GMT, and GMT="" if not.
+GMT="-u"
+# Set VERBOSE to "no" if you would like a more quiet bootup.
+VERBOSE=yes
+# Set EDITMOTD to "no" if you don't want /etc/motd to be editted automatically
+EDITMOTD=yes
+
+PATH=/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin
+umask 022
+export PATH VERBOSE
+
+if [ -x /sbin/unconfigured.sh ]
+then
+  /sbin/unconfigured.sh
+fi
+
+#
+# Trap CTRL-C &c only in this shell so we can interrupt subprocesses.
+#
+trap ":" INT QUIT TSTP
+
+#
+# Load the keymaps *as soon as possible*
+#
+if [ -r /etc/kbd/default.map ]
+then
+  loadkeys /etc/kbd/default.map
+fi
+
+#
+# Set SULOGIN to yes if you want a sulogin to be spawned from
+# this script *before anything else* with a timeout, like on SCO.
+#
+[ "$SULOGIN" = yes ] && sulogin -t 30 $CONSOLE
+
+if [ "$VERBOSE" != no ]
+then
+  echo
+  echo "Running /etc/init.d/boot..."
+  echo
+fi
+
+#
+# Activate the swap device(s) in /etc/fstab. This needs to be done
+# before fsck, since fsck can be quite memory-hungry.
+#
+if [ -x /sbin/swapon ]
+then
+  [ "$VERBOSE" != no ] && echo "Activating swap..."
+  swapon -a 2>/dev/null
+fi
+
+#
+# Ensure that bdflush (update) is running before any major I/O is
+# performed (the following fsck is a good example of such activity :).
+#
+[ -x /sbin/update ] && update
+
+#
+# Check the root file system.
+#
+if [ -f /fastboot ]
+then
+  echo "Fast boot, no file system check"
+else
+  #
+  # Ensure that root is quiescent and read-only before fsck'ing.
+  #
+  mount -n -o remount,ro /
+  if [ $? = 0 ]
+  then
+    echo "Checking root file system..."
+    fsck -a /
+    #
+    # If there was a failure, drop into single-user mode.
+    #
+    # NOTE: "failure" is defined as exiting with a return code of
+    # 2 or larger.  A return code of 1 indicates that file system
+    # errors were corrected but that the boot may proceed.
+    #
+    if [ $? -gt 1 ]
+    then
+      # Surprise! Re-directing from a HERE document (as in
+      # "cat << EOF") won't work, because the root is read-only.
+      echo
+      echo "fsck failed.  Please repair manually and reboot.  Please note"
+      echo "that the root file system is currently mounted read-only.  To"
+      echo "remount it read-write:"
+      echo
+      echo "   # mount -n -o remount,rw /"
+      echo
+      echo "CONTROL-D will exit from this shell and REBOOT the system."
+      echo
+      # Start a single user shell on the console
+      /sbin/sulogin $CONSOLE
+      reboot -f
+    fi
+  else
+    echo "*** ERROR!  Cannot fsck root fs because it is not mounted read-only!"
+    echo
+  fi
+fi
+
+#
+# Remount rootfs rw (default), but do not try to change mtab because it
+# is on a ro fs until the remount succeeded.  Then clean up old mtabs and
+# finally write the new mtab.
+#
+mount -n -o remount,rw /
+rm -f /etc/mtab~ /etc/nologin
+: > /etc/mtab
+mount -o remount,rw /
+mount /proc
+
+#
+# Configure the isa plug and play boards before loading
+# modules. Need to do this before loading modules to get
+# a chance of configuring and starting PnP boards before
+# the drivers mess all this up.
+#
+if [ -x /etc/init.d/isapnp ]
+then
+  /etc/init.d/isapnp start
+fi
+
+#
+# Load the appropriate modules. This needs to be done here in case fs modules
+# are needed for accessing or mounting local file systems.
+#
+if [ -x /etc/init.d/modutils ]
+then
+  /etc/init.d/modutils start
+elif [ -x /etc/init.d/modules ]
+then
+  /etc/init.d/modules start
+fi
+
+#
+# Enable multiple devices. If /etc/mdtab doesn't exist or is
+# empty we don't bother; likewise if mdadd isn't installed.
+#
+# Note that since this is called now you can't swap to an MD device; but
+# you don't want to do that anyway as the Linux kernel can stripe swap
+# partitions itself (see swapon manpage).
+#
+if [ -s /etc/mdtab -a -f /sbin/mdadd ]
+then
+  mdadd -ar
+fi
+
+#
+# Check the rest of the file systems.
+#
+if [ ! -f /fastboot ]
+then
+    echo "Checking all file systems..."
+    fsck -R -A -a
+    if [ $? -gt 1 ]
+    then
+      echo
+      echo "fsck failed.  Please repair manually."
+      echo
+      echo "CONTROL-D will exit from this shell and continue system startup."
+      echo
+      # Start a single user shell on the console
+      /sbin/sulogin $CONSOLE
+    fi
+fi
+rm -f /fastboot
+
+#
+# Put a nologin file in /etc to prevent people from logging in before
+# system startup is complete.
+#
+if [ "$DELAYLOGIN" = yes ]
+then
+  echo "System bootup in progress - please wait" > /etc/nologin
+  cp /etc/nologin /etc/nologin.boot
+fi
+
+#
+# Mount local file systems in /etc/fstab.
+#
+[ "$VERBOSE" != no ] && echo "Mounting local file systems ..."
+mount -avt nonfs,noproc
+
+#
+# Execute swapon command again, in case we want to swap to
+# a file on a now mounted filesystem.
+#
+swapon -a 2>/dev/null
+
+#
+# Set hostname.
+#
+hostname --file /etc/hostname
+
+#
+# Setup the network interfaces. Note that /var/run and /var/lock
+# are cleaned up after this, so don't put anything in the "network"
+# script that leave a pidfile or a lockfile.
+#
+if [ -x /etc/init.d/network ]
+then
+  /etc/init.d/network start
+fi
+
+#
+# Now that TCP/IP is configured, mount the NFS file systems in /etc/fstab.
+#
+echo "Mounting remote file systems ..."
+mount -a -t nfs
+
+#
+# Set and adjust the CMOS clock.
+#
+if [ ! -f /etc/adjtime ]
+then
+  echo "0.0 0 0.0" > /etc/adjtime
+fi
+clock -a $GMT
+
+#
+# Now that /usr/lib/zoneinfo should be available, announce the local time.
+#
+if [ "$VERBOSE" != no ]
+then
+  echo
+  echo "Local time: `date`"
+  echo
+fi
+
+#
+# Wipe /tmp (and don't erase `lost+found', `quota.user' or `quota.group')!
+# Note that files _in_ lost+found _are_ deleted.
+#
+[ "$VERBOSE" != no ] && echo -n "Cleaning: /tmp "
+( cd /tmp && \
+  find . -xdev \
+  ! -ctime -$TMPTIME \
+  ! -name . \
+  ! \( -name lost+found -uid 0 \) \
+  ! \( -name quota.user -uid 0 \) \
+  ! \( -name quota.group -uid 0 \) \
+    -depth -exec rm -rf -- {} \; )
+#
+# Clean up any stale locks.
+#
+[ "$VERBOSE" != no ] && echo -n "/var/lock "
+( cd /var/lock && find . -type f -exec rm -f -- {} \; )
+#
+# Clean up /var/run and create /var/run/utmp so that we can login.
+#
+[ "$VERBOSE" != no ] && echo -n "/var/run "
+( cd /var/run && \
+	find . ! -type d ! -name utmp ! -name innd.pid ! -name random-seed \
+	-exec rm -f -- {} \; )
+: > /var/run/utmp
+[ "$VERBOSE" != no ] && echo "."
+
+#
+# Save the random seed.
+#
+/etc/init.d/urandom start
+
+#
+# Run the package-specific boot scripts in /etc/rc.boot.
+#
+run-parts /etc/rc.boot
+
+#
+# Set pseudo-terminal access permissions.
+#
+chmod 666 /dev/tty[p-za-e][0-9a-f]
+chown root.tty /dev/tty[p-za-e][0-9a-f]
+
+#
+# Update /etc/motd.
+#
+if [ "$EDITMOTD" != no ]
+then
+	uname -a > /tmp/motd
+	sed 1d /etc/motd >> /tmp/motd
+	mv /tmp/motd /etc/motd
+fi
+
+if [ -x /sbin/setup.sh ]
+then
+  /sbin/setup.sh
+fi

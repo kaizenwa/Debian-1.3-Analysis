@@ -1,0 +1,101 @@
+@setfilename ilu-multlang.tim
+@settitle Multiple Languages in One Address Space
+@ifclear largerdoc
+@titlepage
+@title Multiple Languages in One Address Space
+@author Bill Janssen @code{<janssen@@parc.xerox.com>}
+@sp
+@today{}
+@sp
+Copyright @copyright{} 1993, 1994 Xerox Corporation@*
+All Rights Reserved.
+@end titlepage
+@ifinfo
+@node Top, ,(dir),(dir)
+@top Multiple Languages in One Address Space
+@end ifinfo
+@end ifclear
+
+With @ilu version 2.0 or later, modules implemented in different programming
+languages can be mixed in the same address space, with @ilu doing automatic
+translation between data representations.  @footnote{Currently, it does this by marshalling
+one language's representation into a data buffer, as if to transmit it to
+another address space, then hands this buffer to the other language's @ilu support,
+which unmarshalls it into representations appropriate for that language.  We plan
+to optimize this process in the future.}  There are a number of things to consider
+when doing this; this section discusses some of them.
+
+@section Dueling Runtimes
+
+Some languages simply cannot be mixed in the same address space because their
+runtimes will conflict.  @ilu offers no solutions to this problem.  Typical
+examples are two languages like @language{Franz Allegro Common Lisp} and
+@language{DEC SRC Modula-3}.  They each implement a user-level threads package,
+and their implementations of threads probably cannot co-exist.
+
+A possible solution to this problem, called the @system{POSIX Portable Common Runtime} (PPCR),
+is available from Xerox PARC, as @url{ftp://ftp.parc.xerox.com/pub/ppcr/}.  It contains
+a basic runtime which can be used as the platform for a particular language implementation's
+runtime.  Languages which use @system{PPCR} will have a lower chance of having conflicting
+runtimes.
+
+@section Module Initialization
+
+Module initialization really consists of two operations:  interface initialization
+and object instantiation.  The first operation initializes all the interfaces
+used or exported by the module; the second creates one or more true instances of
+objects to be used by other modules.
+
+Generally, each @ilu interface must be initialized.  The process of doing
+this initialization varies from programming language to programming language.
+In @language{ANSI C}, @ilu requires explicit calls to @C{@metavar{interface}__Initialize()}
+for interfaces being used, or @C{@metavar{interface}__InitializeServer()} for interfaces
+being exported.
+In @language{C++}, interface initialization is performed automatically,
+but at some indeterminate time before
+the first symbol from that interface is referenced from outside the interface.
+In @language{Python} or @language{Common Lisp}, interface initialization is performed
+automatically by the language at the time the module describing the interface
+is ``loaded'' into the address space.
+
+In addition to initializing all interfaces being used or exported, a module must create
+one or more true object instances, to allow other modules to access it.  Again, the specific
+way of doing this varies from programming language to programming language.  Once the
+true instance has been created, it can be @dfn{exported} from the module by either publishing it, via
+the @ilu simple binding system, or taking its string binding handle, and passing that
+outside the module for other modules to use.
+
+When multiple languages are used in the same address space, each must be initialized
+according to the standards used for that programming language.  This can be tricky when using
+both statically compiled and dynamically compiled languages together.  Consider the case
+where @language{Python} and @language{ANSI C} are linked together.  
+This use of @language{Python} may be as an extension language to a program written in @language{C}.
+In this case, the @language{C} code must do all initialization of modules written in
+@language{C} before calling into any @language{Python} module which might reference
+them.  Similarly, @language{Python} initialization (@Python{import}) of modules must
+occur before the @language{C} code can use them.  See @file{@metavar{ILUSRC}/src/examples/multlang/}
+for an example of a situation of this sort.
+
+In the other case,
+@language{C} true modules which are to be used from a @language{Python} program
+in the same address space must somehow be first loaded into that address space, then initialized.
+The loading is done by turning the @language{C} module into a @language{Python} @dfn{extension module},
+and either linking it into the @program{python} image, or creating a dynamically loadable module
+from it.
+The initialization is done by then calling @Python{import} on that module from within
+the @language{Python} interpreter.  The extension module's
+initialization routine initializes all of its interfaces,
+creates one or more true objects, and exports them.  After the @Python{import} statement
+returns, the objects are available for finding (see next section)
+from within @language{Python}.
+
+@section Finding Objects
+
+Object instances may be located by calls on the variations of @fn{LookupObject} and @fn{ObjectOfSBH}
+that exist in the various language runtimes.  @fn{LookupObject} is implemented so that it first
+looks to see if the true object for the specified object ID is available in the local address
+space.  If so, it returns a version of that object.  Only if the object is not locally available does it perform external
+lookups in an attempt to locate the object.  Note that for an object to be found via @fn{LookupObject},
+the true instance must first have been published via the implementation language @ilu runtime's
+variant of @fn{PublishObject}.  If you do not want your objects published outside your address space,
+you should use @fn{ObjectOfSBH} to find them. 

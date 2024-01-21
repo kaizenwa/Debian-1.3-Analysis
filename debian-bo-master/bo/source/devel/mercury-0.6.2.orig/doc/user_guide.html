@@ -1,0 +1,1742 @@
+<HTML>
+<HEAD>
+<!-- This HTML file has been created by texi2html 1.31
+     from user_guide.texi on 19 December 1996 -->
+
+<TITLE>The Mercury User's Guide</TITLE>
+</HEAD>
+<BODY>
+<H1>The Mercury User's Guide</H1>
+<P>
+Copyright (C) 1995 University of Melbourne.
+<P>
+Permission is granted to make and distribute verbatim copies of
+this manual provided the copyright notice and this permission notice
+are preserved on all copies.
+<P>
+Permission is granted to copy and distribute modified versions of this
+manual under the conditions for verbatim copying, provided also that
+the entire resulting derived work is distributed under the terms of a
+permission notice identical to this one.
+<P>
+Permission is granted to copy and distribute translations of this manual
+into another language, under the above conditions for modified versions.
+<P>
+<H1><A NAME="SEC1" HREF="user_guide_toc.html#SEC1">Introduction</A></H1>
+<P>
+This document describes the compilation environment of Mercury.
+It describes how to use <SAMP>`mc'</SAMP>, the Mercury compiler;
+how to use <SAMP>`mmake'</SAMP>, the "Mercury make" program,
+a tool built on top of ordinary or GNU make
+to simplify the handling of Mercury programs;
+and how to use Prolog to debug Mercury programs.
+<P>
+We strongly recommend that programmers use <SAMP>`mmake'</SAMP> rather
+than invoking <SAMP>`mc'</SAMP> directly, because <SAMP>`mmake'</SAMP> is generally
+easier to use and avoids unnecessary recompilation.
+<P>
+Since the Mercury implementation is essentially a native-code compiler
+which happens to compile via GNU C, not an interpreter,
+debugging of compiled Mercury programs would require
+a dedicated Mercury debugger program - or at least some
+significant extensions to gdb.  It would also require
+the Mercury compiler to arrange for the object
+code to contain suitable debugging information.
+Although it is possible to debug the intermediate C code, this is
+not productive, since the intermediate C code is extremely low-level
+and bears little resemblance to the source code.
+As an alternative, Mercury programmers may wish to use a Prolog system
+to execute their Mercury programs in order to gain access to this facility.
+The feasibility of this technique is dependent upon the program
+being written in the intersection of the Prolog and Mercury languages,
+which is possible because the two languages have almost the same syntax.
+The Mercury implementation allows you to run a Mercury program
+using NU-Prolog or SICStus Prolog (see section <A HREF="user_guide.html#SEC4">Using Prolog</A>).
+<P>
+<H1><A NAME="SEC2" HREF="user_guide_toc.html#SEC2">File naming conventions</A></H1>
+<P>
+Mercury source files should be named <TT>`*.m'</TT>.
+Each Mercury source file must contain a single Mercury module
+whose name should be the same as the filename without
+the <SAMP>`.m'</SAMP> extension.
+<P>
+Files ending in <TT>`.int'</TT>, <TT>`.int2'</TT> and <TT>`.int3'</TT> are interface files;
+these are generated automatically by the compiler,
+using the <SAMP>`--make-interface'</SAMP> and <SAMP>`--make-short-interface'</SAMP> options.
+Files ending in <TT>`.opt'</TT> are 
+interface files used in inter-module optimization,
+and are created using the <SAMP>`--make-optimization-interface'</SAMP> option.
+<P>
+Since the interface of a module changes less often than its implementation,
+the <TT>`.int'</TT>, <TT>`.int2'</TT>, <TT>`.int3'</TT>, and <TT>`.opt'</TT>
+files will remain unchanged on many compilations.
+To avoid unnecessary recompilations of the clients of the module,
+the timestamps on the these files are updated only if their contents change.
+<TT>`.date'</TT>, <TT>`.date3'</TT> and <TT>`.optdate'</TT> files associated with the
+module are used as date stamps;
+they are used when deciding whether the interface files need to be regenerated.
+<P>
+Files ending in <TT>`.d'</TT> are automatically-generated Makefile fragments
+which contain the dependencies for a module.
+Files ending in <TT>`.dep'</TT> are automatically-generated Makefile fragments
+which contain the rules for an entire program.
+<P>
+In the source code for the Mercury runtime library,
+we use a few files ending in <TT>`.mod'</TT>;
+these are preprocessed using the perl script <SAMP>`mod2c'</SAMP> to produce C files.
+(Originally the Mercury compiler also produced <TT>`.mod'</TT> files,
+but now we compile directly to C.)
+<P>
+As usual, <TT>`.c'</TT> files are C source code,
+<TT>`.h'</TT> files are C header files,
+<TT>`.o'</TT> files are object code,
+<TT>`.no'</TT> files are NU-Prolog object code, and
+<TT>`.ql'</TT> files are SICStus Prolog object code.
+<P>
+<H1><A NAME="SEC3" HREF="user_guide_toc.html#SEC3">Using the Mercury compiler</A></H1>
+<P>
+Following a long Unix tradition,
+the Mercury compiler is called <SAMP>`mc'</SAMP>.
+Some of its options (e.g. <SAMP>`-c'</SAMP>, <SAMP>`-o'</SAMP>, and <SAMP>`-I'</SAMP>)
+have a similar meaning to that in other Unix compilers.
+<P>
+Arguments to <SAMP>`mc'</SAMP> that name Mercury source files
+may omit the <SAMP>`.m'</SAMP> suffix.
+<P>
+To compile a program which consists of just a single module,
+use the command
+<P>
+<PRE>
+mc <VAR>module</VAR>.m
+</PRE>
+<P>
+Unlike traditional Unix compilers, however,
+<SAMP>`mc'</SAMP> will put the executable into a file called <TT>`<VAR>module</VAR>'</TT>,
+not <TT>`a.out'</TT>.
+<P>
+For programs that consist of more than one module, we recommend
+that you use Mmake (see section <A HREF="user_guide.html#SEC8">Using Mmake</A>).  Mmake will perform
+all the steps listed below, using automatic dependency analysis
+to ensure that things are done in the right order, and that
+steps are not repeated unnecessarily.
+<P>
+To compile a module to object code without creating an executable,
+use the command
+<P>
+<PRE>
+mc -c <VAR>module</VAR>.m
+</PRE>
+<P>
+<SAMP>`mc'</SAMP> will put the object code into a file called <TT>`<VAR>module</VAR>.o'</TT>.
+It also will leave the intermediate C code in a file called
+<TT>`<VAR>module</VAR>.c'</TT>.
+<P>
+Before you can compile a module,
+you must make the interface files
+for the modules that it imports (directly or indirectly).
+You can create the interface files for one or more modules using the commands
+<P>
+<PRE>
+mc --make-short-interface <VAR>module1</VAR>.m <VAR>module2</VAR>.m ...
+mc --make-interface <VAR>module1</VAR>.m <VAR>module2</VAR>.m ...
+</PRE>
+<P>
+If you are going to compile with <SAMP>`--intermodule-optimization'</SAMP> enabled,
+then you also need to create the optimization interface files.
+<P>
+<PRE>
+mc --make-optimization-interface <VAR>module1</VAR>.m <VAR>module2</VAR>.m ...
+</PRE>
+<P>
+Given that you have made all the interface files,
+one way to create an executable for a multi-module program
+is to compile all the modules at the same time
+using the command
+<P>
+<PRE>
+mc <VAR>module1</VAR>.m <VAR>module2</VAR>.m ...
+</PRE>
+<P>
+This will by default put the resulting executable in <TT>`<VAR>module1</VAR>'</TT>,
+but you can use the <SAMP>`-o <VAR>filename</VAR>'</SAMP> option to specify a different
+name for the output file, if you so desire.
+<P>
+The other way to create an executable for a multi-module program
+is to compile each module separately using <SAMP>`mc -c'</SAMP>,
+and then link the resulting object files together.
+The linking is a two stage process.
+<P>
+First, you must create and compile an <EM>initialization file</EM>,
+which is a C source file
+containing calls to automatically generated initialization functions
+contained in the C code of the modules of the program:
+<P>
+<PRE>
+c2init <VAR>module1</VAR>.c <VAR>module2</VAR>.c ... &#62; <VAR>main_module</VAR>_init.c,
+mgnuc -c <VAR>main_module</VAR>_init.c
+</PRE>
+<P>
+The <SAMP>`c2init'</SAMP> command line must contain
+the name of the C file of every module in the program.
+The order of the arguments is not important.
+The <SAMP>`mgnuc'</SAMP> command is the Mercury GNU C compiler;
+it is a shell script that invokes the GNU C compiler <SAMP>`gcc'</SAMP>
+with the options appropriate for compiling
+the C programs generated by Mercury.
+<P>
+You then link the object code of each module
+with the object code of the initialization file to yield the executable:
+<P>
+<PRE>
+ml -o <VAR>main_module</VAR> <VAR>module1</VAR>.o <VAR>module2</VAR>.o ... <VAR>main_module</VAR>_init.o
+</PRE>
+<P>
+<SAMP>`ml'</SAMP>, the Mercury linker, is another shell script
+that invokes a C compiler with options appropriate for Mercury,
+this time for linking.  <SAMP>`ml'</SAMP> also pipes any error messages
+from the linker through <SAMP>`mdemangle'</SAMP>, the Mercury symbol demangler,
+so that error messages refer to predicate and function names from
+the Mercury source code rather than to the names used in the intermediate
+C code.
+<P>
+The above command puts the executable in the file <TT>`<VAR>main_module</VAR>'</TT>.
+The same command line without the <SAMP>`-o'</SAMP> option
+would put the executable into the file <TT>`a.out'</TT>.
+<P>
+<SAMP>`mc'</SAMP> and <SAMP>`ml'</SAMP> both accept a <SAMP>`-v'</SAMP> (verbose) option.
+You can use that option to see what is actually going on.
+For the full set of options of <SAMP>`mc'</SAMP>, see section <A HREF="user_guide.html#SEC15">Invocation</A>.
+<P>
+Once you have created an executable for a Mercury program,
+you can go ahead and execute it.  You may however wish to specify
+certain options to the Mercury runtime system.
+The Mercury runtime accepts
+options via the <SAMP>`MERCURY_OPTIONS'</SAMP> environment variable.
+Setting <SAMP>`MERCURY_OPTIONS'</SAMP> to <SAMP>`-h'</SAMP>
+will list the available options.
+The most useful of these are the options that set the size of the stacks.
+<P>
+The det stack and the nondet stack
+are allocated fixed sizes at program start-up.
+The default size is 512k for the det stack and 128k for the nondet stack,
+but these can be overridden with the <SAMP>`-sd'</SAMP> and <SAMP>`-sn'</SAMP> options,
+whose arguments are the desired sizes of the det and nondet stacks
+respectively, in units of kilobytes.
+On operating systems that provide the appropriate support,
+the Mercury runtime will ensure that stack overflow
+is trapped by the virtual memory system.
+<P>
+With conservative garbage collection (the default),
+the heap will start out with a zero size,
+and will be dynamically expanded as needed,
+When not using conservative garbage collection,
+the heap has a fixed size like the stacks.
+The default size is 4 Mb, but this can be overridden
+with the <SAMP>`-sh'</SAMP> option.
+<P>
+<H1><A NAME="SEC4" HREF="user_guide_toc.html#SEC4">Using Prolog</A></H1>
+<P>
+Since the current Mercury implementation does not yet provide any
+useful support for debugging, we recommend that you use a Prolog
+system for debugging your Mercury programs.
+However, there is no point in using a Prolog debugger to track down a bug
+that can be detected statically by the Mercury compiler.
+The command
+<P>
+<PRE>
+mc -e <VAR>module1</VAR>.m ...
+</PRE>
+<P>
+causes the Mercury compiler
+to perform all its syntactic and semantic checks on the named modules,
+but not to generate any code.
+<P>
+In our experience, omitting that step is not wise.
+If you do omit it, you often waste a lot of time
+debugging problems that the compiler could have detected for you.
+<P>
+<H2><A NAME="SEC5" HREF="user_guide_toc.html#SEC5">Using NU-Prolog</A></H2>
+<P>
+You can compile a Mercury source module using NU-Prolog via the command
+<P>
+<PRE>
+mnc <VAR>module1</VAR>.m ...
+</PRE>
+<P>
+<SAMP>`mnc'</SAMP> is the Mercury variant of <SAMP>`nc'</SAMP>, the NU-Prolog compiler.
+It adapts <CODE>nc</CODE> to compile Mercury programs,
+e.g. by defining do-nothing predicates for the various Mercury declarations
+(which are executed by <CODE>nc</CODE>).
+<P>
+Some invocations of <SAMP>`mnc'</SAMP> will result in warnings such as
+<P>
+<PRE>
+Warning: main is a system predicate.
+It shouldn't be used as a non-terminal.
+</PRE>
+<P>
+Such warnings should be ignored.
+<P>
+<SAMP>`mnc'</SAMP> compiles the modules it is given into NU-Prolog bytecode,
+stored in files with a <TT>`.no'</TT> suffix.
+You can link these together using the command
+<P>
+<PRE>
+mnl -o <VAR>main_module</VAR> <VAR>module1</VAR>.no ...
+</PRE>
+<P>
+Ignore any warnings such as
+<P>
+<PRE>
+Warning: main/2 redefined
+Warning: solutions/2 redefined
+Warning: !/0 redefined
+</PRE>
+<P>
+<SAMP>`mnl'</SAMP>, the Mercury NU-Prolog linker,
+will put the executable (actually a shell script invoking a save file)
+into the file <TT>`<VAR>main_module</VAR>.nu'</TT>.
+This can be executed normally using
+<P>
+<PRE>
+./<VAR>main_module</VAR>.nu <VAR>arguments</VAR>
+</PRE>
+<P>
+Alternatively, one can execute such programs using <SAMP>`mnp'</SAMP>,
+the Mercury version of np, the NU-Prolog interpreter.
+The command
+<P>
+<PRE>
+mnp
+</PRE>
+<P>
+will start up the Mercury NU-Prolog interpreter.
+Inside the interpreter, you can load your source files
+with a normal consulting command such as
+<P>
+<PRE>
+['<VAR>module</VAR>.m'].
+</PRE>
+<P>
+You can also use the <TT>`--debug'</TT> option to <SAMP>`mnl'</SAMP> when linking.
+This will produce an executable whose entry point is the NU-Prolog interpreter,
+rather than main/2 in your program.
+<P>
+In both cases, you can start executing your program by typing
+<P>
+<PRE>
+r("<VAR>program-name</VAR> <VAR>arguments</VAR>").
+</PRE>
+<P>
+at the prompt of the NU-Prolog interpreter.
+<P>
+All the NU-Prolog debugging commands work as usual.
+The most useful ones are
+the <CODE>trace</CODE> and <CODE>spy</CODE> commands at the main prompt
+to turn on complete or selective tracing respectively,
+and the <CODE>l</CODE> (leap), <CODE>s</CODE> (skip), and <CODE>r</CODE> (redo)
+commands of the tracer.
+For more information, see the NU-Prolog documentation.
+<P>
+By default the debugger only displays the top levels of terms;
+you can use the <SAMP>`|'</SAMP> command to enter an interactive term browser.
+(Within the term browser, type <SAMP>`h.'</SAMP> for help.)
+Also note that in the debugger, we use a version of <CODE>error/1</CODE>
+which fails rather than aborting after printing the "Software Error:" message.
+This makes debugging easier,
+but will of course change the behaviour after an error occurs.
+<P>
+<H2><A NAME="SEC6" HREF="user_guide_toc.html#SEC6">Using SICStus Prolog</A></H2>
+<P>
+Using SICStus Prolog is similar to using NU-Prolog,
+except that the commands to use are <SAMP>`msc'</SAMP>, <SAMP>`msl'</SAMP>, and
+<SAMP>`msp'</SAMP> rather than <SAMP>`mnc'</SAMP>, <SAMP>`mnl'</SAMP>, and <SAMP>`mnp'</SAMP>.
+<P>
+Due to shortcomings in SICStus Prolog
+(in particular, the lack of backslash escapes in character strings),
+you need to use <SAMP>`sicstus_conv'</SAMP> to convert Mercury <SAMP>`.m'</SAMP> files
+to the <SAMP>`.pl'</SAMP> files that SICStus Prolog expects
+before you can load them into the interpreter.
+The command to use is just
+<P>
+<PRE>
+sicstus_conv <VAR>module</VAR>.m
+</PRE>
+<P>
+By default, <SAMP>`msc'</SAMP> compiles files to machine code using
+SICStus Prolog's <SAMP>`fastcode'</SAMP> mode. If space is more important
+than speed, you can use the <SAMP>`--mode compactcode'</SAMP> option,
+which instructs <CODE>msc</CODE> to use SICStus Prolog's <SAMP>`compactcode'</SAMP>
+mode, which compiles files to a bytecode format.
+<P>
+<H2><A NAME="SEC7" HREF="user_guide_toc.html#SEC7">Hazards of using Prolog</A></H2>
+<P>
+There are some Mercury programs which are not valid Prolog programs.
+In particular, Mercury will always reorder goals
+to ensure that they are mode-correct
+(or report a mode error if it cannot do so),
+but Prolog systems will not always do so,
+and will sometimes just silently give the wrong result.
+For example, in Mercury the following predicate will usually succeed,
+whereas in Prolog it will always fail.
+<P>
+<PRE>
+:- pred p(list(int)::in, list(int)::out) is semidet.
+p(L0, L) :-
+        L \= [],
+        q(L0, L).
+
+:- pred q(list(int)::in, list(int)::out) is det.
+</PRE>
+<P>
+The reason is that in Mercury,
+the test <SAMP>`L \= []'</SAMP> is reordered to after the call to <CODE>q/2</CODE>,
+but in Prolog, it executes even though <CODE>L</CODE> is not bound,
+and consequently the test always fails.
+<P>
+NU-Prolog has logical alternatives
+to the non-logical Prolog operations,
+and since Mercury supports both syntaxes,
+you can use NU-Prolog's logical alternatives to avoid this problem. 
+However, during the development of the Mercury compiler
+we had to abandon their use for efficiency reasons.
+<P>
+Another hazard is that NU-Prolog does not have a garbage collector.
+<P>
+<H1><A NAME="SEC8" HREF="user_guide_toc.html#SEC8">Using Mmake</A></H1>
+<P>
+Mmake, short for "Mercury Make",
+is a tool for building Mercury programs
+that is built on top of ordinary or GNU Make <A NAME="FOOT1" HREF="user_guide_foot.html#FOOT1">(1)</A>.
+With Mmake, building even a complicated Mercury program
+consisting of a number of modules is as simple as
+<P>
+<PRE>
+mmake <VAR>main-module</VAR>.depend
+mmake <VAR>main-module</VAR>
+</PRE>
+<P>
+Mmake only recompiles those files that need to be recompiled,
+based on automatically generated dependency information.
+Most of the dependencies are stored in <TT>`.d'</TT> files that are
+automatically recomputed every time you recompile,
+so they are never out-of-date.
+A little bit of the dependency information is stored in <TT>`.dep'</TT> files
+which are more expensive to recompute.
+The <SAMP>`mmake <VAR>main-module</VAR>.depend'</SAMP> command
+which recreates the <TT>`<VAR>main-module</VAR>.dep'</TT> file
+needs to be repeated only when you add or remove a module from your program,
+and there is no danger of getting an inconsistent executable
+if you forget this step -- instead you will get a compile or link error.
+<P>
+<SAMP>`mmake'</SAMP> allows you to build more than one program in the same directory.
+Each program must have its own <TT>`.dep'</TT> file,
+and therefore you must run <SAMP>`mmake <VAR>program</VAR>.depend'</SAMP>
+for each program.
+<P>
+If there is a file called <SAMP>`Mmake'</SAMP> in the current directory,
+Mmake will include that file in its automatically-generated Makefile.
+The <SAMP>`Mmake'</SAMP> file can override the default values of
+various variables used by Mmake's builtin rules,
+or it can add additional rules, dependencies, and actions.
+<P>
+Mmake's builtin rules are defined by the file
+<TT>`<VAR>prefix</VAR>/lib/mercury/mmake/Mmake.rules'</TT>
+(where <VAR>prefix</VAR> is <TT>`/usr/local/mercury-<VAR>version</VAR>'</TT> by default,
+and <VAR>version</VAR> is the version number, e.g. <SAMP>`0.6'</SAMP>),
+as well as the rules in the automatically-generated <TT>`.dep'</TT> files.
+These rules define the following targets:
+<P>
+<DL COMPACT>
+<DT><TT>`<VAR>main-module</VAR>.depend'</TT>
+<DD>Creates the file <TT>`<VAR>main-module</VAR>.dep'</TT> from <TT>`<VAR>main-module</VAR>.m'</TT>
+and the modules it imports.
+This step must be performed first.
+
+<DT><TT>`<VAR>main-module</VAR>.ints'</TT>
+<DD>Ensure that the interface files for <VAR>main-module</VAR>
+and its imported modules are up-to-date.
+(If the underlying <SAMP>`make'</SAMP> program does not handle transitive dependencies,
+this step may be necessary before
+attempting to make <TT>`<VAR>main-module</VAR>'</TT> or <TT>`<VAR>main-module</VAR>.check'</TT>;
+if the underlying <SAMP>`make'</SAMP> is GNU Make, this step should not be necessary.)
+
+<DT><TT>`<VAR>main-module</VAR>.check'</TT>
+<DD>Perform semantic checking on <VAR>main-module</VAR> and its imported modules.
+Error messages are placed in <TT>`.err'</TT> files.
+
+<DT><TT>`<VAR>main-module</VAR>'</TT>
+<DD>Compiles and links <VAR>main-module</VAR> using the Mercury compiler.
+Error messages are placed in <TT>`.err'</TT> files.
+
+<DT><TT>`<VAR>main-module</VAR>.split'</TT>
+<DD>Compiles and links <VAR>main-module</VAR> using the Mercury compiler,
+with the <SAMP>`--split-c-files'</SAMP> option enabled.
+See section <A HREF="user_guide.html#SEC29">Output-level (LLDS-&#62;C) optimization options</A> for more information
+about <SAMP>`--split-c-files'</SAMP>.
+
+<DT><TT>`<VAR>main-module</VAR>.nu'</TT>
+<DD>Compiles and links <VAR>main-module</VAR> using NU-Prolog.
+
+<DT><TT>`<VAR>main-module</VAR>.nu.debug'</TT>
+<DD>Compiles and links <VAR>main-module</VAR> using NU-Prolog.
+The resulting executable will start up in the NU-Prolog interpreter
+rather than calling main/2.
+
+<DT><TT>`<VAR>main-module</VAR>.sicstus'</TT>
+<DD>Compiles and links <VAR>main-module</VAR> using SICStus Prolog.
+
+<DT><TT>`<VAR>main-module</VAR>.sicstus.debug'</TT>
+<DD>Compiles and links <VAR>main-module</VAR> using SICStus Prolog.
+The resulting executable will start up in the SICStus Prolog interpreter
+rather than calling main/2.
+
+<DT><TT>`<VAR>main-module</VAR>.clean'</TT>
+<DD>Removes the automatically generated files
+that contain the compiled code of the program
+and the error messages produced by the compiler.
+Specifically, this will remove all the <SAMP>`.c'</SAMP>, <SAMP>`.s'</SAMP>, <SAMP>`.o'</SAMP>,
+<SAMP>`.no'</SAMP>, <SAMP>`.ql'</SAMP>, and <SAMP>`.err'</SAMP> files
+belonging to the named <VAR>main-module</VAR> or its imported modules.
+
+<DT><TT>`<VAR>main-module</VAR>.change_clean'</TT>
+<DD>Removes files that need updating if changing garbage collection method or
+starting to use inter-module optimization.
+Specifically, this will remove all the <SAMP>`.c'</SAMP>, <SAMP>`.s'</SAMP>, <SAMP>`.o'</SAMP>,
+<SAMP>`.dep'</SAMP> and executable files belonging to the named <VAR>main-module</VAR>
+or its imported modules.
+
+<DT><TT>`<VAR>main-module</VAR>.realclean'</TT>
+<DD>Removes all the automatically generated files.
+In addition to the files removed by <VAR>main-module</VAR>.clean, this
+removes the <SAMP>`.date'</SAMP>, <SAMP>`.int'</SAMP>, <SAMP>`.int2'</SAMP>, <SAMP>`.int3'</SAMP>,
+<SAMP>`.opt'</SAMP>,
+<SAMP>`.d'</SAMP>, and <SAMP>`.dep'</SAMP> belonging to one of the modules of the program,
+and also the various possible executables for the program ---
+<SAMP>`<VAR>main-module</VAR>'</SAMP>, 
+<SAMP>`<VAR>main-module</VAR>.nu'</SAMP>, 
+<SAMP>`<VAR>main-module</VAR>.nu.save'</SAMP>, 
+<SAMP>`<VAR>main-module</VAR>.nu.debug'</SAMP>, 
+<SAMP>`<VAR>main-module</VAR>.nu.debug.save'</SAMP>, 
+<SAMP>`<VAR>main-module</VAR>.sicstus'</SAMP>, and
+<SAMP>`<VAR>main-module</VAR>.sicstus.debug'</SAMP>.
+
+<DT><TT>`clean'</TT>
+<DD>This makes <SAMP>`<VAR>main-module</VAR>.clean'</SAMP> for every <VAR>main-module</VAR>
+for which there is a <TT>`<VAR>main-module</VAR>.dep'</TT> file in the current
+directory.
+
+<DT><TT>`realclean'</TT>
+<DD>This makes <SAMP>`<VAR>main-module</VAR>.realclean'</SAMP> for every <VAR>main-module</VAR>
+for which there is a <TT>`<VAR>main-module</VAR>.dep'</TT> file in the current
+directory.
+
+</DL>
+<P>
+The variables used by the builtin rules are defined in
+<TT>`<VAR>prefix</VAR>/lib/mercury/mmake/Mmake.vars'</TT>.
+<P>
+Note that since Mmake is built on top of Make or GNU Make,
+you can make use of the features supported by the underlying Make.
+In particular, GNU Make has support for running jobs in parallel,
+which is very useful if you have a machine with more than one CPU.
+<P>
+<H1><A NAME="SEC9" HREF="user_guide_toc.html#SEC9">Profiling</A></H1>
+<P>
+<H2><A NAME="SEC10" HREF="user_guide_toc.html#SEC10">Introduction</A></H2>
+<P>
+The Mercury profiler <SAMP>`mprof'</SAMP> is a tool which can be used to
+analyze a Mercury program's performance, so that the programmer can
+determine which predicates or functions are taking up a
+disproportionate amount of the execution time.
+<P>
+To obtain the best trade-off between productivity and efficiency,
+programmers should not spend too much time optimizing their code
+until they know which parts of the code are really taking up most
+of the time.  Only once the code has been profiled should the
+programmer consider making optimizations that would improve
+efficiency at the expense of readability or ease of maintenance.
+<P>
+A good profiler is a tool that should be part of every software
+engineer's toolkit.
+<P>
+<H2><A NAME="SEC11" HREF="user_guide_toc.html#SEC11">Building profiled applications</A></H2>
+<P>
+To enable profiling, your program must be built in a <SAMP>`.prof'</SAMP> grade.
+For example, if the default grade on your system is <SAMP>`asm_fast.gc'</SAMP>, then
+to compile with profiling enabled, use grade <SAMP>`asm_fast.gc.prof'</SAMP>.  You
+can do this by setting the <SAMP>`GRADE'</SAMP> variable in your Mmake file, e.g. by
+adding the line <SAMP>`GRADE=asm_fast.gc.prof'</SAMP>. 
+See section <A HREF="user_guide.html#SEC22">Compilation model options</A> for more information about the
+different grades.
+<P>
+Enabling profiling has several effects.  Firstly, it causes the
+compiler to generate slightly modified code which counts the number
+of times each predicate or function is called, and for every call,
+records the caller and callee.  Secondly, your program will be linked
+with versions of the library and runtime that were compiled with
+profiling enabled.  (It also has the effect for each source file the compiler
+generates the static call graph for that file in <SAMP>`<VAR>module</VAR>.prof'</SAMP>.)
+<P>
+<H2><A NAME="SEC12" HREF="user_guide_toc.html#SEC12">Creating the profile</A></H2>
+<P>
+The next step is to run your program.  The profiling version of your
+program will collect profiling information during execution, and
+save this information in the files <SAMP>`Prof.Counts'</SAMP>, <SAMP>`Prof.Decls'</SAMP>,
+and <SAMP>`Prof.CallPair'</SAMP>.
+(<SAMP>`Prof.Decl'</SAMP> contains the names of the procedures and their
+associated addresses, <SAMP>`Prof.CallPair'</SAMP> records the number of times
+each procedure was called by each different caller, and <SAMP>`Prof.Counts'</SAMP>
+records the number of times that execution was in each procedure
+when a profiling interrupt occurred.)
+<P>
+It would be nice if there was a way to combine profiling data from
+multiple runs of the same program, but unfortunately there is not yet
+any way to do that.
+<P>
+Due to a known timing-related bug in our code, you may occasionally get
+segmentation violations when running your program with profiling enabled.
+If this happens, just run it again -- the problem does not occur frequently.
+This bug will hopefully be fixed soon.
+<P>
+<H2><A NAME="SEC13" HREF="user_guide_toc.html#SEC13">Displaying the profile</A></H2>
+<P>
+To display the profile, just type <SAMP>`mprof'</SAMP>.  This will read the 
+<TT>`Prof.*'</TT> files and display the flat profile in a nice human-readable 
+format.  If you also want to see the call graph profile, which takes a lot
+longer to generate, type <SAMP>`mprof -c'</SAMP>.
+<P>
+Note that <SAMP>`mprof'</SAMP> can take quite a while to execute, and will
+usually produce quite a lot of output, so you will usually want to
+redirect the output into a file with a command such as
+<SAMP>`mprof &#62; mprof.out'</SAMP>.
+<P>
+<H2><A NAME="SEC14" HREF="user_guide_toc.html#SEC14">Analysis of results</A></H2>
+<P>
+The profile output consists of three major sections.  These are 
+named the call graph profile, the flat profile and the alphabetic listing.
+<P>
+The call graph profile presents the local call graph of each
+procedure.  For each procedure it shows the parents (callers) and
+children (callees) of that procedure, and shows the execution time and
+call counts for each parent and child.  It is sorted on the total
+amount of time spent in the procedure and all of its descendents (i.e.
+all of the procedures that it calls, directly or indirectly.)
+<P>
+The flat profile presents the just execution time spent in each procedure.
+It does not count the time spent in descendents of a procedure.
+<P>
+The alphabetic listing just lists the procedures in alphabetical order,
+along with their index number in the call graph profile, so that you can
+quickly find the entry for a particular procedure in the call graph profile.
+<P>
+The profiler works by interrupting the program at frequent intervals,
+and each time recording the currently active procedure and its caller.
+It uses these counts to determine the proportion of the total time spent in
+each procedure.  This means that the figures calculated for these times
+are only a statistical approximation to the real values, and so they
+should be treated with some caution.
+<P>
+The time spent in a procedure and its descendents is calculated by
+propagating the times up the call graph, assuming that each call to a
+procedure from a particular caller takes the same amount of time.
+This assumption is usually reasonable, but again the results should
+be treated with caution.
+<P>
+Note that any time spent in a C function (e.g. time spent in
+<SAMP>`GC_malloc()'</SAMP>, which does memory allocation and garbage collection) is
+credited to the Mercury procedure that called that C function.
+<P>
+Here is a small portion of the call graph profile from an example program.
+<P>
+<PRE>
+                                  called/total       parents
+index  %time    self descendents  called+self    name           index
+                                  called/total       children
+
+                                                     &#60;spontaneous&#62;
+[1]    100.0    0.00        0.75       0         call_engine_label [1] 
+                0.00        0.75       1/1           do_interpreter [3]
+
+-----------------------------------------------
+
+                0.00        0.75       1/1           do_interpreter [3]
+[2]    100.0    0.00        0.75       1         io__run/0(0) [2] 
+                0.00        0.00       1/1           io__init_state/2(0) [11]
+                0.00        0.74       1/1           main/2(0) [4]
+
+-----------------------------------------------
+
+                0.00        0.75       1/1           call_engine_label [1]
+[3]    100.0    0.00        0.75       1         do_interpreter [3] 
+                0.00        0.75       1/1           io__run/0(0) [2]
+
+-----------------------------------------------
+
+                0.00        0.74       1/1           io__run/0(0) [2]
+[4]     99.9    0.00        0.74       1         main/2(0) [4] 
+                0.00        0.74       1/1           sort/2(0) [5]
+                0.00        0.00       1/1           print_list/3(0) [16]
+                0.00        0.00       1/10          io__write_string/3(0) [18]
+
+-----------------------------------------------
+
+                0.00        0.74       1/1           main/2(0) [4]
+[5]     99.9    0.00        0.74       1         sort/2(0) [5] 
+                0.05        0.65       1/1           list__perm/2(0) [6]
+                0.00        0.09   40320/40320       sorted/1(0) [10]
+
+-----------------------------------------------
+
+                                       8             list__perm/2(0) [6]
+                0.05        0.65       1/1           sort/2(0) [5]
+[6]     86.6    0.05        0.65       1+8      list__perm/2(0) [6] 
+                0.00        0.60    5914/5914        list__insert/3(2) [7]
+                                       8             list__perm/2(0) [6]
+
+-----------------------------------------------
+
+                0.00        0.60    5914/5914        list__perm/2(0) [6]
+[7]     80.0    0.00        0.60    5914         list__insert/3(2) [7] 
+                0.60        0.60    5914/5914        list__delete/3(3) [8]
+
+-----------------------------------------------
+
+                                   40319             list__delete/3(3) [8]
+                0.60        0.60    5914/5914        list__insert/3(2) [7]
+[8]     80.0    0.60        0.60    5914+40319  list__delete/3(3) [8] 
+                                   40319             list__delete/3(3) [8]
+
+-----------------------------------------------
+
+                0.00        0.00       3/69283       tree234__set/4(0) [15]
+                0.09        0.09   69280/69283       sorted/1(0) [10]
+[9]     13.3    0.10        0.10   69283         compare/3(0) [9] 
+                0.00        0.00       3/3           __Compare___io__stream/0(0) [20]
+                0.00        0.00   69280/69280       builtin_compare_int/3(0) [27]
+
+-----------------------------------------------
+
+                0.00        0.09   40320/40320       sort/2(0) [5]
+[10]    13.3    0.00        0.09   40320         sorted/1(0) [10] 
+                0.09        0.09   69280/69283       compare/3(0) [9]
+
+-----------------------------------------------
+</PRE>
+<P>
+The first entry is <SAMP>`call_engine_label'</SAMP> and its parent is
+<SAMP>`&#60;spontaneous&#62;'</SAMP>, meaning that it is the root of the call graph.
+(The first three entries, <SAMP>`call_engine_label'</SAMP>, <SAMP>`do_interpreter'</SAMP>,
+and <SAMP>`io__run/0'</SAMP> are all part of the Mercury runtime;
+<SAMP>`main/2'</SAMP> is the entry point to the user's program.)
+<P>
+Each entry of the call graph profile consists of three sections, the parent
+procedures, the current procedure and the children procedures.  
+<P>
+Reading across from the left, for the current procedure the fields are:
+<P>
+<UL>
+<LI>
+The unique index number for the current procedure. 
+(The index numbers are used only to make it easier to find
+a particular entry in the call graph.)
+
+<LI>
+The percentage of total execution time spent in the current procedure
+and all its descendents. 
+As noted above, this is only a statistical approximation.
+
+<LI>
+The "self" time: the time spent executing code that is 
+part of current procedure.  
+As noted above, this is only a statistical approximation.
+
+<LI>
+The descendent time: the time spent in the
+current procedure and all its descendents.  
+As noted above, this is only a statistical approximation.
+
+<LI>
+The number of times a procedure is called.
+If a procedure is (directly) recursive, this column
+will contain the number of calls from other procedures,
+a plus sign, and then the number of recursive calls.
+These numbers are exact, not approximate.
+
+<LI>
+The name of the procedure followed by its index number. 
+</UL>
+<P>
+The predicate or function names are not just followed by their arity but
+also by their mode in brackets.  A mode of zero corresponds to the first mode
+declaration of that predicate in the source code.  For example,
+<SAMP>`list__delete/3(3)'</SAMP> corresponds to the <SAMP>`(out, out, in)'</SAMP> mode
+of <SAMP>`list__delete/3'</SAMP>.
+<P>
+Now for the parent and child procedures the self and descendent time have
+slightly different meanings.  For the parent procedures the self and descendent
+time represent the proportion of the current procedure's self and descendent 
+time due to that parent.  These times are obtained using the assumption that
+each call contributes equally to the total time of the current procedure.
+<P>
+<H1><A NAME="SEC15" HREF="user_guide_toc.html#SEC15">Invocation</A></H1>
+<P>
+This section contains a brief description of all the options
+available for <SAMP>`mc'</SAMP>, the Mercury compiler.
+Sometimes this list is a little out-of-date;
+use <SAMP>`mc --help'</SAMP> to get the most up-to-date list.
+<P>
+<H2><A NAME="SEC16" HREF="user_guide_toc.html#SEC16">Invocation overview</A></H2>
+<P>
+<CODE>mc</CODE> is invoked as
+<PRE>
+mc [<VAR>options</VAR>] <VAR>modules</VAR>
+</PRE>
+<P>
+For module names, the trailing <TT>`.m'</TT> is optional.
+<P>
+Options are either short (single-letter) options preceded by a single <SAMP>`-'</SAMP>,
+or long options preceded by <SAMP>`--'</SAMP>.
+Options are case-sensitive.
+We call options that do not take arguments <DFN>flags</DFN>.
+Single-letter flags may be grouped with a single <SAMP>`-'</SAMP>, e.g. <SAMP>`-vVc'</SAMP>.
+Single-letter flags may be negated
+by appending another trailing <SAMP>`-'</SAMP>, e.g. <SAMP>`-v-'</SAMP>.
+Long flags may be negated by preceding them with <SAMP>`no-'</SAMP>,
+e.g. <SAMP>`--no-verbose'</SAMP>.
+<P>
+<H2><A NAME="SEC17" HREF="user_guide_toc.html#SEC17">Warning options</A></H2>
+<DL COMPACT>
+<DT><CODE>-w</CODE>
+<DD><DT><CODE>--inhibit-warnings</CODE>
+<DD>Disable all warning messages.
+
+<P>
+<DT><CODE>--halt-at-warn.</CODE>
+<DD>This option causes the compiler to treat all
+warnings as if they were errors.  This means that
+if any warning is issued, the compiler will not
+generate code -- instead, it will return a
+non-zero exit status.
+
+<P>
+<DT><CODE>--halt-at-syntax-error.</CODE>
+<DD>This option causes the compiler to halt immediately
+after syntax checking and not do any semantic checking
+if it finds any syntax errors in the program.
+
+<P>
+<DT><CODE>--no-warn-singleton-variables</CODE>
+<DD>Don't warn about variables which only occur once.
+
+<P>
+<DT><CODE>--no-warn-missing-det-decls</CODE>
+<DD>For predicates that are local to a module (those that
+are not exported), don't issue a warning if the <SAMP>`pred'</SAMP>
+or <SAMP>`mode'</SAMP> declaration does not have a determinism annotation.
+Use this option if you want the compiler to perform automatic
+determinism inference for non-exported predicates.
+
+<P>
+<DT><CODE>--no-warn-det-decls-too-lax</CODE>
+<DD>Don't warn about determinism declarations
+which could have been stricter.
+
+<P>
+<DT><CODE>--no-warn-nothing-exported</CODE>
+<DD>Don't warn about modules whose interface sections have no
+exported predicates, functions, insts, modes or types.
+
+<P>
+<DT><CODE>--warn-unused-args</CODE>
+<DD>Warn about predicate or function arguments which are not used.
+
+<P>
+<DT><CODE>--warn-interface-imports</CODE>
+<DD>Warn about modules imported in the interface which are not
+used in the interface.
+
+<P>
+<DT><CODE>--warn-missing-opt-files</CODE>
+<DD>Warn about <SAMP>`.opt'</SAMP> files that cannot be opened.
+
+<P>
+<DT><CODE>--warn-non-stratification</CODE>
+<DD>Warn about possible non-stratification of the predicates/functions in the 
+module.
+Non-stratification occurs when a predicate/function can call itself
+negatively through some path along its call graph.
+
+
+</DL>
+<P>
+<H2><A NAME="SEC18" HREF="user_guide_toc.html#SEC18">Verbosity options</A></H2>
+<DL COMPACT>
+<DT><CODE>-v</CODE>
+<DD><DT><CODE>--verbose</CODE>
+<DD>Output progress messages at each stage in the compilation.
+
+<P>
+<DT><CODE>-V</CODE>
+<DD><DT><CODE>--very_verbose</CODE>
+<DD>Output very verbose progress messages.
+
+<P>
+<DT><CODE>-E</CODE>
+<DD><DT><CODE>--verbose-error-messages</CODE>
+<DD>Explain error messages.  Asks the compiler to give you a more
+detailed explanation of any errors it finds in your program.
+
+<P>
+<DT><CODE>-S</CODE>
+<DD><DT><CODE>--statistics</CODE>
+<DD>Output messages about the compiler's time/space usage.
+At the moment this option implies <SAMP>`--no-trad-passes'</SAMP>,
+so you get information at the boundaries between phases of the compiler.
+
+<P>
+<DT><CODE>-T</CODE>
+<DD><DT><CODE>--debug-types</CODE>
+<DD>Output detailed debugging traces of the type checking.
+
+<P>
+<DT><CODE>-N</CODE>
+<DD><DT><CODE>--debug-modes</CODE>
+<DD>Output detailed debugging traces of the mode checking.
+
+<P>
+<DT><CODE>--debug-det, --debug-determinism</CODE>
+<DD>Output detailed debugging traces of determinism analysis.
+
+<P>
+<DT><CODE>--debug-opt</CODE>
+<DD>Output detailed debugging traces of the optimization process.
+
+<P>
+<DT><CODE>--debug-vn &#60;n&#62;</CODE>
+<DD>Output detailed debugging traces of the value numbering optimization pass.
+The different bits in the number argument of this option control the
+printing of different types of tracing messages.
+</DL>
+<P>
+<H2><A NAME="SEC19" HREF="user_guide_toc.html#SEC19">Output options</A></H2>
+These options are mutually exclusive.
+If more than one of these options is specified, only the first in
+this list will apply.
+If none of these options are specified, the default action is to
+compile and link the modules named on the command line to produce
+an executable.
+<P>
+<DL COMPACT>
+<DT><CODE>-M</CODE>
+<DD><DT><CODE>--generate-dependencies</CODE>
+<DD>Output "Make"-style dependencies for the module
+and all of its dependencies to <TT>`<VAR>module</VAR>.dep'</TT>.
+
+<P>
+<DT><CODE>-i</CODE>
+<DD><DT><CODE>--make-interface</CODE>
+<DD>Write the module interface to <TT>`<VAR>module</VAR>.int'</TT>.
+Also write the short interface to <TT>`<VAR>module</VAR>.int2'</TT>.
+
+<P>
+<DT><CODE>--make-short-interface</CODE>
+<DD>Write the unqualified version of the short interface to
+<TT>`<VAR>module</VAR>.int3'</TT>.
+
+<P>
+<DT><CODE>--make-optimization-interface</CODE>
+<DD>Write information used for inter-module optimization to
+<TT>`<VAR>module</VAR>.opt'</TT>.
+
+<P>
+<DT><CODE>-G</CODE>
+<DD><DT><CODE>--convert-to-goedel</CODE>
+<DD>Convert the Mercury code to Goedel. Output to file <TT>`<VAR>module</VAR>.loc'</TT>.
+The translation is not perfect; some Mercury constructs cannot be easily
+translated into Goedel.
+
+<P>
+<DT><CODE>-P</CODE>
+<DD><DT><CODE>--pretty-print</CODE>
+<DD><DT><CODE>--convert-to-mercury</CODE>
+<DD>Convert to Mercury. Output to file <TT>`<VAR>module</VAR>.ugly'</TT>.
+This option acts as a Mercury ugly-printer. 
+(It would be a pretty-printer, except that comments are stripped
+and nested if-then-elses are indented too much -- so the result
+is rather ugly.)
+
+<P>
+<DT><CODE>--typecheck-only</CODE>
+<DD>Just check the syntax and type-correctness of the code.
+Don't invoke the mode analysis and later passes of the compiler.
+When converting Prolog code to Mercury,
+it can sometimes be useful to get the types right first
+and worry about modes second;
+this option supports that approach.
+
+<P>
+<DT><CODE>-e</CODE>
+<DD><DT><CODE>--errorcheck-only</CODE>
+<DD>Check the module for errors, but do not generate any code.
+
+<P>
+<DT><CODE>-C</CODE>
+<DD><DT><CODE>--compile-to-c</CODE>
+<DD><DT><CODE>--compile-to-C</CODE>
+<DD>Generate C code in <TT>`<VAR>module</VAR>.c'</TT>, but not object code.
+
+<P>
+<DT><CODE>-c</CODE>
+<DD><DT><CODE>--compile-only</CODE>
+<DD>Generate C code in <TT>`<VAR>module</VAR>.c'</TT>
+and object code in <TT>`<VAR>module</VAR>.o'</TT>
+but do not attempt to link the named modules.
+</DL>
+<P>
+<H2><A NAME="SEC20" HREF="user_guide_toc.html#SEC20">Auxiliary output options</A></H2>
+<DL COMPACT>
+<DT><CODE>--no-assume-gmake</CODE>
+<DD>When generating <TT>`.dep'</TT> files, generate Makefile
+fragments that use only the features of standard make;
+do not assume the availability of GNU Make extensions.
+This makes these files significantly larger.
+
+<DT><CODE>--generate-bytecode</CODE>
+<DD>Output a bytecode form of the module for use
+by an experimental debugger.
+
+<DT><CODE>--generate-prolog</CODE>
+<DD>Convert the program to Prolog. Output to file <TT>`<VAR>module</VAR>.pl'</TT>
+or <TT>`<VAR>module</VAR>.nl'</TT> (depending the the dialect).
+
+<DT><CODE>--prolog-dialect <VAR>dialect</VAR></CODE>
+<DD>Target the named dialect if generating Prolog code.
+The <VAR>dialect</VAR> should be one of <SAMP>`sicstus'</SAMP>, <SAMP>`nu'</SAMP>.
+
+<DT><CODE>--auto-comments</CODE>
+<DD>Output comments in the <TT>`<VAR>module</VAR>.c'</TT> file.
+This is primarily useful for trying to understand
+how the generated C code relates to the source code,
+e.g. in order to debug the compiler.
+The code may be easier to understand if you also use the
+<SAMP>`--no-llds-optimize'</SAMP> option.
+
+<P>
+<DT><CODE>-n</CODE>
+<DD><DT><CODE>--line-numbers</CODE>
+<DD>Output source line numbers in the generated code.
+Only works with the <SAMP>`--convert-to-goedel'</SAMP> and <SAMP>`--convert-to-mercury'</SAMP>
+options.
+
+<P>
+<DT><CODE>--show-dependency-graph</CODE>
+<DD>Write out the dependency graph to <VAR>module</VAR>.dependency_graph.
+
+<P>
+<DT><CODE>-d <VAR>stage</VAR></CODE>
+<DD><DT><CODE>--dump-hlds <VAR>stage</VAR></CODE>
+<DD>Dump the HLDS (intermediate representation) after
+the specified stage number or stage name to
+<TT>`<VAR>module</VAR>.hlds_dump.<VAR>num</VAR>-<VAR>name</VAR>'</TT>.
+Stage numbers range from 1 to 99; not all stage numbers are valid.
+The special stage name <SAMP>`all'</SAMP> causes the dumping of all stages.
+Multiple dump options accumulate.
+
+<P>
+<DT><CODE>-D</CODE>
+<DD><DT><CODE>--verbose-dump-hlds</CODE>
+<DD>With <SAMP>`--dump-hlds'</SAMP>, dumps some additional info.
+
+</DL>
+<P>
+<H2><A NAME="SEC21" HREF="user_guide_toc.html#SEC21">Language semantics options</A></H2>
+<P>
+See the Mercury language reference manual for detailed explanations
+of these options.
+<P>
+<DL COMPACT>
+<DT><CODE>--no-reorder-conj</CODE>
+<DD>Execute conjunctions left-to-right except where the modes imply
+that reordering is unavoidable.
+
+<P>
+<DT><CODE>--no-reorder-disj</CODE>
+<DD>Execute disjunctions strictly left-to-right.
+
+<P>
+<DT><CODE>--fully-strict</CODE>
+<DD>Don't optimize away loops or calls to <CODE>error/1</CODE>.
+
+<P>
+<DT><CODE>--infer-types</CODE>
+<DD>If there is no type declaration for a predicate or function,
+try to infer the type, rather than just reporting an error.
+
+<P>
+<DT><CODE>--infer-modes</CODE>
+<DD>If there is no mode declaration for a predicate,
+try to infer the modes, rather than just reporting an error.
+
+<P>
+<DT><CODE>--no-infer-det, --no-infer-determinism</CODE>
+<DD>If there is no determinism declaration for a procedure,
+don't try to infer the determinism, just report an error.
+
+</DL>
+<P>
+<H2><A NAME="SEC22" HREF="user_guide_toc.html#SEC22">Compilation model options</A></H2>
+<P>
+The following compilation options affect the generated
+code in such a way that the entire program must be
+compiled with the same setting of these options,
+and it must be linked to a version of the Mercury
+library which has been compiled with the same setting.
+Rather than setting them individually, you must
+specify them all at once by selecting a particular
+compilation model ("grade").
+<P>
+<DL COMPACT>
+<DT><CODE>-s <VAR>grade</VAR></CODE>
+<DD><DT><CODE>--grade <VAR>grade</VAR></CODE>
+<DD>Select the compilation model. The <VAR>grade</VAR> should be one of
+<SAMP>`debug'</SAMP>, <SAMP>`none'</SAMP>, <SAMP>`reg'</SAMP>, <SAMP>`jump'</SAMP>, <SAMP>`asm_jump'</SAMP>,
+<SAMP>`fast'</SAMP>, <SAMP>`asm_fast'</SAMP>,
+or one of those with <SAMP>`.gc'</SAMP>, <SAMP>`.prof'</SAMP> or <SAMP>`.gc.prof'</SAMP> appended.
+The default grade is system-dependent; it is chosen at installation time
+by <SAMP>`configure'</SAMP>, the auto-configuration script, but can be overridden
+with the <SAMP>`MERCURY_DEFAULT_GRADE'</SAMP> environment variable if desired.
+Depending on your particular installation, only a subset
+of these possible grades will have been installed.
+Attempting to use a grade which has not been installed
+will result in an error at link time.
+
+The following table shows the options that are selected by each grade; it
+is followed by descriptions of those options.
+
+<DL COMPACT>
+<DT><VAR>Grade</VAR>
+<DD><VAR>Options implied</VAR>.
+
+<DT><SAMP>`debug'</SAMP>
+<DD><CODE>--debug --no-c-optimize</CODE>.
+
+<DT><SAMP>`none'</SAMP>
+<DD>None.
+
+<DT><SAMP>`reg'</SAMP>
+<DD><CODE>--gcc-global-registers</CODE>.
+
+<DT><SAMP>`jump'</SAMP>
+<DD><CODE>--gcc-nonlocal-gotos</CODE>.
+
+<DT><SAMP>`fast'</SAMP>
+<DD><CODE>--gcc-global-registers --gcc-nonlocal-gotos</CODE>.
+
+<DT><SAMP>`asm_jump'</SAMP>
+<DD><CODE>--gcc-nonlocal-gotos --asm-labels</CODE>.
+
+<DT><SAMP>`asm_fast'</SAMP>
+<DD><CODE>--gcc-global-registers --gcc-nonlocal_gotos --asm-labels</CODE>.
+
+<DT>Any of the above followed by <SAMP>`.gc'</SAMP>
+<DD>As above, plus <CODE>--gc conservative</CODE>.
+
+<DT>Any of the above followed by <SAMP>`.prof'</SAMP>
+<DD>As above, plus <CODE>--profiling</CODE>.
+
+</DL>
+
+<P>
+Reminder: the following optimizations should not be set individually.
+Instead, you should use the <SAMP>`--grade'</SAMP> option to change the setting of
+these options.
+
+<P>
+<DT><CODE>--gcc-global-registers</CODE> (grades: reg, fast, asm_fast)
+<DD><DT><CODE>--no-gcc-global-registers</CODE> (grades: debug, none, jump, asm_jump)
+<DD>Specify whether or not to use GNU C's global register variables extension.
+
+<P>
+<DT><CODE>--gcc-non-local-gotos</CODE> (grades: jump, fast, asm_jump, asm_fast)
+<DD><DT><CODE>--no-gcc-non-local-gotos</CODE> (grades: debug, none, reg)
+<DD>Specify whether or not to use GNU C's "labels as values" extension.
+
+<P>
+<DT><CODE>--asm-labels</CODE> (grades: asm_jump, asm_fast)
+<DD><DT><CODE>--no-asm-labels</CODE> (grades: debug, none, reg, jump, fast)
+<DD>Specify whether or not to use GNU C's asm extensions
+for inline assembler labels.
+
+<P>
+<DT><CODE>--gc {none, conservative, accurate}</CODE>
+<DD><DT><CODE>--garbage-collection {none, conservative, accurate}</CODE>
+<DD>Specify which method of garbage collection to use.
+<SAMP>`.gc'</SAMP> grades use <SAMP>`--gc conservative'</SAMP>, other grades use
+<SAMP>`--gc none'</SAMP>.
+<SAMP>`accurate'</SAMP> is not yet implemented.
+
+<P>
+<DT><CODE>--tags {none, low, high}</CODE>
+<DD>(This option is not intended for general use.)
+Specify whether to use the low bits or the high bits of
+each word as tag bits (default: low).
+
+<P>
+<DT><CODE>--num-tag-bits <VAR>n</VAR></CODE>
+<DD>(This option is not intended for general use.)
+Use <VAR>n</VAR> tag bits.  This option is required if you specify
+<SAMP>`--tags high'</SAMP>.
+With <SAMP>`--tags low'</SAMP>, the default number of tag bits to use
+is determined by the auto-configuration script.
+
+<P>
+<DT><CODE>--have-delay-slot</CODE>
+<DD>(This option is not intended for general use.)
+Assume that branch instructions have a delay slot.
+
+<P>
+<DT><CODE>--num-real-r-regs <VAR>n</VAR></CODE>
+<DD>(This option is not intended for general use.)
+Assume r1 up to r<VAR>n</VAR> are real general purpose registers.
+
+<P>
+<DT><CODE>--num-real-f-regs <VAR>n</VAR></CODE>
+<DD>(This option is not intended for general use.)
+Assume f1 up to f<VAR>n</VAR> are real floating point registers.
+
+<P>
+<DT><CODE>--num-real-r-temps <VAR>n</VAR></CODE>
+<DD>(This option is not intended for general use.)
+Assume that <VAR>n</VAR> non-float temporaries will fit into real machine registers.
+
+<P>
+<DT><CODE>--num-real-f-temps <VAR>n</VAR></CODE>
+<DD>(This option is not intended for general use.)
+Assume that <VAR>n</VAR> float temporaries will fit into real machine registers.
+
+<P>
+<DT><CODE>--profiling</CODE> (grades: any grade ending in <SAMP>`.prof'</SAMP>)
+<DD>Enable profiling.  Insert profiling hooks in the
+generated code, and also output some profiling
+information (the static call graph) to the file
+<SAMP>`<VAR>module</VAR>.prof'</SAMP>.  See section <A HREF="user_guide.html#SEC9">Profiling</A>.
+
+<P>
+<DT><CODE>--debug</CODE> (grades: debug)
+<DD>Enable debugging.
+Pass the <SAMP>`-g'</SAMP> flag to the C compiler, instead of <SAMP>`-DSPEED'</SAMP>,
+to enable debugging of the generated C code. 
+This option also implies <SAMP>`--no-c-optimize'</SAMP>.
+Debugging support is currently extremely primitive -
+this option is probably not useful to anyone except the Mercury implementors.
+We recommend that you use instead use `mnp' or `msp'.
+See section <A HREF="user_guide.html#SEC4">Using Prolog</A> for details.
+
+<P>
+<DT><CODE>--args {old, compact}</CODE>
+<DD><DT><CODE>--arg-convention {old, compact}</CODE>
+<DD>(This option is not intended for general use.)
+Use the specified argument passing convention
+in the generated low-level C code.
+With the <SAMP>`simple'</SAMP> convention,
+the <VAR>n</VAR>th argument is passed in or out using register r<VAR>n</VAR>.
+With the <SAMP>`compact'</SAMP> convention,
+the <VAR>n</VAR>th input argument is passed using register r<VAR>n</VAR>
+and the <VAR>n</VAR>th output argument is returned using register r<VAR>n</VAR>.
+The <SAMP>`compact'</SAMP> convention generally leads to more efficient code.
+However, currently only the <SAMP>`simple'</SAMP> convention is supported.
+
+<P>
+<DT><CODE>--no-type-layout</CODE>
+<DD>(This option is not intended for general use.)
+Don't output base_type_layout structures or references to them.
+This option will generate smaller executables, but will not allow the
+use of code that uses the layout information (e.g. <SAMP>`functor'</SAMP>, 
+<SAMP>`arg'</SAMP>). Using such code will result in undefined behaviour at
+runtime. The C code also needs to be compiled with
+<SAMP>`-DNO_TYPE_LAYOUT'</SAMP>.
+
+</DL>
+<P>
+<H2><A NAME="SEC23" HREF="user_guide_toc.html#SEC23">Code generation options</A></H2>
+<P>
+<DL COMPACT>
+<DT><CODE>--no-trad-passes</CODE>
+<DD>The default <SAMP>`--trad-passes'</SAMP> completely processes each predicate
+before going on to the next predicate.
+This option tells the compiler
+to complete each phase of code generation on all predicates
+before going on the next phase on all predicates.
+
+
+<P>
+<DT><CODE>--no-reclaim-heap-on-nondet-failure</CODE>
+<DD>Don't reclaim heap on backtracking in nondet code.
+
+<P>
+<DT><CODE>--no-reclaim-heap-on-semidet-failure</CODE>
+<DD>Don't reclaim heap on backtracking in semidet code.
+
+<P>
+<DT><CODE>--cc <VAR>compiler-name</VAR></CODE>
+<DD>Specify which C compiler to use.
+
+<P>
+<DT><CODE>--c-include-directory <VAR>dir</VAR></CODE>
+<DD>Specify the directory containing the Mercury C header files.
+
+<P>
+<DT><CODE>--cflags <VAR>options</VAR></CODE>
+<DD>Specify options to be passed to the C compiler.
+
+</DL>
+<P>
+<H2><A NAME="SEC24" HREF="user_guide_toc.html#SEC24">Optimization options</A></H2>
+<P>
+<H3><A NAME="SEC25" HREF="user_guide_toc.html#SEC25">Overall optimization options</A></H3>
+<P>
+<DL COMPACT>
+<DT><CODE>-O <VAR>n</VAR></CODE>
+<DD><DT><CODE>--opt-level <VAR>n</VAR></CODE>
+<DD><DT><CODE>--optimization-level <VAR>n</VAR></CODE>
+<DD>Set optimization level to <VAR>n</VAR>.
+Optimization levels range from -1 to 6.
+Optimization level -1 disables all optimizations,
+while optimization level 6 enables all optimizations
+except for the cross-module optimizations listed below.
+
+In general, there is a trade-off between compilation speed and the
+speed of the generated code.  When developing, you should normally use
+optimization level 0, which aims to minimize compilation time.  It
+enables only those optimizations that in fact usually <EM>reduce</EM>
+compilation time.  The default optimization level is level 2, which
+delivers reasonably good optimization in reasonable time.  Optimization
+levels higher than that give better optimization, but take longer,
+and are subject to the law of diminishing returns.  The difference in
+the quality of the generated code between optimization level 5 and
+optimization level 6 is very small, but using level 6 may increase
+compiation time and memory requirements dramatically.
+
+Note that if you want the compiler to perform cross-module
+optimizations, then you must enable them separately;
+the cross-module optimizations are not enabled by any <SAMP>`-O'</SAMP>
+level, because they affect the compilation process in ways
+that require special treatment by <SAMP>`mmake'</SAMP>.
+
+<P>
+<DT><CODE>--opt-space</CODE>
+<DD><DT><CODE>--optimize-space</CODE>
+<DD>Turn on optimizations that reduce code size
+and turn off optimizations that significantly increase code size.
+</DL>
+<P>
+<DL COMPACT>
+<DT><CODE>--intermodule-optimization</CODE>
+<DD>Perform inlining and higher-order specialization of the code for
+predicates or functions imported from other modules.
+
+<P>
+<DT><CODE>--split-c-files</CODE>
+<DD>Generate each C function in its own C file,
+so that the linker will optimize away unused code.
+This has the same effect as <SAMP>`--optimize-dead-procs'</SAMP>,
+except that it works globally at link time, rather than
+over a single module, so it does a much better job of
+eliminating unused procedures.
+This option significantly increases compilation time,
+link time, and intermediate disk space requirements,
+but in return reduces the size of the final
+executable, typically by about 10-20%.
+This option is only useful with <SAMP>`--procs-per-c-function 1'</SAMP>.
+
+N.B.  When using <SAMP>`mmake'</SAMP>, the <SAMP>`--split-c-files'</SAMP> option should
+not be placed in the <SAMP>`MCFLAGS'</SAMP> variable.  Instead, use the
+<SAMP>`<VAR>MODULE</VAR>.split'</SAMP> target, i.e. type <SAMP>`mmake foo.split'</SAMP>
+rather than <SAMP>`mmake foo'</SAMP>.
+
+</DL>
+<P>
+<H3><A NAME="SEC26" HREF="user_guide_toc.html#SEC26">High-level (HLDS-&#62;HLDS) optimization options</A></H3>
+<P>
+These optimizations are high-level transformations on our HLDS (high-level
+data structure).
+<P>
+<DL COMPACT>
+<DT><CODE>--no-inlining</CODE>
+<DD>Disable all forms of inlining.
+
+<DT><CODE>--no-inline-simple</CODE>
+<DD>Disable the inlining of simple procedures.
+
+<DT><CODE>--no-inline-single-use</CODE>
+<DD>Disable the inlining of procedures called only once.
+
+<DT><CODE>--inline-compound-threshold <VAR>threshold</VAR></CODE>
+<DD>Inline a procedure if its size
+(measured roughly in terms of the number of connectives in its internal form),
+multiplied by the number of times it is called,
+is below the given threshold.
+
+<DT><CODE>--inline-simple-threshold <VAR>threshold</VAR></CODE>
+<DD>Inline a procedure if its size is less than the given threshold.
+
+<DT><CODE>--intermod-inline-simple-threshold <VAR>threshold</VAR></CODE>
+<DD>Similar to --inline-simple-threshold, except used to determine which
+predicates should be included in <SAMP>`.opt'</SAMP> files. Note that changing this 
+between writing the <SAMP>`.opt'</SAMP> file and compiling to C may cause link errors,
+and too high a value may result in reduced performance.
+
+
+<P>
+<DT><CODE>--no-common-struct</CODE>
+<DD>Disable optimization of common term structures.
+
+<P>
+<DT><CODE>--no-common-goal</CODE>
+<DD>Disable optimization of common goals.
+At the moment this optimization
+detects only common deconstruction unifications.
+Disabling this optimization reduces the class of predicates
+that the compiler considers to be deterministic.
+
+
+
+<P>
+<DT><CODE>--no-follow-code</CODE>
+<DD>Don't migrate builtin goals into branched goals.
+
+<P>
+<DT><CODE>--no-optimize-unused-args</CODE>
+<DD>Don't remove unused predicate arguments. The compiler will
+generate less efficient code for polymorphic predicates.
+
+<P>
+<DT><CODE>--no-optimize-higher-order</CODE>
+<DD>Don't specialize calls to higher-order predicates where
+the higher-order arguments are known.
+
+<P>
+<DT><CODE>--optimize-constructor-last-call</CODE>
+<DD>Enable the optimization of "last" calls that are followed by
+constructor application.
+
+<P>
+<DT><CODE>--optimize-dead-procs.</CODE>
+<DD>Enable dead predicate elimination.
+
+<P>
+<DT><CODE>--excess-assign</CODE>
+<DD>Remove excess assignment unifications.
+
+<P>
+<DT><CODE>--optimize-saved-vars</CODE>
+<DD>Reorder goals to minimize the number of variables
+that have to be saved across calls.
+
+
+</DL>
+<P>
+<H3><A NAME="SEC27" HREF="user_guide_toc.html#SEC27">Medium-level (HLDS-&#62;LLDS) optimization options</A></H3>
+<P>
+These optimizations are applied during the process of generating
+low-level intermediate code from our high-level data structure.
+<P>
+<DL COMPACT>
+<DT><CODE>--no-static-ground-terms</CODE>
+<DD>Disable the optimization of constructing constant ground terms
+at compile time and storing them as static constants.
+
+<P>
+<DT><CODE>--no-smart-indexing</CODE>
+<DD>Generate switches as a simple if-then-else chains;
+disable string hashing and integer table-lookup indexing.
+
+<P>
+<DT><CODE>--dense-switch-req-density <VAR>percentage</VAR></CODE>
+<DD>The jump table generated for an atomic switch
+must have at least this percentage of full slots (default: 25).
+
+<P>
+<DT><CODE>--dense-switch-size <VAR>size</VAR></CODE>
+<DD>The jump table generated for an atomic switch
+must have at least this many entries (default: 4).
+
+<P>
+<DT><CODE>--lookup-switch-req-density <VAR>percentage</VAR></CODE>
+<DD>The lookup tables generated for an atomic switch
+in which all the outputs are constant terms
+must have at least this percentage of full slots (default: 25).
+
+<P>
+<DT><CODE>--lookup-switch-size <VAR>size</VAR></CODE>
+<DD>The lookup tables generated for an atomic switch
+in which all the outputs are constant terms
+must have at least this many entries (default: 4).
+
+<P>
+<DT><CODE>--string-switch-size <VAR>size</VAR></CODE>
+<DD>The hash table generated for a string switch
+must have at least this many entries (default: 8).
+
+<P>
+<DT><CODE>--tag-switch-size <VAR>size</VAR></CODE>
+<DD>The number of alternatives in a tag switch
+must be at least this number (default: 8).
+
+<P>
+<DT><CODE>--no-middle-rec</CODE>
+<DD>Disable the middle recursion optimization.
+
+<P>
+<DT><CODE>--no-simple-neg</CODE>
+<DD>Don't generate simplified code for simple negations.
+
+<P>
+<DT><CODE>--no-follow-vars</CODE>
+<DD>Don't optimize the assignment of registers in branched goals.
+
+</DL>
+<P>
+<H3><A NAME="SEC28" HREF="user_guide_toc.html#SEC28">Low-level (LLDS-&#62;LLDS) optimization options</A></H3>
+<P>
+These optimizations are transformations that are applied to our
+low-level intermediate code before emitting C code.
+<P>
+<DL COMPACT>
+<DT><CODE>--no-llds-optimize</CODE>
+<DD>Disable the low-level optimization passes.
+
+<P>
+<DT><CODE>--no-optimize-peep</CODE>
+<DD>Disable local peephole optimizations.
+
+<P>
+<DT><CODE>--no-optimize-jumps</CODE>
+<DD>Disable elimination of jumps to jumps.
+
+<P>
+<DT><CODE>--no-optimize-fulljumps</CODE>
+<DD>Disable elimination of jumps to ordinary code.
+
+<P>
+<DT><CODE>--no-optimize-labels</CODE>
+<DD>Disable elimination of dead labels and code.
+
+<P>
+<DT><CODE>--optimize-dups</CODE>
+<DD>Enable elimination of duplicate code.
+
+
+<P>
+<DT><CODE>--optimize-value-number</CODE>
+<DD>Perform value numbering on extended basic blocks.
+
+
+<P>
+<DT><CODE>--no-optimize-frames</CODE>
+<DD>Disable stack frame optimizations.
+
+<P>
+<DT><CODE>--no-optimize-delay-slot</CODE>
+<DD>Disable branch delay slot optimizations.
+
+<P>
+<DT><CODE>--optimize-repeat <VAR>n</VAR></CODE>
+<DD>Iterate most optimizations at most <VAR>n</VAR> times (default: 3).
+
+<P>
+<DT><CODE>--optimize-vnrepeat <VAR>n</VAR></CODE>
+<DD>Iterate value numbering at most <VAR>n</VAR> times (default: 1).
+
+</DL>
+<P>
+<H3><A NAME="SEC29" HREF="user_guide_toc.html#SEC29">Output-level (LLDS-&#62;C) optimization options</A></H3>
+<P>
+These optimizations are applied during the process of generating
+C intermediate code from our low-level data structure.
+<P>
+<DL COMPACT>
+<DT><CODE>--no-emit-c-loops</CODE>
+<DD>Use only gotos -- don't emit C loop constructs.
+
+<P>
+<DT><CODE>--use-macro-for-redo-fail</CODE>
+<DD>Emit the fail or redo macro instead of a branch
+to the fail or redo code in the runtime system.
+
+<P>
+<DT><CODE>--procs-per-c-function <VAR>n</VAR></CODE>
+<DD>Don't put the code for more than <VAR>n</VAR> Mercury
+procedures in a single C function.  The default
+value of <VAR>n</VAR> is one.  Increasing <VAR>n</VAR> can produce
+slightly more efficient code, but makes compilation slower.
+Setting <VAR>n</VAR> to the special value zero has the effect of
+putting all the procedures in a single function,
+which produces the most efficient code
+but tends to severely stress the C compiler.
+
+<P>
+<DT><CODE>--no-c-optimize</CODE>
+<DD>Don't enable the C compiler's optimizations.
+
+</DL>
+<P>
+<H2><A NAME="SEC30" HREF="user_guide_toc.html#SEC30">Miscellaneous options</A></H2>
+<DL COMPACT>
+<DT><CODE>-I <VAR>dir</VAR></CODE>
+<DD><DT><CODE>--search-directory <VAR>dir</VAR></CODE>
+<DD>Append <VAR>dir</VAR> to the list of directories to be searched for 
+imported modules.
+
+<P>
+<DT><CODE>-?</CODE>
+<DD><DT><CODE>-h</CODE>
+<DD><DT><CODE>--help</CODE>
+<DD>Print a usage message.
+
+</DL>
+<P>
+<H2><A NAME="SEC31" HREF="user_guide_toc.html#SEC31">Link options</A></H2>
+<DL COMPACT>
+<P>
+<DT><CODE>-o <VAR>filename</VAR></CODE>
+<DD><DT><CODE>--output-file <VAR>filename</VAR></CODE>
+<DD>Specify the name of the final executable.
+(The default executable name is the same as the name of the
+first module on the command line, but without the <SAMP>`.m'</SAMP> extension.)
+
+<P>
+<DT><CODE>--link-flags <VAR>options</VAR></CODE>
+<DD>Specify options to be passed to <SAMP>`ml'</SAMP>, the Mercury linker.
+
+<P>
+<DT><CODE>-L <VAR>directory</VAR></CODE>
+<DD><DT><CODE>--library-directory <VAR>directory</VAR></CODE>
+<DD>Append <VAR>dir</VAR> to the list of directories in which to search for libraries.
+
+<DT><CODE>-l <VAR>library</VAR></CODE>
+<DD><DT><CODE>--library <VAR>library</VAR></CODE>
+<DD>Link with the specified library.
+
+<DT><CODE>--link-object <VAR>object</VAR></CODE>
+<DD>Link with the specified object file.
+
+</DL>
+<P>
+<H1><A NAME="SEC32" HREF="user_guide_toc.html#SEC32">Environment variables</A></H1>
+<P>
+The shell scripts in the Mercury compilation environment
+will use the following environment variables if they are set.
+There should be little need to use these, because the default
+values will generally work fine.
+<P>
+<DL COMPACT>
+<DT><CODE>MERCURY_DEFAULT_GRADE</CODE>
+<DD>The default grade to use if no <SAMP>`--grade'</SAMP> option is specified.
+
+<P>
+<DT><CODE>MERCURY_OPTIONS</CODE>
+<DD>A list of options for the Mercury runtime that gets
+linked into every Mercury program.
+Options are available to set the size of the different memory
+areas, and to enable various debugging traces. 
+Set <SAMP>`MERCURY_OPTIONS'</SAMP> to <SAMP>`-h'</SAMP> for help.
+
+<P>
+<DT><CODE>MERCURY_C_INCL_DIR</CODE>
+<DD>Directory for the Mercury C header files (<TT>`*.h'</TT>).
+
+<P>
+<DT><CODE>MERCURY_INT_DIR</CODE>
+<DD>Directory for the Mercury library interface
+files (<TT>`*.int'</TT>, <TT>`*.int2'</TT>, <TT>`*.int3'</TT> and <TT>`*.opt'</TT>).
+
+<P>
+<DT><CODE>MERCURY_NC_BUILTIN</CODE>
+<DD>Filename of the Mercury `nc'-compatibility file (nc_builtin.nl).
+
+<P>
+<DT><CODE>MERCURY_C_LIB_DIR</CODE>
+<DD>Base directory containing the Mercury libraries (<TT>`libmer.a'</TT> and
+possibly <TT>`libmer.so'</TT>) for each configuration and grade.
+The libraries for each configuration and grade should
+be in the subdirectory <VAR>config</VAR>/<VAR>grade</VAR> of <CODE>$MERCURY_C_LIB_DIR</CODE>.
+
+<P>
+<DT><CODE>MERCURY_NONSHARED_LIB_DIR</CODE>
+<DD>For IRIX 5, this environment variable can be used to specify a
+directory containing a version of libgcc.a which has been compiled with
+<SAMP>`-mno-abicalls'</SAMP>.  See the file <SAMP>`README.IRIX-5'</SAMP> in the Mercury
+source distribution.
+
+<P>
+<DT><CODE>MERCURY_MOD_LIB_DIR</CODE>
+<DD>The directory containing the .init files in the Mercury library.
+They are used to create the initialization file <TT>`*_init.c'</TT>.
+
+<P>
+<DT><CODE>MERCURY_MOD_LIB_MODS</CODE>
+<DD>The names of the .init files in the Mercury library.
+
+<P>
+<DT><CODE>MERCURY_NU_LIB_DIR</CODE>
+<DD>Directory for the NU-Prolog object files (<TT>`*.no'</TT>) for the
+NU-Prolog Mercury library.
+
+<P>
+<DT><CODE>MERCURY_NU_LIB_OBJS</CODE>
+<DD>List of the NU-Prolog object files (<TT>`*.no'</TT>) for the Mercury
+library.
+
+<P>
+<DT><CODE>MERCURY_COMPILER</CODE>
+<DD>Filename of the Mercury Compiler.
+
+<P>
+<DT><CODE>MERCURY_INTERPRETER</CODE>
+<DD>Filename of the Mercury Interpreter.
+
+<P>
+<DT><CODE>MERCURY_MKINIT</CODE>
+<DD>Filename of the program to create the <TT>`*_init.c'</TT> file.
+
+</DL>
+<P>
+<H1><A NAME="SEC33" HREF="user_guide_toc.html#SEC33">Using a different C compiler</A></H1>
+<P>
+The Mercury compiler takes special advantage of certain extensions
+provided by GNU C to generate much more efficient code.  We therefore
+recommend that you use GNU C for compiling Mercury programs.
+However, if for some reason you wish to use another compiler,
+it is possible to do so.  Here's what you need to do.
+<P>
+<UL>
+<LI>You must specify the name of the new compiler.
+You can do this either by setting the <SAMP>`MERCURY_C_COMPILER'</SAMP>
+environment variable, by adding a line
+<SAMP>`MGNUC=MERCURY_C_COMPILER=... mgnuc'</SAMP> to your <SAMP>`Mmake'</SAMP> file,
+or by using the <SAMP>`--cc'</SAMP> option to <SAMP>`mc'</SAMP>.
+You may need to specify some option(s) to the C compiler
+to ensure that it uses an ANSI preprocessor (e.g. if you
+are using the DEC Alpha/OSF 3.2 C compiler, you would need to
+pass <SAMP>`--cc="cc -std"'</SAMP> to <SAMP>`mc'</SAMP> so that it will pass the
+<SAMP>`-std'</SAMP> option to <SAMP>`cc'</SAMP>).
+
+<LI>
+You must use the grade <SAMP>`none'</SAMP> or <SAMP>`none.gc'</SAMP>. 
+You can specify the grade in one of three ways: by setting the
+<SAMP>`MERCURY_DEFAULT_GRADE'</SAMP> environment variable, by adding a line
+<SAMP>`GRADE=...'</SAMP> to your <SAMP>`Mmake'</SAMP> file, or by using the
+<SAMP>`--grade'</SAMP> option to <SAMP>`mc'</SAMP>.  (You will also need to install
+those grades of the Mercury library, if you have not already done so.)
+
+<LI>
+If your compiler is particularly strict in
+enforcing ANSI compliance, you may also need to compile the Mercury
+code with <SAMP>`--no-static-ground-terms'</SAMP>.
+
+</UL>
+<P>
+</BODY>
+</HTML>

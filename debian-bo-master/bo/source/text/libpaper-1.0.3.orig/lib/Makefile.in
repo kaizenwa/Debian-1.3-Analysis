@@ -1,0 +1,140 @@
+# Makefile for libpaper.
+# Copyright (C) 1995 Yves Arrouye <Yves.Arrouye@imag.fr>
+ 
+#### Start of system configuration section. ####
+ 
+srcdir = @srcdir@/..
+VPATH = @srcdir@
+
+@SET_MAKE@
+
+INSTALL = @INSTALL@
+INSTALL_HEADER = @INSTALL@ -m 444 $(INSTALL_GROUP) $(INSTALL_OWNER)
+INSTALL_LIB = @INSTALL@ -m 444 $(INSTALL_GROUP) $(INSTALL_OWNER)
+INSTALL_LIBSO = @INSTALL@ -m 755 $(INSTALL_GROUP) $(INSTALL_OWNER)
+
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+
+libdir = $(prefix)/lib
+incdir = $(prefix)/include
+
+# Directory in which to install library files.
+datadir = @datadir@
+
+ifeq ($(datadir),/)
+etcdir = /etc
+else
+etcdir = $(datadir)/etc
+endif
+
+# Other configuration
+
+PAPERCONF=letter
+
+PAPERVAR=PAPERCONF
+PAPERSIZEVAR=PAPERSIZE
+
+PAPERSIZE=$(etcdir)/papersize
+
+LN_S = @LN_S@
+RANLIB = @RANLIB@
+
+CC = @CC@
+
+SHAREDCFLAGS = @SHAREDCFLAGS@
+
+CFLAGS = -O2 $(SHAREDCFLAGS) -DPAPERCONF=\"$(PAPERCONF)\" -DPAPERVAR=\"$(PAPERVAR)\" -DPAPERSIZE=\"$(PAPERSIZE)\" -DPAPERSIZEVAR=\"$(PAPERSIZEVAR)\"
+
+#### End of system configuration section. ####
+
+SRC = paper.c dimen.c
+OBJ = $(SRC:.c=.o)
+
+LIB = libpaper.a
+LIBSO = libpaper.so
+
+LIBSOMAJOR = 1
+LIBSOMINOR = 0.2
+
+INSTALLEDFILES = $(libdir)/$(LIB) \
+    $(incdir)/paper.h
+INSTALLEDSHARED = $(libdir)/$(LIBSO).$(LIBSOMAJOR).$(LIBSOMINOR) \
+    $(libdir)/$(LIBSO).$(LIBSOMAJOR) \
+    $(libdir)/$(LIBSO)
+
+all: static @shared@
+
+static: $(LIB)
+shared: $(LIBSO).$(LIBSOMAJOR).$(LIBSOMINOR) \
+    $(LIBSO).$(LIBSOMAJOR) $(LIBSO)
+
+
+install: install-static install-@shared@
+
+install-static: all installdirs $(INSTALLEDFILES)
+install-shared: shared installdirs $(INSTALLEDSHARED)
+install-:
+
+uninstall:
+	$(RM) $(INSTALLEDFILES) $(INSTALLEDSHARED) $(INSTALLEDOTHERFILES)
+
+$(incdir)/paper.h: paper.h
+	$(INSTALL_HEADER) $< $(incdir)
+
+$(libdir)/$(LIB): $(LIB)
+	$(INSTALL_LIB) $(LIB) $(libdir)
+	$(RANLIB) $@
+
+$(libdir)/$(LIBSO): $(libdir)/$(LIBSO).$(LIBSOMAJOR).$(LIBSOMINOR)
+	(cd $(libdir) && $(RM) $(LIBSO) && $(LN_S) $(LIBSO).$(LIBSOMAJOR).$(LIBSOMINOR) $(LIBSO))
+
+$(libdir)/$(LIBSO).$(LIBSOMAJOR): $(libdir)/$(LIBSO).$(LIBSOMAJOR).$(LIBSOMINOR)
+	(cd $(libdir) && $(RM) $(LIBSO).$(LIBSOMAJOR) && $(LN_S) $(LIBSO).$(LIBSOMAJOR).$(LIBSOMINOR) $(LIBSO).$(LIBSOMAJOR))
+
+$(libdir)/$(LIBSO).$(LIBSOMAJOR).$(LIBSOMINOR): $(LIBSO).$(LIBSOMAJOR).$(LIBSOMINOR) 
+	$(INSTALL_LIBSO) $(LIBSO).$(LIBSOMAJOR).$(LIBSOMINOR) $(libdir)
+
+$(mandir)/man5/papersize.5: papersize.5
+	$(INSTALL_MAN) $< $@
+
+$(LIBSO).$(LIBSOMAJOR): $(LIBSO).$(LIBSOMAJOR).$(LIBSOMINOR)
+	$(LN_S) $< $@
+
+$(LIBSO): $(LIBSO).$(LIBSOMAJOR).$(LIBSOMINOR)
+	$(LN_S) $< $@
+
+installdirs:
+	${srcdir}/mkinstalldirs $(libdir) $(incdir)
+
+$(LIB): $(LIB)($(OBJ))
+	$(RANLIB) $@
+
+$(LIBSO).$(LIBSOMAJOR).$(LIBSOMINOR): $(OBJ)
+	$(CC) -shared -Wl,-soname,$(LIBSO).$(LIBSOMAJOR) -o $@ $(OBJ)
+
+paper.o: paper.h paperspecs.h paper.c
+dimen.o: dimen.h dimen.c
+
+paperspecs.h: paperspecs Makefile
+	echo >$@
+	echo '    /* This file has been automaticaly generated.' >>$@
+	echo '       Edit paperspecs to make changes to the papers specifications. */' >>$@
+	echo >>$@
+	sed -e '/^[     ]*$$/d' -e 's/\(.*\) \(.*\) \(.*\)/    { "\1", \2, \3 },/' paperspecs >>$@
+
+$(srcdir)/configure: $(srcdir)/configure.in $(M4FILES)
+	cd $(srcdir); rm -f configure && autoconf && chmod +x configure
+Makefile: Makefile.in $(srcdir)/config.status
+	cd $(srcdir); ./config.status
+$(srcdir)/config.status: $(srcdir)/configure
+	cd $(srcdir); ./config.status --recheck
+
+clean:
+	$(RM) $(OBJ) paperspecs.h
+
+distclean: clean
+	$(RM) Makefile $(LIB) $(LIBSO).$(LIBSOMAJOR).$(LIBSOMINOR) \
+	    $(LIBSO).$(LIBSOMAJOR) $(LIBSO)
+
+

@@ -1,0 +1,493 @@
+
+	Last update: 5/29/96 (Mark Erikson)
+
+	This document does change between releases.  Please read it each
+    time you pick up a new version of Qpopper.  If you have any questions
+    or problems, please contact qpopper@qualcomm.com.
+
+	For the most part if you keep stay with the default for your system
+    you should be fine.  But if you want to add a feature, you're going to
+    have to read through the list below.
+
+SECTIONS:
+	MAKE
+	NOTES
+	INSTALL
+	DEBUGGING
+	RUNNING
+	BULLETINS
+	SERVER MODE
+	APOP
+
+MAKE:
+        To install the popper you need to determine which OS is supported
+    and run the appropriate make command.  Just run make for the list of
+    available builds.
+
+        There are a few options to consider when doing a build.
+
+	1) popper.h - There are some defines you may want to change
+
+	    a) MMDF_SEP_CHAR - Default is '\001' (<CTL>-A).  A line
+			    which starts with this character is considered
+			    an MMDF separater.  The rest of the line is
+			    copied as the separator reguardless of its value.
+
+	    b) BULLDIR - Compiled value as opposed to the command line
+			    option.  Does the same thing, enables bulletins.
+			    You can also specify this value in the make
+			    file -DBULLDIR=\"/var/spool/bulls\".  This makes
+			    bulletins the default reguardless of the
+			    commandline options.  The option -DBULLDB uses
+			    an ndbm database for tracking bulletins sent to
+			    pop users.  If you use this feature, it will
+			    read the old ~user/.popbull file if it exists.
+			    -DBULLDB requires two blank files with the name
+			    of BULLDIR/bulldb.pag and BULLDIR/bulldb.dir be
+			    created.
+
+	    c) NEWBULLCNT - New users receive all bulletins by default.
+			    This value reduces the max bulletin value for
+			    new popper users.
+
+	    d) OFF_T - If "off_t" is not typedefed for you then set this
+		       define to a type that lseek and ftruncate expect
+		       as an offset parameter.
+	       UID_T, GID_T, and PID_T are also available for portability.
+
+	    e) BLOCK_UID - This value protects mailboxes of all UIDs at and
+			   below from being accessed via the popper.  The
+			   default value is 10.  That means that root and
+			   other users with UID values of 10 and under will
+			   not be able to login via the popper.
+
+	2) The makefile for your OS is setup for the most common defaults.
+	   Below are some values which you may wish to modify.
+
+	    a) KERBEROS - Define this value if you want to add Kerberos IV
+			    support in the server.  Make sure you update
+			    make file to load the appropriate libraries
+			    (-lkrb).  This option only works if you have
+			    Kerberos headers and libraries installed.  You
+			    may also want to define KUSEROK if you want to
+			    use the kuserok() function.
+
+	    b1) AUTHFILE - Define this value to reference the file which
+			   only allows users listed in the file to have
+			   popper access.  Ex: -DAUTHFILE=\"/etc/authfile\"
+			   The format is a list of user id's, one per line.
+
+	    b2) NONAUTHFILE - Define this value to reference the file which
+			      excludes listed users.
+			      Ex: -DAUTHFILE=\"/etc/nonauthfile\"
+			      The format is a list of user id's, one per line.
+
+	    c) AUTH - Define this value if your system supports special
+			authorization mechanisms like shadow passwords or
+			special crypt programs.  The make files have been
+			setup for this as best as I can tell.  SunOS4.x does
+			not support this by default since it requires the C2
+			code to be loaded which is not done by default.  If
+			you support shadow passwords on SunOS4.x then define
+			SUNOS4 and AUTH in the make.sunos makefile.  You may
+			have to port a pop_pass routine for your OS before
+			enabling this feature.
+
+	    d) RPOP - This feature allows the pop client to use the
+			hosts.equiv and .rhosts files for system/user
+			validation.  This feature is not recommened since
+			it is far to easy to spoof a system on a PC or a
+			Mac.
+
+	    e) SECURENISPLUS - Add this define if (and only if!) you are
+			    running secure NIS+, namely when the popper
+			    server can't access a users' encrypted password.
+
+	    f) DEBUG - Verbose logging (requires -d commandline argument to
+			enable).  Only enable this if you are having problems
+			figuring out why popper is not working.  Log files
+			on busy systems will get large fast.
+	    
+	    g) SETPROCTITLE - This define controls whether setproctitle()
+			should be used to display user, host, and status
+			in the process title.  Your OS must support this
+			feature.
+
+	    h) KEEP_TEMP_DROP - Keep the .user.pop file around.  It can be
+			    used to determine when the last time a user has
+			    accessed their mail.
+
+	    i) MAILOCK - Special interface into SunOS dot locking (user.lock).
+
+	    j) BIND43 - BSD 4.3 domain name service.
+
+	    k) HAVE_VSPRINTF - If the vsprintf functions are available on
+			       your system.
+
+	    l) STRDUP - Define if your system does not support the strdup()
+			library call.
+
+	    m) STRNCASECMP - Define if your system does no support the
+			     strncasecmp() library call.
+
+	    n) SYSLOG42 - The Qualcomm popper defaults to BSD 4.3 syslog.
+
+	    o) SYSV - All SVR4 systems define this value.
+
+	    p) BINMAIL_IS_SETGID - If /bin/mail on your system is setgid
+			    then you should define this value.  It is 
+			    necessary on systems which do no support the
+			    sticky bit for directories.
+
+	    q) HOMEDIRMAIL - Define this if mail is spooled into the users
+			    home directory.  Check the macro and the sprintf
+			    statement in pop_pass.c to make sure the location
+			    is correct for your system.
+
+	    r) APOP=\"/etc/pop.auth\" - The location of the authorization
+			    database.  Users found in this DB may not use
+			    user/pass authentication if they are found in
+			    the apop database.
+
+	    s) POPUID=\"pop\" - Username of the owner of the apop database.
+
+	    t) GNUPASS - This define specifies the use of the (modified :-)
+			GNU getpass routine which allows longer than 8 char
+			passwords to be entered when using popauth.  There
+			is also a define within popauth (NO_GETLINE) if you
+			compile this code and it complains of not getline
+			routine.
+
+	    u) CONTENT_LENGTH - If your MTA (Mail Transport Agent) inserts
+			Content-Length header into the message then define
+			this option.
+
+	    v) SERVER_MODE - see SERVER MODE section for details
+
+	    w) NO_STATUS - Do not update the status Header of the message
+			and do no store the UID in the message header.
+
+	    x) NOUPDATEONABORT - By defaul the Qualcomm popper does enters
+			the update state on abort.  Some sites do not like
+			this.  This flag causes the popper to ignore any
+			changes (deletes) to occur if a popper session is
+			aborted.
+
+	    y) HASH_SPOOL=(1|2) - Mail is deposited into the mailspools by
+			either (1) hashing the first 4 characters or (2)
+			use mailspools in directories of the form of
+			/<1st letter>/<2nd letter>/file.
+
+	    z) BULLDB - Use a central database located in the bulletin
+			directory instead of a users home directory.  This
+			feature will use the users .popbull file the first
+			time for backwards compatibility.  BULLDBDIR can
+			be defined in the make file if an alternate
+			location for the bulletin database is desired.
+
+	    A) CHECK_SHELL - Enable this compile time feature to lock out
+			     users via the shell value.  A user shell of
+			     /POPPER/ANY/SHELL will allow the user access
+			     but block other programs that check shells.
+
+	3) When qpopper runs it moves your mailspool to a temporary location
+	   (.user.pop).  The default location is in the mail spool directory.
+	   /tmp is an alternative but is consider to be a security risk and
+	   a system reboot will probably clear the temporary .user.pop files.
+	   For performance reasons a sysadmin who has many users (say 1000
+	   or more) can create a separate spool directory for popper files.
+	   /usr/spool/poptemp could be a good choice.  Permissions should the
+	   same as your mailspool as well as the same owner and group.
+
+	4) Mail spool directory.  Some systems have symbolic links from
+	   /usr/mail to /usr/spool/mail.  Some don't.  I've tried to guess
+	   at which OS uses /usr/man and which uses /usr/spool/mail.
+	   Sometimes I guess wrong.  Make sure you check this before
+	   installing.
+
+	5) I wouldn't suggest that you use qpopper over NFS.  I'm not sure
+	   the locking works correctly.  This is being looked into.
+
+NOTES:
+
+	The popper uses /etc/passwd to validate the userid for any user
+    in any mode (user/pass, kerberos, apop, authuser, nonauthuser).  This
+    is because the mail spool file must be owned by someone and ownership
+    relationships live in /etc/passwd.  So, a user name must exist in both
+    the passwd file as well as any of the other files associated with other
+    authentication methods.
+
+	SCO - some versions of SCO use the crypt_d library, others the
+	      crypt_i library.  This distribution assumes crypt_d. SCO
+	      requires loading the Standard and TCP/IP development 
+	      environments in order to get the sockets and crypt libraries.
+
+	IRIX - The default spool directory is /usr/mail, some systems
+	       use /usr/spool/mail.
+
+	FreeBSD - Requires the crypt library for password comparisons.
+	          Check the FreeBSD.crypt file in the doc directory for
+		  locations nearest you :-)
+
+	OSF/1 - If you are not using enhanced security (shadow passwords)
+		then turn off the AUTH define.  Otherwise, you will receive
+		a link error stating that set_auth_parameters() is not
+		defined.
+
+	A/UX - A/UX does no support the sticky bit so the default dir is
+		/tmp.  If you want to support shadow passwords, you need
+		to add the -DAUTH define into make.aux.  A shadow passwd
+		library is also required.  You can find one on
+		jagubox.gsfc.nasa.gov.  A/UX requires gcc and libUTIL.a,
+		also available on jagubox, build this version of popper.
+
+	ISC - APOP does no work because the port was done on a system
+		without dbm.  If you want to use apop, then get a working
+		dbm library, change the link line, and add the APOP defines.
+
+	SUNOS - Some systems don't seem to have strerr defined in the default
+		location.  You may need to use the alternate CFLAGS to compile
+		correctly.
+
+	NCR - May need to increase STRTHRESH.  Eg: a 600 user system was
+		increased from 0x200000 to 0x600000.
+
+	Next - You should probably use NetInfo Manager available under
+		Next Admin to change your services file.
+
+	Bulletins - The From line must be complete with address and date.
+		    If the popper has determined that it can use full From
+		    lines then a simple "From " line will cause the message
+		    to get concatenated to the previous message.
+
+INSTALL:
+	After running make on the appropriate OS, you need to move the
+    popper to a known location.  There is no one correct place.  Many
+    sysadmins prefer /usr/local/lib.
+
+	Modify your /etc/inetd.conf file to contain the following line.
+    You may have to modify it to support your version of the file.  Note:
+    for AIX sysadmins, you should use SMIT and not edit the following
+    files.
+
+pop3    stream  tcp     nowait  root    /usr/local/lib/popper   popper -s
+
+	If your OS does not have an inetd.conf file then it uses the
+    config file /etc/servers.  Use the following line:
+
+pop3	tcp	/usr/local/etc/popper	popper -s
+
+	For all OS version you must modify your /etc/services file to
+    include the following line.
+
+pop3            110/tcp                         # Post Office
+
+	Restart inetd with a kill -HUP <inetdpid> and you should be all
+    set (some systems can use inetd -c).
+    
+	If you have modified these files for AIX, the following commands
+    may work for you.  First you need to import the new inetd.conf file
+    and then you need to re-init inetd.  Use the following commands.
+
+	    inet imp
+	    refresh -s inetd
+
+	If you are running NIS, please don't forgot to update your maps.
+
+
+DEBUGGING:
+	Telnet to the popper port "telnet <popper host> pop3".  If you
+    receive one of the following error messages
+
+    "connect: Connection refused"
+	    This message is telling you that inetd is not servicing the
+	pop port.  Check your services file and make sure the port name
+	"pop3" is spelt the same way as the one in inetd.conf.  It can
+	also mean that you have not reset inetd (kill -HUP <inetd PID>)
+	(some systems can use inetd -c).
+    or 
+
+    "connect: Connection closed"
+	    or similar messages indicate that inetd has the correct port
+	assigned to the popper, but that either the program cannot be
+	located or it is failing on startup.  If you are compiling
+	with a listed OS, chances are the pop program is mis named in
+	the /etc/inetd.conf file.  Otherwise, add the -d flag and check
+	your log messages for the source of the problem.
+
+	What you are looking for is the startup banner.  If you see the
+    following line then you have correctly installed the popper as far
+    as inetd is concerned.
+
+  +OK QPOP (version 2.1.4-R4) at <system> starting.  <13625.811191280@system>
+
+	Now you need to run two commands to authorize yourself.  You
+    should make sure you have a message or two queued up so you can
+    make sure the popper is pointed at the correct mail spool file.
+    Don't be alarmed, the password is echoed back, that's the way it
+    is suppose to work:
+
+    user <your user name here>
+    +OK Password required for <your user name hsers>
+    pass <your password>
+    +OK mark has 2 message(s) (4123 octets).
+
+	You have successfully authorized yourself.  You have two messages.
+    At this point you can enter "quit" to exit.  list and uidl are two
+    commands to list out each message by size and unique ID respectively.
+    If you get this far Eudora or any other pop client will not have a
+    problem communicating with your popper.
+
+	If you get the following line:
+
+	Unable to process From lines (envelops), change recognition modes.
+
+	It means that your mailbox is corrupted (the first line is not a
+    recognizable From header or MMDF separator) or there is a From line
+    I haven't seen before.  Edit the mail spool file and send me the first
+    line.  If the first line is blank then remove it until you reach the
+    From line.
+
+	If you get an error message saying that your password is incorrect,
+    you might be using shadow password and need to use the -DAUTH define.
+    Or, you might be using a UID less than 11 (default) which is automatically
+    blocked from access.
+
+RUNNING:
+
+	There are a couple of command line options you may want to use.
+
+	-b bulldir	- Location of the bulletin directory.  The command
+			  line will override the compiled in value if it
+			  is defined.  Human readable file names can be
+			  created in the form of number.string (eg:
+			  00001.Bulletin_one, 00002.2hr_Downtime_2-4-95).
+			  A bulletin database can be used to track the
+			  bulletins instead of the users home directory.
+			  This feature is enabled with -DBULLDB during
+			  compile time.  -DBULLDB requires two blank files
+			  with the name of BULLDIR/bulldb.pag and
+			  BULLDIR/bulldb.dir be created.
+
+	-d		- Enable debug logging if it has beem compiled in.
+
+	-k		- If compiled with -DKERBEROS, this flag enables
+			  Kerberos only support.  Make sure you place this
+			  invocation of the popper at the appropriate kpop
+			  port in inetd.
+
+	-s		- Enable statistics logging.  
+
+	-t logfile	- If debug and trace file are defined, output from
+			  logging goes to the trace file instead of syslog.
+
+	-T timeout	- Change the compiled default for read timeouts.
+			  120 seconds seems to be more than long enough.
+			  30 seconds is a little short but acceptable for
+			  many sites.  This value will cause the popper
+			  to terminate the connection with the client and
+			  move the messages back to the users maildrop.
+			  The RFC states that this timeout should be 600
+			  seconds (10 minutes).
+
+
+BULLETINS:
+
+	Bulletins are of the form:
+
+-------------- start message -------------
+From mark Wed Nov  9 13:31:08 1994
+Date: Wed, 9 Nov 1994 13:31:07 -0800 (PST)
+From: "Mark Erikson" <mark@qualcomm.com>
+Subject: test bulletin
+
+	This is a test bulletin.  This message will be appended to the 
+    end of the mailspool when the user logs into the popper.
+
+	Note that you should modify the From: and Subject: header and I
+    suggest that you modify the Date: header as well.
+
+--------------- end message --------------
+
+	Do not include the --- start message --- and --- end message ---
+    lines to your bulletin.
+
+
+SERVER MODE:
+
+	This mode of operation is specifically designed to work with POP
+    only accounts.
+
+	The default mode of the popper is to copy the mailspool to the
+    temporary location and remove the mailspool.  This keeps other mail
+    programs from modifying the mailspool while a pop session is active.
+    When complete, the mailspool is copied back to the spool directory
+    if there are any messages left.  This process is a little wasteful
+    if you never keep mail on the server, or, you do leave mail on the
+    server and do mailchecks occasionally.  For large pop servers the
+    extra IO processing can be a performance problem.  This is the reason
+    SERVER MODE was created.
+
+	Enabling SERVER_MODE assumes that only /bin/mail and popper are
+    accessing the mail spool.  In server mode the mailspool is locked
+    and scanned and then unlocked.  The popper will assume that only
+    new messages will be appended to the mailspool.  After retrieving
+    messages the popper checks for left over messages (undeleted messages)
+    for status and UID updates and updates the mailspool if there are
+    any changes.
+
+	The benifit of using this mode is that the mailspool is not
+    copied to the temporary spool area unless mail is left on the server,
+    and then only when messages are read and/or deleted.  The NO_STATUS
+    flag causes the popper to ignore the Status header and recalculates
+    the UID each time the mailspool is run.  The advantage of this is
+    that when new messages are read, the new UID and Status headers are
+    not updated and no copy of the mailspool is done.  Greate for LMOS.
+    
+	In server mode if all messages are deleted then the mailspool
+    is simply truncated (unless new messages have arrived).  The initial
+    copy is not done and IO cycles are saved.  Small sites probably won't
+    see much of a gain using this feature of the popper.
+
+
+APOP:
+
+	APOP and an alternate authentication method.  It's strong point is
+    its ability to authenticate without passing the password in cleartext
+    over the wire.
+
+	To enable this feature you need to define the following compiler
+    defines:
+
+	APOP=\"/etc/pop.auth\"
+	POPUID=\"pop\"
+
+	The first define is the location of the datebase, the second
+    specifies the user/password entry that will own the authorization
+    database.
+
+	When you build the popper with APOP, you will also get a program
+    called popauth which must be installed in a public location.  This
+    program must also run SUID as the 'pop' user so that it can make
+    modifications to the pop.auth database.
+    
+    NOTE: Make sure the datebase /etc/pop.auth is owned by POPUID and that
+	  the permissions are 600.  popauth -init is suppose to do the
+	  right thing and create the file with the proper owner and perms.
+
+	The database must be initialized by root with the command
+
+	    popauth -init
+
+	New users can be added by root or the 'pop' user with the command
+
+	    popauth -user <user>
+
+	Or removed with
+
+	    popauth -delete <user>
+
+	Anyone add themselves or can change their password with the command 
+
+	    popauth
+

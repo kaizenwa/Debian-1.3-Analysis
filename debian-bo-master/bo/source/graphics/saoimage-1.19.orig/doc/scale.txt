@@ -1,0 +1,192 @@
+
+SAOimage scaling
+
+
+scaling from image file values to the range of the display color map
+
+the color map
+
+The workstation display only associates colors with a small, finite set
+of values (typically integer values between 0 and 255).  The values used
+by the workstations are associated to the colors in its palette through
+a color map (e.g. 0=black, 1=dark blue, ...).  Some of the color map
+entries are reserved for such things as the colors of the screen or
+window background, the mouse cursor, and terminal window text, leaving
+fewer color map values for an application like SAOimage to use.  See the
+color chapter for a more detailed discussion.
+
+the image data
+
+Image data may have an arbitrary range of data values.  Data values may
+be very large or be very small or negative values, and they may have
+fractional components.  Image scaling involves binning groups of image
+data values for each display color map value.
+
+basic scaling
+
+Take the case of an image with a range of values from 0 to +1199 (a
+range of 1200).  Imagine that SAOimage has only 200 color map values
+to work with.  It might assign one color map slot (or bin) to each
+range of six in the image.  Thus values 0 to 5 would be assigned the
+lowest color map slot, say 0.  6 to 11 would be assigned to 1, and so
+on up to the values between 1195 and 1199 going to slot 199 in the
+color map.  Then, if slot 0 was black, all pixels in the image with
+data values between 0 and 5 would appear black in the display.  If
+color map slot 131 was assigned the color pink, then image pixels
+whose data value was between 787 and 792 would appear pink in the
+display.
+
+scaling distributions
+
+The above example is an example of linear scaling.  But suppose that it
+was important to be able to see the differences among levels 2, 3, 4,
+and 5, but not so important to see a difference between 1001 and 1002.
+Perhaps it would be sufficient to see differences between 1001 and 1100,
+but 1001, 1002, 1003, etc. could all have the same color.  Then it would
+be better to use a scaling that used more color map slots for the lower
+image values than the higher image values.  Log and square root scaling
+do that.  To understand how that works, imagine a graph with image values
+along the side and color map values along the bottom.  A plot of linear
+scaling would be a straight line.  A log line would be curved, having
+less slope at the bottom (more color map values per image value range)
+and get steeper toward the top.  The square root function would be similar
+but follow a different curve.
+
+non-linear distributions
+
+Suppose that weighting toward one end or the other wasn't good enough.  
+Perhaps the data values fall in clusters with big gaps in between.
+Imagine an image with most of its data clustered between 0 and 200,
+but two or three pixels with a value of 1000.  In the linear scaling 80%
+of the color cells would be used for non-existent values between 200 and
+1000.  Worse, as is common with CCD images, perhaps there are bad pixels
+with values like -1200, which have nothing to do with the data.
+
+ equalization
+
+It is appropriate to speak in terms of a histogram of the data values,
+plotting ranges of data values by the frequency (number of pixels) of
+their occurrence in the image.  Suppose that the ranges in the histogram
+were selected such that each range was associated with one color map
+value.  In a poor scaling distribution, many of the ranges have few or
+no actual occurrences in the image.  Histogram equalization is a process
+whereby each range is adjusted with respect to the others, until each
+range has about the same number of pixel occurrences in the image, thus
+maximizing the information in the display.  This usually produces a
+dramatic improvement in the amount of visible detail in the display.
+
+The drawback of histogram equalization is that the ranges can vary
+greatly in size, thus a difference between two adjacent color map values
+may represent a big or a small difference in data values, with much
+irregularity from one step to the next.
+
+windowing the scaling
+
+Where most of the data falls within a single contiguous range, with bad
+pixels or infrequent events in the extremes to either end, scaling to the
+color map can be restricted to a specific range, with all values below that
+range having the same color as the minimum and all values above that range
+having the same color as the maximum.  This can either be accomplished by
+specifying the limits directly, or by looking for a section of the image
+which is free from extreme values, and basing the scaling on the values in
+that section only.
+
+stretching the color map range
+
+Another trick to show more detail with a limited color map is to reuse it.
+By wrapping the color map on itself, it could represent the range of values
+from 0 to 99, and then start over, 100 having the same color as 0 and 199
+having the same color as 99.  This works for smoothly varying data and even
+has a sort of contoured look to it.  Where the data fluctuations are greater
+than the base range, the result is a lot of meaningless noise.
+
+
+realization and efficiency within SAOimage
+
+In order to realize reasonable execution times for rescaling the image
+display, SAOimage does not apply its scaling functions to real data.
+Where the image data was real, double, or long, the data is linearly
+rescaled to integer values between -32768 and 32767 (a range of 65,536).
+Each scaling function produces a look-up table (or map) for this range
+of values which is used to draw or redraw the display.  If the data has
+such great extremes that this range linearly applied to the data's range
+will be insufficient, windowing limits for the initial linear scaling can
+be given on the command line (-rmin, -rmax).
+
+The scaling function is further windowed by being applied only to the
+range of image values actually being displayed at the time the function
+is invoked.  Pixels not appearing in the display window are not considered
+in the scaling algorithm.  Thus scaling after panning and zooming will
+produce different scale look-up table mappings, depending on the contents
+of the display.  Panning and zooming can be used in this way to find a
+better scaling.  To allow for extreme data that just appear at the edges
+(common in CCD images) data within 2 pixels of the edge of the display
+are not considered in the assessment of range.  In verbose mode, the
+scaling routine reports the range of values which it finds in the
+display.
+
+One or both limits of the value range for scaling can be restricted
+by using the -min and -max arguments on the command line.  When given,
+the low end of the range will not extend below the -min value, and/or
+the upper end will not extend above the -max value.  The limit value 
+should be given in terms of original file values (not the internal
+short-integer values, should they differ).  The -min and/or -max
+value can be cleared by giving the -min or -max switch with no
+argument.
+
+Panning or zooming after a scale map has been made does not cause a new
+scaling map to be calculated.  The display is drawn with the existing
+scaling map.  If the new display has values outside the range when the
+map was made, these values are usually clipped  in terms of a histogram of the data values,
+plotting ranges of data values by the frequency (number of pixels) of
+their occurrence in the image.  Suppose that the ranges in the histogram
+were selected such that each range was associated with one color map
+value.  In a poor scaling distribution, many of the ranges have few or
+no actual occurrences in the image.  Histogram equalization is a process
+whereby each range is adjusted with respect to the others, until each
+range has about the same number of pixel occurrences in the image, thus
+maximizing the information in the display.  This usually produces a
+dramatic improvement in the amount of visible detail in the display.
+
+The drawback of histogram equalization is that the ranges can vary
+greatly in size, thus a difference between two adjacent color map values
+may represent a big or a small difference in data values, with much
+irregularity from one step to the next.
+
+windowing the scaling
+
+Where most of the data falls within a single contiguous range, with bad
+pixels or infrequent events in the extremes to either end, scaling to the
+color map can be restricted to a specific range, with all values below that
+range having the same color as the minimum and all values above that range
+having the same color as the maximum.  This can either be accomplished by
+specifying the limits directly, or by looking for a section of the image
+which is free from extreme values, and basing the scaling on the values in
+that section only.
+
+stretching the color map range
+
+Another trick to show more detail with a limited color map is to reuse it.
+By wrapping the color map on itself, it could represent the range of values
+from 0 to 99, and then start over, 100 having the same color as 0 and 199
+having the same color as 99.  This works for smoothly varying data and even
+has a sort of contoured look to it.  Where the data fluctuations are greater
+than the base range, the result is a lot of meaningless noise.
+
+
+realization and efficiency within SAOimage
+
+In order to realize reasonable execution times for rescaling the image
+display, SAOimage does not apply its scaling functions to real data.
+Where the image data was real, double, or long, the data is linearly
+rescaled to integer values between -32768 and 32767 (a range of 65,536).
+Each scaling function produces a look-up table (or map) for this range
+of values which is used to draw or redraw the display.  If the data has
+such great extremes that this range linearly applied to the data's range
+will be insufficient, windowing limits for the initial linear scaling can
+be given on the command line (-rmin, -rmax).
+
+The scaling function is further windowed by being applied only to the
+range of image values actually being displayed at the time the function
+is invoked.  Pixels not appearing in the display window are not considered
+in t

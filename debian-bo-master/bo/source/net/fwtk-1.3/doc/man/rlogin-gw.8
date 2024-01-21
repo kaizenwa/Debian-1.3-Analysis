@@ -1,0 +1,154 @@
+.\" Marcus J. Ranum, 1993 
+.\" Wei Xu, 1994
+.\" Copyright (C) Trusted Information Systems, Inc.
+.\" All rights reserved
+.TH RLOGIN-GW 8 "12 August 1994"
+.SH NAME
+rlogin-gw - rlogin proxy server
+.SH SYNOPSIS
+.B rlogin-gw
+[invoked from inetd]
+.SH DESCRIPTION
+.IX  "rlogin-gw"  ""  "\(em rlogin proxy server"
+.LP
+.B rlogin-gw
+provides pass-through rlogin proxy services with logging and
+access control.
+When
+.B rlogin-gw
+is invoked from
+.B inetd(8),
+it reads its configuration and checks to see if the
+system that has just connected is permitted to use the
+proxy. If not, it shuts down with a message and logs
+the connection. If the peer is permitted to use the
+proxy,
+.B rlogin-gw
+checks the username that is provided as part of the
+.I rlogin
+protocol, and if it is of the form of
+.I user@host
+an attempt will be made to reconnect to the host and
+log in as that user. If no host is specified,
+.B rlogin-gw
+enters a command loop in which it awaits for a user to specify 
+a) the system to which they wish to connect,
+b) the X-gateway they wish to invoke (see man page
+.B x-gw 
+for details).
+.SH OPTIONS
+.LP
+.B rlogin-gw
+reads its configuration rules and permissions
+information from the firewall configuration
+table
+.B netperm-table,
+retrieving all rules specified for "rlogin-gw".
+The following configuration rules are recognized:
+.TP
+.B directory pathname
+specifies a directory to which
+.B rlogin-gw
+will chroot(2) prior to providing service.
+.TP
+.B prompt string
+specifies a prompt for
+.B rlogin-gw
+to use while it is in command mode.
+.TP
+.B timeout seconds
+specifies the number of seconds of idleness after which the
+proxy should disconnect. Default is no timeout.
+.TP
+.B denial-msg filename
+specifies the name of a file to display to the remote user
+if they are denied permission to use the proxy. If this
+option is not set, a default message is generated.
+.TP
+.B help-msg filename
+specifies the name of a file to display if the "help"
+command is issued. If this option is not set, a listing
+of the internal commands is printed.
+.TP
+.B denydest-msg filename
+specifies the name of a file to display if a user
+attempts to connect to a remote server that they are
+not permitted to. If this option is not set, a default
+message is generated.
+.TP
+.B authserver hostname [portnumber [cipherkey]]
+specifies the name or address of a system to use for
+network authentication. If
+.B rlogin-gw
+is built with a compiled-in value for the server and
+port, they will be used as defaults but can be overridden
+if specified as above. If support for DES-encryption of
+traffic is present in the server, an optional cipherkey
+can be provided, to secure communications with the server.
+.TP
+.B hosts host-pattern [host-pattern2...] [options]
+rules specify host and access permissions. Typically, a
+hosts rule will be in the form of:
+.na
+.sp 1
+rlogin-gw:	deny-hosts unknown
+rlogin-gw:	hosts 192.33.112.* 192.94.214.*
+.ad
+.sp 1
+There may be several host patterns following the "hosts"
+keyword, ending with the first optional parameter beginning
+with '-'. Sub-options are:
+.IP
+.B \-dest pattern
+.br
+.B \-dest { pattern1 pattern2 ... }
+.br
+specifies a list of valid destinations. If no list is specified,
+all destinations are considered valid. The -dest list is processed
+in order as it appears on the options line. -dest entries preceeded
+with a '!' character are treated as negation entries. Therefore the
+rule:
+.sp
+.nf
+.na
+-dest !*.mit.edu -dest *
+.fi
+.ad
+.sp
+will permit hosts that are not in the domain "mit.edu" to be
+connected to.
+.IP
+.B \-auth
+.br
+specifies that the proxy should require a user to authenticate
+with a valid user-id prior to being permitted to use the gateway.
+.IP
+.B \-passok
+.br
+specifies that the proxy should permit users to change their passwords
+if they are connected from the designated host. Only hosts on a trusted
+network should be permitted to change passwords, unless token-type
+authenticators are distributed to all users.
+.IP
+.SH INSTALLATION
+.LP
+To install
+.B rlogin-gw
+first place the executable in a system area, then modify
+.B inetd.conf(5)
+to reflect the appropriate executable path. The rlogin
+proxy must be installed on the rlogin port (port 513)
+in order to function without requiring modified clients.
+Verify installation by attempting a connection, and
+monitoring the system logs.
+.SH FILES
+.PD 0
+.TP 20
+.B /etc/inetd.conf
+.B netperm-table
+.SH SEE ALSO
+.BR netperm-table (5)
+.BR inetd (8)
+.BR authsrv (8)
+.BR x-gw (8)
+.SH BUGS

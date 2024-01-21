@@ -1,0 +1,1313 @@
+This is Info file mercury_library.info, produced by Makeinfo-1.63 from
+the input file library.texi.
+
+START-INFO-DIR-ENTRY
+* Mercury Library: (mercury_library). The Mercury Library Reference Manual
+END-INFO-DIR-ENTRY
+
+   This file documents the Mercury standard library.
+
+   Copyright (C) 1995 University of Melbourne.
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+   Permission is granted to copy and distribute modified versions of
+this manual under the conditions for verbatim copying, provided also
+that the entire resulting derived work is distributed under the terms
+of a permission notice identical to this one.
+
+   Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions.
+
+
+File: mercury_library.info,  Node: Top,  Up: (mercury)
+
+Mercury Library Reference Manual
+********************************
+
+   The Mercury standard library contains a variety of modules which we
+hope may be of general usefulness.  If you write a module that would be
+useful to others, and you would like us to include it as part of the
+Mercury standard library, please let us know.
+
+   The following documentation is simply the interface parts to those
+modules, automatically extracted from the source code.  Some of the
+library modules are not very well documented; we apologize.
+
+   For many of the modules in the standard library, we have not yet had
+enough experience using them to be confident that the current interface
+is satisfactory; it is likely that the interfaces to many of the
+modules in the standard library will change somewhat in future releases
+of the Mercury system.  Some modules are rather experimental modules
+that may even be removed in future releases.  Of course, we wouldn't
+make changes gratuitously, but at the current time, preserving 100%
+backwards compatibility would be disadvantageous in the long run.
+
+   To help you protect yourself from depending on modules that are
+likely to change, each module has a comment "stability:
+low/medium/high" at the top which gives an indication of the likely
+stability of the interface to that module.  For modules whose stability
+is "high", new functionality may be added to the interface, but we
+envisage very few if any changes to the interface of the sort that
+might break existing code.  For modules whose stability is "medium", we
+expect that changes are more likely.  For modules whose stability is
+"low", such changes are highly likely.  If you want to minimize the
+possibility of your programs requiring modification to work with new
+releases of the Mercury system, we recommend that if possible you use
+only those modules whose stability is described as either "medium to
+high" or "high".
+
+   Sometime in the near future, we will implement module qualifiers,
+and then all of the double-underscores will be replaced with module
+qualifiers, so that e.g. `list__append' will become `list:append' (and
+in fact the `list:' prefix will become optional).  At that time, some
+reorganization of the library may occur.  When this change happens, we
+will provide users with a tool to automate conversion of existing
+programs.
+
+* Menu:
+
+
+* array::
+* assoc_list::
+* bag::
+* bimap::
+* bintree::
+* bintree_set::
+* bool::
+* char::
+* dir::
+* eqvclass::
+* float::
+* getopt::
+* graph::
+* group::
+* int::
+* io::
+* lexer::
+* library::
+* list::
+* map::
+* math::
+* mercury_builtin::
+* multi_map::
+* ops::
+* parser::
+* pqueue::
+* queue::
+* random::
+* rbtree::
+* relation::
+* require::
+* set::
+* set_bbbtree::
+* set_ordlist::
+* set_unordlist::
+* stack::
+* std_util::
+* store::
+* string::
+* swi_builtin::
+* swi_lib::
+* term::
+* term_io::
+* time::
+* tree234::
+* uniq_array::
+* varset::
+
+
+File: mercury_library.info,  Node: array,  Next: assoc_list,  Prev: Top,  Up: Top
+
+array
+*****
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     
+     % File: array.m
+     % Main author: bromage.
+     % Based on the original version using 2-3 trees by conway.
+     % Stability: low
+     
+     % This file contains a set of predicates for generating an manipulating
+     % an array data structure.  The current implementation does not actually
+     % use an array - instead we use a map with integer keys, which is implemented
+     % using a tree data structure.
+     %
+     % The current interface will eventually be replaced by a version using
+     % unique modes, and the implementation will be replaced by one which
+     % uses real arrays.
+     
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+     
+     :- module array.
+     :- interface.
+     :- import_module int, list.
+     
+     :- type array(T).
+     
+     	% array__init creates an array with bounds from Low to High, with each
+     	% element initialized to Init.
+     :- pred array__init(int, int, T, array(T)).
+     :- mode array__init(in, in, in, out) is det. % want an array_skeleton?
+     
+     	% array__bounds returns the upper and lower bounds of an array.
+     :- pred array__bounds(array(_T), int, int).
+     :- mode array__bounds(in, out, out) is det.
+     
+     	% array__lookup returns the Nth element of an array.
+     	% It is an error if the index is out of bounds.
+     :- pred array__lookup(array(T), int, T).
+     :- mode array__lookup(in, in, out) is det.
+     
+     	% array__semidet_lookup is like array__lookup except that
+     	% it fails if the index is out of bounds.
+     :- pred array__semidet_lookup(array(T), int, T).
+     :- mode array__semidet_lookup(in, in, out) is semidet.
+     
+     	% array__set sets the nth element of an array, and returns the
+     	% resulting array (good opportunity for destructive update ;-).
+     	% It is an error if the index is out of bounds.
+     :- pred array__set(array(T), int, T, array(T)).
+     :- mode array__set(in, in, in, out) is det.
+     
+     	% array__resize takes an array and new lower and upper bounds.
+     	% the array is expanded or shrunk at each end to make it fit
+     	% the new bounds.
+     :- pred array__resize(array(T), int, int, array(T)).
+     :- mode array__resize(in, in, in, out) is det.
+     
+     	% array__from_list takes a list (of nonzero length),
+     	% and returns an array containing those elements in
+     	% the same order that they occured in the list.
+     :- pred array__from_list(list(T), array(T)).
+     :- mode array__from_list(in, out) is det.
+     
+     	% array__to_list takes an array and returns a list containing
+     	% the elements of the array in the same order that they
+     	% occurred in the array.
+     :- pred array__to_list(array(T), list(T)).
+     :- mode array__to_list(in, out) is det.
+     
+     	% array__fetch_items takes an array and a lower and upper
+     	% index, and places those items in the array between these
+     	% indices into a list.  It is an error if either index is
+     	% out of bounds.
+     :- pred array__fetch_items(array(T), int, int, list(T)).
+     :- mode array__fetch_items(in, in, in, out) is det.
+     
+     	% array__bsearch takes an array, an element to be found
+     	% and a comparison predicate and returns the position of
+     	% the element in the array.  Assumes the array is in sorted
+     	% order.  Fails if the element is not present.  If the
+     	% element to be found appears multiple times, the index of
+     	% the first occurrence is returned.
+     	% call/N currently does not allow output arguments to come
+     	% before input arguments, so you can't just pass compare/3
+     	% in here. :-(
+     :- pred array__bsearch(array(T), T, pred(T, T, comparison_result), int).
+     :- mode array__bsearch(in, in, pred(in, in, out) is det, out) is semidet.
+     
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: assoc_list,  Next: bag,  Prev: array,  Up: Top
+
+assoc_list
+**********
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     
+     % File: assoc_list.m.
+     % Main authors: fjh, zs.
+     % Stability: medium to high.
+     
+     % This file contains the definition of the type assoc_list(K, V)
+     % and some predicates which operate on those types.
+     
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+     
+     :- module assoc_list.
+     
+     :- interface.
+     
+     :- import_module list, std_util.
+     
+     %--------------------------------------------------%
+     
+     :- type assoc_list(K,V)	==	list(pair(K,V)).
+     
+     :- type assoc_list(T)	==	list(pair(T,T)).
+     
+     	% Swap the two sides of the pairs in each member of the list.
+     
+     :- pred assoc_list__reverse_members(assoc_list(K, V), assoc_list(V, K)).
+     :- mode assoc_list__reverse_members(in, out) is det.
+     
+     	% Zip together two lists; abort if they are of different lengths.
+     
+     :- pred assoc_list__from_corresponding_lists(list(K), list(V), assoc_list(K,V)).
+     :- mode assoc_list__from_corresponding_lists(in, in, out) is det.
+     
+     	% Return the first member of each pair.
+     
+     :- pred assoc_list__keys(assoc_list(K, V), list(K)).
+     :- mode assoc_list__keys(in, out) is det.
+     
+     	% Return the second member of each pair.
+     
+     :- pred assoc_list__values(assoc_list(K, V), list(V)).
+     :- mode assoc_list__values(in, out) is det.
+     
+     	% Find the first element of the association list that matches
+     	% the given key, and return the associated value.
+     
+     :- pred assoc_list__search(assoc_list(K, V), K, V).
+     :- mode assoc_list__search(in, in, out) is semidet.
+     
+     	% Find the first element of the association list that matches
+     	% the given key. Return the associated value, and the original
+     	% list with the selected element removed.
+     
+     :- pred assoc_list__remove(assoc_list(K, V), K, V,
+     	assoc_list(K, V)).
+     :- mode assoc_list__remove(in, in, out, out) is semidet.
+     
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: bag,  Next: bimap,  Prev: assoc_list,  Up: Top
+
+bag
+***
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     %
+     % file: bag.m
+     %	An implementation of multisets.
+     % main author: conway.
+     % stability: medium
+     %
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+     
+     :- module bag.
+     
+     :- interface.
+     
+     :- type bag(T).
+     
+     	% create an empty bag
+     :- pred bag__init(bag(T)).
+     :- mode bag__init(out) is det.
+     
+     	% insert a particular value in a bag
+     :- pred bag__insert(bag(T), T, bag(T)).
+     :- mode bag__insert(in, in, out) is det.
+     
+     	% insert a list of values into a bag
+     :- pred bag__insert_list(bag(T), list(T), bag(T)).
+     :- mode bag__insert_list(in, in, out) is det.
+     
+     	% remove one occurrence of a particular value from a bag
+     :- pred bag__remove(bag(T), T, bag(T)).
+     :- mode bag__remove(in, in, out) is det.
+     
+     	% remove all occurrences of a particular value from a bag
+     :- pred bag__remove_all(bag(T), T, bag(T)).
+     :- mode bag__remove_all(in, in, out) is det.
+     
+     	% check whether a bag contains a particular value
+     :- pred bag__contains(T, bag(T)).
+     :- mode bag__contains(in, in) is semidet.
+     
+     	% given a bag, produce a sorted list with no duplicates
+     	% containing all the values in the bag
+     :- pred bag__to_list_without_duplicates(bag(T), list(T)).
+     :- mode bag__to_list_without_duplicates(in, out) is det.
+     
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: bimap,  Next: bintree,  Prev: bag,  Up: Top
+
+bimap
+*****
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     %
+     % File: bimap.m.
+     % Main author: conway.
+     % Stability: medium.
+     %
+     % This file provides a bijective map ADT.
+     % A map (also known as a dictionary or an associative array) is a collection
+     % of (Key,Data) pairs which allows you to look up any Data item given the
+     % Key.  A bimap also allows you to look up the Key given the Data.
+     %
+     % The implementation is a pair of maps.
+     %
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+     
+     :- module bimap.
+     :- interface.
+     :- import_module list, int, std_util, assoc_list.
+     
+     %--------------------------------------------------%
+     
+     :- type bimap(_K, _V).
+     
+     %--------------------------------------------------%
+     
+     	% Initialize an empty bimap.
+     :- pred bimap__init(bimap(_,_)).
+     :- mode bimap__init(out) is det.
+     
+     	% Check whether a bimap is empty.
+     :- pred bimap__is_empty(bimap(_,_)).
+     :- mode bimap__is_empty(in) is semidet.
+     
+     :- pred bimap__search(bimap(K,V), K, V).
+     :- mode bimap__search(in, in, out) is semidet.
+     :- mode bimap__search(in, out, in) is semidet.
+     
+     :- pred bimap__lookup(bimap(K,V), K, V).
+     :- mode bimap__lookup(in, in, out) is det.
+     
+     :- pred bimap__reverse_lookup(bimap(K,V), K, V).
+     :- mode bimap__reverse_lookup(in, out, in) is det.
+     
+     :- pred bimap__insert(bimap(K,V), K, V, bimap(K,V)).
+     :- mode bimap__insert(in, in, in, out) is semidet.
+     
+     :- pred bimap__set(bimap(K,V), K, V, bimap(K,V)).
+     :- mode bimap__set(in, in, in, out) is det.
+     
+     	% Given a bimap, return a list of all the keys in the bimap
+     :- pred bimap__ordinates(bimap(K, _V), list(K)).
+     :- mode bimap__ordinates(in, out) is det.
+     
+     	% Given a bimap, return a list of all the data values in the bimap
+     :- pred bimap__coordinates(bimap(_K, V), list(V)).
+     :- mode bimap__coordinates(in, out) is det.
+     
+     	% convert a bimap to an association list
+     :- pred bimap__to_assoc_list(bimap(K,V), assoc_list(K,V)).
+     :- mode bimap__to_assoc_list(in, out) is det.
+     
+     	% convert an association list to a bimap
+     :- pred bimap__from_assoc_list(assoc_list(K,V), bimap(K,V)).
+     :- mode bimap__from_assoc_list(in, out) is det.
+     
+     /****
+     	% delete a key-value pair from a bimap
+     :- pred bimap__delete(bimap(K,V), K, V, bimap(K,V)).
+     :- mode bimap__delete(in, in, out, out) is det.
+     :- mode bimap__delete(in, out, in, out) is det.
+     
+     :- pred bimap__from_corresponding_lists(list(K), list(V), bimap(K, V)).
+     :- mode bimap__from_corresponding_lists(in, in, out) is det.
+     ****/
+     
+     %--------------------------------------------------%
+     
+     :- import_module map.
+     
+     :- type bimap(K,V)	--->	bimap(map(K,V), map(V, K)).
+     
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: bintree,  Next: bintree_set,  Prev: bimap,  Up: Top
+
+bintree
+*******
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     %
+     % File: bintree.m.
+     % Main author: conway.
+     % Stability: medium (obsolete).
+     %
+     % This module exists primarily for historical reasons.  It is unlikely
+     % to be useful, and may not be supported in future releases.
+     % You should use `map' instead.
+     %
+     % This file provides a straight-forward binary search tree implementation of
+     % a map (dictionary).
+     %
+     % bintree__insert, bintree__update, and
+     % bintree__set differ only in how they handle the case where the value
+     % being inserted already exists in the tree.  `insert' will only insert
+     % new keys, and will fail if you attempt to insert an existing key into
+     % the tree. `update' will only allow you to modify the data for existing
+     % keys, and will fail if the key isn't already in the tree.  `set' will
+     % always succeed; it will replace the old value for that key if the key
+     % was already in the tree, or insert a new node into the tree if the key
+     % wasn't already present.
+     %
+     %--------------------------------------------------%
+     
+     :- module bintree.
+     :- interface.
+     :- import_module list, std_util, assoc_list.
+     
+     :- type bintree(K, V).
+     
+     :- pred bintree__init(bintree(K,V)).
+     :- mode bintree__init(uo) is det.
+     
+     :- pred bintree__insert(bintree(K,V), K, V, bintree(K,V)).
+     :- mode bintree__insert(in, in, in, out) is semidet.
+     
+     :- pred bintree__update(bintree(K,V), K, V, bintree(K,V)).
+     :- mode bintree__update(in, in, in, out) is semidet.
+     
+     :- pred bintree__set(bintree(K,V), K, V, bintree(K,V)).
+     :- mode bintree__set(di, di, di, uo) is det.
+     :- mode bintree__set(in, in, in, out) is det.
+     
+     :- pred bintree__search(bintree(K,V), K, V).
+     :- mode bintree__search(in, in, in) is semidet.	% implied
+     :- mode bintree__search(in, in, out) is semidet.
+     
+     :- pred bintree__delete(bintree(K,V), K, bintree(K,V)).
+     :- mode bintree__delete(in, in, out) is det.
+     
+     :- pred bintree__remove(bintree(K,V), K, V, bintree(K,V)).
+     :- mode bintree__remove(in, in, out, out) is semidet.
+     
+     :- pred bintree__keys(bintree(K,_V), list(K)).
+     :- mode bintree__keys(in, out) is det.
+     
+     :- pred bintree__values(bintree(_K,V), list(V)).
+     :- mode bintree__values(in, out) is det.
+     
+     :- pred bintree__from_list(assoc_list(K,V), bintree(K,V)).
+     :- mode bintree__from_list(in, out) is det.
+     
+     :- pred bintree__from_sorted_list(assoc_list(K,V), bintree(K,V)).
+     :- mode bintree__from_sorted_list(in, out) is det.
+     
+     :- pred bintree__from_corresponding_lists(list(K), list(V), bintree(K,V)).
+     :- mode bintree__from_corresponding_lists(in, in, out) is det.
+     
+     :- pred bintree__to_list(bintree(K,V), assoc_list(K,V)).
+     :- mode bintree__to_list(in, out) is det.
+     
+     	% count the number of elements in a tree
+     :- pred bintree__count(bintree(_K,_V), int).
+     :- mode bintree__count(in, out) is det.
+     
+     	% count the depth of a tree
+     :- pred bintree__depth(bintree(_K,_V), int).
+     :- mode bintree__depth(in, out) is det.
+     
+     :- pred bintree__branching_factor(bintree(_K,_V), int, int).
+     :- mode bintree__branching_factor(in, out, out) is det.
+     
+     :- pred bintree__balance(bintree(K, V), bintree(K, V)).
+     :- mode bintree__balance(in, out) is det.
+     
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: bintree_set,  Next: bool,  Prev: bintree,  Up: Top
+
+bintree_set
+***********
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     
+     :- module bintree_set.
+     
+     % Main authors: fjh.
+     % Stability: medium.
+     
+     % This file provides an alternate implementation of the `set' ADT
+     % defined in module `set'.  See that file for comments about the semantics
+     % of the predicates.  This file implements sets as binary sorted trees,
+     % using module `bintree', and so provides different performance
+     % characteristics.
+     
+     % bintree_set__is_member is a version of bintree_set__member
+     % with a more restricted mode, which is implemented much
+     % more efficiently using bintree__search.
+     
+     %--------------------------------------------------%
+     
+     :- interface.
+     :- import_module list.
+     
+     :- type bintree_set(_T).
+     
+     	% `bintree_set__list_to_set(List, Set)' is true iff `Set' is the set
+     	% containing only the members of `List'.
+     
+     :- pred bintree_set__list_to_set(list(T), bintree_set(T)).
+     :- mode bintree_set__list_to_set(in, out) is det.
+     
+     	% `bintree_set__sorted_list_to_set(List, Set)' is true iff
+     	% `Set' is the set containing only the members of `List'.
+     	% `List' must be sorted.
+     
+     :- pred bintree_set__sorted_list_to_set(list(T), bintree_set(T)).
+     :- mode bintree_set__sorted_list_to_set(in, out) is det.
+     
+     	% `bintree_set__list_to_bintree_set(Set, List)' is true iff
+     	% `List' is the list of all the members of `Set', in sorted
+     	% order.
+     
+     :- pred bintree_set__to_sorted_list(bintree_set(T), list(T)).
+     :- mode bintree_set__to_sorted_list(in, out) is det.
+     
+     	% `bintree_set__init(Set)' is true iff `Set' is an empty set.
+     
+     :- pred bintree_set__init(bintree_set(_T)).
+     :- mode bintree_set__init(uo) is det.
+     
+     :- pred bintree_set__singleton_set(bintree_set(T), T).
+     :- mode bintree_set__singleton_set(out, in) is det.
+     
+     	% `bintree_set__equal(SetA, SetB)' is true iff
+     	% `SetA' and `SetB' contain the same elements.
+     
+     :- pred bintree_set__equal(bintree_set(T), bintree_set(T)).
+     :- mode bintree_set__equal(in, in) is semidet.
+     
+     	% `bintree_set__subset(SetA, SetB)' is true iff `SetA' is a
+     	% subset of `SetB'.
+     
+     :- pred bintree_set__subset(bintree_set(T), bintree_set(T)).
+     :- mode bintree_set__subset(in, in) is semidet.
+     
+     	% `bintree_set__superset(SetA, SetB)' is true iff `SetA' is a
+     	% superset of `SetB'.
+     
+     :- pred bintree_set__superset(bintree_set(T), bintree_set(T)).
+     :- mode bintree_set__superset(in, in) is semidet.
+     
+     	% `bintree_set_member(X, Set)' is true iff `X' is a member of `Set'.
+     
+     :- pred bintree_set__member(T, bintree_set(T)).
+     :- mode bintree_set__member(in, in) is semidet.
+     :- mode bintree_set__member(out, in) is nondet.
+     
+     	% `bintree_set_member(X, Set)' is true iff `X' is a member of `Set'.
+     
+     :- pred bintree_set__is_member(T, bintree_set(T)).
+     :- mode bintree_set__is_member(in, in) is semidet.
+     
+     	% `bintree_set__insert(Set0, X, Set)' is true iff `Set' is the union of
+     	% `Set0' and the set containing only `X'.
+     
+     :- pred bintree_set__insert(bintree_set(T), T, bintree_set(T)).
+     :- mode bintree_set__insert(di, di, uo) is det.
+     :- mode bintree_set__insert(in, in, out) is det.
+     
+     	% `bintree_set__insert_list(Set0, Xs, Set)' is true iff `Set'
+     	% is the union of `Set0' and the set containing only the
+     	% members of `Xs'.
+     
+     :- pred bintree_set__insert_list(bintree_set(T), list(T), bintree_set(T)).
+     :- mode bintree_set__insert_list(di, di, uo) is det.
+     :- mode bintree_set__insert_list(in, in, out) is det.
+     
+     	% `bintree_set__remove(Set0, X, Set)' is true iff `Set0' contains `X',
+     	% and `Set' is the relative complement of `Set0' and the set
+     	% containing only `X', i.e.  if `Set' is the set which contains
+     	% all the elements of `Set0' except `X'.
+     
+     :- pred bintree_set__remove(bintree_set(T), T, bintree_set(T)).
+     :- mode bintree_set__remove(in, in, out) is semidet.
+     % The following mode could be implemented, but hasn't been:
+     % :- mode bintree_set__remove(in, out, out) is nondet.
+     
+     	% `bintree_set__remove_list(Set0, Xs, Set)' is true iff Xs does
+     	% not contain any duplicates, `Set0' contains every member of
+     	% `Xs', and `Set' is the relative complement of `Set0' and the
+     	% set containing only the members of `Xs'.
+     
+     :- pred bintree_set__remove_list(bintree_set(T), list(T), bintree_set(T)).
+     :- mode bintree_set__remove_list(in, in, out) is semidet.
+     
+     	% `bintree_set__delete(Set0, X, Set)' is true iff `Set' is the relative
+     	% complement of `Set0' and the set containing only `X', i.e.
+     	% if `Set' is the set which contains all the elements of `Set0'
+     	% except `X'.
+     
+     :- pred bintree_set__delete(bintree_set(T), T, bintree_set(T)).
+     :- mode bintree_set__delete(in, in, out) is det.
+     
+     	% `bintree_set__delete_list(Set0, Xs, Set)' is true iff `Set'
+     	% is the relative complement of `Set0' and the set containing
+     	% only the members of `Xs'.
+     
+     :- pred bintree_set__delete_list(bintree_set(T), list(T), bintree_set(T)).
+     :- mode bintree_set__delete_list(in, in, out) is det.
+     
+     	% `set_union(SetA, SetB, Set)' is true iff `Set' is the union of
+     	% `SetA' and `SetB'.  If the sets are known to be of different
+     	% sizes, then for efficiency make `SetA' the larger of the two.
+     
+     :- pred bintree_set__union(bintree_set(T), bintree_set(T), bintree_set(T)).
+     :- mode bintree_set__union(in, in, out) is det.
+     
+     	% `set_intersect(SetA, SetB, Set)' is true iff `Set' is the
+     	% intersection of `SetA' and `SetB'.
+     
+     :- pred bintree_set__intersect(bintree_set(T), bintree_set(T), bintree_set(T)).
+     :- mode bintree_set__intersect(in, in, out) is det.
+     
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: bool,  Next: char,  Prev: bintree_set,  Up: Top
+
+bool
+****
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     
+     % File: bool.m.
+     % Main authors: fjh, zs.
+     % Stability: medium to high.
+     
+     % This module exports the boolean type `bool' and some operations on bools.
+     
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+     
+     :- module bool.
+     
+     :- interface.
+     
+     :- import_module list.
+     
+     %--------------------------------------------------%
+     
+     % The boolean type.
+     % Unlike most languages, we use `yes' and `no' as boolean constants
+     % rather than `true' and `false'.  This is to avoid confusion
+     % with the predicates `true' and `fail'.
+     
+     :- type bool ---> yes ; no.
+     
+     :- pred bool__or(bool, bool, bool).
+     :- mode bool__or(in, in, out) is det.
+     
+     :- pred bool__or_list(list(bool), bool).
+     :- mode bool__or_list(in, out) is det.
+     
+     :- pred bool__and(bool, bool, bool).
+     :- mode bool__and(in, in, out) is det.
+     
+     :- pred bool__and_list(list(bool), bool).
+     :- mode bool__and_list(in, out) is det.
+     
+     :- pred bool__not(bool, bool).
+     :- mode bool__not(in, out) is det.
+     
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: char,  Next: dir,  Prev: bool,  Up: Top
+
+char
+****
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+     
+     % File: char.m.
+     % Main author: fjh.
+     % Stability: high.
+     
+     % This module defines some predicates that manipulate characters.
+     
+     % Originally we used `character' rather than `char' for the type name
+     % because `char' was used by NU-Prolog to mean something different.
+     % But now we use `char' and the use of `character' is discouraged.
+     %
+     % NU-Prolog atoms can only include 7-bit ASCII chars, so the current
+     % implementation does not support 8-bit characters.
+     
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+     
+     :- module char.
+     :- interface.
+     
+     :- import_module list.
+     
+     %--------------------------------------------------%
+     
+     :- type char == character.
+     
+     :- pred char__to_int(char, int).
+     :- mode char__to_int(in, out) is det.
+     :- mode char__to_int(in, in) is semidet.	% implied
+     :- mode char__to_int(out, in) is semidet.
+     	% Convert a character to it's corresponding numerical code.
+     
+     :- pred char__to_upper(char, char).
+     :- mode char__to_upper(in, out) is det.
+     	% Convert a character to uppercase.
+     
+     :- pred char__to_lower(char, char).
+     :- mode char__to_lower(in, out) is det.
+     	% Convert a character to lowercase.
+     
+     :- pred char__lower_upper(char, char).
+     :- mode char__lower_upper(in, out) is semidet.
+     :- mode char__lower_upper(out, in) is semidet.
+     	% char__lower_upper(Lower, Upper) is true iff
+     	% Lower is a lower-case letter and Upper is the corresponding
+     	% upper-case letter.
+     
+     :- pred char__is_whitespace(char).
+     :- mode char__is_whitespace(in) is semidet.
+     	% True iff the character is whitespace, i.e. a space, tab,
+     	% newline, carriage return, form-feed, or vertical tab.
+     
+     :- pred char__is_upper(char).
+     :- mode char__is_upper(in) is semidet.
+     	% True iff the character is an uppercase letter.
+     
+     :- pred char__is_lower(char).
+     :- mode char__is_lower(in) is semidet.
+     	% True iff the character is a lowercase letter.
+     
+     :- pred char__is_alpha(char).
+     :- mode char__is_alpha(in) is semidet.
+     	% True iff the character is a letter.
+     
+     :- pred char__is_alnum(char).
+     :- mode char__is_alnum(in) is semidet.
+     	% True iff the character is a letter or digit.
+     
+     :- pred char__is_alpha_or_underscore(char).
+     :- mode char__is_alpha_or_underscore(in) is semidet.
+     	% True iff the character is a letter or an underscore.
+     
+     :- pred char__is_alnum_or_underscore(char).
+     :- mode char__is_alnum_or_underscore(in) is semidet.
+     	% True iff the character is a letter, a digit or an underscore.
+     
+     :- pred char__is_digit(char).
+     :- mode char__is_digit(in) is semidet.
+     	% True iff the character is a decimal digit (0-9).
+     
+     :- pred char__is_binary_digit(char).
+     :- mode char__is_binary_digit(in) is semidet.
+     	% True iff the character is a binary digit (0 or 1).
+     
+     :- pred char__is_octal_digit(char).
+     :- mode char__is_octal_digit(in) is semidet.
+     	% True iff the character is a octal digit (0-7).
+     
+     :- pred char__is_hex_digit(char).
+     :- mode char__is_hex_digit(in) is semidet.
+     	% True iff the character is a hexadecimal digit (0-9, a-f, A-F).
+     
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: dir,  Next: eqvclass,  Prev: char,  Up: Top
+
+dir
+***
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     
+     % File: dir.m.
+     % Main author: fjh.
+     
+     % Filename and directory handling.
+     % Stability: high.
+     
+     %--------------------------------------------------%
+     
+     :- module dir.
+     :- interface.
+     :- import_module string.
+     
+     	% predicates to isolate system dependencies
+     
+     :- pred dir__directory_separator(character).
+     :- mode dir__directory_separator(out) is det.
+     :- mode dir__directory_separator(in) is semidet.
+     	% Returns '/'.
+     
+     :- pred dir__this_directory(string).
+     :- mode dir__this_directory(out) is det.
+     :- mode dir__this_directory(in) is semidet.	 % Implied
+     	% Returns ".".
+     
+     	% predicates for splitting filenames into a directory part and
+     	% a filename part.
+     
+     :- pred dir__split_name(string::in, string::out, string::out) is det.
+     :- pred dir__basename(string::in, string::out) is det.
+     :- pred dir__dirname(string::in, string::out) is det.
+     
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: eqvclass,  Next: float,  Prev: dir,  Up: Top
+
+eqvclass
+********
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     %
+     % File: eqvclass.m.
+     % Author: zs.
+     % Stability: low.
+     %
+     % A module for handling equivalence classes.
+     %
+     %--------------------------------------------------%
+     
+     :- module eqvclass.
+     
+     :- interface.
+     
+     :- import_module set, list, std_util.
+     
+     :- type eqvclass(T).
+     
+     	% Create an empty equivalance class.
+     
+     :- pred eqvclass__init(eqvclass(T)).
+     :- mode eqvclass__init(out) is det.
+     
+     	% Is this item known to the equivalence class?
+     
+     :- pred eqvclass__is_member(eqvclass(T), T).
+     :- mode eqvclass__is_member(in, in) is semidet.
+     
+     	% Make an element known to the equivalence class.
+     	% The element may already be known to the class;
+     	% if it isn't, it is created without any equivalence relationships.
+     
+     :- pred eqvclass__ensure_element(eqvclass(T), T, eqvclass(T)).
+     :- mode eqvclass__ensure_element(in, in, out) is det.
+     
+     	% Make an element known to the equivalence class.
+     	% The element must not already be known to the class;
+     	% it is created without any equivalence relationships.
+     
+     :- pred eqvclass__new_element(eqvclass(T), T, eqvclass(T)).
+     :- mode eqvclass__new_element(in, in, out) is det.
+     
+     	% Make two elements of the equivalence class equivalent.
+     	% It is ok if they already are.
+     
+     :- pred eqvclass__ensure_equivalence(eqvclass(T), T, T, eqvclass(T)).
+     :- mode eqvclass__ensure_equivalence(in, in, in, out) is det.
+     
+     	% Make two elements of the equivalence class equivalent.
+     	% It is an error if they are already equivalent.
+     
+     :- pred eqvclass__new_equivalence(eqvclass(T), T, T, eqvclass(T)).
+     :- mode eqvclass__new_equivalence(in, in, in, out) is det.
+     
+     	% Test if two elements are equivalent.
+     
+     :- pred eqvclass__same_eqvclass(eqvclass(T), T, T).
+     :- mode eqvclass__same_eqvclass(in, in, in) is semidet.
+     
+     	% Return the set of the partitions of the equivalence class.
+     
+     :- pred eqvclass__partition_set(eqvclass(T), set(set(T))).
+     :- mode eqvclass__partition_set(in, out) is det.
+     
+     	% Return a list of the partitions of the equivalence class.
+     
+     :- pred eqvclass__partition_list(eqvclass(T), list(set(T))).
+     :- mode eqvclass__partition_list(in, out) is det.
+     
+     	% Create an equivalence class from a partition set.
+     	% It is an error if the sets are not disjoint.
+     
+     :- pred eqvclass__partition_set_to_eqvclass(set(set(T)), eqvclass(T)).
+     :- mode eqvclass__partition_set_to_eqvclass(in, out) is det.
+     
+     	% Create an equivalence class from a list of partitions.
+     	% It is an error if the sets are not disjoint.
+     
+     :- pred eqvclass__partition_list_to_eqvclass(list(set(T)), eqvclass(T)).
+     :- mode eqvclass__partition_list_to_eqvclass(in, out) is det.
+     
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: float,  Next: getopt,  Prev: eqvclass,  Up: Top
+
+float
+*****
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     %
+     % File: float.m.
+     % Main author: fjh.
+     % Stability: medium.
+     %
+     % Floating point support.
+     %
+     % XXX - What should we do about unification of two Nan's?
+     %
+     %--------------------------------------------------%
+     
+     :- module float.
+     :- interface.
+     
+     	% less than
+     :- pred <(float, float).
+     :- mode <(in, in) is semidet.
+     
+     	% greater than
+     :- pred >(float, float).
+     :- mode >(in, in) is semidet.
+     
+     	% less than or equal
+     :- pred =<(float, float).
+     :- mode =<(in, in) is semidet.
+     
+     	% greater than or equal
+     :- pred >=(float, float).
+     :- mode >=(in, in) is semidet.
+     
+     	% absolute value
+     :- pred float__abs(float, float).
+     :- mode float__abs(in, out) is det.
+     
+     	% maximum
+     :- pred float__max(float, float, float).
+     :- mode float__max(in, in, out) is det.
+     
+     	% minumim
+     :- pred float__min(float, float, float).
+     :- mode float__min(in, in, out) is det.
+     
+     	% addition
+     :- func float + float = float.
+     :- mode in    + in    = uo  is det.
+     :- mode uo  + in  = in  is det.
+     :- mode in  + uo  = in  is det.
+     
+     	% subtraction
+     :- func float - float = float.
+     :- mode in    - in    = uo  is det.
+     :- mode uo  - in  = in  is det.
+     :- mode in  - uo  = in  is det.
+     
+     	% multiplication
+     :- func float * float = float.
+     :- mode in    * in    = uo  is det.
+     :- mode uo  * in  = in  is det.
+     :- mode in  * uo  = in  is det.
+     
+     	% division
+     :- func float / float = float.
+     :- mode in    / in    = uo  is det.
+     :- mode uo  / in  = in  is det.
+     :- mode in  / uo  = in  is det.
+     
+     	% unary plus
+     :- func + float = float.
+     :- mode + in    = uo  is det.
+     
+     	% unary minus
+     :- func - float = float.
+     :- mode - in    = uo  is det.
+     
+     %--------------------------------------------------%
+     
+     /* The following are predicates which do the same thing as the
+        above functions.  They are obsolete.  Don't use them.
+        They will eventually disappear in some future release.
+     */
+     
+     :- pred builtin_float_plus(float, float, float).
+     :- mode builtin_float_plus(in, in, uo) is det.
+     
+     :- pred builtin_float_minus(float, float, float).
+     :- mode builtin_float_minus(in, in, uo) is det.
+     
+     :- pred builtin_float_times(float, float, float).
+     :- mode builtin_float_times(in, in, uo) is det.
+     
+     :- pred builtin_float_divide(float, float, float).
+     :- mode builtin_float_divide(in, in, uo) is det.
+     
+     :- pred builtin_float_gt(float, float).
+     :- mode builtin_float_gt(in, in) is semidet.
+     
+     :- pred builtin_float_lt(float, float).
+     :- mode builtin_float_lt(in, in) is semidet.
+     
+     :- pred builtin_float_ge(float, float).
+     :- mode builtin_float_ge(in, in) is semidet.
+     
+     :- pred builtin_float_le(float, float).
+     :- mode builtin_float_le(in, in) is semidet.
+     
+     %--------------------------------------------------%
+     
+             % float__ceiling_to_int(X, Ceil) is true if Ceil is the
+     	% smallest integer not less than X.
+     :- pred float__ceiling_to_int(float, int).
+     :- mode float__ceiling_to_int(in, out) is det.
+     
+             % float__floor_to_int(X, Ceil) is true if Ceil is the
+     	% largest integer not greater than X.
+     :- pred float__floor_to_int(float, int).
+     :- mode float__floor_to_int(in, out) is det.
+     
+             % float__round_to_int(X, Round) is true if Round is the
+     	% integer closest to X.  If X has a fractional value of
+     	% 0.5, it is rounded up.
+     :- pred float__round_to_int(float, int).
+     :- mode float__round_to_int(in, out) is det.
+     
+             % float__truncate_to_int(X, Trunc) is true if Trunc is
+     	% the integer closest to X such that |Trunc| =< |X|.
+     :- pred float__truncate_to_int(float, int).
+     :- mode float__truncate_to_int(in, out) is det.
+     
+     %--------------------------------------------------%
+     
+     :- pred float__pow( float, int, float).
+     :- mode float__pow( in, in, out) is det.
+     %	float__pow( Base, Exponent, Answer)
+     %		A limited way to calculate powers.  The exponent must be an
+     %		integer greater or equal to 0.  Currently this function runs
+     %		at O(n), where n is the value of the exponent.
+     
+     %--------------------------------------------------%
+     % System constants
+     
+     	% Maximum floating-point number
+     :- pred float__max(float).
+     :- mode float__max(out) is det.
+     
+     	% Minimum normalised floating-point number
+     :- pred float__min(float).
+     :- mode float__min(out) is det.
+     
+     	% Smallest number x such that 1.0 + x \= 1.0
+     :- pred float__epsilon(float).
+     :- mode float__epsilon(out) is det.
+     
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: getopt,  Next: graph,  Prev: float,  Up: Top
+
+getopt
+******
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU General
+     % Public License - see the file COPYING in the Mercury distribution.
+     %--------------------------------------------------%
+     
+     % File: getopt.m
+     % Authors: fjh, zs
+     % Stability: medium
+     
+     % This module exports the predicate getopt__process_options/4,
+     % which can be used to parse command-line options.
+     %
+     % This version allows both short (single-character) options
+     % and GNU-style long options. It also has the GNU extension
+     % of recognizing options anywhere in the command-line, not
+     % just at the start.
+     %
+     % To use this module, you must provide an `option' type which
+     % is an enumeration of all your different options.
+     % You must provide predicates `short_option(Char, Option)'
+     % and `long_option(String, Option)' which convert the short
+     % and/or long names for the option to this enumeration type.
+     % (An option can have as many names as you like, long or short.)
+     % You must provide a predicate `option_default(Option, OptionData)'
+     % which specifies both the type and the default value for every option.
+     % We support four different option types: bool, int, string, and
+     % "accumulating" (which accumulates a list of strings).
+     % For the first three option types, if there are multiple occurrences
+     % of the same option on the command-line, then the last (right-most)
+     % occurrence will take precedence.  For "accumulating" options,
+     % multiple occurrences will be appended together into a list.
+     % Single-character boolean options can be negated by following them
+     % with another `-', e.g. `-x-' will negate the `-x' option.
+     % Long boolean options can be negated by preceding them with `--no-',
+     % e.g. `--no-foo' will negate the `--foo' option.
+     
+     :- module getopt.
+     :- interface.
+     :- import_module int, string, bool, list, map, std_util.
+     
+     % getopt__process_options(OptionOps, Args, NonOptionArgs, Result)
+     %
+     %	Scans through 'Args' looking for options, places all the
+     %	non-option arguments in 'NonOptionArgs', and records the
+     %	options in the OptionTable.  OptionTable is a map from
+     %	a user-defined option type to option_data.
+     %	If an invalid option is encountered, we return error(Message)
+     %	otherwise we return ok(OptionTable) in 'Result'.
+     %
+     %	The argument `OptionOps' is a structure holding three or four
+     %	predicates used to categorize a set of options. Their
+     %	interfaces should be like these:
+     %
+     % :- pred short_option(character::in, option::out) is semidet.
+     % 	True if the character names a valid single-character option.
+     %
+     % :- pred long_option(string::in, option::out) is semidet.
+     %	True if the character names a valid long option.
+     %
+     % :- pred option_default(option::out, option_data::out) is nondet.
+     %	Nondeterministically returns all the options with their
+     %	corresponding types and default values.
+     %
+     % :- pred special_handler(option::in, special_data::in,
+     %	option_table::in, maybe_option_table::out) is semidet.
+     %	This predicate is invoked whenever getopt finds an option
+     %	(long or short) designated as special, with special_data holding
+     %	the argument of the option (if any). The predicate can change the
+     %	option table in arbitrary ways in the course of handling the option,
+     %	or it can return an error message.
+     %	The canonical examples of special options are -O options in compilers,
+     %	which set many other options at once.
+     
+     :- pred getopt__process_options(
+     		option_ops(OptionType)::in(option_ops),
+     		list(string)::in,
+     		list(string)::out,
+     		maybe_option_table(OptionType)::out
+     	) is det.
+     
+     :- type option_ops(OptionType)
+     	--->	option_ops(
+     			pred(character, OptionType),	% short_option
+     			pred(string, OptionType),	% long_option
+     			pred(OptionType, option_data)	% option_default
+     		)
+     	;	option_ops(
+     			pred(character, OptionType),	% short_option
+     			pred(string, OptionType),	% long_option
+     			pred(OptionType, option_data),	% option_default
+     			pred(OptionType, special_data,	% special option handler
+     				option_table(OptionType),
+     				maybe_option_table(OptionType))
+     		).
+     
+     :- inst option_ops =
+     	bound((
+     		option_ops(
+     			pred(in, out) is semidet,	% short_option
+     			pred(in, out) is semidet,	% long_option
+     			pred(out, out) is nondet	% option_default
+     		)
+     	;	option_ops(
+     			pred(in, out) is semidet,	% short_option
+     			pred(in, out) is semidet,	% long_option
+     			pred(out, out) is nondet,	% option_default
+     			pred(in, in, in, out) is semidet% special handler
+     		)
+     	)).
+     
+     :- type option_data
+     	--->	bool(bool)
+     	;	int(int)
+     	;	string(string)
+     	;	accumulating(list(string))
+     	;	special
+     	;	bool_special
+     	;	int_special
+     	;	string_special.
+     
+     :- type special_data
+     	--->	none
+     	;	bool(bool)
+     	;	int(int)
+     	;	string(string).
+     
+     :- type option_table(OptionType)
+     	==	map(OptionType, option_data).
+     
+     :- type maybe_option_table(OptionType)
+     	--->	ok(option_table(OptionType))
+     	;	error(string).
+     
+     	% The following three predicates search the option table for
+     	% an option of the specified type; if it is not found, they
+     	% report an error by calling error/1.
+     
+     :- pred getopt__lookup_bool_option(option_table(Option), Option, bool).
+     :- mode getopt__lookup_bool_option(in, in, out) is det.
+     
+     :- pred getopt__lookup_int_option(option_table(Option), Option, int).
+     :- mode getopt__lookup_int_option(in, in, out) is det.
+     
+     :- pred getopt__lookup_string_option(option_table(Option), Option, string).
+     :- mode getopt__lookup_string_option(in, in, out) is det.
+     
+     %--------------------------------------------------%
+

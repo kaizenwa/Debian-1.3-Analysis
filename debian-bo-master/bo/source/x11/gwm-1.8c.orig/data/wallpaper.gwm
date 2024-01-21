@@ -1,0 +1,113 @@
+;; Wallpaper : Enable association of root-tiles with rooms.
+;; Should associate an icon pixmap also - extension.
+;; Jules - 3/2/93
+;;
+;; Use like this :-
+;;   (set-wallpaper "Other"   '("grainy" "#fed"      "#888050"))
+;;   (set-wallpaper "Desktop" '("escher" "SlateBlue" "LightCyan"))
+;;   (new-dvroom-manager "Other")
+;;   (new-dvroom-manager "Desktop")
+;;
+;; I Customize the image displayed by my room icon to be
+;;  (or (get-wallpaper) "x")
+;; So that a rooms icon identifies the room better.
+
+(defun convert-to-wallpaper (details)
+  (if
+      (and (= (type details) 'list) (= 3 (length details)))
+      (with (
+             foreground (color-make (# 1 details))
+             background (color-make (# 2 details))
+             )
+            (pixmap-make (# 0 details)))
+    (= (type details) 'string) (pixmap-load details)
+    (= (type details) 'pixmap) details
+    (? "Did not understand wallpaper description : " details "\n")
+    ))
+
+(defun set-wallpaper (name details)
+  (resource-put
+   (+ "GwmRoom.wallpaper." name)
+   (convert-to-wallpaper details)))
+
+(defun get-wallpaper ()
+ (resource-get
+   (+ "GwmRoom.wallpaper." window-icon-name)
+   (+ "GwmRoom.wallpaper." window-icon-name))))
+
+
+(defun update-wallpaper ()
+   ;; (? "Entering Room : " window-icon-name "\n")
+  (with
+   (paper (get-wallpaper) wob root-window)
+   (if paper (: wob-tile paper))))
+
+(defaults-to
+  opening-room ()
+  default-wallpaper   (list 
+      "/dept/acm/graphics/bitmaps/xlogo16" "#000" "#6959ce" ) 
+  )
+
+(if (not (boundp 'wallpaper.std-iconify-window))
+    (progn
+
+      (: wallpaper.std-iconify-window std-iconify-window)
+
+;; If we find a Room being opened or closed decide wether to restore the
+;; default wallpaper or to use the room's wallpaper.
+
+      (defun std-iconify-window args
+        (if (= window-name "rmgr")
+            (progn
+              (if (= window-status 'icon)
+                  (progn
+                    (: opening-room t)
+                    (? "Opening room : " window-icon-name "\n")
+                    (update-wallpaper))
+                (= window-status 'window)
+                (progn
+                  (: opening-room ())
+                  (? "Closing room : " window-icon-name "\n"))
+                  )
+              (if (not opening-room)
+                  (eval (+ '(set-root-tile) default-wallpaper))
+                )
+              ))
+        (eval (+  '(wallpaper.std-iconify-window) args)))
+))
+
+
+(df to-be-done-after-setup+= args
+    (: to-be-done-after-setup (+ to-be-done-after-setup args)))
+
+(to-be-done-after-setup+= (eval (+ '(set-root-tile) default-wallpaper)))
+
+
+;; =================================================
+
+;;-----------------------------------------------------------------------------
+;; Root Window convenience functions.
+
+;; set-root-cursor (cursor &optional foreground background)
+
+(defun set-root-cursor args
+  (with (
+         cursor     (# 0 args)
+         foreground (or (color-make (# 1 args)) foreground)
+         background (or (color-make (# 2 args)) background)
+         wob        root-window
+         )
+        (: wob-cursor (cursor-make cursor))))
+
+;; set-root-tile (tile &optional foreground background)
+
+(defun set-root-tile args
+  (with (
+         map        (# 0 args)
+         foreground (or (color-make (# 1 args)) foreground)
+         background (or (color-make (# 2 args)) background)
+         wob        root-window
+         )
+        (: wob-tile (pixmap-make background map foreground ))))
+
+;

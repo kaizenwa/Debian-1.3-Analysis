@@ -1,0 +1,188 @@
+Installation Guide to Term
+==========================
+
+The quick way to install term is as follows:
+
+   If you have access to root:
+	% ./configure --root
+	% make
+	% su -c 'make install installman'
+   otherwise,
+        % ./configure --user
+	% make install installman
+
+For group-shared or user-shared, replace "install" with "share" in the 
+"make install installman" command.  If term is your only network connection
+then also add "installnet" to your make command.  Here is the command I run:
+
+	% ./configure --root;make;su -c 'make installnet installman'
+
+
+For more detailed information, read on.
+
+
+Configure
+---------
+
+The "configure" tool is responsible for generating a Makefile from the
+supplied Makefile.in.  In theory, you shouldn't have to modify either 
+one to support most standard installations.
+
+"configure" attempts to autodetect the type of system it is running on,
+by examining the output of "uname", "arch", or tcsh's $HOSTTYPE, or by
+performing other OS-specific tests.  If this doesn't work for you for
+some reason, you will need to specify the name of the OS on the command
+line to "configure".  Currently configurable systems are:
+
+      aix            IBM AIX
+      bsdi           BSDi
+     *convex         C220 ConvexOS 11.0
+      dynixptx       Dynix/PTX
+     *hcx            HCX/UX 5.1
+      hpux           HP/UX
+      irix           Irix
+     *linux          Linux 1.0, 1.1
+     *machten        MachTen
+      mips           MIPS
+      netbsd         NetBSD
+     *next           NeXT 2.1, 3.0
+     *osf1           OSF/1
+      sco            SCO Unix
+      sgi            SGI
+     *sol2           Solaris 2.x aka SunOS 5.x
+     *sun            Solaris 1.x aka SunOS 4.x
+      svr4           SVR4
+     *titan          Titan/OS
+     *ultrix         Ultrix 4.x
+
+Systems known to autodetect are marked with a *.  If your system does not
+autodetect, and you can come up with some unique way of identifying it,
+please send in a patch.  Systems that have at least successfully run
+term via "./termtest" are listed below along with the version of term:
+
+     MIPS Ultrix 4.4, gcc 2.5.8 (term 2.1.0)
+     SunOS 4.1.3, gcc 2.5.8 (term 2.1.0)
+     SunOS 5.3, gcc 2.5.6 (term 2.1.0)
+     Linux 1.1.x, gcc 2.5.8 (term 2.1.0)
+     NeXT 2.1, cc (term 2.1.0)
+     Alpha OSF/1 V2.0, gcc 2.5.8 (term 2.1.0)
+     HCX/UX 5.1, cc (term 2.1.0)
+
+configure can be used to build the binary in a directory separate from
+the source.  The easiest way to do this is to cd to the build directory
+and invoke configure with the full path to the source directory, e.g.
+/usr/src/local/term/configure.  configure will generate a Makefile
+that looks for the source in that directory using the VPATH mechanism
+(supported by GNU make and various commercial makes).  If for some reason
+you need to explicitly specify the source directory, you may use the
+--srcdir option of configure.
+
+configure by default will ask you if you can install as root.  If so,
+it will default to installing into /usr/local (and using group sharing
+if you select shared mode).  If not, configure will generate a default
+Makefile that will install term into your home directory and configure
+it for user sharing (if you select shared mode).  You may specify 
+--root or --user on the command line to avoid the question.
+
+The --prefix option to configure can be used to specify a different target
+destination.  A standard layout with lib, bin, and man directories at that
+point is assumed.  If you prefer to specify a non-standard arrangement,
+you can use the --mandir, --bindir, --libdir, and --sharedir arguments
+to provide the paths to the directories you would like to install into.
+
+Finally, configure accepts --shlib and --static options to enable
+or disable creating and using a dynamic libtermnet library on those
+platforms that support such libraries (currently Linux, NetBSD, SunOS 4.x,
+and Solaris 2.x support is provided).  By default, under Linux, installing 
+with --root will get dynamic libraries, and with --user will not (since
+shared libraries require LD_LIBRARY_PATH to be set if installed by a
+user).  NetBSD, SunOS 4.x, and Solaries 2.x will default to shared 
+libraries either way.
+
+After configure is run, it creates a "config.status" file in the build
+directory.  This file can be executed to reconfigure the Makefile if
+the Makefile.in file is changed.  GNU make will do this automatically
+when you type "make", if necessary.
+
+Note that if your .term directory is mounted over NFS, you will need to
+edit the Makefile.in to add -DTERM_NFS_DIR to CFLAGS.  Or even better,
+use user share-mode, and link ~/term/tmp to a directory that is not
+NFS mounted like /usr/tmp or /tmp.
+
+If you need to change either configure or Makefile.in for any other
+reason, see if you can abstract the changes out into a form similar
+to that used elsewhere and send in a patch.
+
+
+Linux Shared Library Notes
+--------------------------
+
+You will need to have the Linux tools-2.11 toolset or newer installed
+to build the default Linux shared library version.  The current version
+is available from sunsite.unc.edu:/pub/Linux/gcc/src/tools-2.15.tar.gz.
+If you don't want to be bothered, use configure --static to build static
+versions of the tools (as was done with term 1.18 and earlier versions).
+
+If you are building for Linux with shared libraries, and wish to try
+testing a new set of binaries before installing them, you will have
+to do a "make install-shlib" as root after the "make", or the binaries
+will either not find the shared library, or use the previous version
+if you have such installed.
+
+If you would like to hack on the term code, and don't know anything
+about shared libraries, you can either just use --static and rely on
+the maintainer to fold your changes in with dynamic library support,
+or you can do it yourself with the following brief guide.  (The best
+thing to do is to read the tools doc/README.ps file, which explains
+in detail the what, how, and why of shared libraries.)
+
+If you don't add any new functions or data, and don't make any of the
+global variables larger (e.g. expanding arrays), the dynamic library
+configuration won't change.  You are happy; don't read any further.
+
+If you do add new functions or data, you will do `make' and get:
+
+    *** WARNING: ./jump/jump.log exists!
+
+or some similar message.  The jump.log file in the jump directory contains
+new symbols (functions or data) that have to be integrated into the
+shared library configuration files before you can rebuild the library.
+
+Look at the jump.log file.  If all the new entries are marked with " T "
+(that is, functions), you are in luck.  Just append the file to 
+jump.funcs, make clean, and try again.
+
+If there are some non-T symbols, these represent data.  You will need
+to convert the initial field full of zeros into a hexadecimal value
+corresponding to the largest you think that variable will ever be.
+Most globals are ints, which take four bytes (see the existing jump.vars
+file for an example).  For arrays (like com_result), you need to decide
+if the array is likely to grow in the future, and pick some reasonable
+upper bound value to put in the initial field to represent the array's
+size in bytes.  If you're not sure what the current size of a variable
+is, do a `nm -n' on the object file to get a listing of the symbols
+and their addresses.  "C" (common, or bss) symbols simply list their
+size in the address field, so that's easy.  For "D" symbols, you need to
+subtract the address of your symbol from that of the following "D" symbol
+to get the size (if there is no following symbol, you're on your own).
+Once you've updated all the size fields, add the relevant lines to the
+jump.vars file.  (Note that we didn't mention the size for "T" symbols
+in the previous paragraph.  That was on purpose; the size field for "T"
+symbols isn't used.)
+
+If all of this seems a little confusing, you should probably read through
+the tools documentation to get the bigger picture.  Shared libraries
+are the most confusing part of building code for Linux (although they
+are more efficient than shared libraries in use on other platforms).
+
+For the dll buff, the termnet library is using addresses 0x66000000
+through 0x660fffff.  The jump table size limit is 0x1000, and the global
+data size 0x4000.  The version number corresponds to the fields of the
+VERSION variable; thus for VERSION 11854, the library version is 1.18.54.
+We hope to keep libraries backwards compatible; if for some reason
+we have to bump the library major version before bumping term's major
+version number, we will stop keeping a close correspondence with VERSION.
+
+
+(Installation guide written by Chris Metcalf <metcalf@lcs.mit.edu>;
+bugs to Bill Riemers <bcr@physics.purdue.edu.)

@@ -1,0 +1,7 @@
+FULL_VERSION  = 28.0.0
+MAJOR_VERSION = 28
+
+SHLIB      = libg++.so.$(FULL_VERSION)
+MSHLINK    = libg++.so.$(MAJOR_VERSION)
+BUILD_LIBS = $(ARLIB) $(SHLIB) $(SHLINK) $(MSHLINK)
+SHFLAGS    = -Wl,-soname,$(MSHLINK)

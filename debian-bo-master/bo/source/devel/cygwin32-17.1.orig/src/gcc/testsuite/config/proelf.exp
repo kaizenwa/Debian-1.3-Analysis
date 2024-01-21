@@ -1,0 +1,288 @@
+# Copyright (C) 1996 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+# Please email any bugs, comments, and/or additions to this file to:
+# bug-gcc@prep.ai.mit.edu
+
+# Note some of this was cribbed from the gdb testsuite since we need
+# to use some pretty standard gdb features (breakpoints in particular).
+
+# It's also worth noting this really isn't specific to the proelf
+# targets even though it's name is proelf.exp.  I'm simply tired of
+# trying to get dejagnu/tcl/expect to do what I want.
+#
+# In theory this framework could be used for c-torture testing any
+# target board which gdb can connect to and should really be named
+# gdb.exp, gcc-gdb.exp, or something similar .
+
+# Load up some standard GCC junk.
+load_lib ${tool}.exp
+load_lib remote.exp
+
+push_target hppro
+
+#
+# ${tool}_version -- extract and print the version number of gcc/g++
+#
+
+proc ${tool}_version {} {
+    global tool
+    default_${tool}_version
+}
+
+#
+# ${tool}_start -- compile a program
+#
+
+proc ${tool}_start { prog } {
+    global tool
+    default_${tool}_start $prog
+}
+
+#
+# Delete all breakpoints and verify that they were deleted.  If anything
+# goes wrong we just exit.
+#
+proc delete_breakpoints {} {
+    global prompt
+
+    send "delete breakpoints\n"
+    expect {
+	-re "Delete all breakpoints.*y or n. $" {
+	    send "y\n"
+	    exp_continue
+	}
+	-re ".*$prompt $" { }
+	timeout { perror "Delete all breakpoints (timeout)" ; exit 1}
+    }
+    send "info breakpoints\n"
+    expect {
+	-re "No breakpoints or watchpoints..*$prompt $" {}
+	-re ".*$prompt $" { perror "breakpoints not deleted" ; exit 1}
+	timeout { perror "info breakpoints (timeout)" ; exit 1}
+    }
+}
+
+#
+# Inform the debugger that we have a new exec file.
+# return a -1 if anything goes wrong, 0 on success.
+#
+proc gdb_file_cmd { arg } {
+    global verbose
+    global loadpath
+    global loadfile
+    global GDB
+    global prompt
+    global spawn_id
+    upvar timeout timeout
+
+    # The "file" command loads up a new symbol file for gdb, deal with
+    # the various messages it might spew out.
+    send "file $arg\n"
+    expect {
+        -re "Reading symbols from.*done.*$prompt $" {
+            verbose "\t\tLoaded $arg into the $GDB"
+            return 0
+        }
+        -re "has no symbol-table.*$prompt $" {
+            perror "$arg wasn't compiled with \"-g\""
+            return -1
+        }
+        -re "A program is being debugged already.*Kill it.*y or n. $" {
+            send "y\n"
+                verbose "\t\tKilling previous program being debugged"
+            exp_continue
+        }
+        -re "Load new symbol table from \".*\".*y or n. $" {
+            send "y\n"
+            expect {
+                -re "Reading symbols from.*done.*$prompt $" {
+                    verbose "\t\tLoaded $arg with new symbol table into $GDB"
+                    return 0
+                }
+                timeout {
+                    perror "(timeout) Couldn't load $arg, other program already l
+oaded."
+                    return -1
+                }
+            }
+	}
+        -re ".*No such file or directory.*$prompt $" {
+            perror "($arg) No such file or directory\n"
+            return -1
+        }
+        -re "$prompt $" {
+            perror "couldn't load $arg into $GDB."
+            return -1
+            }
+        timeout {
+            perror "couldn't load $arg into $GDB (timed out)."
+            return -1
+        }
+        eof {
+            # This is an attempt to detect a core dump, but seems not to
+            # work.  Perhaps we need to match .* followed by eof, in which
+            # expect does not seem to have a way to do that.
+            perror "couldn't load $arg into $GDB (end of file)."
+            return -1
+        }
+    }
+}
+
+#
+# ${tool}_load -- load the program and execute it
+#
+# PROG is a full pathname to the file to load, no arguments.
+# Result is "untested", "pass", "fail", etc.
+#
+
+proc ${tool}_load { prog } {
+    global exec_output
+    global GDB
+    global GDBFLAGS
+    global prompt
+    global timeout
+    global targetname
+    global serialport
+    global baud
+
+    # Make sure the file we're supposed to load really exists.
+    if ![file exists $prog] then {
+	perror "$prog does not exist."
+        return "untested"
+    }
+
+    # Remove all breakpoints, then tell the debugger that we have
+    # new exec file.
+    delete_breakpoints
+    gdb_file_cmd $prog
+
+    # Now set up breakpoints in exit, _exit, and abort.  These
+    # are used to determine if a c-torture test passed or failed.  More
+    # work would be necessary for things like the g++ testsuite which
+    # use printf to indicate pass/fail status.
+    send "break _exit\n"
+    expect {
+	-re "Breakpoint.*$prompt $" { }
+	default {
+	    send "break exit\n"
+	    expect {
+		-re "Breakpoint.*$prompt $" { }
+		-re "Function.*not defined.*$prompt $" { return "untested"}
+		default perror {
+		    "Unable to set breakpoint in _exit."
+		    return "untested"
+		}
+	    }
+	}
+    }
+
+    send "break abort\n"
+    expect {
+	-re "Breakpoint.*$prompt $" { }
+	-re "Function.*not defined.*$prompt $" { }
+	default {
+	    perror "Unable to set breakpoint in abort."
+	    return "untested"
+	}
+    }
+
+    # Now connect to the target board.
+    send "set remotebaud $baud\n"
+    send "target $targetname $serialport\n"
+    expect {
+	-re "Remote target $targetname connected to.*$prompt $" { }
+	-re "Connected to the simulator.*$prompt $" { }
+	default { 
+	    perror "Unable to connect to target board."
+	    return "untested"
+	}
+    }
+
+    # Now download the executable to the target board.  If communications
+    # with the target are very slow the timeout might need to be increased.
+    set timeout 600
+    send "load\n"
+    expect {
+	-re ".*text.*data.*$prompt $" { }
+	default {
+	    perror "Unable to send program to target board."
+	    return "untested"
+	}
+    }
+    set timeout 30
+
+    # Now start up the program and look for our magic breakpoints.
+    # To make this more robust we might want to check the exit status,
+    # but that might be tough to do in a machine independent manner,
+    # particularly if exit doesn't have debug symbols.
+    send "run\n"
+    expect {
+	-re "Breakpoint.*exit.*$prompt $" {
+	    send "target exec\n"
+	    expect {
+		-re "y or n. $" {
+		    send "y\n"
+		    expect -re "No exec file now.*$prompt $" { return "pass" }
+		    }
+	    }
+	    return "pass"
+	}
+	-re "Breakpoint.*abort.*$prompt $" {
+	    send "target exec\n"
+	    expect {
+		-re "y or n. $" {
+		    send "y\n"
+		    expect -re "No exec file now.*$prompt $" { return "fail"}
+		    }
+	    }
+	    return "fail"
+	}
+	default {
+	    send "target exec\n"
+	    expect {
+		-re "y or n. $" {
+		    send "y\n"
+		    expect -re "No exec file now.*$prompt $" { return "fail"}
+		    }
+	    }
+	    return "fail"
+	}
+    }
+}
+
+#
+# ${tool}_exit -- just a stub, nothing to do.
+#
+
+proc ${tool}_exit { } { }
+
+# The variable prompt is a regexp which matches the gdb prompt.  Set it if it
+# is not already set.
+if ![info exists prompt] then {
+    set prompt "\\(gdb\\)"
+}
+
+# Similarly for GDB.  Look in the object directory for gdb if we aren't
+# provided with one.
+if ![info exists GDB] then {
+    # We have to go back two now that we're in gcc/testsuite.
+    set GDB "${objdir}/../../gdb/gdb"
+}
+
+# Start up gdb (no startfiles, no windows) and wait for a prompt.
+spawn $GDB -nw -nx
+expect -re ".*$prompt $" { }

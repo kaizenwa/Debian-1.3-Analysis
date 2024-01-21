@@ -1,0 +1,58 @@
+#! /bin/sh
+# addgroup - add a newsgroup, locally only
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/maint:$NEWSBIN/relay:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+usage="Usage: $0 groupname {y|n|m|x|=realgroup}"
+
+case $# in
+2)	;;
+*)	echo "$usage" >&2 ; exit 2	;;
+esac
+
+case "$1" in
+*/*)	echo "$usage" >&2 ; exit 2	;;
+esac
+
+case "$2" in
+[ynmx])	;;
+=*/*)	echo "$usage" >&2 ; exit 2	;;
+=*)	;;
+*)	echo "$usage" >&2 ; exit 2	;;
+esac
+
+already="`awk '\$1 == \"'"$1"'\"' $NEWSCTL/active`"
+if test " $already" != " "
+then
+	echo "$0: $1 appears to exist already: \`$already'" >&2
+	exit 1
+fi
+
+lock -v LOCK $$ 5 || exit 1
+trap "unlock LOCK ; trap 0 ; exit 0" 0 1 2 15
+
+max=0000000000
+case "$2" in
+[x=]*)	;;
+*)	d=`echo $1 | tr . /`
+	hi=
+	if test -d $NEWSARTS/$d			# recreating old group
+	then
+		hi=`ls -f $NEWSARTS/$d | egrep '^[0-9]+$' | sort -n | tail -1`
+	fi
+	if test " $hi" != " "			# old articles still there
+	then
+		max=000$hi
+	fi
+	mkpdir $NEWSARTS/$d $NEWSOV/$d
+	touch $NEWSOV/$d/.overview
+	;;
+esac
+echo "$1 $max 00001 $2" >>$NEWSCTL/active
+
+SENDER=${LOGNAME-${USER-unknown}}@`newshostname`
+echo "$1 `now` $SENDER" >>$NEWSCTL/active.times

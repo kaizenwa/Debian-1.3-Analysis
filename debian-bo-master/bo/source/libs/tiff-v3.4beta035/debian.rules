@@ -1,0 +1,97 @@
+#! /usr/bin/make -f
+#
+# To make the binary distribution package, the ``Debianized'' source package
+# and the context diff to the original package, type `./debian.rules dist'.
+# Make sure that `debian.rules' is executable before the final distribution
+# is made.
+#
+# Invoke each target with `./debian.rules <target>'.  All targets should be
+# invoked with the package root as the current directory.
+#
+# The `binary' target must be run as root, as it needs to install files with
+# specific ownerships.  The `diff' target assumes that you have the original
+# source package available, unpacked, in ../$(p)-$(v).orig, or that you have
+# the previous revision of the ``Debianized'' source package and context diff
+# in the parent directory.
+
+source = libtiff3
+version = 3.4beta035
+debian = 1
+arch = $(shell dpkg --print-architecture)
+lname = $(source)_$(version)-$(debian)
+sname = $(source)_$(version)
+dname = tiff-v3.4beta035
+soname = libtiff.so.3.4.035
+
+build: checkdir
+	./configure --noninteractive
+	$(MAKE) all
+	touch build-stamp
+
+clean: checkdir
+	-test -f Makefile && $(MAKE) clobber
+	rm -rf debian-{tmp,dev,gif} build-stamp *~
+
+binary: checkdir checkroot
+	test -f build-stamp || $(MAKE) -f debian.rules build
+	rm -rf debian-{tmp,dev,gif}
+	install -d -g root -m 755 -o root \
+	  debian-tmp/{DEBIAN,usr/{bin,lib,doc/copyright,man/man1}} \
+	  debian-dev/{DEBIAN,usr/{lib,doc/{copyright,libtiff3/images},include,man/man3}} \
+	  debian-gif/{DEBIAN,usr/{doc/copyright,bin,man/man1}}  # Unisys sucks.
+	install -g root -m 755 -o root libtiff/$(soname) debian-tmp/usr/lib
+	install -g root -m 644 -o root libtiff/libtiff.a debian-dev/usr/lib
+	ln -s $(soname) debian-tmp/usr/lib/libtiff.so.3
+	ln -s $(soname) debian-dev/usr/lib/libtiff.so
+	install -g root -m 644 -o root libtiff/{tiff.h,tiffio.h} \
+	  debian-dev/usr/include
+	install -g root -m 644 -o root man/apps/*.1 debian-tmp/usr/man/man1
+	mv debian-tmp/usr/man/man1/gif2tiff.1 debian-gif/usr/man/man1
+	install -g root -m 644 -o root man/lib/*.3t debian-dev/usr/man/man3
+	install -s -g root -m 755 -o root tools/{fax2ps,fax2tiff,pal2rgb,ppm2tiff,ras2tiff,rgb2ycbcr,thumbnail,tiff2bw,tiff2ps,tiffcmp,tiffcp,tiffdither,tiffdump,tiffinfo,tiffmedian,tiffsplit} debian-tmp/usr/bin
+	install -s -g root -m 755 -o root tools/gif2tiff debian-gif/usr/bin
+	install -g root -m 644 -o root COPYRIGHT \
+	  debian-tmp/usr/doc/copyright/libtiff3
+	ln -s libtiff3 debian-dev/usr/doc/copyright/libtiff3-dev
+	ln -s libtiff3 debian-gif/usr/doc/copyright/libtiff3-gif
+	install -g root -m 644 -o root html/*.html \
+	  debian-dev/usr/doc/libtiff3
+	install -g root -m 644 -o root html/images/* \
+	  debian-dev/usr/doc/libtiff3/images
+	sed -e "s/VERSION/$(version)-$(debian)/g" -e "s/ARCH/$(arch)/g" \
+	  libtiff3.control > debian-tmp/DEBIAN/control
+	sed -e "s/VERSION/$(version)-$(debian)/g" -e "s/ARCH/$(arch)/g" \
+	  libtiff3-dev.control > debian-dev/DEBIAN/control
+	sed -e "s/VERSION/$(version)-$(debian)/g" -e "s/ARCH/$(arch)/g" \
+	  libtiff3-gif.control > debian-gif/DEBIAN/control
+	chmod 644 debian-{tmp,dev,gif}/DEBIAN/control
+	dpkg --build debian-tmp && dpkg-name -s .. debian-tmp.deb
+	dpkg --build debian-dev && dpkg-name -s .. debian-dev.deb
+	dpkg --build debian-gif && dpkg-name -s .. debian-gif.deb
+
+source: clean
+	cd .. && \
+	tar cf $(lname).tar $(dname) && gzip -9f $(lname).tar
+
+diff: clean
+	cd .. && \
+	(diff -ruN $(dname).orig $(dname) > $(lname).diff; [ $$? = 1 ]) && \
+	gzip -9f $(lname).diff
+
+changes:
+	cd .. && \
+	dchanges -p -n $(lname).tar.gz $(lname).diff.gz $(source)*deb && \
+	cd -
+
+checkdir:
+	test $(dname) = $(shell basename $$PWD)
+
+checkroot:
+	test root = $(shell whoami)
+
+dist: binary source diff changes
+
+.PHONY: build binary source diff clean checkdir checkroot
+
+# Local Variables:
+# mode:Makefile

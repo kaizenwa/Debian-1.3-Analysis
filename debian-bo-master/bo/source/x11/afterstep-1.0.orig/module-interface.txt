@@ -1,0 +1,394 @@
+The AfterStep Module Interface
+
+Hannu Rummukainen <hrummuka@cc.hut.fi>
+March 1997
+
+
+This document is intended to serve as an introduction to the AfterStep
+module interface and its capabilities.  This is not meant to be a
+comprehensive reference guide; make anything involved and you are bound to
+be reading AfterStep sources anyway.  Some background knowledge on xlib and
+unix programming is assumed.
+
+A module is basically a separate unix program that AfterStep starts and
+communicates with.  A module can be started during AfterStep initialization
+via the Module option, or at any time during the X session by the Module
+built-in.  A module can run indefinitely until AfterStep exits, or can
+perform a single task and exit.
+
+
+Module Invocation
+=================
+
+A module should be an executable file located in one of the directories
+listed in the .steprc ModulePath option.  It is referenced in AfterStep
+commands by the name of the executable.
+
+AfterStep gives a module 5 or 6 command line arguments (in addition to
+its path name in argv[0]), as follows:
+
+argv[0]
+	The path and name used by AfterStep to start the module.
+
+argv[1]
+	The file descriptor for the open pipe that the module must
+	write to in order to send commands and requests to AfterStep.
+	This is an integer formatted in decimal.
+
+argv[2]
+	The file descriptor for the open pipe that the module must
+	read to in order to acquire any information sent by AfterStep.
+	This is an integer formatted in decimal.
+
+argv[3]
+	The name of the AfterStep configuration file.  If the original
+	configuration file was preprocessed, the file name points to a
+	file that contains the output of the preprocessor.
+
+argv[4]
+	The Window ID of the application window that was focused when the
+	module was invoked.  The argument is zero if no window was focused,
+	or if the Module was started during AfterStep initialization.
+	This is an unsigned 32 bit integer formatted in hexadecimal.
+
+argv[5]
+	The AfterStep context of the module invocation.  Briefly, when
+	the previous argument specifies a window, this argument tells
+	which part of the window (title bar, client area etc) was
+	concerned.
+
+	The AfterStep contexts are defined in the include file
+	"appropriate path/afterstep/afterstep.h".
+
+	This is an unsigned 32 bit integer formatted in hexadecimal.
+
+argv[6]	(optional, check argc to be sure)
+	Any command line arguments for the module, if such were supplied
+	in the Module command that invoked this module.  They are all sent
+	as a single null-terminated string.
+
+The DISPLAY environment variable points to the display managed by
+the AfterStep instance that started the module.
+
+
+Sending commands to AfterStep
+=============================
+
+The data sent to AfterStep consists of packets with a structure like this:
+
+Window w;
+	Window ID for the window to be affected, or None.
+	The window ID can refer to an application window or to a decoration
+	window made by AfterStep, including the top-level frame window.
+
+int size;
+	The length of the text string to follow in characters.
+	The size is limited to no more than 255 characters.
+
+char text[size];
+	A text command formatted similarly to the function field in
+	the mouse and key bindings in .steprc.  See below for special
+	commands available in Modules.
+
+int cont;
+	If this is nonzero, everything goes on as usual.
+	On the other hand, if the integer value is zero, AfterStep closes
+	the pipes to the module permanently.
+
+The text commands are rather thoroughly documented on the AfterStep manual
+page.  However, there are a couple of additional commands that can only be
+issued by a module:
+
+Set_Mask maskvalue
+	Set the input mask for the module, in order to specify what actions
+	AfterStep should inform the module about.  The input mask values are
+	defined in the include file "appropriate path/afterstep/module.h".
+
+Send_WindowList
+	Get the AfterStep window list in its entirety.
+	See below for more information.
+
+Unlock
+	Let AfterStep return to normal after it's been locked.
+
+When AfterStep is about to exit, it closes down the communication pipes.
+Modules should detect this and respond with SIGCHLD when they are ready
+to let go.  However, in 30 seconds AfterStep exits anyway.
+
+The locking facility is a kludge to allow animating of iconifying windows.
+A better alternative is on the way, and I do not recommend depending on
+the current implementation.  For now, when you set the input mask bit
+M_LOCKONSEND, AfterStep stops on its tracks when sending any packet to your
+module.  You have to acknowledge each and every packet by a Unlock command.
+
+
+Reading information from AfterStep
+==================================
+
+AfterStep sends information to modules in small packets.  By default a
+module will get all types of packets, but it is recommended that you select
+(with the Set_Mask command) exactly the types of packets that you need.
+
+Every packet sent to modules begins with a header:
+
+unsigned long START_FLAG;
+	A special packet start flag defined in module.h
+
+unsigned long packet_type;
+	A packet type identifier, equivalent to the input masks defined
+	in module.h
+
+unsigned long packet_length;
+	The total length of the packet in unsigned longs, including
+	everything from the start flag to the last unsigned long.
+
+The contents of the rest of the packet depend on the packet type.  Each type
+contains a constant amount of data items, as shown by the table below.  Of
+course, a future version might send more data so using the packet length
+field is a good idea.  Every data item is cast to unsigned long before
+sending, except for strings which are merely copied into place.
+
+Of the common data items below: `app_win' is the window id of the real
+client application window, `frame' is the window id of the top-level frame
+window, which is an ancestor of the application window, and a child of the
+root window.  The corresponding ASWindow structure pointer is there as well,
+what it is good for I do not know.
+
+------------------------------------------------------------------------------
+packet type    #data	what the data items are for, in order and with
+	       items	types to cast them back to, if necessary
+	a brief explanation
+------------------------------------------------------------------------------
+M_ADD_WINDOW	  0	-
+	A new window is being created.
+	Followed by M_WINDOW_NAME, M_ICON_NAME, M_RES_CLASS and M_RES_NAME.
+
+M_DESTROY_WINDOW  3	Window app_win, Window frame, ASWindow* t
+	A window is destroyed.
+
+M_FOCUS_CHANGE	  3	Window app_win, Window frame, ASWindow* t
+			or: 0, 0, 0
+	Contains the identity of the window that just got the focus.
+	If the window is not managed by AfterStep, all the data values
+	are sent as zero.
+
+M_MAP		  3	Window app_win, Window frame, ASWindow* t
+	A window is mapped.  This is not sent if the mapping is due to
+	deiconification.
+
+M_RAISE_WINDOW	  3	Window app_win, Window frame, ASWindow* t
+	A window is raised.  Note: these messages are not a reliable way
+	of tracking the window stacking order; should you want to do this,
+	do an occasional Send_WindowList or communicate directly with the
+	X server.
+
+M_LOWER_WINDOW	  3	Window app_win, Window frame, ASWindow* t
+	A window is lowered.
+
+M_ICONIFY	  7	Window app_win, Window frame, ASWindow* t,
+			icon_x, icon_y, icon_width, icon_height
+	A window is iconified.
+	When this packet is sent as part of a window list, the four last
+	data items are zero in case the window is iconified but the icon is
+	unmapped.
+
+M_DEICONIFY	  3	Window app_win, Window frame, ASWindow* t,
+			icon_x, icon_y, icon_width, icon_height
+	A window is deiconified.
+	The last four data items are zero if the deiconification was
+	initiated by the application itself.
+
+M_ICON_LOCATION	  7	Window app_win, Window frame, ASWindow* t,
+			new_icon_x, new_icon_y, icon_width, icon_height
+	An icon was moved.
+
+M_TOGGLE_PAGING	  1	0 or 1
+	The TogglePage built-in is called; the data value is 1 if the
+	edge scrolling is enabled and 0 if it is disabled.
+
+M_NEW_PAGE	  3	new_x, new_y, desknumber
+	The virtual screen is scrolled.
+
+M_NEW_DESK	  1	new_desknumber
+	A change of desktop.
+
+M_SHADE		  3	Window app_win, Window frame, ASWindow* t
+	A window is shaded.
+
+M_UNSHADE	  3	Window app_win, Window frame, ASWindow* t
+	A window is unshaded.
+
+M_END_WINDOWLIST  0
+	An end marker for the Send_WindowList packetfest.  See below.
+
+M_CONFIGURE_WINDOW  24	Window app_win, Window frame, ASWindow* t,
+			frame_x, frame_y, frame_width, frame_height,
+			Desk, flags, title_height, boundary_width,
+			hints.base_width, hints.base_height,
+			hints.width_inc, hints.height_inc,
+			hints.min_width, hints.min_height,
+			hints.max_width, hints.max_height,
+			0, icon_pixmap_w, hints.win_gravity,
+			TextPixel, BlackPixel
+	Some properties or flags associated with a window were changed.
+	Except for the zero and the ASWindow pointer, the data items in
+	the packet are fields of the ASWindow structure (see afterstep.h).
+
+M_WINDOW_NAME	  3+s	Window app_win, Window frame, ASWindow* t,
+			char[] window_name
+	The title of a window is set or changed.
+
+M_ICON_NAME	  3+s	Window app_win, Window frame, ASWindow* t,
+			char[] icon_name
+	The icon name of a window is set or changed.
+
+M_RES_CLASS	  3+s	Window app_win, Window frame, ASWindow* t,
+			char[] res_class
+	The class name of a window is set.
+
+M_RES_NAME	  3+s	Window app_win, Window frame, ASWindow* t,
+			char[] res_name
+	The application name of a window is set.
+------------------------------------------------------------------------------
+
+There is no corresponding packet for the mask value M_LOCKONSEND.
+
+
+In response to a Send_WindowList request, AfterStep sends the following
+packets to the module that sent the request:
+
+	M_TOGGLE_PAGING
+	M_NEW_DESK
+	M_NEW_PAGE
+	* for each window:
+		M_CONFIGURE_WINDOW
+		M_WINDOW_NAME
+		M_ICON_NAME
+		M_RES_CLASS
+		M_RES_NAME
+		* if the window is iconified,
+			M_ICONIFY
+		  (see the M_ICONIFY description for a special note on this)
+	* to terminate the window list:
+	M_END_WINDOWLIST
+
+
+The AfterStep library
+=====================
+
+There is a library of utility routines available in the lib directory of the
+source distribution.  Your module can take advantage of the library by
+including the include file aftersteplib.h and linking to libafterstep.a.
+
+Here's a lowdown of the routines in the library:
+
+void SendText(int *fd,char *message,unsigned long window);
+void SendInfo(int *fd, char *message, unsigned long window);
+	Send a command to AfterStep.  The fd argument is the file descriptor
+	of the module-to-AfterStep pipe, message is the text command to be
+	sent, and window is None or the window ID of the window to be
+	affected.  The continuation flag in the packet is set.
+
+	Interestingly, the two functions are identical.
+
+char *findIconFile(char *icon, char *pathlist, int type);
+	Search for a file with the specified name (the `icon' argument)
+	along the pathlist given.  If found, the complete path name of the
+	file is returned.
+	The type argument corresponds to the second argument of access(2).
+	Typical values are R_OK and X_OK for readability and executability.
+
+int ReadASPacket(int fd, unsigned long *header, unsigned long **body);
+	Read a packet from AfterStep.  The fd is the file descriptor of
+	the AfterStep-to-module pipe, header should point to an array of
+	MAX_HEADER unsigned longs, and body is the address of a pointer
+	that will be filled with the address of the body of the packet.
+
+	The caller is responsible for free()ing the packet body area.
+
+	The routine returns a positive number if the read went fine,
+	zero if the packet was invalid and a negative value if something
+	is very wrong.
+
+	You should provide a routine with a prototype like
+		void DeadPipe(int nonsense);
+	that will be called by ReadASPacket when the pipe is no longer open.
+	Usually this indicates that AfterStep is exiting.
+
+void sleep_a_little(int n);
+	Sleep for the specified amount of microseconds.
+
+int GetFdWidth(void);
+	Get the maximum number of files a process can open.
+
+char *safemalloc(int size);
+	This is a malloc() that is guaranteed to succeed.
+
+int matchWildcards(char *pattern, char *string);
+	Returns a nonzero value if the string matches the pattern.
+	The characters '?' and '*' are wildcards with the usual meanings.
+
+int mystrcasecmp(char *a, char *b);
+int mystrncasecmp(char *a, char *b, int n);
+	These provide the nonstandard but useful str[n]casecmp functions
+	for systems that do not have them.  Briefly, they are just like
+	the ANSI str[n]cmp functions but ignore case differences.
+
+char *CatString3(char *a, char *b, char *c);
+	Concatenate 3 strings into a single 256 byte global buffer.
+
+int mygethostname(char *client, int namelen);
+	Get the name of the host machine if it is available by some means.
+	The string buffer is provided by the caller.
+
+int mygetostype(char *buf, int max);
+	Acquire a string indicating the OS type if such information is
+	available.  The string buffer is provided by the caller.
+
+void CopyString(char **dest, char *source);
+	Allocate memory for a copy of the source string, save the address
+	of the allocate area to *dest, and copy the source string without
+	any leading or trailing whitespace to the allocated area.
+
+
+Compatibility with Fvwm
+=======================
+
+As AfterStep is derived from Fvwm 1.24, the module interface is very close
+to that of Fvwm.  In practice AfterStep and Fvwm-1 modules are often
+interchangeable; however problems do occur.  I don't know a lot about the
+Fvwm interface so this section is sketchy at best.
+
+Fvwm does not support locking (M_LOCKONSEND) nor shading (M_SHADE,
+M_UNSHADE).
+
+Fvwm does not send icon coordinates in M_DEICONIFY messages.
+
+AfterStep does not support any of the Fvwm-2 extensions.
+
+More?
+
+
+Further reading
+===============
+
+The AfterStep source code is the definitive resource.  The source is a mess,
+but in principle it is modular which makes it easier to begin reading and
+comprehending relevant sections of the code.  The module communication takes
+place in module.c.
+
+Obviously existing modules are a good basis for experimentation.  See the
+official ftp site and your favourite search engine to find more modules.
+
+If you are just beginning X programming and looking for more depth than is
+available in the man pages, see the comp.windows.x FAQ for literature
+references.  For the economically challenged, the X source distribution
+contains dozens of megabytes of documentation.
+
+
+Disclaimer
+==========
+
+The document contains probably several inaccuracies, mistakes and what not.
+All responsibility is hereby transferred to the readers of the document.
+Use it for good.

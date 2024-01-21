@@ -1,0 +1,143 @@
+XCOMM
+XCOMM Copyright (C) 1989-94 GROUPE BULL
+XCOMM
+XCOMM Permission is hereby granted, free of charge, to any person obtaining a
+XCOMM copy of this software and associated documentation files
+XCOMM (the "Software"), to deal in the Software without restriction, including
+XCOMM without limitation the rights to use, copy, modify, merge, publish,
+XCOMM distribute, sublicense, and/or sell copies of the Software, and to permit
+XCOMM persons to whom the Software is furnished to do so, subject to the
+XCOMM following conditions:
+XCOMM The above copyright notice and this permission notice shall be included
+XCOMM in all copies or substantial portions of the Software.
+XCOMM
+XCOMM THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+XCOMM OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+XCOMM MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+XCOMM IN NO EVENT SHALL GROUPE BULL BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+XCOMM LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+XCOMM FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+XCOMM DEALINGS IN THE SOFTWARE.
+XCOMM
+XCOMM Except as contained in this notice, the name of GROUPE BULL shall not be
+XCOMM used in advertising or otherwise to promote the sale, use or other
+XCOMM dealings in this Software without prior written authorization from
+XCOMM GROUPE BULL.
+XCOMM
+
+XCOMM
+XCOMM Imakefile for gwm
+XCOMM Use Makefile.noXtree if you do want to use imake
+XCOMM
+
+XCOMM Configuration parameters:
+XCOMM comment out  if you don't have installed libXpm.a with the rest of X
+#define UseInstalledXpm Yes
+
+XCOMM CONFIGDEFS=-Dbison
+
+XCOMM ************* WARNING: IF YOU CHANGE THIS CHANGE ALSO IN data/Imakefile
+GWMDIR = /usr/local/lib/gwm
+
+#if defined (UseInstalledXpm)
+XPMINC =
+XPMLIB = -lXpm
+DEPXPMLIB = $(USRLIBDIR)/libXpm.a
+#else
+XPMINC = -I/where_I_can_find_X11/xpm.h
+XPMLIB = /whereever_I_Have_stored_it/libXpm.a
+DEPXPMLIB = $(XPMLIB)
+#endif
+
+XCOMM ----- end of configuration parameters, do not edit below -----
+
+SUBDIRS = data
+
+#define IHaveSubdirs
+#define PassCDebugFlags 'CDEBUGFLAGS=$(CDEBUGFLAGS)'
+
+OPTIONSDEFS = -DX11R6 -DSECURE -DSTATS -DUSER_DEBUG  -DWOOL_APP_NAME=\"GWM\" \
+	 -DWOOL_APP_name=\"gwm\" -DGWM
+
+PATHDEFS = -DINSTALL_PATH=\"$(GWMDIR)\" \
+	-DINSTALL_DIR=\"$(GWMDIR)\" -DDEFAULT_DEFAULT_WLPATH=\"$(GWMDIR)\"
+EXTRA_INCLUDES=-I$(INCDIR)/extensions
+
+#ifdef SYSV
+OSDEFS = -DSYSV
+#endif
+
+#ifdef SparcArchitecture
+CONFIGDEFS = -DDOUBLE_ALIGN
+#endif
+#if defined(VaxArchitecture) && (HasGcc == NO)
+CONFIGDEFS = -DSTUPID
+#endif
+#ifdef HPArchitecture
+CONFIGDEFS = -DNO_STRUCTURE_OFFSETS -DUSE_STANDARD_MALLOC
+#endif
+#ifdef IBMArchitecture
+#ifdef RsArchitecture
+CONFIGDEFS = -DSYSV -DDO_NOT_DECLARE_STRCHR -DNEED_SELECT_H
+#else
+#ifdef PS2Architecture
+CONFIGDEFS = -DIBM_RT -DNO_STRUCTURE_OFFSETS
+#else
+CONFIGDEFS = -DIBM_RT -Nn3000
+#endif
+#endif
+#endif
+#ifdef sm90
+CONFIGDEFS = -DSTUPID -DSYSV
+#endif
+#ifdef gould
+CONFIGDEFS = -DDOUBLE_ALIGN
+#endif
+#ifdef sequent
+EXTRA_LIBRARIES = -lseq
+#endif
+
+LOCAL_LIBRARIES = $(XPMLIB)
+SYS_LIBRARIES   = $(EXTENSIONLIB) $(XLIB)
+DEPLIBS         = $(DEPXPMLIB) $(DEPEXTENSIONLIB) $(DEPXLIB)
+DEFINES         = $(OPTIONSDEFS) $(PATHDEFS) $(OSDEFS) $(CONFIGDEFS) $(XPMINC)
+ 
+SRCS = 	bar.c client.c error.c gwm.c icccm.c machine.c malloc.c \
+	menu.c plug.c reference.c revision.c screen.c user.c gwm-spy.c \
+	wl_active.c wl_atom.c wl_bar.c wl_client.c wl_coll.c \
+	wl_cursor.c wl_event.c wl_fsm.c wl_func.c wl_label.c wl_list.c \
+	wl_menu.c wl_name.c wl_number.c wl_pixmap.c wl_plug.c \
+	wl_pointer.c wl_string.c wob.c wool-gwm.c wool.c wops.c 
+
+OTHERSRCS = wool.yac wool.lex
+
+OBJS = 	y.tab.o \
+ 	bar.o client.o error.o gwm.o icccm.o machine.o malloc.o \
+	menu.o plug.o reference.o revision.o screen.o user.o gwm-spy.o \
+	wl_active.o wl_atom.o wl_bar.o wl_client.o wl_coll.o \
+	wl_cursor.o wl_event.o wl_fsm.o wl_func.o wl_label.o wl_list.o \
+	wl_menu.o wl_name.o wl_number.o wl_pixmap.o wl_plug.o \
+	wl_pointer.o wl_string.o wob.o wool-gwm.o wool.o wops.o 
+
+ComplexProgramTarget(gwm)
+MakeSubdirs($(SUBDIRS))
+DependSubdirs($(SUBDIRS))
+ForceSubdirs($(SUBDIRS))
+
+
+depend:: lex.yy.c y.tab.c
+
+lex.yy.c : wool.lex 
+	lex wool.lex
+	-if grep FLEX lex.yy.c;then cp gwm-parsers/lex.yy.c .; fi
+
+y.tab.c : wool.yac 
+	yacc wool.yac
+	-if grep YYBYACC y.tab.c;then cp gwm-parsers/y.tab.c .;fi
+
+y.tab.o: lex.yy.c y.tab.c
+
+clean::
+	$(RM) lex.yy.c y.tab.c
+
+all:: gwm

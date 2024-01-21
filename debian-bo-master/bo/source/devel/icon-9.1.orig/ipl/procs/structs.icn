@@ -1,0 +1,291 @@
+############################################################################
+#
+#	File:     structs.icn
+#
+#	Subject:  Procedures for structure operations
+#
+#	Author:   Ralph E. Griswold
+#
+#	Date:     July 25, 1995
+#
+############################################################################
+#  
+#     These procedures manipulate structures.
+#  
+#       depth(t)	compute maximum depth of tree t
+#  
+#       eq(x,y)		compare list structures x and y
+#  
+#       equiv(s,y)	compare arbitrary structures x and y
+#
+# 	keylist(T)	list of keys in table T
+#  
+#       ldag(s)		construct a dag from the string s
+#
+#	limage(L)	unadorned image of list L
+#
+#	revlist(L)	reversal of list L
+#
+#       ltree(s)	construct a tree from the string s
+#  
+#	seteq(S1, S2)	equivalence test for sets S1 and S2
+#
+#	setlt(S1, S2)	less-than test for sets S1 and S2
+#
+#       stree(t)	construct a string from the tree t
+#  
+#	tbleq(T1, T2)	equivalence test for tables T1 amd T2
+#
+#       tcopy(t)	copy tree t
+#
+#       teq(t1,t2)	compare trees t1 and t2
+#
+#	vallist(T)	list of values in table T
+#
+#	valset(T)	set of values for table T
+#  
+#       visit(t)	visit, in preorder, the nodes of the tree t
+#  
+#     The procedure equiv() tests for the "equivalence" of two values. For types
+#  other than structures, it does the same thing as x1 === x2.  For structures,
+#  the test is for "shape".  For example,
+#
+#	equiv([],[])
+#
+#  succeeds.
+#
+#     It handles loops, but does not recognize them as such.  For example,
+#  given
+#
+#	L1 := []
+#	L2 := []
+#	put(L1,L1)
+#	put(L2,L1)
+#
+#	equiv(L1,L2)
+#
+#  succeeds.
+#
+#     The concept of equivalence for tables and sets is not quite right
+#  if their elements are themselves structures.  The problem is that there
+#  is no concept of order for tables and sets, yet it is impractical to
+#  test for equivalence of their elements without imposing an order.  Since
+#  structures sort by "age", there may be a mismatch between equivalent
+#  structures in two tables or sets.
+#
+#  Note:
+#     The procedures equiv and ldag have a trailing argument that is used on
+#  internal recursive calls; a second argument must not be supplied
+#  by the user.
+#  
+############################################################################
+
+procedure depth(ltree)		#: depth of tree
+   local count
+
+   count := 0
+   every count <:= 1 + depth(ltree[2 to *ltree])
+   return count
+
+end
+
+procedure eq(x,y)		#: compare lists
+   local i
+
+   if x === y then return y
+   if type(x) == type(y) == "list" then {
+      if *x ~= *y then fail
+      every i := 1 to *x do
+         if not eq(x[i],y[i]) then fail
+      return y
+     }
+
+end
+	
+procedure equiv(x1,x2,done)	#: compare structures
+   local code, i
+
+   if x1 === x2 then return x2		# Covers everything but structures.
+
+   if type(x1) ~== type(x2) then fail	# Must be same type.
+
+   if type(x1) == ("procedure" | "file" | "window")
+      then fail				# Leave only those with sizes (null
+					# taken care of by first two tests).
+
+   if *x1 ~= *x2 then fail		# Skip a lot of possibly useless work.
+
+					# Structures (and others) remain.
+
+   /done := table()			# Basic call.
+
+   (/done[x1] := set()) |		# Make set of equivalences if new.
+      (if member(done[x1],x2) then return x2)
+
+					# Records complicate things.
+   image(x1) ? (code := (="record" | type(x1)))
+
+   case code of {
+      "list" | "record": 
+         every i := 1 to *x1 do
+            if not equiv(x1[i],x2[i],done) then fail
+      "table": if not equiv(sort(x1,3),sort(x2,3),done) then fail
+      "set":   if not equiv(sort(x1),sort(x2),done) then fail
+      default: fail			# Vaues of other types are different. 
+      }
+
+   insert(done[x1],x2)			# Equivalent; add to set.
+   return x2
+
+end
+
+procedure keylist(tbl)		#: list of keys in table
+   local lst
+
+   lst := []
+   every put(lst, key(tbl))
+   return sort(lst)
+
+end
+
+procedure ldag(stree,done)	#: construct dag from string
+   local L
+
+   /done := table()
+   if L := \done[stree] then return L
+   stree ?
+      if L := [tab(upto('('))] then {
+         move(1)
+         while put(L,ldag(tab(bal(',)')),done)) do
+            move(1)
+         }
+      else L := [tab(0)]
+   return done[stree] := L
+
+end
+
+procedure limage(L)		#: list image
+   local result
+
+   if type(L) ~== "list" then stop("*** invalid type to limage()")
+
+   result := ""
+
+   every result ||:= image(!L) || ","
+
+   return ("[" || result[1:-1] || "]") | "[]"
+
+end
+
+procedure ltree(stree)		#: construct tree from string
+   local L
+
+   stree ?
+      if L := [tab(upto('('))] then {
+         move(1)
+         while put(L,ltree(tab(bal(',)')))) do
+            move(1)
+         }
+      else L := [tab(0)]
+   return L
+
+end
+
+procedure revlist(lst)		#: list reversal
+   local newlist, i
+
+   newlist := copy(lst)
+   every i := 1 to *newlist / 2 do
+      newlist[i] :=: newlist[-i]
+   return newlist
+
+end
+
+procedure seteq(set1, set2)	#: set equivalence
+   local x
+
+   if *set1 ~= *set2 then fail
+   every x := !set1 do
+      if not member(set2, x) then fail
+   return set2
+
+end
+
+procedure setlt(set1, set2)	#: set inclusion
+   local x
+
+   if *set1 >= *set2 then fail
+   every x := !set1 do
+      if not member(set2, x) then fail
+   return set2
+
+end
+
+procedure stree(ltree)		#: construct string from tree
+   local s
+
+   if *ltree = 1 then return ltree[1]
+   s := ltree[1] || "("
+   every s ||:= stree(ltree[2 to *ltree]) || ","
+   return s[1:-1] || ")"
+
+end
+
+procedure tbleq(tbl1, tbl2)	#: table equivalence
+   local x
+   static prod
+
+   initial prod := []
+
+   if *tbl1 ~= *tbl2 then fail
+   if tbl1[prod] ~=== tbl2[prod] then fail
+   else every x := key(tbl1) do
+      if not(member(tbl2, x)) |
+         (tbl2[x] ~=== tbl1[x]) then fail
+   return tbl2
+
+end
+
+procedure tcopy(ltree)		#: tree copy
+   local L
+
+   L := [ltree[1]]
+   every put(L,tcopy(ltree[2 to *ltree]))
+   return L
+
+end
+
+procedure teq(L1,L2)		#: tree equivalence
+   local i
+
+   if *L1 ~= *L2 then fail
+   if L1[1] ~== L2[1] then fail
+   every i := 2 to *L1 do
+      if not teq(L1[i],L2[i]) then fail
+   return L2
+
+end
+
+procedure vallist(tbl)		#: list of tabe values
+   local list1
+
+   list1 := []
+   every put(list1, !tbl)
+   return list1
+
+end
+
+procedure valset(tbl)		#: set of table values
+   local set1
+
+   set1 := set()
+   every insert(set1, !tbl)
+   return set1
+
+end
+
+procedure visit(ltree)		#: visit nodes of tree
+
+   suspend ltree | visit(ltree[2 to *ltree])
+
+end

@@ -1,0 +1,145 @@
+# Configure template for libelf
+# Copyright (C) 1995, 1996 Michael Riepe <michael@stud.uni-hannover.de>
+# Process this file with autoconf to produce a configure script.
+
+AC_INIT(VERSION)
+AC_CONFIG_HEADER(config.h)
+
+AC_PREREQ(2.10)
+
+PACKAGE=libelf
+VERSION=`cat $srcdir/VERSION`
+AC_SUBST(PACKAGE)
+AC_SUBST(VERSION)
+
+ALL_LINGUAS=
+
+set `echo $VERSION | sed 's/\./ /g'`
+MAJOR=${1-1}
+MINOR=${2-0}
+REVISION=${3-0}
+AC_SUBST(MAJOR)
+
+dnl Checks for programs.
+AC_PROG_MAKE_SET
+AC_PROG_CC
+AC_PROG_CPP
+AC_PROG_INSTALL
+AC_PROG_RANLIB
+AC_PROG_LN_S
+
+dnl Checks for libraries.
+
+dnl Checks for header files.
+AC_HEADER_STDC
+AC_CHECK_HEADERS(unistd.h)
+
+AC_CACHE_CHECK([for elf.h], libelf_cv_header_elf_h, [
+  libelf_cv_header_elf_h='no'
+  for h in sys/elf.h elf.h; do
+    AC_TRY_CPP([#include <$h>], [
+      libelf_cv_header_elf_h=$h
+      break
+    ])
+  done
+])
+test -d lib || mkdir lib
+rm -f lib/sys_elf.h
+if test "$libelf_cv_header_elf_h" = no; then
+  AC_REQUIRE([AC_PROG_LN_S])
+  dir=$srcdir
+  case $dir in
+    /*)
+      ;;
+    *)
+      dir=../$dir
+      ;;
+  esac
+  (cd lib && eval $LN_S $dir/lib/elf_repl.h sys_elf.h) >/dev/null 2>&1 ||
+    cp $srcdir/lib/elf_repl.h lib/sys_elf.h ||
+    exit 1
+else
+  echo "#include <$libelf_cv_header_elf_h>" >lib/sys_elf.h
+
+  dnl
+  dnl Slowaris declares Elf32_Dyn in <link.h>
+  dnl
+  AC_CACHE_CHECK([for declaration of Elf32_Dyn], libelf_cv_struct_elf32_dyn, [
+    libelf_cv_struct_elf32_dyn='no'
+    for h in $libelf_cv_header_elf_h link.h; do
+      AC_TRY_COMPILE([#include <$h>], [Elf32_Dyn x;], [
+	libelf_cv_struct_elf32_dyn=$h
+	break
+      ])
+    done
+  ])
+  if test "$libelf_cv_struct_elf32_dyn" = link.h; then
+    AC_DEFINE(NEED_LINK_H)
+  elif test "$libelf_cv_struct_elf32_dyn" = no; then
+    AC_MSG_ERROR([no declaration for Elf32_Dyn])
+  fi
+
+  dnl
+  dnl Linux declares struct nlist in <elf.h>
+  dnl
+  AC_CACHE_CHECK([whether $libelf_cv_header_elf_h declares struct nlist],
+    libelf_cv_struct_nlist, [
+      AC_TRY_COMPILE([#include <$libelf_cv_header_elf_h>],
+	[struct nlist nl;],
+	[libelf_cv_struct_nlist=yes],
+	[libelf_cv_struct_nlist=no])
+  ])
+  if test "$libelf_cv_struct_nlist" = yes; then
+    AC_DEFINE(HAVE_STRUCT_NLIST_DECLARATION)
+  fi
+fi
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_TYPE_OFF_T
+AC_TYPE_SIZE_T
+
+dnl Checks for library functions.
+AC_FUNC_MMAP
+AC_CHECK_FUNCS(ftruncate memcmp memcpy memmove)
+AC_REPLACE_FUNCS(memset)
+if test "$ac_cv_func_memset" = yes; then
+  AC_DEFINE(HAVE_MEMSET)
+fi
+
+AC_CACHE_CHECK([whether overlapping arrays are copied correctly],
+  libelf_cv_working_memmove,
+  [AC_TRY_RUN(changequote(<<, >>)dnl
+    <<#include "confdefs.h"
+    #if HAVE_MEMMOVE
+    extern void *memmove();
+    #else
+    extern void bcopy();
+    #define memmove(d,s,n) bcopy((s),(d),(n))
+    #endif
+    extern int strcmp();
+    main() {
+      char buf[] = "0123456789";
+      memmove(buf + 1, buf, 9);
+      if (strcmp(buf, "0012345678")) exit(1);
+      exit(0);
+    }>>, changequote([, ])dnl
+    libelf_cv_working_memmove=yes,
+    libelf_cv_working_memmove=no,
+    libelf_cv_working_memmove=no)])
+if test "$libelf_cv_working_memmove" != yes; then
+  AC_DEFINE(HAVE_BROKEN_MEMMOVE)
+fi
+
+dnl Check for NLS support
+mr_ENABLE_NLS
+
+dnl Check for shared library support
+mr_ENABLE_SHARED
+
+dnl Check for debug support
+mr_ENABLE_DEBUG
+
+AC_OUTPUT([Makefile lib/Makefile po/Makefile], [echo timestamp > stamp-h])
+
+# vi: set ts=8 sw=2 :

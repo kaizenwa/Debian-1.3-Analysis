@@ -1,0 +1,79 @@
+#! /bin/sh
+# Prepare up to $4 batches of size $2-$3 in files named togo.[0-9] ,
+# working from $1.  Note that $4 can be 0, a special case.
+#
+# If the togo files do not contain file sizes, we make an arbitrary guess
+# at an average size.
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/batch:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+input="$1"
+maxbatch="$2"
+absmax="$3"
+nwanted="$4"
+
+rm -f togo.overflow togo.count
+awk 'BEGIN {
+	batchsize = 0
+	bno = 1
+	ndone = 0
+	batch = "togo." bno
+	nwanted = '$nwanted'
+	maxbatch = '$maxbatch'
+	absmax = '$absmax'
+	origmax = maxbatch
+	minbatch = 1
+	if (nwanted == 0) {		# a bit of a kludge
+		minbatch = 0
+		maxbatch = 0
+		ndone = -1
+	}
+}
+{
+	if ($NF ~ /^<.*>$/)			# ihave/sendme or NNTP
+		size = length($0) + 1
+	else if (NF == 1 || $NF !~ /^[0-9]+$/)	# no size present
+		size = 3000			# Arbitrary guess.
+	else
+		size = $NF + 15			# 15 for "#! rnews nnnnn"
+	if (size > absmax) {
+		print "article", $1, ">" absmax "bytes, not sent to \"'"$NEWSSITE"'\""
+		next			# NOTE NEXT
+	}
+
+	if (batchsize + size > maxbatch && batchsize >= minbatch) {
+		# Go to next batch.
+		ndone++
+		if (ndone < nwanted) {
+			bno++
+			batch = "togo." bno
+		} else if (ndone == nwanted && FILENAME == "togo.more") {
+			batch = "togo.next"
+			nnext = 4 * nwanted	# how many batches in togo.next
+			if (nnext < 20)		# at least 20
+				nnext = 20
+			maxbatch = origmax * nnext
+			minbatch = 1
+		} else {
+			print NR - 1 >"togo.count"
+			exit		# punt to sed to rebuild togo.more
+		}
+		batchsize = 0
+	}
+	batchsize += size
+	print >batch
+}' $input
+
+# handle the overflow case efficiently
+if test -s togo.count
+then
+	sed "1,`cat togo.count`d" $input >togo.overflow
+	rm togo.count
+	mv togo.overflow $input
+else
+	rm $input
+fi

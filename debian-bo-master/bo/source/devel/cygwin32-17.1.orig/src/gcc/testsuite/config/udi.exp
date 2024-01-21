@@ -1,0 +1,171 @@
+# Copyright (C) 1994, 1996 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+# Please email any bugs, comments, and/or additions to this file to:
+# bug-gcc@prep.ai.mit.edu
+
+# This file was written by Rob Savoye. (rob@cygnus.com)
+
+#
+# load support libraries
+#
+load_lib ${tool}.exp
+load_lib udi.exp
+load_lib remote.exp
+
+set shell_prompt "mondfe>"
+
+# When using the simulator (-n iss) and running nice'd, things can naturally
+# take a little longer, so increase the timeout.
+set timeout 30
+
+#
+# ${tool}_version -- extract and print the version number of gcc/g++
+#
+
+proc ${tool}_version {} {
+    global tool
+    default_${tool}_version
+}
+
+#
+# ${tool}_start -- compile a program
+#
+
+proc ${tool}_start { arglist } {
+    global tool
+    default_${tool}_start $arglist
+}
+
+#
+# ${tool}_load -- load the program and execute it
+#
+# See default.exp for explanation of arguments and results.
+#
+
+proc ${tool}_load { prog } {
+    global targetname
+    global shell_id
+    global shell_prompt
+    global connectmode
+
+    if ![file exists $prog] then {
+	perror "$prog does not exist."
+	verbose -log "$prog does not exist." 3
+	return "untested"
+    }
+
+    # Load the program.
+    if $shell_id<0 then {
+	verbose -log "$prog not executed, couldn't connect to target." 3
+	return "untested"
+    }
+    if [${connectmode}_download $shell_id $prog] then {
+	verbose -log "$prog not executed, download failed." 3
+	return "unresolved"
+    }
+
+    # Execute it.
+    set result -1
+    set retries 3
+    send -i $shell_id "g\n"
+    verbose "Executing $prog." 2
+    expect {
+	-i $shell_id "*Process exited with 0x0*$shell_prompt*" {
+            verbose "$prog executed successfully" 2
+	    set result 0
+	}
+	-i $shell_id  "*Halt instruction encountered*" {
+            verbose "$prog got a HALT instruction" 2
+	    set result 1
+	}
+	-i $shell_id "*$shell_prompt*" {
+	    # Note that depending on the timing, we may not always arrive here,
+	    # even for successful execution.
+	    verbose "Process started." 3
+	    exp_continue
+	}
+	-i $shell_id timeout {
+	    warning "$prog timed out."
+	    if { [incr retries -1] > 0 } {
+		exp_continue
+	    }
+	    verbose "$prog timed out." 3
+	    set result -1
+	}
+    }
+
+    # See what happened.
+    switch -- $result {
+	0 { return "pass" }
+	1 - -1 {
+	    warning "Resetting the target."
+	    set retries 0
+	    send -i $shell_id "r\n"
+	    expect {
+		-i $shell_id "r*$shell_prompt*" { 
+		    verbose "Target reset." 2
+		}	    
+		-i $shell_id timeout {
+		    # Get nastier.  We want to leave the system in a state
+		    # ready to run the next testcase.
+		    incr retries
+		    if { $retries == 1 } {
+			catch "exec kill -INT [exp_pid -i $shell_id]"
+			send -i $shell_id "r\n"
+			exp_continue
+		    } else {
+			${tool}_exit
+			set shell_id [eval $connectmode "$targetname"]
+			if { $shell_id < 0 } {
+			    perror "Couldn't reset the target."
+			}
+		    }
+		}
+	    }
+	    if { $result == 1 } {
+		return "fail"
+	    } else {
+		return "unresolved"
+	    }
+	}
+    }
+    return "unresolved"
+}
+
+#
+# ${tool}_exit -- shutdown the connection (or simulator)
+#
+
+proc ${tool}_exit {} {
+    global shell_id connectmode
+    verbose "Shutting down $connectmode."
+
+    if { $shell_id >= 0 } {
+	exit_$connectmode $shell_id
+
+	# mondfe (the program) doesn't always delete the socket so ensure
+	# it's deleted, but only if we successfully connected.
+	catch "exec rm -f /tmp/soc_name."
+    }
+    set shell_id -1
+}
+
+# Start the remote shell (or simulator).
+# ??? I think `mondfe' should be called `connect_mondfe'.
+# `shell_id' is local to this file.
+
+set shell_id [ eval $connectmode "$targetname" ]

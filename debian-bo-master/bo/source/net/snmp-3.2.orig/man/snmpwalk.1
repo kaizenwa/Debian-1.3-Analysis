@@ -1,0 +1,142 @@
+.\*/***********************************************************
+.\" 	Copyright 1988, 1989 by Carnegie Mellon University
+.\" 
+.\"                       All Rights Reserved
+.\" 
+.\" Permission to use, copy, modify, and distribute this software and its 
+.\" documentation for any purpose and without fee is hereby granted, 
+.\" provided that the above copyright notice appear in all copies and that
+.\" both that copyright notice and this permission notice appear in 
+.\" supporting documentation, and that the name of CMU not be
+.\" used in advertising or publicity pertaining to distribution of the
+.\" software without specific, written prior permission.  
+.\" 
+.\" CMU DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING
+.\" ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT SHALL
+.\" CMU BE LIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR
+.\" ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+.\" WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+.\" ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
+.\" SOFTWARE.
+.\" ******************************************************************/
+.TH SNMPWALK 1 "July 1996"
+.UC 4
+.SH NAME
+snmpwalk - communicates with a network entity using SNMP GET Next Requests.
+.SH SYNOPSIS
+snmpwalk [-p <port>] host community [variable-name]
+.SH DESCRIPTION
+Snmpwalk is an SNMP application that uses GET NEXT Requests to query for a tree
+of information about a network entity.
+.PP
+The
+.I host
+specification may be either a host name or an internet address
+specified in "dot notation"
+.PP
+The
+.I community
+specifies the community name for the transaction with the remote system.
+.PP
+A variable may also be given on the
+command line.  This variable specifies which portion of the object identifier
+space will be searched using GET NEXT Requests.  All variables in the subtree
+below the given variable are queried and their values presented to the user.
+Each variable name is given in the format specified in
+.IR variables (5).
+.PP
+If the "variable-name" argument is not present, snmpwalk will search the whole Internet MIB.
+.PP
+For example
+.PP
+.I snmpwalk netdev-kbox.cc.cmu.edu public system
+.PP
+will retrieve the variables sysDescr.0 and sysObjectID.0 and sysUpTime.0:
+.PP
+.I Name: system.sysDescr.0
+.br
+.I OCTET STRING- (ascii):	Kinetics FastPath2
+.PP
+.I Name: system.sysObjectID.0
+.br
+.I OBJECT IDENTIFIER:  .iso.org.dod.internet.private.enterprises.CMU.sysID.CMU-KIP
+.PP
+.I Name: system.sysUpTime.0
+.br
+.I Timeticks: (2291082) 6:21:50
+.PP
+If the network entity has an error processing the request packet, an error
+packet will be returned and a message will be shown, helping to pinpoint why
+the request was malformed.
+.PP
+If the tree search causes attempts to search beyond the end of the MIB, a message
+will be displayed:
+.PP
+.I End of MIB.
+.PP
+Adding a "-d" to the argument list will cause the application to dump input and output packets.
+.PP
+.SH COMMUNITY ARGUMENT
+The agent and applications are all SNMPv1/SNMPv2c/SNMPv2u compatible.
+The version is that the application will use is selected by inspecting
+the first character of the community string provided to the
+application, as follows:
+.TP
+.B o 
+if the first character of the community string is a "+" then
+the SNMPv2c (community-based SNMPv2 as specified in RFC 1901)
+is used (the remainder of the community string is used as the
+actual community string);
+.TP
+.B o 
+if the first character of the community string is a "/" then
+the SNMPv2u (User-based security model) is used (see the note
+below for more details);
+.TP
+.B o
+all other community strings select SNMPv1.
+.PP
+
+A community string that begins with a slash selects the SNMPv2u
+protocol.  The "community" string is parsed to build the parameters
+for the communication. The format of the string is:
+.nf
+	/userName/[authKey]/[privKey]/[contextSelector]
+.fi
+Trailing slashes may be omitted. Both authKey and privKey may be
+specified as hex or as a human readable password.  To specify a hex
+key, the key must begin with "0x" and be followed by exactly 32 hex
+digits (to form a 16 octet key).  If a human readable password is
+entered, the password is passed through the "password to key algorithm"
+to generate the 16 octet key. The password to key algorithm is
+specified in the "User-Based Security Model for SNMPv2" RFC. 
+
+A "+" or "/" character may not start a SNMPv1 community string and may
+not be contained within any SNMPv2 parameters (this is an
+*implementation* restriction).
+
+Some "community" string examples:
+.nf
+/joe 			-- qos=noAuth/noPriv, context="", userName="joe"
+
+/boneless/chicken/ranch -- qos=auth/priv, context="", userName="boneless"
+			   authKey=pw2key("chicken"), privKey=pw2key("ranch")
+			   *note* privacy not supported, trying this will generate
+			   a UnsupportedQoS report.
+
+/maplesyrup/sugarbush//other 
+			-- qos=auth/noPriv, context="other", userName="maplesyrup"
+			   authKey=pw2key("sugarbush",agentID)
+
+/glenn/0x4ca25023b00a6689ef21cb1b6fa9cb0e
+			-- qos=auth/noPriv, context="", userName="glenn"
+			   authKey=4ca25023b00a6689ef21cb1b6fa9cb0e
+			   (the authKey is keyed using an agentID)
+
++public			-- SNMPv2c using public as the community string
+
+public			-- SNMPv1 using public as the community string
+.fi
+.PP
+.SH "SEE ALSO"
+variables(5), RFC 1065, RFC 1066, RFC 1067

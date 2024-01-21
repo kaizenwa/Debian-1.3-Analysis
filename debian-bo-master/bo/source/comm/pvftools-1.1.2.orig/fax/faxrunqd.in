@@ -1,0 +1,603 @@
+#!@PERL@
+## - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+## faxrunqd
+## ========
+##
+## Daemon to process faxes spooled with 'faxspool' from the mgetty+sendmail
+## package by Gert Doering. This daemon is able to use more than one modem to
+## send faxes over multiple lines at one time.
+##
+## Faxrunqd will be startet once and awakes every 60 seconds to look at the 
+## queue. If there is a waitung job it looks for a free line and spawnes a new
+## process to handle the job.
+## 
+## If 'sendfax' returns an error the job will be tried  3 times in 10Min distance,
+## exept BUSY is returned. In this case the job will be tried 5 times in 15Min
+## distance. 
+##
+## (c) 1995 Bodo Bauer - S.u.S.E. GmbH, Fuerth
+##
+## - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+## History:
+##
+##   01IX95     0.4  -> test parr. faxing                
+##   04IX95     0.41 -> Accounting                     
+##   05IX95     0.42 -> Use private Lockfiles LCK...$tty.fax
+##                      Runs on galois since 5IX95 16:30
+##
+## - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+##             Please send pizzas and bug-reports to bb@suse.de
+## - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+$vers = "faxrunqd IX95 0.42";
+
+## ----------------------------------------------------------------------------
+## Configuration
+## ----------------------------------------------------------------------------
+
+##
+## Files and directories
+## ---------------------
+
+## write debug info to
+$logfile   = "@FAX_SPOOL@/faxrunqd.log";
+
+## where the spooled faxes will be found
+$spooldir  = "@FAX_SPOOL_OUT@";
+
+## program to send faxes with
+$faxsender = "@SBINDIR@/sendfax";
+
+## mailer for notifying users
+$mailer    = "@MAILER@";
+
+## where lock files live in
+$lockdir   = "/var/spool/uucp";
+
+## say we are alife
+$touch     = "@FAX_SPOOL_OUT@/.last_run";
+
+## writing my own pid in
+$pidfile = "/etc/faxrunqd.pid";
+
+## accounting file, one line per fax
+$accfile = "@FAX_SPOOL_OUT@/faxrunqd.acc";
+
+##
+## Retry parameters 
+## ----------------
+
+## misc error
+$maxtries  = 3;
+$waittime  = 10;
+
+## BUSY
+$maxbusy   = 5;
+$waitbusy  = 15;
+
+##
+## Other important things...
+## -------------------------
+
+## which lines to use for faxes
+@ttys      = ( "ttyC0", "ttyC1", "ttyC2", "ttyC3" );
+
+## after processing the queue, faxrunqd will sleep for ?? seconds
+$sleeptime = 60;
+
+## ----------------------------------------------------------------------------
+##                   !! no changes below this line !!
+## ----------------------------------------------------------------------------
+
+##
+## Senfax return values:
+##
+
+@sendfax_ret = ( "all pages transmitted successful",         #  0
+ 		 "error on command line",                    #  1
+		 "cannot open Fax device",                   #  2
+		 "error initializing the modem",             #  3
+		 "dial failed: BUSY",                        #  4 
+		 "", "", "", "", "",                         # -- not used
+		 "dial failed: ERROR or NO CARRIER",         # 10
+		 "waiting for XON failed",                   # 11
+		 "transmitting or polling page(s) failed" ); # 12
+
+## ----------------------------------------------------------------------------
+## Subroutines
+## ----------------------------------------------------------------------------
+
+## ----------------------------------------------------------------------------
+## give date...
+##
+sub getdate {
+    local ( $dummy );
+    local ( $min   );
+    local ( $hour  );
+    local ( $mday  );
+    local ( $mon   );
+    local ( $year  );
+    local ( $datum );
+
+    ( $dummy, $min, $hour, $mday, $mon, $year, $dummy, $dummy, $dummy) = localtime ( time );
+    $mon++;
+    $datum = sprintf ( "%02d.%02d.%02d %02d:%02d", $mday, $mon, $year, $hour, $min );
+
+    $datum;
+}
+
+## ----------------------------------------------------------------------------
+## give time...
+##
+sub gettime {
+    local ( $dummy );
+    local ( $min   );
+    local ( $hour  );
+    local ( $mday  );
+    local ( $mon   );
+    local ( $year  );
+    local ( $datum );
+
+    ( $dummy, $min, $hour, $mday, $mon, $year, $dummy, $dummy, $dummy) = localtime ( time );
+    $mon++;
+    $datum = sprintf ( "%02d%02d", $hour, $min );
+
+    $datum;
+}
+
+
+## ----------------------------------------------------------------------------
+## spawn process to handel the fax
+##
+
+sub spawn_fax {
+    local ( $job  ) = $_[0];
+    local ( $line ) = $_[1];
+
+    local ( $childpid );
+    
+    $childpid = fork();
+
+    if ( $childpid == 0 ) {
+	##
+	## child process
+	##
+
+	close ( LOG );
+	# reset signal handler in child process (will clash with system())
+	$SIG{ 'CHLD' } = 'DEFAULT';
+	$status = &faxit ( $job, $line );
+	exit $status;
+
+    } else {
+	##
+	## parent process
+	##
+
+	print LOG "\t spawned child (PID $childpid)\n";
+	$child{$childpid} = $job;
+    }
+}
+
+
+## ----------------------------------------------------------------------------
+## Wait for childs
+##
+
+sub sigchld_handler {
+    local ( $childpid ) = 0;
+
+    $childpid = wait();
+
+    $date = &getdate();
+    print LOG "$child{$childpid} [$date]\n";
+    print LOG "\t Child returns (PID $childpid)\n";
+
+    open ( TMPLOG, "$spooldir/$child{$childpid}/JOB.$childpid" ); 
+    while ( <TMPLOG> ) {
+	print LOG $_;
+    }
+    close ( TMPLOG );
+
+    ## flush logfile
+    close ( LOG );
+    open ( LOG, ">>$logfile" ) || die "unable to open file \"$logfile\"";
+
+    unlink ( "$spooldir/$child{$childpid}/JOB.$childpid" );
+
+    $child{$childpid} = "*";
+
+    ## Wait for the next child
+    $SIG { 'CHLD' } = 'sigchld_handler';
+
+    if ( $sleep ) {
+	sleep ( $sleeptime );
+    }
+}
+
+## ----------------------------------------------------------------------------
+## send mail on succes
+##
+
+sub mail_success {
+
+    local ( $mailto ) = $_[0];
+    local ( $phone  ) = $_[1];
+    local ( $job    ) = $_[2];
+    local ( $start  ) = $_[3];
+    local ( $end    ) = $_[4];
+    local ( $tries  ) = $_[5];
+
+    open ( MAILER, "|$mailer $mailto" );
+    print MAILER "To: $mailto\n";
+    print MAILER "Subject: Your fax to $phone\n";
+    print MAILER "From: root (Fax Subsystem)\n\n";
+    $date = &getdate();
+
+    if ( $tries == 1 ) {
+	print MAILER "Your fax has been sent successfully.\n";
+    } else {
+	print MAILER "Sending succeeded after $tries unsuccessful tries.\n";
+    }
+    print MAILER "Time: $start -> $end\n";
+    
+    if ( -f "$spooldir/$job/JOB.log" ) {
+	print MAILER "\nFaxlog:\n\n";
+	open ( JOBLOG, "<$spooldir/$job/JOB.log" );
+	while ( <JOBLOG> ) {
+	    print MAILER ") $_";;
+	}
+	close ( JOBLOG );
+    }
+    close ( MAILER );
+    
+}
+
+## ----------------------------------------------------------------------------
+## send mail on error
+##
+
+sub mail_error {
+    local ( $mailto ) = $_[0];
+    local ( $phone  ) = $_[1];
+    local ( $job    ) = $_[2];
+    local ( $start  ) = $_[3];
+    local ( $end    ) = $_[4];
+    local ( $tries  ) = $_[5];
+
+    open ( MAILER, "|$mailer $mailto" );
+    print MAILER "To: $mailto\n";
+    print MAILER "Subject: Error in transmitting fax to $phone\n";
+    print MAILER "From: root (Fax Subsystem)\n\n";
+    print MAILER "Inputfile: $input\n";
+    print MAILER "It was not possible to send your fax to $phone!\n";
+    print MAILER "Transmission log:\n\n";
+    open ( JOBLOG, "<$spooldir/$job/JOB.log" );
+    while ( <JOBLOG> ) {
+	print MAILER ") $_";;
+    }
+    close ( JOBLOG );
+    print MAILER "\nThe fax job is suspended, you can requeue it with the commands:\n\n";
+    print MAILER "\tcd $spooldir/$job\n";
+    print MAILER "\trm JOB.log\n";
+    print MAILER "\tmv JOB.suspended JOB\n";
+    close ( MAILER );
+}
+
+## ----------------------------------------------------------------------------
+## handle fax
+##
+
+sub faxit {
+    local ( $job    ) = $_[0];
+    local ( $line   ) = $_[1];
+
+    local ( $user   ) = ""; 
+    local ( $phone  ) = "";
+    local ( $mail   ) = " ";
+    local ( $time   ) = "0000";
+    local ( $verbto ) = "";
+    local ( $input  ) = "";
+    local ( $flags  ) = "";
+
+
+    local ( $tries  ) = 0;
+    local ( $status ) = -1;
+
+    local ( $startdate );
+    local ( $enddate   );
+    local ( $mailto    );
+    local ( $max       );
+    local ( $newtime   );
+    local ( $min       );
+    local ( $hour      );
+
+    open ( TMPLOG, ">$spooldir/$job/JOB.$$" );
+
+    ## read the JOB file
+    open ( JOB, "<$spooldir/$job/JOB.locked" ) || die "can not open file $spooldir/$job/JOB.locked\n";
+
+    while ( <JOB> ) {
+	chop;
+	if ( /^user/ ) {
+	    ( $dummy, $user ) = split ( /\s/, $_, 2 );
+	} elsif ( /^mail/ ) {
+	    ( $dummy, $mail ) = split ( /\s/, $_, 2 );
+	} elsif ( /^phone/ ) {
+	    ( $dummy, $phone ) = split ( /\s/, $_, 2 );
+	} elsif ( /^time/ ) {
+	    ( $dummy, $time ) = split ( /\s/, $_, 2 );
+	} elsif ( /^verbose_to/ ) {
+	    ( $dummy, $verbto ) = split ( /\s/, $_, 2 );
+	} elsif ( /^input/ ) {
+	    ( $dummy, $input ) = split ( /\s/, $_, 2 );
+	} elsif ( /^header/ ) {
+	    ( $dummy, $header ) = split ( /\s/, $_, 2 );
+	    $flags = "$flags -h $header";
+	} elsif ( /^poll/ ) {
+	    $flags = "$flags -p";
+	} elsif ( /^normal_res/ ) {
+	    $flags = "$flags -n";
+	} elsif ( /^pages/ ) {
+	    ( $dummy, $pages ) = split ( /\s/, $_, 2 );
+	}
+    }
+    close ( JOB );
+ 
+    ## whom to mail to?
+    if ( $mail =~ /^\s$/ ) {
+	$mailto = $user;
+    } else {
+	$mailto = $mail;
+    }
+    
+    $cmd = "$faxsender -l $line $flags $phone $pages";
+    
+    print TMPLOG "\t Fax from $user ($mailto) to $phone. Inputfile: $input\n";
+    print TMPLOG "\t execute: $cmd\n";
+    
+    ## count tries already done
+    
+    if ( -f "$spooldir/$job/JOB.log" ) {
+	open ( JOBLOG, "<$spooldir/$job/JOB.log" );
+	while ( <JOBLOG> ) {
+	    $tries++;
+	}
+	close ( JOBLOG );
+    }
+    
+    $tries++;
+    
+    $startdate = &getdate();
+    system ( "(cd $spooldir/$job ; $cmd)" );
+    $status = $? / 256;
+    $enddate = &getdate();
+    
+    # remove privat Lockfile
+    unlink ( "$lockdir/LCK..$line.fax" );
+				 
+    print TMPLOG "\t [$tries] Exit Status: $status ($sendfax_ret[$status])\n";
+    
+    open ( JOB, ">> $spooldir/$job/JOB.locked" );
+				 
+    if ( $status == 0 ) {
+	##
+	## transmission successful
+	##
+	print TMPLOG "\t transmission successful\n";
+	print TMPLOG "\t time:$startdate -> $enddate\n";
+	
+	## remove job
+	system ( "rm -f $spooldir/$job/*" );
+	system ( "rmdir $spooldir/$job" );
+	
+	## notify user
+	&mail_success( $mailto, $phone, $job, $startdate, $enddate, $tries );
+
+	## write accounting info
+	open ( ACC, ">>$accfile" ) || die "can not open file: $accfile";
+	print ACC "SUCCESS: JOB $job BY $mailto TO $phone TRIES $tries TIME $startdate -> $enddate\n";
+	close ( ACC );
+	
+    } else {
+	
+	## 
+	## some error hapened
+	##
+	
+	( $dummy, $min, $hour, $dummy, $dummy, $dummy, $dummy, $dummy, $dummy) = localtime ( time );
+	
+	if ( $status == 4 ) {
+	    
+	    $max = $maxbusy;
+	    print TMPLOG "\t Remote station BUSY\n";
+	    
+	    open ( JOBLOG, ">>$spooldir/$job/JOB.log" );
+	    print JOBLOG "$enddate -> Remote station BUSY\n";
+	    close ( JOBLOG );
+	    
+	    ## suspend job for some minutes
+	    $min += $waitbusy;
+	    if ( $min >= 60 ) {
+		$min -= 60;
+		$hour += 1;
+		if ( $hour >= 24 ) {
+		    $hour = 0;
+		}
+	    }
+	    $newtime = $hour*100 + $min;
+	    print TMPLOG "\t next try after $newtime\n";
+	    
+	    open ( JOB, ">>$spooldir/$job/JOB.locked" );
+	    print JOB "time $newtime\n";
+	    close ( JOB );
+	    
+	} else {
+	    
+	    $max = $maxtries;
+	    print TMPLOG "\t Transmission Error ($sendfax_ret[$status])\n";
+		
+	    open ( JOBLOG, ">>$spooldir/$job/JOB.log" );
+	    print JOBLOG "$enddate -> Error $sendfax_ret[$status] (Status $status)\n";
+	    close ( JOBLOG );
+	    
+	    ## suspend job for 10 minutes
+	    $min += $waittime;
+	    if ( $min >= 60 ) {
+		$min -= 60;
+		$hour += 1;
+		if ( $hour >= 24 ) {
+		    $hour = 0;
+		}
+	    }
+	    $newtime = $hour*100 + $min;
+	    print TMPLOG "\t next try after $newtime\n";
+	    
+	}
+	
+	if ( $tries > $max ) {
+	    ##
+	    ## suspend job and notify user
+	    ##
+	    rename ( "$spooldir/$job/JOB.locked", "$spooldir/$job/JOB.suspended" );
+	    &mail_error( $mailto, $phone, $job, $startdate, $enddate, $tries );
+	    print TMPLOG "\t Suspending job\n";
+
+	    ## write accounting info
+	    open ( ACC, ">>$accfile" ) || die "can not open file: $accfile";
+	    print ACC "ERROR: JOB $job BY $mailto TO $phone TRIES $tries\n";
+	    close ( ACC );
+
+	} else {
+	    ##
+	    ## give it another chance
+	    ##
+	    rename ( "$spooldir/$job/JOB.locked", "$spooldir/$job/JOB" );
+	}
+    }
+    close ( TMPLOG );
+    $status;
+}
+
+## ----------------------------------------------------------------------------
+## Main
+## ----------------------------------------------------------------------------
+
+##
+## flush output
+##
+$| = 1;
+
+$date = &getdate();
+
+open ( LOG, ">>$logfile" ) || die "unable to open file \"$logfile\"";
+
+print LOG "\n**** $vers\n**** [$date] PID $$\n\n";
+
+##
+## write pid in pidfile
+## 
+open ( PID, ">$pidfile" ) || die "unable to open file \"$pidfile\"";
+print PID $$;
+close ( PID );
+
+##
+## install signalhandler to wait for childs
+##
+$SIG { 'CHLD' } = 'sigchld_handler';
+
+##
+## go to fax spool directory, process all JOB files
+##
+if ( -d $spooldir ) {
+
+    while ( 1 ) {
+
+	## we are alife!
+	open ( TOUCH, ">$touch" ) || die "unable to open file \"$touch\"";
+	print TOUCH "$date\n";
+	close ( TOUCH );
+
+	## look if there is something to do
+	opendir ( SPOOL, "$spooldir" );
+	@jobs =  sort ( readdir ( SPOOL ) );
+	closedir ( SPOOL );
+
+	foreach $job ( @jobs ) {
+	    if ( $job =~ /^F/ && -f "$spooldir/$job/JOB" ) {
+		
+		## OK, here is something to do
+		$date = &getdate();
+		print LOG "$job [$date]\n";
+		
+		## lock the job
+		rename ( "$spooldir/$job/JOB", "$spooldir/$job/JOB.locked" );
+
+		## is it time to do the job?
+		$now = &gettime();
+		$time = 0;
+		open ( JOB, "<$spooldir/$job/JOB.locked" ) || die "can not open file $spooldir/$job/JOB.locked\n";
+		while ( <JOB> ) {
+		    chop;
+		    if ( /^time/ ) { 
+			( $dummy, $time ) = split ( /\s/, $_, 2 );
+		    }			
+		}
+		close ( JOB );
+		if ( $time > $now ) {
+		    ## time not reached, skip job
+		    print LOG "\t Sendtime ($time>$now) not reached - skipping job\n";
+		    rename ( "$spooldir/$job/JOB.locked", "$spooldir/$job/JOB" );
+		} else {
+		    
+		    ## which line to use?
+		    $line = "***";
+		    foreach $tty ( @ttys ) {
+			if ( ! -f "$lockdir/LCK..$tty" && ! -f "$lockdir/LCK..$tty.fax" ) {
+			    $line = $tty;
+			    last;
+			}
+		    }
+		    
+		    if ( $line eq "***" ) {
+			## no free line found?!
+			print LOG "\t no free tty - skipping job\n";
+			
+			## unlock job
+			rename ( "$spooldir/$job/JOB.locked", "$spooldir/$job/JOB" );
+			last;
+		    } else {
+			print LOG "\t Using /dev/$line\n";
+			open ( DUMMY, ">$lockdir/LCK..$line.fax" ) ||  die "can not open $lockdir/LCK..$line.fax";
+			close ( DUMMY );
+			## fax it
+			&spawn_fax ( $job, $line );
+			## give a little time to lock the line
+			sleep ( 10 );
+		    }
+		}
+	    }
+	    ## flush logfile
+	    close ( LOG );
+	    open ( LOG, ">>$logfile" ) || die "unable to open file \"$logfile\"";
+	}
+
+	## wait some time...
+	$sleep = 1;
+	sleep ( $sleeptime );
+	$sleep = 0;
+    }
+
+} else {
+    print LOG "there is no spooldir: \"$spooldir\"\n<--\n";
+    die "there is no spooldir: \"$spooldir\"";
+}
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,42 @@
+#!/bin/bash
+
+PRIV=root
+COMMAND=
+
+
+function eusername () {
+   grep "^[^:]*:[^:]*:$1:" /etc/passwd|cut -f1 -d:
+}
+#with getopt I cannot get multy-word commands to work (like -c "ls -al").
+#
+#set -- `getopt p:c: "$@"`
+#if test $? != 0; then
+#    echo 'Usage: ...'
+#  exit 2
+#fi
+for i in "$@"; do
+   case "$prev" in
+     -p)
+       PRIV="$i";;
+     -c)
+       COMMAND="$i";;
+   esac
+   prev="$i"
+done
+
+eus=`eusername $EUID`
+if test $eus = "root" -o $eus = $PRIV; then
+  $COMMAND
+else
+  echo About to execute $COMMAND. 
+  echo This command needs $PRIV priveleges to be executed.
+  echo enter $PRIV passwd:
+  while ! su $PRIV -c "$COMMAND"; do
+    echo 'Incorrect password. Try again? (y/n)'
+    read ans
+    if test $ans = "n" -o $ans = "N"; then
+      exit 1
+    fi
+  done  
+fi
+    

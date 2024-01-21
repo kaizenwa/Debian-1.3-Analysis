@@ -1,0 +1,341 @@
+
+This is the Nth public release of MD, which stands for Multiple
+Devices.  Its main goal is to group several disks or partitions
+together, making them look like a single block device.  Furthermore,
+it is interface independent, so it is possible to mix IDE
+(MFM/RLL/ESDI/AT-BUS), SCSI, and even old XT-like disks.
+
+Note that Roger E. Wolff <R.E.Wolff@et.tudelft.nl> wrote a similar
+thing named red.  This main difference between the two projects is
+that md does things much more efficiently (at the expense of some
+memory, since it makes a massive use of hash tables).
+
+**WARNING** : This is **VERY ALPHA** software.  Don't use it unless
+you know exactly what you're doing.  This patch works for me, and I
+trust my data to it, but I do very frequent backups.  So, if this
+damned thing goes wild, I won't loose a lot.  Please backup your own
+system BEFORE using this software.  Linear and RAID-0 are in a BETA
+state, so, even though it is much more stable that RAID-1, be very
+careful.
+
+Since MD pre0.31, RAID-[15] have been removed from the main
+distribution, because of pathological unstability... and for the
+kernel integration of linear and RAID-0 modes.
+
+--
+
+Theory of operations :
+
+The kernel patch included in the package create a new block device
+driver called "md" (device major=9, which is now the official 
+and registered major number).  The main difference between this
+driver and the other ones like "hd" and "sd" (among others...) is
+that "md" never access the disks itself.  The trick is to redirect
+requests that the upper layer sends to the md driver back to the
+physical driver.  With a little help from a hash table (a friend of
+mine...), you shouldn't notice too much difference in speed.
+
+There are currently three modes (personalities) to manage such
+devices : linear, raid0, and raid1. 
+
+Linear means that real devices are appended to each other.  This kind
+of device should be easily expandable (see 'Future extensions'
+section), but gives little or no speed improvement. 
+
+Raid0 does a classic (and rather efficient) striping on disks
+(i.e. contiguous blocks on the md device are spread across real
+devices).  It gives rather good performances on SCSI disks, specially
+with concurrent disk access.  There's no limitation on disks sizes
+(i.e. sizes can be different, md will cope with this).
+
+Raid1 adds mirroring to raid0 striping.  Note that it is not complete
+yet (no rebuild tools, error trapping is incomplete).  It's also known
+to be rather slow when writing. 
+
+	Please note that, since all of this is done by software, it
+can't be as fast as a hardware implementation of these RAID levels.
+You can even say that it is rather slow.  Anyway, it is better than
+nothing at all...
+
+--
+
+Using it :
+	Once the kernel is patched and running, you can use a small
+command set to manage your md-devices :
+- mdadd md-dev block-dev1 block-dev2 ... : add blocks devices to
+md-dev.
+- mdrun -px md-dev : make the md device usable as a block device.
+- mdstop md-dev : stop the device (if started) and cancel the group,
+flushing all buffers.
+
+For example, here's what I used to have in my /etc/rc:
+	/sbin/mdadd /dev/md0 /dev/sdb1 /dev/sdc2
+
+It groups /dev/sdb1 and /dev/sdc2 in a single device called /dev/md0.
+Note that it could also be written :
+        /sbin/mdadd /dev/md0 /dev/sdb1
+        /sbin/mdadd /dev/md0 /dev/sdc2
+
+BE CAREFUL ! :
+        /sbin/mdadd /dev/md0 /dev/sdb1 /dev/sdc2
+is NOT equivalent to
+        /sbin/mdadd /dev/md0 /dev/sdc2 /dev/sdb1
+
+It produces a device that have the same size, but that will be very
+different, specially if you have already put a filesystem on it.  So
+once you've configured a md-device with an arbitrary order, ALWAYS USE
+THAT ORDER, or you won't retrieve your data.  You have been warned!!
+
+Note that the device is NOT yet usable.  It has to be started with :
+	/sbin/mdrun -px /dev/md0
+
+where x is :
+	l : starts the device in linear mode,
+	0 : starts the device in raid-0 mode,
+	1 : starts the device in raid-1 mode.
+
+So running this device in linear mode is just a matter of :
+        /sbin/mdrun -pl /dev/md0
+
+To create a 'raid0' device, you should have used
+        /sbin/mdrun -p0 /dev/md0
+
+Two other options can also be used:
+	-cnk (raid-0 and raid-1 only) : set the chunk size.  n is the
+chunk size in kBytes.  For example, -c8k set a 8 kB chunk size.  Note
+that chunk size must be a power of 2.  Default is PAGE_SIZE.
+You can also set the chunk size the old way using the chunk factor
+(option -cn).  The chunk factor indicate the size of a chunk on a real
+device, according to the following formula :
+	chunk_size = PAGE_SIZE << chunk factor
+
+So, on a 386, a chunk factor of 0 indicate a chunk size of 4096
+bytes, a chunk factor of 1 indicates a chunk size of 8192 bytes, a
+chunk factor of 2 indicates a chunk size of 16384 bytes and so on...
+the default is -c0.  The chunk factor setting is present for backward
+compatibility.  It is better to set the chunk size using -cNk, like
+-c8k for instance.
+
+	-fn (raid-1 only) : set the maximum number of faults that a
+physical device can generate before being permanently disabled.
+Default is -f0, and I think it's better leaving it this way...
+
+It is a good idea to create an /etc/mdtab file that contains entries
+to run mdadd on.  Each line describes a md device with the following
+syntax: 
+
+md_dev		mode,c,f,crc	dev1 dev2 ... devn
+
+where	mode is one of linear, raid0, raid1
+	c is the chunk factor (optional)
+	f is the fault number (optional)
+	crc is the checksum (optional)
+
+For example, here a sample /etc/mdtab :
+
+# mdtab for ten_wasted_months
+
+/dev/md0	raid0,8k   /dev/sdb1	/dev/sdc2	# /usr/local
+/dev/md1        linear	   /dev/hda6	/dev/hda7	# /mnt for swapfile
+/dev/md2	raid1,4k,1 /dev/sdd1 	/dev/sde1
+
+For an automatic and checksumed creation of /etc/mdtab, look at
+mdcreate(8), that does the work rather easily...
+
+So I can simply do
+	/sbin/mdadd -a
+	/sbin/mdrun -a
+
+You can even use the '-r' flag to automagically start the device once
+it has been successfully completed.  In this case, the above becomes :
+	/sbin/mdrun -ar
+
+To use a particular device, use the syntax
+	/sbin/mdadd [-r] md_device
+
+mdstop is not very useful, but it's a good way of being sure that the
+md-device has been sync-ed.
+
+You can see the exact state of your md-devices by looking at
+/proc/mdstat which looks like this on a test machine running in linear
+mode :
+	$ cat /proc/mdstat
+	Personalities : [1 linear] [2 raid0]
+	read_ahead 8 sectors
+	md0 : active linear hda6 hda7 10360 blocks
+	md1 : inactive
+	md2 : inactive
+	md3 : inactive
+
+First, you have the supported personalities (linear and striped, also
+called raid0), followed by the current read_ahead value (currently for
+debbuging purpose, should go away...).  Following is the state of each
+device the kernel is configured for.  Here, /dev/md0 is active and
+/dev/md[1-3] are stopped.  Then you see the devices used for the
+current md-device and the total size in 1024 bytes blocks.  You can
+obtain much more information by defining MD_DEBUG in linear_status
+(in linear.c) (respectively in raid0_status (in raid0.c)).
+
+Now, the same machine running in striped mode with 8k chunk size :
+
+	$ cat /proc/mdstat
+	Personalities : [1 linear] [2 raid0]
+	read_ahead 8 sectors
+	md0 : active raid0 hda6 hda7 10360 blocks 8k chunks
+	md1 : inactive
+	md2 : inactive
+	md3 : inactive
+
+You can now do whatever you want with an active md-device (create a
+filesystem, a swapfile, or even a swap partition (the last one seems
+to be really useful, since many people reported a big speed improvement
+when swapping to a md device running in striped mode...).
+
+--
+
+Install :
+	In the package, you should have found these files:
+
+- README   : this file,
+- ChangeLog: history of the project (I use this file when I'm getting upset),
+- mdpatch  : patch to kernel against version 1.3.68
+- mdadd.c  : source for mdadd, mdrun and mdstop,
+- mdparse.c: parser for mdadd & co
+- mdtab	   : Example for /etc/mdtab
+- mdadd.8  : man page for mdadd, mdstop and mdrun,
+- mdtab.5  : man page for /etc/mdtab,
+- md.lsm   : lsm entry for md,
+- Makefile : guess what...
+
+As you're used to, do a
+		$ patch -p0 -s < wherever_it_lives/mdpatch
+from the directory that contains your linux tree (supposed to be clean...).
+You can now compile your brand new (bugged ? ;-) kernel (don't forget
+to do a 'make config' first and to answer 'yes' to the questions about
+md-device).
+
+BEWARE : since 1.3.69, md is included in the mainstream kernel. So,
+there's no patch release of md anymore. To be sure to have the last
+version of md, consider upgrading to the latest kernel version...
+
+Kernel modules are now supported.  You must have at least support for
+the md driver compiled into the kernel, and then load personalities at
+run time, thanks to the modules package.  If you want to use that
+feature, just issue a
+		$ make modules
+after the kernel compilation, and install modules as describe in the
+modules package.  Note that each personality eats about 4k of kernel
+space, so this can be a win if your kernel is getting too big for lilo
+to load it successfully.  You should use the new 'module versions'
+feature in the kernel, since some structures (struct request, struct
+buffer_head) are now changing and are depending on your md setup
+(kernel support for raid-1 or raid-5).  This will avoid some
+unpleasant crashes with modules and kernel not configured the same
+way...
+
+In the meantime (Yes sir, that's what I call multitasking !), get back
+to the package, edit Makefile to suit your taste, and do a
+		$ make
+		$ make install
+(the latest may require you to be logged in as root).
+
+You shouldn't get any warning during both of the compilations.  It also
+creates entries in /dev called md[0-3].  If you need some more, add
+them and change the MAX_MD_DEV constant in md.h.  Also, if you want
+more than 8 real devices per md-device, adjust the MAX_REAL constant
+to suit your needs.  If you want some stats about chunk size, define
+MD_COUNT_SIZE in md.h (will appear in /proc/mdstat like (X/Y/Z) where
+X, Y and Z are the number of requests smallest, equal and bigger than
+the current chunk size).
+
+If you want up-to-the-minute info about md, as well as a place to
+start discussions, join the linux-raid mailing list !  To subscribe
+send a message to Majordomo@vger.rutgers.edu and put this line in the
+body:
+
+subscribe linux-raid <your email address>
+
+Since I'm off the net most of the time, you'll find there a convenient
+place to ask urgent questions.
+
+--
+
+Bugs :
+	Most are features, since all known bugs have been blasted out.  The
+unknown bugs are still remaining...
+
+	* There is at least one known bug with mkdosfs, which asks the
+device about physical geometry.  This is, of course, not relevant with a
+md-dev.  So the max size of a DOSFS on such a device is sometimes limited to
+a fraction of the avaible size.  If there's a DOSFS guru out there that can
+help me, please have a look at the HDIO_GETGEO ioctl in md.c.  But who will
+use DOSFS on such a device anyway ?
+
+	* The code heavily depends on 1024 bytes blocks and 512 bytes
+sectors.  I hope I'll never have to change it...
+
+	* You CANNOT use floppies as real devices for md, since they are not
+managed the same way hard-disks are.  Maybe some day, I'll dig into that, but
+don't be too sure, since it has a rather low priority on my
+'Things-to-do-one-day-when-I-have-time-to-give-a-look' list ;-).
+
+	* In striped mode, chunk size depends on hardware page size.  So a
+striped device with a 0 factor on an i386 (PAGE_SIZE=4k) cannot be used on
+an Alpha (PAGE_SIZE=8k).  Better use now the literal chunk size rather than
+factor in your mdtab, and avoid using 4k chunk size if you plan moving your
+array to an Alpha.
+
+	* RAID-1 doesn't support mixed SCSI/non-SCSI pairs.  You'll have to
+choose one of those worlds (believe me, SCSI is better...).
+
+	If you find a bug, report as fast a possible.  Please include :
+- the kernel version you're running,
+- the kind of real devices you're using,
+- a copy of your partition tables (using fdisk),
+- a copy of your /proc/mdtab (with MD_DEBUG enabled),
+- if the bug results in a crash, kernel info as described in
+/usr/src/linux/README, since this will help a lot,
+- any application message showing that there's a problem.
+
+All those informations will help a lot in making md more reliable.
+
+	* This file itself is a known bug ;-).
+
+--
+
+Future extensions :
+	Well, what I'd like to have now is a way to extend an existing
+file system by just adding a new device to a md-dev running in linear
+mode (of course, no data loss !!).  If Remy Card reads this, I'd be glad
+to have his opinion about it (Yes, I can read french ;-).
+
+	Some people asked me about full RAID support.  I'm thinking
+hard about it, but don't have much time yet.  Anyway, raid0 personality
+is a first step in that direction.  Raid1 is almost working, but I'd
+like to have some help, since I only have 24 hours a day, not enough
+disk space, and a lot of other things to do (like any other Linux
+hacker, I think... ;-).
+
+Also feel free to send me any idea about what you'd like to see in a
+future version.  Any positive feedback would be very nice too !
+
+--
+
+Thanks to :
+	Linus Torvalds and others for writing such a beast,
+	All the courageous people that have been testing early versions,
+	CD Rasmussen <cdr@star.net> for proof-reading the docs,
+	pc, jpl, arthur & jmm for everything, including missed train ;-),
+	All my friends for being there when life is so painful.
+
+Most of all, I'd like to thank bb, the light of my life, for her love,
+for kickin' my ass when I needed to and opening my eyes when I was so
+blind... Life with you is sometimes painful, but what a terrific life !
+
+--
+
+Please send any idea, opinion or bug report to
+<zyngier@ufr-info-p7.ibp.fr> (preferred) or to <maz@gloups.fdn.fr>
+
+			Marc ZYNGIER
+

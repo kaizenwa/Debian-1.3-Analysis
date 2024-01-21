@@ -1,0 +1,234 @@
+	------------------------------------------------------------
+	   A P S F I L T E R   V 4.9.1  -  "FAQ with answers ..."
+	------------------------------------------------------------
+
+                   copyright Andreas Klemm 1993, 1994, 1995
+
+                           andreas@knobel.gun.de
+
+                   ---------------------------------------
+
+			co-author Thomas Bueschgens 
+
+			    sledge@hammer.oche.de
+
+                         ---------------------------
+
+-------------------------------------------------
+Apsfilter Frequently Asked Questions with answers
+-------------------------------------------------
+
+Q 1.1	I just installed dvips but I can't print dvi files.
+
+A:	Perhaps you forgot to run $APS_BASEDIR/setup/filtersetup
+	again as root. This script updates the file 
+	$APS_BASEDIR/global/filters_found automatically this way:
+		HAVE_DVIPS=True
+	Without this definition apsfilter is unable to print dvi files.
+
+	If this didn't solve your problem, then I assume, that you
+	installed your dvips program in a very exotic path.
+	Refer to the section, how to incorporate unusual searchpaths
+	into apsfilter -> Q 1.5.
+
+Q 1.2	Ok, I ran mksymlinks as root again, but I'm still unable to 
+	print dvi files.
+
+A:	Perhaps your dvips program is in a very tricky search path.
+	Apsfilter only knows about search paths that are defined
+	in the $APS_BASEDIR/global/GLOBAL.sh file.
+	Add the path to your dvips binary to tat file and run
+	$APS_BASEDIR/setup/mksymlinks (with root permissions)
+	again !
+
+Q 1.3	Do I have to invoke apsfilter directly ?
+
+	No ! Apsfilter creates entries for your printer in /etc/printcap.
+	You are now able to print the various file types by simply typing:
+		lpr file
+
+	If you don't tell lpr, which printer to use, lpr selects the
+	default lineprinter, the printcap entry with the name "lp".
+	The default lineprinter calls apsfilter as input filter with
+	this default behaviour:
+		- automatic filetype recognition enabled
+		- monochrome printing enabled
+
+	There are some special situations where you want to tell apsfilter
+	to behave different. This is the reason for that many entries in
+	/etc/printcap for only one printer !
+
+	The -P option of the lpr command allows you to switch between
+	the different printer entries... i.e.:
+		lpr -P ascii
+		lpr -P raw
+
+Q 1.4	Printing of long ascii listings (C-Source,...) is dog slow
+
+	You can disable the feature to pipe ascii text through
+	a2ps and gs by using the printer alias "raw".
+		lpr -Praw some_long_listing
+
+	Your text will now be printed directly without time
+	consuming filters ...
+
+	If your printer is a HP printer, then he needs a special
+	setup to break lines accordingly (cr/nl conversion).
+	This can be done by hacking the needed escape sequences in
+	into the environment variable
+		PRINT_RAW_SETUP_PRINTER='\027E2'
+	which is located in your $HOME/.apsfilterrc file.
+	Remove the '#' sign in front of the environment variable
+	to make it active and type in the correct escape sequence.
+
+Q 1.5	How to manage strange search paths for filter programs in apsfilter
+
+	Modify the file $APS_BASEDIR/global/GLOBAL.sh
+	Append your very_special_searchpath to the variable
+		LOCAL_PATH=/usr/local/bin:/local/bin
+
+	i.e. if your dvips is located in /foo/bin and your 
+	pbmplus utilities are located in /bar/bin, then
+	modify that line into:
+		LOCAL_PATH=/usr/local/bin:/local/bin:/foo/bin:/bar/bin
+
+	After that re-run (as root) the program 
+		$APS_BASEDIR/setup/filtersetup
+	to create a new file:
+		$APS_BASEDIR/global/filters_found
+
+Q 1.6   I've installed apsfilter and still cannot print anything using
+	lpr! Using cat <filename> | /dev/lp? works fine. Any ideas?
+
+A:	Sure!! First check out wether lpr does work without apsfilter
+	installed, if not, check out your documentation (for
+	Linux-Users this would be the Printing-Howto).
+
+	If this doesn't help you may need to reinstall lpr and
+	friends to get the permissions right! Sometimes the Distribs
+	have Printing f*cked up!
+
+Q 1.7	Why don't you use make for installation ?
+
+	It's because of history. Initially I don't wanted the SETUP
+	stuff and the user was forced to fiddle apsfilter himself
+	into the lpd print mechanism ... But many user had problems,
+	because at that time there came no printcap(5) manpage with
+	the Linux distributions, so I was forced to write an
+	installation script ....
+	An everything grew more and more ...
+	So, I know about "certain" standards ... but now its
+	a bit too late and would cost too much time, to rewrite
+	everything for those "configure; make; make install - freaks"
+
+Q 1.8	when printing using a filter that prints two pages on one sheet
+	(lp1 and lp2 in my case), a few characters are cut off at the 
+	beginning of the first page output and put onto the second sheet.
+	From: Michael_Nelson <nelson@seahunt.imat.com>
+
+	I figured it out.  In the use.doc for gs, it states that it
+	requires 1.5MB of RAM to do 300x300dpi on a LaserJet III.  I
+	only have 1MB (the standard amount).  So, I changed the
+	resolution GS_RES or something in apsfilter to 150x150 and it
+	works fine now.  I did the same in gslj, and it now works
+	properly too.
+
+	bin/apsfilter: 
+
+	#------------------------------------------------------------------------
+	#
+	# (2) PRINTER RESOLUTION - GS_RESOL
+	#
+	...
+
+	case $PRINTER in
+	...
+		# laserjet|ljet[23]*)		GS_RESOL=300x300 ;;
+		laserjet|ljet[23]*)		GS_RESOL=150x150 ;;
+
+Q 1.9	What about remote printer support
+
+	Ok, _one_ is now supported. Please make an entry in /etc/printcap
+	for such a printer called "remote":
+
+	remote|remotep|LJ4 remote on ethernet:\
+		:lp=:\
+		:rm=remote_host:\			IP=addr
+		:rp=remote_printer_name:\
+		:sd=/var/spool/remote:\
+		:lf=/var/spool/remote/log:\
+		:mx#0:\
+		:sh:sf:
+
+	Create spool dir /var/spool/remote
+
+		mkdir -p /var/spool/remote
+		touch /var/spool/remote/log
+		chown -R UID.GID /var/spool/remote
+		chmod 775 /var/spool/remote
+
+	where UID is the user id under that your lpd works and
+	GID the group ID. Look, what SETUP did for your system ...
+
+	Modify bin/apsfilter at ~ line 55. Set REMOTE_PRINTER by removing
+	the '#' at the beginning of the line.
+	#REMOTE_PRINTER=True
+
+	This adds the command "| lpr -Premote" to the PRINT_PS
+	variable ...
+
+	Please note, that you loose control over your printjob now,
+	since the lpr -Premote command is incoked under lpd permissions.
+	So only root is allowed to kill jobs in the "remote" queue.
+
+	Yes, this is an ugly hack, but many people reported, that 
+	they want and need it ;-)
+
+Q 1.10	Print Problems for Panasonic KX-1123 (KX-1123P?) dot-matrix solved
+	From: Donald R. Newcomb <dnewcomb@whale.st.usm.edu>:
+
+	Problem solved: Set printer type to "epson" and add a line in the
+	apsfilter script to set the GS_RESOL variable to "360x180".
+
+Q 1.11	Print Problems with FreeBSD 2.X solved, rewindstdin fixed.
+	From: Lucas James <jj@ldjpc.apana.org.au>
+
+	#include <unistd.h>
+
+	main()
+	{
+     		return lseek(STDIN_FILENO, (off_t)0, SEEK_SET) < 0;
+	}
+
+Q 1.12	SunOS / Solaris file command can't read data from a pipe :-(
+
+	So apsfilter failed to work ...
+
+	Added file command of the FreeBSD 2.0R distribution to
+	the src tree. Backup your originally file command
+	and your /etc/magic file and then proceed compiling
+	and installing it very carefully ... you are now on
+	your own !!!
+
+Q 1.13  How can I prevent as root, that apsfilter users hack
+	the system by putting dangerous commands into their
+	$HOME/.apsfilterrc scripts ?
+
+	With apsfilter 4.9 a new configuration FLAG is introduced:
+	SECURE.
+
+	Comment or Comment out the secure option in the global config
+	file /etc/apsfilterrc.
+
+Q 1.14	dvips doesn't work, what now ?
+
+	Don't suffer... There is a good chance to make it work
+	by checking, if your "incarnation" of dvips has a 
+	different command line option to change your printers
+	resolution.
+
+	The default for apsfilter is to use the -P option
+	to tell dvips your printers resolution.
+
+	Copy apfilterrc to /etc/apsfilterrc and change perhaps
+	DVIPS_RESOL_DorP from -P to -D. After that try again.

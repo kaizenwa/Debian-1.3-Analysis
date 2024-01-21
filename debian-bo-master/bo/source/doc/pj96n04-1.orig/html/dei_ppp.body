@@ -1,0 +1,288 @@
+<!--
+      dei_ppp.html
+      Last modification: Sun, 3 Nov 1996 09:51:15 +0200
+      dei_ppp.	DEI via PPP	PJ 4: Connettersi al DEI	Articoli
+  -->
+
+Il file README:
+
+<pre>
+
+                              SCRIPT PPP
+                    per connettersi al DEI con Linux
+
+                           Giuseppe Zanetti
+                         (beppe@dei.unipd.it)
+
+Questo pacchetto permette di collegarsi al DEI mediante PPP. Il DEI fornisce
+accessi PPP dinamici, ovvero il cui indirizzo cambia ad ogni collegamento, in
+funzione della linea telefonica a cui si chiama (chiamando la stessa linea si
+ottiene lo stesso IP address).
+
+                            INSTALLAZIONE
+
+Per installare il pacchetto bisogna avere installato il seguente software:
+
+- PPP per Linux, disponibile ad esempio nella slackware o su sunsite.unc.edu
+                 (mirror su ftp.unipd.it)
+
+Bisogna poi inserire i seguenti valori in /etc/resolv.conf:
+
+--------------------------/etc/resolv.conf---------------------
+domain dei.unipd.it
+nameserver 147.162.2.100
+---------------------------------------------------------------
+
+Dopodiche` si devono installare gli script in un directory contenuto nel
+PATH:
+
+- PPP_DEI [numero linea]  esegue il collegamento col DEI. Una volta abilitato
+                          il collegamento monitorizza il file dei messaggi di
+                          sistema (per controllare lo stato della connessione
+                          ed eventuali altri messaggi). Per terminare la
+                          visualizzazione premete ^C (non abbatte la linea)
+
+                          [numero linea] e` opzionale e permette di scegliere
+                                         a quale modem del terminal server
+                                         collegarsi, ovvero quale IP ottenere.
+
+                          es: PPP_DEI    si collega al modem di default
+                              PPP_DEI 4  si collega al modem 8277764
+
+                          BUGS: alle volte si incanta alla partenza; la
+                                soluzione e` premere ^C e riprovare. Se non
+                                funziona si lanci "minicom" e si resetti il
+                                modem con "ATZ". Si torni al DOS (ehmm.. a 
+                                Linux :-) con ^Z^Q (Leave without reset).
+
+- PPP_OFF                 abbatte il collegamento
+
+
+Ora dovete editare il file di configurazioni. Le configurazioni devono essere
+inserite nel file $HOME/.deippprc (ovvero /.deippprc se siete root ... non ho
+mai provato ppp con altri utenti che non fossero root !) nel seguente modo:
+
+
+LOGIN=[il proprio nome di login]
+PASSWORD=[la propria password]
+DEFAULTLINE=[seleziona il numero telefonico di default]
+
+esempio:
+
+----------------------------/.deippprc------------------------
+LOGIN=beppe
+PASSWORD=nonteladico
+DEFAULTLINE=4
+---------------------------------------------------------------
+
+
+ricordatevi di proteggere il file in lettura !
+
+                                  UTILIZZO
+
+Per lanciare la connessione si scrive PPP_DEI [numero linea]. Poi si possono
+lanciare i programmi che si desiderano (telnet, ftp, gopher, Netscape, ...).
+Una volta sazi di programmare in LISP sulle macchine del DEI :-) potete
+terminare la connessione con PPP_OFF e chiudere il monitor dei messaggi
+con ^C. Quando si usa PPP_OFF il monitor segnalera` l'avvenuta disconnessione
+con linee del tipo:
+
+Mar 28 19:27:53 freddy pppd[153]: Connection terminated.
+Mar 28 19:27:53 freddy pppd[153]: set kernel debugging level to 2
+Mar 28 19:27:53 freddy pppd[153]: Exit.
+Mar 28 19:27:54 freddy kernel: ppp_ioctl: set debug level 2, netpacket 0
+Mar 28 19:27:54 freddy kernel: ppp: channel ppp0 going down for IP packets!
+Mar 28 19:27:54 freddy kernel: ppp: channel ppp0 closing.
+
+                                TROUBLESHHOTING
+
+D: alle volte il programma si incanta col messaggio
+   setting tty ... connecting ...
+
+R: la soluzione e` premere ^C e riprovare. Se non funziona si lanci "minicom"
+   e si resetti il modem con "ATZ". Si torni al DOS (ehmm.. a Linux :-) con
+   la combinazione ^Z^Q (Leave without reset). Credo il problema sia dovuto al
+   fatto che PPP_OFF non resetta correttamente il modo di funzionamento della
+   seriale.
+
+D: Il programma non trova alcuni pezzi (chat o pppd)
+R: avete installato il pacchetto ppp ? magari avete una versione nuova in cui
+   sono cambiati alcuni path... soluzione: modificate a mano PPP_DEI
+
+D: Per chiamare Padova mi occorre un prefisso
+R: modifica a mano PPP_OFF
+
+D: non ho il telefono a toni
+R: modifica a mano PPP_OFF
+
+D: perche` non prendo la linea ?
+R: la chat e` fallita per qualche motivo: scoprilo con: tail /var/adm/messages
+
+Per informazioni: Giuseppe Zanetti
+                  beppe@dei.unipd.it
+                  beppe@iperv.it
+
+</pre>
+
+Il file PPP_DEI:
+
+<pre>
+
+#!/bin/sh
+
+# ---------------------------------------------------------------------------
+# Script di Collegamento al Cisco del DEI - Universita` di Padova
+#
+# autore Giuseppe Zanetti (beppe@iperv.it)
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+#                            CONFIGURAZIONI
+#
+# le configurazioni devono essere inserite nel file $HOME/.deippprc nel
+# seguente modo:
+#
+# LOGIN=[il proprio nome di login]
+# PASSWORD=[la propria password]
+# DEFAULTLINE=[ultima cifra del numero telefonico di default]
+#
+# esempio:   LOGIN=beppe
+#            PASSWORD=nonteladico
+#            DEFAULTLINE=4
+#
+# ricordatevi di proteggere il file in lettura !
+# ---------------------------------------------------------------------------
+
+
+
+
+# ---------------------------------------------------------------------------
+#                      NON TOCCATE LE RIGHE SEGUENTI
+# ---------------------------------------------------------------------------
+
+
+CONFILE=$HOME/.deippprc
+
+LOGIN=`grep ^LOGIN= $CONFILE|cut -f2 -d=`
+PASSWORD=`grep ^PASSWORD= $CONFILE|cut -f2 -d=`
+DEFAULTLINE=`grep ^DEFAULTLINE= $CONFILE|cut -f2 -d=`
+
+clear
+echo "---------------------------------------------------------------------------"
+echo "      Script di Collegamento al Cisco del DEI - Universita\` di Padova"
+echo
+echo "                 autore Giuseppe Zanetti (beppe@iperv.it)"
+echo "---------------------------------------------------------------------------"
+
+echo "                   ------------- DEI PPP SETUP ------------"
+echo "                   CONFILE=$CONFILE"
+echo "                   LOGIN=$LOGIN"
+echo "                   PASSWORD=$PASSWORD"
+echo "                   DEFAULTLINE=$DEFAULTLINE"
+echo "                   ----------------------------------------"
+echo
+
+SPEED=""
+SPEOK=""
+
+N=$1
+
+if [ "$1" = "" ]
+then
+	N=$DEFAULTLINE
+fi
+
+echo Calling DEI Linea $N ...
+
+if [ "$1" = 2400 ]
+then
+	SPEED="AT&N3"
+	SPEOK="OK"
+fi
+
+# check if the link is running
+
+# the special file that rappresents the serial port
+
+CUA=/dev/modem
+
+# uncomment this if you use a modem; comment if you use a 3 wires cable
+
+MODEM=modem
+CRTSCTS=crtscts
+
+# uncomment the ADDR that you need
+# format is my_address:yours_address
+# or noipdefaults if it is assigned
+# from the server
+
+#ADDR=150.178.101.2:150.178.101.1
+#ADDR=193.207.29.72:
+#ADDR=:150.178.101.1
+ADDR=noipdefault
+
+# the debug level (bethween 0 and 5)
+
+DEBUGLEVEL=0
+
+# reset the modem port permissions
+
+chown root $CUA
+chmod 666 $CUA
+
+# start the link
+
+(
+	stty 0
+    echo -n "setting tty ... " 1>&2
+    stty 38400 -tostop
+
+    echo -n "connecting ... " 1>&2
+
+    if /usr/lib/ppp/chat -v "" AT OK ATZ OK $SPEED $SPEOK atd827776$N CONNECT "\r\r" ername:-"\r"-ername: "\r\r" sername: $LOGIN ssword: $PASSWORD \> ppp
+    then
+		/usr/lib/ppp/pppd $MODEM $CRTSCTS asyncmap 0 debug kdebug $DEBUGLEVEL mru 296 mtu 296 defaultroute $CUA $ADDR &
+
+		if [ ! $? = 0 ]
+		then
+			echo "pppd error (see /var/adm/messages)" 1>&2
+		fi
+
+		tail -f /var/adm/messages 1>&2
+    else
+		echo "chat failed" 1>&2
+		exit 1
+    fi
+) < $CUA > $CUA
+
+</pre>
+
+Il file PPP_OFF:
+
+<pre>
+
+#!/bin/sh
+
+PORT=$1
+
+if [ "$PORT" = "" ]
+then
+	PORT=0
+fi
+
+if [ -f /var/run/ppp$PORT.pid ]
+then
+	kill -INT `cat /var/run/ppp$PORT.pid`
+	echo "PPP terminated"
+else
+	echo "PPP not running"
+fi
+
+echo
+echo "Last connection statistics:"
+echo
+echo "Begin: " `grep "ipcp: up" /var/adm/messages | tail -1 | cut -c8-15`
+echo "End:   " `grep "ipcp: down" /var/adm/messages | tail -1 | cut -c8-15`
+echo
+
+</pre>

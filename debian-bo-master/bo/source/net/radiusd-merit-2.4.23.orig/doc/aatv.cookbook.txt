@@ -1,0 +1,215 @@
+
+
+              The Care and Feeding of a New AATV within RADIUS
+
+
+   This document attempts to describe all the steps necessary to write
+a new AATV and add it to this generic RADIUS release.  An example AATV
+(which doesn't do much in the way of authentication, authorization or
+accounting) is included for reference.  The only thing missing is the
+real code implementing the new algorithm (this is what you need to add).
+
+   Every effort has been made to make the AATV experience a painless one.
+The RADIUS engine has been modularized and made AATV savvy.  The number
+of things you have to do (besides write your own AATV code) has been held
+to the absolute minimum.  Assuming you have your AATV all ready (see the
+steps below), you should need to make only the following few changes to
+the Merit RADIUS release before compiling and starting your debug cycle.
+
+   One change is necessary to the Makefile, of course.  Just follow the
+examples for any existing AATV module (e.g., rad.file.c or rad.accounting.c).
+You will need to add the name of the source file (e.g., $(SRC)/hello.aatv.c)
+to the RAD_SRCS make macro definition.  Similarly, add the name of the object
+file (e.g., $(OBJ)/hello.aatv.o) to the RAD_OBJS make macro definition.  Don't
+forget to add a target to compile the source file into the object file.  Place
+this make target and rule(s) somewhere near the end of the standard Makefile.
+
+   The second change is in the radius.h include file.  Look into this file and
+locate the definition of the AATVS macro.  It is located after the definition
+of the AATV structure itself and just before the list of event names.  Recall
+that an AATV has only one public symbol, an AATVPTR.  This is the name of the
+address of the AATV itself.  These public symbol names usually conform to the
+standard "rad_????_aatv" syntax where the question marks are replaced with the
+name of your AATV ("hello" in this case).  See below for the relevant section
+from the radius.h file.  This macro is a comma separated list of AATVPTRs.
+
+/* from the RADIUS.H file */
+
+#define AATVS   &rad_realm_aatv,   &rad_unix_aatv,   &rad_2rad_aatv, \
+                &rad_tacs_aatv,    &rad_kchp_aatv,   &rad_mnet_aatv, \
+                &rad_akrb_aatv,    &rad_mkrb_aatv,   &rad_file_aatv, \
+                &rad_authen_aatv,  &rad_passwd_aatv  <--- add your AATV here!
+
+You also will need to add an external reference to your public AATV pointer:
+
+   extern AATVPTR  rad_hello_aatv;    /* My hello AATV public reference */
+
+   A possible third change is necessary if you've written an authentication
+type AATV.  It is possible to use AATVs for authentication, after all, that is
+why they were invented in the first place!  In this case you will need to add
+an entry to the dictionary file to record the external string by which your
+authentication AATV will be known for purposes of configuring your users file.
+In the dictionary file you should find several "Authentication Types" defined
+along with their values (in the fourth column).  The third column is the ASCII
+string which is placed in the users file during configuration.  This string is
+NOT case sensitive.  You also will need to add a new Authentication Type (for
+example AA_HELLO) and increase the size of PW_AUTH_MAX macro in the radius.h
+include file.  Since the Authentication Type may also appear in the authfile,
+you should note that Merit RADIUS (currently as of 2.4.20) requires all but
+Authentication Type = UNIX-PW to include a non-NULL third field.
+
+   Now, you should be able to compile RADIUS with your changes/additions and
+begin to debug your AATV!
+
+   There are several rules which need to be understood (and observed!) to make
+best use of the AATV philosophy.  First and foremost is the concept of hiding
+information.  Only one public symbol is made visible to the rest of the RADIUS
+code.  All functions and global variables created within the new AATV module
+must be declared "static" (which in C hides them from other modules at linking
+time).  Of course, all of the existing global variables and public functions
+within the RADIUS software are available to be used within the new AATV.  Just
+include the "radius.h" file.  Other include files may be necessary to have a
+successful compile, but that depend upon what library functions the new AATV
+needs to call in order to perform its algorithm.
+
+   It is a good idea to have a file header comment describing (briefly) what
+the new AATV is all about.  It is probably a good idea to use SCCS or RCS to
+archive your changes, so include the appropriate syntactic sugar as required.
+Include "radius.h" after any system include files you may need.  After this
+list any global variables from other parts of the RADIUS code which your AATV
+needs.  Finally, list any local (static) variables your AATV function(s) will
+need -- including the function prototypes (forward references) for all needed
+functions within this file and the AATV (transfer vector) itself.  See below.
+
+   Every AATV needs an action function.  This is the main piece of code within
+the AATV which implements your algorithm.  The other functions (init, cleanup,
+recv and timer) are optional and may be omitted (unless you need them).  Use
+the NULL function pointer to refer to them in the transfer vector if you don't
+need them.  List the action function (and any other functions) by name in the
+transfer vector after the AATV name, authentication type and function type.
+The socket parameter may be either zero or minus one (-1).  The minus one is a
+flag used to convey to the init function that this AATV needs to bind a socket,
+but this hasn't been done yet (this is useful when re-initializing the AATVs).
+
+   The AATV name is a string of up to 32 characters used for identification
+purposes.  Every AATV may potentially appear in a finite state machine (FSM)
+configuration table.  Since this table is a human readable (i.e., ASCII) text
+file, the AATV name must be printable ASCII.  It must also be unique.  See the
+radius.fsm(5) man page for a complete list of the known AATVs as of this date.
+The authentication type is next and is one of about ten different types, but,
+unless you are writing an authentication AATV, it should be minus one (-1).
+The function type is one of AA_DIRECT, AA_SOCKET_, AA_FORK or AA_FREPLY.  See
+the "aatv.txt" file for more information about these four function types.
+
+   Finally, you get to the code you need to write, and the reason you care at
+all about this AATV thing, in the first place!  Begin with a multi-line (block)
+function header comment which identifies the name of your action function and
+describes the basic purpose and what events it returns and why.  Follow this
+with the standard function prototype (each AATV action function takes a pointer
+to an authentication request structure (AUTH_REQ), an integer and a string and
+returns an integer event).  Inside the function feel free to implement your
+AATV algorithm any way your deem suitable.  The only limitations would be on
+such things as making socket calls (recvfrom, bind, select, sendto) or forking
+in an AATV of AA_DIRECT type.  Forking isn't prohibited, but you may have some
+trouble with returning the wait(2) status.  The group of function types listed
+above was created to select amongst and indicate how those various features
+would be handled in conjunction with the RADIUS "engine" code.
+
+   The basic idea behind all of this is: the RADIUS engine calls on the FSM to
+perform some action.  The FSM selects the action to be performed based on such
+things as the current state and the given event for this call.  In turn, the
+FSM calls upon the selected AATV action function to do the work so designated 
+which, by no means, may delay the engine process.  It is because of this last
+point that remote socket calls and forking AATV processes came into being.
+
+/*
+ *
+ *        Hello World (AATV Example)  [Page one of two]
+ *
+ */
+
+static char     rcsid[] = "$Id$";
+
+static char     sccsid[] = "%W%";
+
+#include        <sys/types.h>
+#include        <sys/param.h>
+#include        <netinet/in.h>
+
+#include        <stdio.h>
+#include        <syslog.h>
+
+#include        "radius.h"
+
+extern char     port_msg[128];        /* Various public (global) symbols ... */
+extern int      ack_nak_flag;         /* ...from the RADIUS engine - see ... */
+extern int      debug_flag;           /* ...the radiusd.c file.              */
+
+/*
+ *
+ *        Hello World (AATV Example)  [Page two of two]
+ *
+ */
+
+static int      rad_hello_action PROTO((AUTH_REQ *, int, char *));
+
+static AATV     hello_aatv =
+                {
+                        "HELLO",                /* AATV name */
+                        -1,                     /* authentication type */
+                        AA_DIRECT,              /* function type */
+                        NULL,                   /* init function */
+                        NULL,                   /* timer function */
+                        rad_hello_action,       /* action function */
+                        NULL,                   /* receive function */
+                        NULL,                   /* cleanup function */
+                        0                       /* socket file descriptor */
+                };
+
+AATVPTR         rad_hello_aatv = & hello_aatv;
+
+/*************************************************************************
+ *
+ *        Function: rad_hello_action
+ *
+ *        Purpose: Example AATV (aka Hello World!)
+ *
+ *************************************************************************/
+
+static int
+rad_hello_action (authreq, value, afpar)
+
+AUTH_REQ       *authreq;
+int             value;
+char           *afpar;
+
+{
+        int             i = 1;
+        static char    *func = "rad_hello_action";
+
+        dprintf(2, (LOG_DAEMON, LOG_DEBUG, "%s: entered", func));
+
+        strcpy (port_msg, "Hello World!");
+	ack_nak_flag = i;
+
+        return EV_ACK;
+} /* end of rad_hello_action () */
+
+The various utility functions found (mostly) in the funcs.c, the users.c and
+the util.c files are meant to provide relatively painless access to the items
+inside the AUTH_REQ structure and the attribute-value pairs attached to it.
+Almost all processing of a RADIUS request (be it authentication, authorization
+or accounting) is centered on the handling of the attribute-value pairs (and
+their values) which come to the RADIUS server from a RADIUS client.  A few of
+the more useful utility functions are:
+
+   avpair_add() -- add a particular attribute-value pair by name and value
+   debug_list() -- print out the values of all attribute-value pairs on a list
+   find_auth_type() -- given an authentication realm, return various data
+   find_client() -- given an IP address, identify this RADIUS client/server
+   get_vp() -- search for a particular attribute-value pair by attribute name
+   get_last_vp() -- search backwards for a particular attribute-value pair
+   list_copy() -- duplicate an attribute-value pair list
+   list_free() -- release the memory of an attribute-value pair list
+   logit() -- add a line to the logging facility (logfile or syslog)
+   user_find() -- look up a named user in the users file database

@@ -1,0 +1,575 @@
+head	1.5;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.5
+date	97.01.19.20.02.00;	author david;	state Rel;
+branches;
+next	1.4;
+
+1.4
+date	97.01.19.18.54.16;	author david;	state Rel;
+branches;
+next	1.3;
+
+1.3
+date	96.10.26.15.15.26;	author david;	state Rel;
+branches;
+next	1.2;
+
+1.2
+date	96.09.13.20.21.29;	author david;	state Rel;
+branches;
+next	1.1;
+
+1.1
+date	96.07.13.20.58.08;	author david;	state Rel;
+branches;
+next	1.0;
+
+1.0
+date	95.12.31.18.18.55;	author david;	state Rel;
+branches;
+next	;
+
+
+desc
+@Simple rpn calculator, tries to emulate a HP28.
+Stack related procedures.
+@
+
+
+1.5
+log
+@Renamed sun_sunos[45] to sunos[45]
+@
+text
+@/************************************************************************
+ * stack.c -- part of rpncalc.c						*
+ *									*
+ * Refer to rpncalc.c for copyrights and license permissions.           *
+ ************************************************************************/
+
+/* $Id: stack.c,v 1.4 1997/01/19 18:54:16 david Rel david $
+ * $Log: stack.c,v $
+ * Revision 1.4  1997/01/19 18:54:16  david
+ * Some braces rearranged.
+ *
+ * Revision 1.4  1997/01/19 18:19:23  david
+ * new command `char'.
+ *
+ * Revision 1.2  1996/09/13 20:21:29  david
+ * lclint additions
+ *
+ * Revision 1.1  1996/07/13 20:58:08  david
+ * Cosmetic changes due to linting.
+ *
+ * Revision 1.0  1995/12/31 18:18:55  david
+ * Initial revision
+ *
+ * Revision 1.2  1995/11/25 21:45:20  david
+ * Unlimited stack depth due to dynamical allocation of the stack
+ * elements (linear linked list).
+ *
+ * The stack operations have now the right value in the cmd->argno field. This
+ * is done even at the expense of superfluous push/pops (dup),
+ * unfortunately.
+ * */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <ctype.h>
+#include <locale.h>
+
+#ifdef sunos5
+#include <ieeefp.h>
+#endif
+#include <limits.h>
+
+#include "cmds.h"
+#include "utils.h"
+#include "stack.h"
+
+struct elm *anchor=NULL;
+
+int pushtostack=1;
+
+enum BASE base=DEC;
+int digits=3;			/* accuracy, number of digits */
+
+/* Push an element on the stack */
+double push(double elem)
+{
+  struct elm *next;
+
+  if (pushtostack)
+  {
+    next=anchor;
+    anchor=(struct elm *)xmalloc(sizeof(struct elm));
+    anchor->value=elem;  anchor->next=next; anchor->prev=NULL;
+    if (anchor->next != NULL) anchor->next->prev=anchor;
+  }
+  return 0.0; /* dummy */
+}
+
+/* Pop an element from the stack */
+double pop(void)
+{
+  double value;
+
+  if (anchor != NULL)
+  {
+    value=anchor->value; anchor=anchor->next; 
+    if (anchor != NULL) {
+	if (anchor->prev != NULL) free(anchor->prev);
+    	anchor->prev=NULL;
+    }
+  }
+  else
+  {
+    fprintf(stderr, "pop: stack empty.\n"); value=0.0; 
+    pushtostack=0;
+  }
+  return value;
+}
+
+/* Returns the elm-th element from the stack */
+double pick(double op1)
+{
+  long int n, i;
+  struct elm *p;
+  
+  n=(long int)op1; p=anchor; i=1; 
+  while ((p != NULL) && (p->next != NULL) && (i<n)) { p=p->next; i++; }
+
+  if ((i==n) && (p!=NULL)) return p->value;
+  else
+  {
+    fprintf(stderr, "pick: element not available.\n"); 
+    pushtostack=0;
+    return 0.0;
+  }
+}
+
+/* Drop top element */
+double drop(void)
+{
+  struct elm *top;
+  if (anchor != NULL) 
+  {
+    top=anchor; anchor=top->next; 
+    if (anchor != NULL) anchor->prev=NULL; 
+    free(top);
+  }
+  else
+  {
+    fprintf(stderr, "drop: stack empty.\n"); pushtostack=0;
+  }
+
+  return 0.0; /* dummy value */
+}
+
+/* Duplicate top element */
+double dupel(double d)
+{
+  (void)push(d); (void)push(d);
+  return 0.0; /* dummy */
+}
+
+/* Duplicate top element two times */
+double dupel2(double d)
+{
+  (void)push(d); (void)push(d); (void)push(d);
+  return 0.0; /* dummy */
+}
+
+double dupn(double n, double d)
+{
+  long int i;
+
+  for (i=1; i<=(long int)n; i++) (void)push(d);
+  return 0.0; /* dummy value */
+}
+
+double dropn(double n)
+{
+  long int i;
+
+  for (i=1; i<=(long int)n; i++) (void)drop();
+  return 0.0; /* dummy value */
+}
+
+double clear(void)
+{
+  struct elm *p, *t;
+
+  p=anchor;
+  while (p != NULL) 
+  {
+    t=p; p=p->next; 
+    free(t);
+  }
+  anchor=NULL;
+  return 0.0; /* dummy value */
+}
+
+/* Push 2nd-top element on the stack */
+double over(void)
+{
+  (void)push(pick(2));
+  return 0.0; /* dummy value */
+}
+
+/* How many elements are on the stack ? */
+double depth(void)
+{
+  struct elm *p;
+  double n;
+
+  p=anchor; n=0;
+  while (p != NULL) { p=p->next; n++; }
+
+  return n;
+}
+
+/* Swap the 1st and 2nd element on stack */
+double swap(void)
+{
+  double tmp1, tmp2;
+
+  tmp1 = pop(); tmp2 = pop();
+  (void)push(tmp1); (void)push(tmp2);
+  return 0.0; /* dummy value */
+}
+
+/* Roll top three elements: 1 2 3 -> 3 1 2 */
+double roll(void)
+{
+  double tmp1, tmp2, tmp3;
+
+  tmp1 = pop(); tmp2 = pop(); tmp3 = pop();
+  
+  (void)push(tmp1); (void)push(tmp3); (void)push(tmp2);
+  return 0.0; /* dummy value */
+}
+
+/*
+ * Show the contents of the stack. Depending on the base the stack contents 
+ * will be shown in dec, hex or oct notation (integers only) or in the normal
+ * way: Show integers as ii and floats as ff.ffff
+ *
+ * Infinite results and NaN (not a number) will be displayed by using
+ * isinf() and isnan().
+ */
+double showstack()
+{
+  struct elm *p;
+  double value;
+  short int i;
+
+  if (anchor != NULL)
+  {
+    p=anchor; i=1;
+    while (p->next != NULL) { p=p->next; i++; }
+    while (p != NULL)
+    {
+      printf("%2i: ", i);
+      value=p->value;  
+      switch (base)
+      {
+        case HEX:  printf("0x%lx", (unsigned long int)value); break;
+        case OCT:  printf("0%lo",  (signed long int)value); break;
+	case CHAR: {
+			unsigned long int  v=floor(value);
+			unsigned char c=(unsigned char)v;
+
+			printf("%03ld 0%03lo 0x%02lx ",v,v,v);
+			if (isprint(c)) printf("'%c'",c);
+			else if (iscntrl(c)) {
+			  if (c < 32)        printf("^%c", c+64);
+			  else if (c == 127) printf("^?");
+			  else               printf("M-^%c", c-64);
+			}
+			break;
+		   }
+        case DEC:
+        default:
+#ifdef sunos5
+		  if (!finite(value)) {
+#else
+	          if (isinf(value)) {
+#endif
+	            printf("%cinfinity",
+#ifdef sunos5
+			   finite(value) == 0 ? '+' : '-');
+#else
+			   isinf(value) == 1 ? '+' : '-');
+#endif
+		  }
+	          else if (isnan(value)) { printf("NaN"); }
+	          else if ((floor(value) == value) && 
+			  ((long int)value <= LONG_MAX)) {
+		    printf("%.0f",value);
+		  } else {
+		    printf("%.*g", (digits+1), value);
+		  }
+	          break;
+	  
+      }
+      printf("\n");
+      p=p->prev; i--;
+    }  
+  }
+  return 0.0; /* dummy value */
+}
+
+double sethex(void)
+{
+  base = HEX;
+  return 0.0; /* dummy value */
+}
+
+double setdec(void)
+{
+  base = DEC;
+  return 0.0; /* dummy value */
+}
+  
+double setoct(void)
+{
+  base = OCT;
+  return 0.0; /* dummy value */
+}
+
+double setchar(void)
+{
+  base = CHAR;
+  return 0.0; /* dummy value */
+}
+@
+
+
+1.4
+log
+@Some braces rearranged.
+@
+text
+@d7 1
+a7 1
+/* $Id: stack.c,v 1.4 1997/01/19 18:19:23 david Exp david $
+d9 3
+d39 1
+a39 1
+#ifdef sun_sunos55
+d252 1
+a252 1
+#ifdef sun_sunos55
+d258 1
+a258 1
+#ifdef sun_sunos55
+@
+
+
+1.3
+log
+@Changes in order to make rpncalc compile under SunOs 5.5
+@
+text
+@d4 1
+a4 19
+ * A little RPN (Reverse Polish Notation) calculator,                   *
+ * rudimentary emulating a HP 28S. 					*
+ * 								        *
+ * rpncalc is (c) David Frey, 1993, 1994, 1995				*
+ *								        * 
+ * This program is free software; you can redistribute it and/or modify *
+ * it under the terms of the GNU General Public License as published by *
+ * the Free Software Foundation; either version 2 of the License, or    *
+ * (at your option) any later version.                                  *
+ *									* 
+ * This program is distributed in the hope that it will be useful,      *
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of       *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the        *
+ * GNU General Public License for more details.                         *
+ *									* 
+ * You should have received a copy of the GNU General Public License    *
+ * along with this program; if not, write to the Free Software          *
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.            *
+ *									* 
+d7 1
+a7 1
+/* $Id: stack.c,v 1.2 1996/09/13 20:21:29 david Rel $
+d9 3
+d33 4
+a36 1
+#ifdef sun
+d43 1
+a43 6
+
+struct elm
+{
+  double value;
+  struct elm *prev, *next;
+};
+d75 4
+a78 1
+    if (anchor != NULL) anchor->prev=NULL;
+d228 1
+d232 15
+a246 2
+        case HEX: printf("%2i: 0x%lx\n", i, (unsigned long int)value); break;
+        case OCT: printf("%2i: 0%lo\n",  i, (signed long int)value); break;
+d249 2
+a250 2
+#ifdef sun
+		  if (!finite(value))
+d252 1
+a252 1
+	          if (isinf(value)) 
+d254 2
+a255 3
+		  {
+	            printf("%2i: %cinfinity\n", i, 
+#ifdef sun
+d261 6
+a266 11
+	          else if (isnan(value))
+	          {
+		    printf("%2i: NaN\n", i);
+		  }
+	          else if ((floor(value) == value) && ((long int)value <= LONG_MAX))
+		  {
+		    printf("%2i: %.0f\n", i, value);
+		  }
+	          else
+		  {
+		    printf("%2i: %.*g\n", i, (digits+1), value);
+d271 1
+d293 6
+@
+
+
+1.2
+log
+@lclint additions
+@
+text
+@d25 1
+a25 1
+/* $Id: stack.c,v 1.1 1996/07/13 20:58:08 david Rel david $
+d27 3
+d48 3
+d230 1
+a230 1
+double showstack(void)
+d249 3
+d253 1
+d256 3
+d260 1
+@
+
+
+1.1
+log
+@Cosmetic changes due to linting.
+@
+text
+@d25 1
+a25 1
+/* $Id: stack.c,v 1.0 1995/12/31 18:18:55 david Rel david $
+d27 3
+d56 1
+a56 1
+static struct elm *anchor=NULL;
+d58 1
+a58 1
+int pushtostack=TRUE;
+d60 1
+a60 1
+static enum BASE base=DEC;
+a81 1
+  struct elm *top;
+d85 1
+a85 2
+    top=anchor;
+    value=top->value; anchor=top->next; 
+a86 1
+    free(top);
+d91 1
+a91 1
+    pushtostack=FALSE;
+d99 1
+a99 1
+  int n, i;
+d102 1
+a102 1
+  n=(int)op1; p=anchor; i=1; 
+d105 1
+a105 1
+  if (i==n) return p->value;
+d109 1
+a109 1
+    pushtostack=FALSE;
+d126 1
+a126 1
+    fprintf(stderr, "drop: stack empty.\n"); pushtostack=FALSE;
+d135 1
+a135 1
+  push(d); push(d);
+d142 1
+a142 1
+  push(d); push(d); push(d);
+d148 1
+a148 1
+  int i;
+d150 1
+a150 1
+  for (i=1; i<=n; i++) push(d);
+d156 1
+a156 1
+  int i;
+d158 1
+a158 1
+  for (i=1; i<=n; i++) drop();
+d179 1
+a179 1
+  push(pick(2));
+d187 1
+a187 1
+  int n;
+d201 1
+a201 1
+  push(tmp1); push(tmp2);
+d212 1
+a212 1
+  push(tmp1); push(tmp3); push(tmp2);
+d239 2
+a240 2
+        case HEX: printf("%2i: 0x%X\n", i, (int)value); break;
+        case OCT: printf("%2i: 0%o\n", i, (int)value); break;
+d252 1
+a252 1
+	          else if ((floor(value) == value) && (value <= LONG_MAX))
+@
+
+
+1.0
+log
+@Initial revision
+@
+text
+@d25 1
+a25 1
+/* $Id: stack.c,v 1.2 1995/11/25 21:45:20 david Rel david $
+d27 3
+d53 2
+a54 1
+struct elm *anchor=NULL;
+d56 2
+a57 1
+enum BASE base=DEC;
+@

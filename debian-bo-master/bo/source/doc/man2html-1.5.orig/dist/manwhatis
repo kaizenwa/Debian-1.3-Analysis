@@ -1,0 +1,157 @@
+#!/usr/bin/awk -f
+#
+#  Generate a whatis index into the manual pages by using find tp 
+#  locate all the whatis files.
+#  Michael Hamilton <michael@actrix.gen.nz>
+#
+BEGIN {
+
+  OFS="";
+  section = ARGV[1];
+  "echo $PPID" | getline pid;
+
+  if (section !~ /^[0-9]$/) {
+    print "Content-type: text/html\n\n";  
+    print "<head>";
+    print "<title>Manual - Illegal section</title>";
+    print "</head>\n<body>";
+    print "Illegal section number '" section "'." ;
+    print "Must be 0..9 or all";
+    print "</body>";
+    exit;
+  }
+    
+  cache_dir  = "/var/man2html";
+  cache_file = "whatis-" section ".html";
+  cache = cache_dir "/" cache_file;
+				# Find out the man path
+  "/usr/bin/man -w" | getline man_path
+  gsub(":", " ", man_path);
+				# See if anything is out of date.
+  if (system("test -f " cache) == 0) {
+    cmd = "/usr/bin/find " man_path " -maxdepth 1 -name whatis -newer " cache;
+    cmd | getline need_update;
+  }
+  else {
+    need_update = 1;
+  }
+
+  if (need_update != "") {
+
+    cache_tmp  = cache "_" pid;
+    sort_tmp   = cache_dir "/manwhatis_tmp_" pid ;
+    buffer_tmp = cache_dir "/manwhatis_tmp2_" pid;
+
+    sec_name[1] = "User Commands";
+    sec_name[2] = "System Calls";
+    sec_name[3] = "Library Functions";
+    sec_name[4] = "Special Files";
+    sec_name[5] = "File Formats";
+    sec_name[6] = "Games";
+    sec_name[7] = "Miscellany";
+    sec_name[8] = "Administration and Privileged Commands";
+    
+				# Print heading
+    print "Content-type: text/html\n\n" > cache_tmp;  
+    print "<html>\n<head>" > cache_tmp;
+    print "<title>Manual Pages - Names and Descriptions: " section ". " sec_name[section] "</title>" > cache_tmp;
+
+    print "</head>\n<body>" > cache_tmp;
+    print "<h1>Manual Pages - Names and Descriptions</h1>" > cache_tmp;
+    print "<h1>Section " section ": " sec_name[section] "</h1>" > cache_tmp;
+    "hostname" | getline hostname;
+    "date" | getline date;
+    print hostname " (" date ")" > cache_tmp;
+				# Find out the man path 
+    "/usr/bin/man -w" | getline;
+    $1 = $1 ":";
+    gsub(":", " ", $1); 
+
+    find_cmd = "/usr/bin/find " man_path " -maxdepth 1 -name whatis -printf '%p '";
+    find_cmd | getline whatis_files;
+    close(find_cmd);
+				# Try to parse valid entries - those that contain ([0-9])
+    extract_cmd =  "/usr/bin/egrep -h '\\(" section "[A-Za-z]*\\)' " whatis_files ;
+
+    print "<br>Manual pages referenced in " whatis_files "<p>" > cache_tmp;
+
+    sort_cmd = "/usr/bin/sort -f > " sort_tmp;
+    while ( extract_cmd | getline ) { 
+      if (bracket_pos = index($0, "(")) {
+	sec_full_num = substr($0, bracket_pos + 1, index($0, ")") - bracket_pos - 1); 
+	names = substr($0, 1, bracket_pos - 2);
+				# Get rid of blanks and commas.
+	n = split(names, name_list, " *, *");
+	description = substr($0, bracket_pos + length(sec_full_num) + 2);
+				# Generate a entry for each name
+	for (i = 1; i <= n; i++) {
+	  print name_list[i] " " sec_full_num " " name_list[1] " / " description | sort_cmd;
+	}
+      }
+    }
+    close(extract_cmd);
+    close(sort_cmd);
+    while (getline < sort_tmp) { 
+      letter = tolower(substr($1,1,1));
+      if (letter != last_letter) { 
+	if (last_letter) {
+	  print "</dl><p>" > buffer_tmp;
+	}
+	last_letter = letter;
+	letter_index[++num_letters] = letter;
+				# Terminate list, start a new one
+
+	print "<h2> <a name=\"", letter, "\">", toupper(letter), "</a></h2>\n<dl>" > buffer_tmp ;
+      }
+				# Generate a <dt> for the name
+      if ($3 != last_file || $1 != last_name) {	# Don't repeat the same entry link.
+	print "<dt><a href=\"http:/cgi-bin/man2html?", $3, "+", $2, "\">", $1, "(", $2, ")", "</a>" > buffer_tmp;
+	last_file = $3;
+	last_name = $1;
+      }
+      print "<dd>", substr($0, match($0, "/") + 1) > buffer_tmp;
+    }
+				# Finish off last list
+    print "\n</dl><p>" > buffer_tmp;
+    close(buffer_tmp);
+
+    system("rm " sort_tmp);
+
+				# Print out alphabetic quick index and other links
+    for (i = 1; i <= num_letters; i++) {
+      print "<a href=\"#" letter_index[i] "\">" toupper(letter_index[i]) "</a>" > cache_tmp;
+    }
+    print "<hr>" > cache_tmp;
+    print "<a href=\"http:/cgi-bin/man2html\">Return to Main Contents</a>" > cache_tmp;
+    
+    print "<p>Other sections:" > cache_tmp;
+    for (i=1; i<=8; i++) { 
+      if (i != section) {	# Dont print an entry for the section we are in
+	print "<a href=\"http:/cgi-bin/manwhatis?" i "\">" i ". " sec_name[i] "</a> " > cache_tmp;
+      }
+    }
+    print "<hr><p>" > cache_tmp;
+				# Print out the accumulated contents entries
+    while ((getline < buffer_tmp)) print > cache_tmp;
+    print "<hr><p>" > cache_tmp;
+
+    for (i = 1; i <= num_letters; i++) {
+      print "<a href=\"#" letter_index[i] "\">" toupper(letter_index[i]) "</a>" > cache_tmp;
+    }
+    print "<hr>" > cache_tmp;
+    print "<p><a href=\"http:/cgi-bin/man2html\">Return to Main Contents</a>" > cache_tmp;
+    
+    print "<p>Other sections:" > cache_tmp;
+    for (i=1; i<=8; i++) { 
+      if (i != section) {	# Dont print an entry for the section we are in
+	print "<a href=\"http:/cgi-bin/manwhatis?" i "\">" i ". " sec_name[i] "</a> " > cache_tmp;
+      }
+    }
+    print "</body>" > cache_tmp;
+    print "</html>" > cache_tmp;
+    system("/bin/mv " cache_tmp " " cache);
+    system("/bin/rm " buffer_tmp);
+  }
+  system("/bin/cat " cache);
+  exit;
+}

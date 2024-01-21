@@ -1,0 +1,135 @@
+#! /usr/bin/make -f
+#
+# Last updated: Tue Apr 16 16:23:34 BST 1996 by and1000
+#
+# To make the binary distribution package, the ``Debianized'' source package
+# and the context diff to the original package, type `./debian.rules dist'.
+# Make sure that `debian.rules' is executable before the final distribution
+# is made.
+#
+# Invoke each target with `./debian.rules <target>'.  All targets should be
+# invoked with the package root as the current directory.
+#
+# The `binary' target must be run as root, as it needs to install files with
+# specific ownerships.  The `diff' target assumes that you have the original
+# source package available, unpacked, in ../$(p)-$(v).orig, or that you have
+# the previous revision of the ``Debianized'' source package and context diff
+# in the parent directory.
+
+CC = gcc
+CFLAGS = -O2
+LDFLAGS = -s
+
+# The name of the package (for example, `emacs').
+p = xcal
+# The version of the package (for example, `19.28').
+v = 4.1
+# The Debian revision of the package (for example, `2').
+d = 2
+# The architecture of this build
+a = $(shell dpkg --print-architecture)
+
+build:
+# Builds the binary package.
+	xmkmf
+	make Makefiles
+	make derived
+	make depend
+	make
+	touch stamp-build
+
+clean:
+# Undoes the effect of `make -f debian.rules build'.
+	-make clean
+	rm -f Makefile pscal/Makefile xcal_cal/Makefile xcalev/Makefile \
+	  xcalpr/Makefile
+	rm -f Makefile.bak pscal/Makefile.bak xcal_cal/Makefile.bak \
+	  xcalev/Makefile.bak xcalpr/Makefile.bak
+	rm -f stamp-build
+	rm -rf debian-tmp
+
+binary:
+# Makes a binary package.
+	test -f stamp-build || make -f debian.rules build
+	install -d -g root -m 755 -o root debian-tmp
+	chmod g-s debian-tmp
+	install -d -g root -m 755 -o root debian-tmp/DEBIAN
+# Do the binaries first
+	install -d -g root -m 755 -o root debian-tmp/usr/X11R6/bin
+	install -g root -m 755 -o root xcal \
+	  debian-tmp/usr/X11R6/bin/xcal
+	install -g root -m 755 -o root xcalpr/xcalpr \
+	  debian-tmp/usr/X11R6/bin/xcalpr
+	install -g root -m 755 -o root xcalev/xcalev \
+	  debian-tmp/usr/X11R6/bin/xcalev
+	install -g root -m 755 -o root xcal_cal/xcal_cal \
+	  debian-tmp/usr/X11R6/bin/xcal_cal
+	install -g root -m 755 -o root pscal/pscal.script \
+	  debian-tmp/usr/X11R6/bin/pscal
+# app-defaults
+	install -d -g root -m 755 -o root \
+	  debian-tmp/usr/X11R6/lib/X11/app-defaults
+	install -g root -m 444 -o root XCal.ad \
+	  debian-tmp/usr/X11R6/lib/X11/app-defaults/XCal
+	install -g root -m 444 -o root XCal.help \
+	  debian-tmp/usr/X11R6/lib/X11/app-defaults/XCal.help
+# manpages
+	install -d -g root -m 755 -o root debian-tmp/usr/X11R6/man/man1
+	install -g root -m 444 -o root xcal.man \
+	  debian-tmp/usr/X11R6/man/man1/xcal.1x
+	install -g root -m 444 -o root xcalpr/xcalpr.man \
+	  debian-tmp/usr/X11R6/man/man1/xcalpr.1x
+	install -g root -m 444 -o root xcalev/xcalev.man \
+	  debian-tmp/usr/X11R6/man/man1/xcalev.1x
+	install -g root -m 444 -o root xcal_cal/xcal_cal.man \
+	  debian-tmp/usr/X11R6/man/man1/xcal_cal.1x
+	install -g root -m 444 -o root pscal/pscal.man \
+	  debian-tmp/usr/X11R6/man/man1/pscal.1x
+# copyright
+	install -d -g root -m 755 -o root debian-tmp/usr/doc/copyright
+	install -g root -m 644 -o root debian.README \
+	  debian-tmp/usr/doc/copyright/$(p)
+# finish up
+	sed -e '2s/=V/$(v)/' -e '2s/=D/$(d)/' -e '3s/=A/$(a)/' debian.control \
+	  > debian-tmp/DEBIAN/control
+	chmod 644 debian-tmp/DEBIAN/control
+	install -g root -m 644 -o root debian.conffiles \
+	  debian-tmp/DEBIAN/conffiles
+	dpkg --build debian-tmp
+	mv debian-tmp.deb ../$(p)-$(v)-$(d).deb
+
+source:
+# Makes a source package.
+	-test -f stamp-build && make -f debian.rules clean
+	( cd .. && tar cf - $(p)-$(v) | gzip -9f > $(p)-$(v)-$(d).tar.gz )
+
+diff:
+# Makes a context diff.
+	-test -f stamp-build && make -f debian.rules clean
+	-test -d ../$(p)-$(v).orig -o -f ../$(p)-$(v)-`expr $(d) - 1`.diff.gz \
+	  || ( echo "Original source package is not available." ; false )
+	-test -d ../$(p)-$(v).orig || make -f debian.rules orig
+	( cd .. && diff -cNr $(p)-$(v).orig $(p)-$(v) | gzip -9f \
+	  > $(p)-$(v)-$(d).diff.gz )
+	-test -f stamp-orig \
+	  && rm -rf ../$(p)-$(v).orig && rm -f stamp-orig
+
+dist: binary source diff
+# Prepares the package for distribution.
+
+orig:
+# Prepares the original package from the previous
+# Debian revision source package and context diff.
+	( cd .. \
+	  && mkdir $(p).orig \
+	  && cd $(p).orig \
+	  && tar xzf ../$(p)-$(v)-`expr $(d) - 1`.tar.gz \
+	  && cd $(p)-$(v) \
+	  && ( zcat ../../$(p)-$(v)-`expr $(d) - 1`.diff.gz \
+	    | patch -sER -p1 ) \
+	  && find . -name "*.orig" -exec rm -f {} \; \
+	  && cd .. \
+	  && mv $(p)-$(v) ../$(p)-$(v).orig \
+	  && cd .. \
+	  && rmdir $(p).orig )
+	touch stamp-orig

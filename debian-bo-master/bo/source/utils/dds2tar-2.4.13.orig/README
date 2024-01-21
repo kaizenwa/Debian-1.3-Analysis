@@ -1,0 +1,172 @@
+
+    dds2tar  Digital-Data-Storage Extract Tool
+
+             This tool makes use of the fast seek command of DAT devices.
+             Files from a selected file archive can be extracted within
+             one minute.
+
+             This tool is written for Linux SCSI tape archives.
+             It should be easy, to change this for your machine.
+             The only problem should be the ioctls for
+                MTIOCTOP,(MTSEEK,arg) and MTIOCPOS.
+             Please send the changes to me, so I can distribute them.
+
+             J"org Weule                     weule@cs.uni-duesseldorf.de
+                                             Fon: +49 211 751409
+
+             This software is available at
+
+                         ftp.uni-duesseldorf.de:/pub/unix/apollo
+
+             ( This is my personal directory, I started writing PD-software
+               on Apollo-Computers, but they are dying now :-( . Now you
+               will find some other stuff there.)
+
+----------------------------------------------------------------------------
+
+                              LICENSE
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published
+    by the Free Software Foundation; either version 1, or (at your option) 
+    any	later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+----------------------------------------------------------------------------
+
+                              DESCRIPTION
+
+To extract a file from a tape, you have to know the location of the file.
+A tar archive is a sequence of tar records, 512 byte each. The blocksize
+(tar -b #) selects the number of tar records inside each block of the tape.
+(HP is calling the blocks of the tape records also.)
+
+The location of a file is a tuple of the block number and the number of the
+record where the header of the file can be found inside the block.
+
+The first step will be to extract a table with block and record information
+of all files in one archive. If the archive is the 10'th file of the tape,
+you will get the table by:
+
+             mt asf 10
+             dds2index -t my-archive-table -f /dev/nst0
+
+Tar is writing some record information to stdout, when you select the options
+-R and -v. To use this information as a location table, you have to know the
+block number of the first block and the blocksize of the archive. If it's the
+first archive of the tape and the blocksize is the default of 20, you can
+use the verbose lines of tar as a location table. (Additional lines with
+warnings can be included). Otherwise you have to patch tar to retrieve the
+location information. If you don't want to patch tar, feel free to insert
+the output of 'mt-dds tell' at the top of the verbose output of tar.
+
+If you have applied the patch file 'tar-1.11.2.patch' to GNU tar, you can use 
+the verbose output of the tar command (tar -c -v --record-file F) instead of the
+index file generated with the dds2index command above.
+
+(If you patch tar-1.11.2, you are able to write the record-information
+ to a file while getting the errors on screen. The patch 'tar-1.11.2.patch'
+ adds the option '--record-file F'. Additionally a small bug in the source file
+ 'create.c' of tar is fixed. I have moved one line to correct the verbose output
+ of the record numbers. While creating the archive, you can store the current
+ time at the label record. A bug fix to write this date to the verbose output
+ is also done in the source file 'list.c'.)
+
+ !  The patch tar-1.11.2.patch moves one line inside the source file 'create.c'
+ !  and adds some lines for the ability to direct the verbose output to a file.
+ !  Two extra lines are printed to the terminal in some cases to get to current
+ !  tape position at the start and the blocksize.
+ !  Nothing else is done. There should be no extra risk for your data.
+ !  The tar will stay fully compatible to the original version.
+ !  The patch is also convenient for other operating systems.
+
+Lines of the index file stating with '#' are ignored. So you can insert
+some comments. This distribution includes some examples of index files.
+Look for files 'index-of-*'
+
+Once you have the table, you can get the files very quickly. Lets suppose,
+you want to extract everything of the glibc, you have to invoke
+the following command:
+
+             dds2tar -t my-archive-table 'glibc*' | tar -f - -xvv
+
+dds2tar will search in the archive table for the blocks to read, and 
+extracts the records with the selected files. These records together
+are giving a valid tar archive, to use tar for restoring to your disk.
+This will also work, if the files are not a continuous area of the tape.
+dds2tar is skipping over the gaps very quickly with a seek command.
+If you want to extract exactly one file, use -x instead of -p.
+If you want to extract all files, witch named include a pattern,
+use -g instead of -p or -x.
+A list of files is valid to search for. 
+
+With the option -z, you can force the index file to be in compressed mode.
+Compressed archive files are not supported.
+If you  don't use the option -t, stdin or stdout are used in this case.
+The default device is /dev/nst0, witch can be overwritten by the TAPE variable
+and the option -f.
+
+If you want to get familiar with the command, use 
+
+             # skipping to some file
+             mt rewind
+             mt fsf 20
+
+             # creating the table of the archive
+             dds2index -t my-archive-table 
+
+             # The following line is an alternative way to create the index.
+             # You have to patch tar to make the option --record-file
+             # available.
+             # tar -t --record-file my-archive-table
+
+             # extract all files with the substring glibc in there names
+             # and use tar to check the output of dds2tar.
+             dds2tar -t my-archive-table 'glibc*' | tar -f - -tvv
+             # See what's going on ...                  ^^^^ ^^
+
+to see what's going on. In any case, dds2tar is reading your tape,
+so don't worry. Only the file specified by -t is written by this example.
+
+NOTE:
+To make extraction easier, dds2tar will also extract the directories
+for the selected files. So you will also get the full directory hierarchy.
+
+The owners of HP-DAT devices will find the actions comp-on, comp-off and
+comp-query (dds-compression-mode) of mt-dds convenient to change the compression
+mode of the device. Turning off the compression will speed up storing
+'gzip'ed files.
+
+WARNING:
+If we seek to the first block of a file, it can happen, that we are
+going to the position before the filemark. The program is closing and opening
+the file in that case to step over the filemark. Don't use /dev/st0 in that
+case, use /dev/nst0.
+
+THANKS:
+Thanks to Andreas (Andreas_Bagge@h2.maus.de), who has send me a new manual
+page, witch gave me the ideas how to split dds2tar-1.1.3 into peaces.
+His page was also the starting point for the approved man-page added to this
+version.
+
+Last change 2.2.95 by J"org Weule
+
+----------------------------------------------------------------------------
+
+                              INSTALLATION
+
+1. Change the "Makefile" to reflect the buffersize of the kernel.
+   Otherwise uncomment the definition of BUFFER.
+
+2. type "make install".
+
+3. patch tar-1.11.8 if you like.
+

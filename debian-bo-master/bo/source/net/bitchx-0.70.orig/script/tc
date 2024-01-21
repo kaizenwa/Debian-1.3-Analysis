@@ -1,0 +1,79 @@
+/*
+ * ``TC'' - Tabscript Clone For EPIC
+ * (C) 1995 Jeremy Nelson
+ * Originally written for Daveman's Toolbox
+ * Please use and distribute this script like crazy!
+ */
+
+#
+# (note from jfn)  The original allowed you to save up to 10 nicks to 
+# by cycled through by pressing <tab> or <esc>.  I totaly rewrote the file
+# and added the ability to set the number of nicks to save, and also made 
+# it a full tabkey clone.  This file is a lot easier to figure out, too.
+# 
+# What it does:
+#     save an arbitrary number of nicks in a list (settable by you)
+#     cycle through the list by pressing <tab>
+#     cycle backwards through the list by pressing <^R>
+#     remove last <TAB>bed nick from the list (^X^X)
+#
+# Because this script uses a queue instead of a list and index counter, 
+# you may find this script has a different set of idiosyncrasies then 
+# the original tabscript.
+#
+
+bind ^I parse_command ^get_msg_nick tc.msglist
+bind ^R parse_command ^get_msg_nick_backward tc.msglist
+bind ^X^X parse_command echo *** Nickname $pop(tc.msglist) removed
+
+# maximum number of nicks you want to keep track of...
+@ tc.max_nicks = 6
+
+#
+# add a word to a list -- makes sure the list doesnt get longer then
+# the number allowed in max_nicks.
+#
+alias add_to_list {
+	if (where = match($1 $($0)))
+	{
+		if ((kludge = notw(${where-1} $($0))))
+			{@ $0 = kludge}
+			{@ $0 = []}
+		@ kludge = []
+	}
+	assign $0 $1 $rightw($tc.max_nicks $($0))
+}
+
+#
+# Takes the last word in a string and puts it at the front.
+# Pretty straightforward
+#
+alias rotate unshift $0 $pop($0)
+alias roll push $0 $shift($0)
+
+#
+# do the obvious thing
+#
+alias get_msg_nick {
+	roll $0
+	type ^U/msg $rightw(1 $($0)) 
+}
+alias get_msg_nick_backward {
+	rotate $0
+	type ^U/msg $rightw(1 $($0)) 
+}
+alias addnick fe ($*) tc.an {add_to_list tc.msglist $tc.an}
+alias nicklist echo *** Nickname list: $tc.msglist
+
+on #-msg -12782 * add_to_list tc.msglist $0
+on #-send_msg -12782 * add_to_list tc.msglist $0 
+
+on #-dcc_chat -12782 * add_to_list tc.msglist =$0
+on #-send_dcc_chat -12782 * add_to_list tc.msglist =$0
+
+/*
+ * This alias doesnt work if you try to do something like:
+ * /m x ....
+ * because $x expands to your userhost, and that gets confusing.
+ */
+ALIAS M if ([$($0)]) {msg $($0) $1-} {msg $0 $1-}

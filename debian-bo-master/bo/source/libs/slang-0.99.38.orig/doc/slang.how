@@ -1,0 +1,321 @@
+This document explains how to embed S-Lang into your C program.  It is a
+good idea to look at the file calc.c as you read this document.  For a more
+extensive application, see the JED editor source.
+
+Sections in this document are separated by a dashed line.
+
+------------------------------------------------------------------------
+/* 
+ * Copyright (c) 1992, 1994 John E. Davis 
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.   Permission is not granted to modify this
+ * software for any purpose without written agreement from John E. Davis.
+ *
+ * IN NO EVENT SHALL JOHN E. DAVIS BE LIABLE TO ANY PARTY FOR DIRECT,
+ * INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT OF
+ * THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF JOHN E. DAVIS
+ * HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * JOHN E. DAVIS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS"
+ * BASIS, AND JOHN E. DAVIS HAS NO OBLIGATION TO PROVIDE MAINTENANCE,
+ * SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+ */
+
+------------------------------------------------------------------------
+
+Rules of the game:
+
+1.  All C called from S-Lang functions are passed parameters by reference
+NOT by value.  For example, suppose you wish to add an intrinsic to S-Lang
+which is associated with a c function called `calculate_sum' and takes one
+integer parameter and computes the sum of all integers between 0 and the
+value of the integer. An acceptable function might look like:
+
+int calculate_sum (int *maxn)
+{
+   int i, sum = 0;
+   
+   for (i = 1; i <= *maxn; i++) sum += i;
+   return (sum);
+}
+
+Again, when S-Lang calls this function, a pointer to the integer is passed!
+
+
+2.  All parameters passed must be regarded as constants.   That is, the
+    function should not attempt to modify the value of any object pointed to
+    by the parameter.  The following is not allowed:
+    
+    void bad(char *s)
+    {
+       fprintf(stdout, "Passed string is %s", s);  /* ok statement */
+       *s = 0;  /* object modified! */
+    }
+
+   
+------------------------------------------------------------------------
+The basic link between your C program and the S-Lang interpreter is through
+a table that you must create.   The table will look something like:
+
+SLang_Name_Type some_name_here[] =
+{
+   MAKE_INTRINSIC(".function_name", c_function, TYPE, number of parameters),
+   .
+   .
+   SLANG_END_TABLE
+};
+
+It is composed of entries of the form:
+
+   MAKE_INTRINSIC(".function_name", c_function, TYPE, number of parameters),
+
+and ends with `SLANG_END_TABLE'.  MAKE_INTRINSIC is a macro which formats the
+above information in such a way that it can be put into an S-Lang name table.
+Here `function_name' is the name of the function that is to be associated
+with the c function `c_function'.  Notice the `dot' (.) that preceeds
+`function_name'.  This will be replaced by a hash value at runtime.  TYPE is
+the return type of c_function.  It must be one of:
+
+   VOID_TYPE   -- function returns nothing
+   INT_TYPE    -- returns integer
+   STRING_TYPE -- returns a char *.
+   FLOAT_TYPE  -- returns double precision floating point value.
+
+declared in slang.h. `number of parameters' is an integer which indicates
+the number of parameters the C function requires.  Notice that the type of
+the parameters is not specified.  This is because the address of the object
+is passed and not the object it self.
+
+   !!! Note: The floating point type used by S-Lang is double precision.
+
+For example consider the function `calculate_sum' described earlier.
+Suppose you wish to have this function associated with the name `sum'.  Then
+the table must contain the entry:
+
+   MAKE_INTRINSIC(".sum", calculate_sum, INT_TYPE, 1),
+
+In addition to C functions, it is also possible to associate global C
+variables with S-Lang names.  This association is provided by the
+MAKE_VARIABLE macro:
+
+   MAKE_VARIABLE(".var", &c_variable, TYPE, flag),
+
+Here TYPE is one of the above types and flag is an integer which can be
+either 0 or 1 and indicates whether the variable is read only of not.  If
+the variable is read_only, a S-Lang statement of the form
+
+   var = 10;
+    
+will generate a syntax error.  Also EVERY string variable added in this
+manner must be declared as read only.  Suppose that your program has a
+version number string, i.e.,
+
+char *version = "1.7-21a";
+
+and you wish to make its value available to the S-Lang interpreter.  Then,
+simply put the line 
+
+MAKE_VARIABLE(".version", version, STRING_TYPE, 1),
+
+in the file intrin.ci.  Since the variable version is a pointer, the address
+operator, `&', should be omitted.
+
+Any number of MAKE_VARIABLE and MAKE_INTRINSIC statements may be placed in
+any order the table.
+
+------------------------------------------------------------------------
+
+Finally, once the table is constructed, it may be made known to the S-Lang
+interpreter using the function 
+
+   int SLang_add_table(SLang_Name_Type *, char *);
+
+The first parameter is the table itself and the second parameter is a name
+given to the table.  The name must not begin with an underscore and must be
+less than 32 characters long.  The name is usually the name of the program.
+This function returns 1 if the table was successfully added to the
+interpreter or 0 if something went wrong (malloc error).
+
+In addition to calling SLang_add_table, one must also call `init_SLang' and
+perhaps one or more other initialization routines.  For example, if your
+application will be using `sin', `cos', etc, it is also necessary to call
+`init_SLmath'.  If file i/o will be used, call `init_SLfiles' as well.
+These routines all return 1 if successful or 0 otherwise.
+
+For example, calc.c uses:
+   if (!init_SLang() 		       /* basic interpreter functions */
+       || !init_SLmath() 	       /* sin, cos, etc... */
+       || !init_SLfiles()	       /* file i/o */
+       || !SLang_add_table(Calc_Intrinsics, "Calc"))   /* calc specifics */
+     {
+	fprintf(stderr, "Unable to initialize S-Lang.\n");
+	exit(1);
+     }
+
+where Calc_Intrinsics is the name of a table of the form previously
+discussed. 
+
+Most applications will also probably want to load a user initialization file
+immediately afterwards as in.  The initialization file will consists of
+S-Lang code.  For example, suppose the init file is called init.sl.  To load
+it, call:
+
+   SLang_load_file("init.sl");
+
+This function takes a filename as its argument.  If the file name is a NULL
+pointer, S-Lang will be loaded from stdin.  In fact, some programs will want
+to load from stdin in the form of a command line interface.  This is
+achieved most simply as:
+
+   while(1)
+     {
+	SLang_load_file(NULL);
+	if (!SLang_Error) break; 
+	SLang_restart(1);
+	SLang_Error = 0;
+     }
+
+SLang_Error is an integer variable which indicates an error if non-zero.  
+The global variable 
+
+    char *SLang_User_Prompt;
+    
+is used as a prompt when reading from stdin.  If it is NULL (default) no
+prompt is used.
+
+Again, see the source to the JED editor for a complex example of the
+interaction between S-Lang and C.
+-----------------------------------------------------------------
+This final section provides addition technical information.
+
+Global variables:
+
+  extern volatile int SLang_Error;
+  /* Non zero if error occurs.  Must be reset to zero to continue. */
+
+  extern int SLang_Traceback;
+  /* If non-zero, dump an S-Lang traceback upon error.  Available as 
+     _traceback in S-Lang. */
+
+  extern char *SLang_User_Prompt;
+  /* Prompt to use when reading from stdin */
+  extern char SLang_Version[];
+
+  extern int (*SLang_Error_Routine)(char *);
+  /* Pointer to application dependent error messaging routine.  By default,
+     messages are displayed on stderr. */
+
+  extern void (*SLang_Dump_Routine)(char *);
+  /* Called if S-Lang traceback is enabled as well as other debugging 
+     routines (e.g., trace).  By default, these messages go to stderr. */
+  
+
+  extern int (*user_open_slang_object)(SLang_Load_Type *); 
+  extern int (*user_close_slang_object)(SLang_Load_Type *);
+  /* user defined loading routines. */
+
+/* Functions: */
+
+   extern int init_SLang(void);   
+   /* This function is mandatory and must be called by all applications */
+
+   extern int init_SLfiles(void);
+   /* called if fputs, fgets, etc are need in S-Lang */
+
+   extern int init_SLmath(void);
+   /* called if math functions sin, cos, etc... are needed. */
+
+   extern int init_Slunix(void);
+   /* Unix specific system functions stat, lstat, etc... */
+   
+   int SLang_add_table(SLang_Name_Type *);
+   /* add application dependent function table to S-Lang. Returns 0 upon
+      failure or 1 upon success. */
+
+   extern int SLang_load_file(char *);
+   /* Load a file of S-Lang code for interpreting.  If the parameter is
+   NULL, input comes from stdin. */
+
+   extern void SLang_restart(int);
+   /* should be called if an error occurs.  If the passed integer is
+   non-zero, items are popped off the stack; otherwise, the stack is 
+   left intact.  Any time the stack is believed to be trashed, this routine
+   should be called with a non-zero argument (e.g., if setjmp/longjmp is
+   called). */ 
+
+   extern void SLang_byte_compile_file(char *);
+   /* takes a file of S-Lang code and ``byte-compiles'' it for faster
+   loading.  The new filename is equivalent to the old except that a `c' is
+   appended to the name.  (e.g., init.sl --> init.slc).
+
+   extern void SLang_autoload(char *fun, char *file);
+   /* Automatically load S-Lang function `fun' from `file'.  This function
+      is also available via S-Lang */
+   
+   extern char *SLang_load_string(char *);
+   /* Like SLang_load_file except input is from a null terminated string. */
+   
+   extern void SLang_do_pop(void);
+   /* pops item off stack and frees any memory associated with it */
+   
+   extern int SLang_pop_integer(int *x);
+   /* pops integer *x from the stack.  Returns 0 upon success and non-zero
+      if the stack is empty or a type mismatch occurs, setting SLang_Error.
+      */
+
+   extern int SLang_pop_string(char **s, int *flag);
+   /* pops string *s from stack.  If *flag is non-zero, the string must be
+      freed after its use.  DO NOT FREE s if *flag IS ZERO! Returns 0 upon
+      success */
+      
+   #define FLOAT double
+   extern int SLang_pop_float(FLOAT *x, int *convert, int *i);
+   /* Pops FLOAT *x from stack.  If *convert is non-zero, *x was derived
+      from the integer *i. Returns zero upon success. */
+      
+   extern long *SLang_pop_pointer(unsigned short *type, int *do_free);
+   /* Returns a pointer to object of type *type on top of stack. 
+      If *do_free is non-zero, the Object must be freed after use. */
+
+   
+   extern void SLang_push_string(char *s);
+   /* Push string s onto stack */
+   
+   extern void SLang_push_integer(int i);
+   /* push integer i on stack */
+
+   extern void SLang_push_malloced_string(char *s);
+   /* The normal SLang_push_string mallocs space for the string.  This one
+      does not.  DO NOT FREE IT IF YOU USE THIS ROUTINE */
+
+   extern int SLang_is_defined(char *name);
+   /* Return non-zero is name is defined otherwise returns 0. */
+   
+   extern int SLang_run_hooks(char *fun, char *p1, char *p2);
+   /* calls S-Lang function `fun' pushing strings p1 and p2 onto the stack
+      first.  If either string is NULL, it is not pushed. If fun is not
+      defined, 0 is returned. */
+
+   extern int SLang_execute_function(char *fun);
+   /* Call S-Lang function `fun' */
+
+   extern char *SLang_find_name(char *name);
+   /* Return a pointer to name in table if it is defined.  Returns NULL
+   otherwise.  This is useful when one wants to avoid redundant strings. 
+   */
+
+   extern char *SLang_rpn_interpret(char *s);
+   /* Interpret string as reverse polish notation */
+
+   extern void SLang_doerror(char *s);
+   /* set SLang_Error and display `s' as error message */
+   
+   extern long *SLang_add_array(char *, long *, int, int, int, int, char *);
+   /* Undocumented */

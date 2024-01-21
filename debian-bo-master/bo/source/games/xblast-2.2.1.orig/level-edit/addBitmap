@@ -1,0 +1,188 @@
+#!/usr/bin/tclsh
+
+proc renameFile {fileName} {
+    set newFileName "\#$fileName"
+    set bakFileName "$fileName\~"
+ 
+    if {![file exists $newFileName]} {
+	puts "File \"$newFileName\" does not exist"
+	return
+    }
+    if {[file exists $fileName]} {
+	exec mv $fileName $bakFileName
+	exec mv $newFileName $fileName
+    }
+    puts "Old file stored in $bakFileName"
+}
+
+proc checkBitmap {fileName varName} {
+    #
+    # open block data file
+    #
+    set fp [open "block.c" "r"]
+    while {-1 != [gets $fp line]} {
+	if {0 == [string first "\#include \"$fileName\"" $line]} {
+	    puts "file \"$fileName\" already included"
+	    close $fp
+	    return 1
+	}
+	if {-1 != [string first "${varName}_bits" $line]} {
+	    puts "variable \"$varName\" already used"
+	    close $fp
+	    return 1
+	}
+    }
+    close $fp
+    return 0
+}
+
+proc insertBitmap {fileName varName fileAddon varAddon} {
+    #
+    # open in and output file
+    #
+    set fin [open "block.c" "r"]
+    set fout [open "\#block.c" "w"]
+    while {-1 != [gets $fin line]} {
+	if {-1 != [string first "/* add bitmap files here */" $line]} {
+	    puts $fout "\#include \"$fileName\""
+	}
+	if {-1 != [string first "/* add bitmaps here */" $line]} {
+	    puts $fout "  \{ ${varName}_width, ${varName}_height,\
+		    ${varName}_bits \},"
+	}
+	if {-1 != [string first "/* add addon files here */" $line]} {
+	    if {$fileAddon != {}} {
+		puts $fout "\#include \"$fileAddon\""
+	    }
+	}
+	if {-1 != [string first "/* add addons here */" $line]} {
+	    if {$varAddon != {} } {
+		puts $fout "  \{ ${varAddon}_width, ${varAddon}_height,\
+			${varAddon}_bits \},"
+	    } else {
+		puts $fout "  \{0, 0, (unsigned char *)0\}, \
+			/* ${varName}_bits */ "
+	    }
+	}
+	puts $fout $line
+    }
+    close $fin
+    close $fout
+    
+}
+
+proc checkBlock {blockName} {
+    #
+    # open block name file
+    #
+    set fp [open "block.h" "r"]
+    while {-1 != [gets $fp line]} {
+	if {0 == [string first "\#define $blockName" $line]} {
+	    close $fp
+	    return 1
+	}
+    }
+    close $fp
+    return 0
+}
+
+proc insertBlock {blockName} {
+    #
+    # open block name file
+    #
+    set fp [open "block.h" "r"]
+    set fout [open "\#block.h" "w"]
+    while {-1 != [gets $fp line]} {
+	if {0 == [string first "\#define MAX_BLOCK_TILES" $line]} {
+	    set index [lindex $line 2]
+	    puts $fout "\#define $blockName  $index"
+	    incr index
+	    puts $fout "\#define MAX_BLOCK_TILES  $index"
+	} else {
+	    puts $fout $line
+	}
+	
+    }
+    close $fp
+    close $fout
+    return 0
+}
+ 
+proc addBitmap {argc argv0 argv} {
+    #
+    # check args
+    #
+    if { (2 != $argc) && (3 != $argc) } {
+	puts "Usage $argv0 blockName bitmapFile \[addonFile\]"
+	exit 
+    }
+    set blockName [lindex $argv 0]
+    set bitmapFile [lindex $argv 1]
+    if {![file exists $bitmapFile]} {
+	puts "File \"$bitmapFile\" does not exists"
+	exit 
+    }
+    set bitmapName [file tail [file root $bitmapFile]]
+    if {3 == $argc} {
+	set addonFile [lindex $argv 2]
+	if {![file exists $addonFile]} {
+	    puts "File \"$addonFile\" does not exists"
+	    exit 
+	}
+	set addonName [file tail [file root $addonFile]]
+    } else {
+	set addonFile {}
+	set addonName {}
+    }
+    #
+    # check if name is valid
+    #
+    if {0 != [string first BL $blockName]} {
+	puts "block name \"$blockName\" is not valid"
+	puts "block names must begin with BL"
+	exit 
+    }
+    #
+    # check if block already exits
+    #
+    if {[checkBlock $blockName]} {
+	puts "block named \"$blockName\" already exists"
+	exit
+    }
+    #
+    # check if bitmap is already included 
+    #
+    if {[checkBitmap $bitmapFile $bitmapName]} {
+	puts "bitmap \"$bitmapFile\" already used"
+	exit
+    }
+    if {$addonFile != {}} {
+	if {[checkBitmap $addonFile $addonName]} {
+	    puts "addon bitmap \"$addonFile\" already used"
+	    exit
+	}
+    }
+
+    #
+    # insert block name in include file
+    # 
+    insertBlock $blockName
+
+    #
+    # add bitmap file and data
+    #
+    insertBitmap $bitmapFile $bitmapName $addonFile $addonName
+
+    #
+    # if everything has worked copy files
+    #
+    renameFile block.c
+    renameFile block.h
+}
+
+
+#
+# main program
+#
+[file tail $argv0] $argc $argv0 $argv
+exit

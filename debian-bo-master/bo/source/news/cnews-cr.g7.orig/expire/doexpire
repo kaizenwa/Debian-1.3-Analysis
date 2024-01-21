@@ -1,0 +1,113 @@
+#! /bin/sh
+# doexpire - overall administration for expire
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/expire:$NEWSBIN/nov:$NEWSBIN:$NEWSPATH; export PATH
+umask $NEWSUMASK
+
+dor='?'
+opts=
+aux=yes
+histdir=$NEWSCTL
+for dummy
+do
+	case "$1" in
+	-r)	dor=yes ; opts="$opts -r"	;;
+	-f)	dor=no				;;
+	-e)	aux=no				;;
+	--)					;;
+	-a)	opts="$opts $1 $2" ; shift	;;
+	-H)	opts="$opts $1 $2"
+		histdir=$2
+		shift
+		;;
+	-*)	opts="$opts $1"			;;
+	*)	break				;;
+	esac
+	shift
+done
+case $# in
+0)	;;
+*)	echo "$0: unknown arguments \`$*'" >&2 ; exit 2	;;
+esac
+
+if test -f $NEWSCTL/symlinks.used
+then
+	opts="$opts -l"
+fi
+
+lock -o LOCKexpire $$ || {
+	echo "$0: doexpire apparently already running, won't start another" |
+							report 'two doexpires'
+	exit 0
+}
+status=1
+trap 'unlock LOCKexpire ; trap 0 ; exit $status' 0 1 2 15
+
+if test " `spacefor 1 archive`" -le 0
+then
+	(
+		echo "$0:"
+		echo "	Space shortage in archiving area!"
+		echo "	Unable to archive old articles -- holding them in"
+		echo "	current directories using \`expire -h'.  If shortage"
+		echo "	persists, human action is urgently needed."
+	) | report -u "archiving-area space shortage"
+	opts="$opts -h"
+fi
+
+cd $histdir
+case "$dor" in
+'?')	ropt=-r				# tentatively
+	for counter in x x x x		# four tries
+	do
+		rm -f history.o		# it's about to vanish anyway
+		size="`sizeof history history.pag history.dir`"
+		if test " `spacefor $size control`" -gt 0
+		then
+			ropt=
+			break
+		fi
+		sleep 600		# and hope it will improve
+	done
+	if test " $ropt" = " -r"
+	then
+		(
+			echo "$0:"
+			echo "	SEVERE SPACE SHORTAGE in $histdir !"
+			echo "	Unable to rebuild history files due to insufficient"
+			echo "	space for temporaries -- resorting to \`expire -r'."
+			echo "	Growth of the history files will make things worse;"
+			echo "	if shortage persists, human action is urgently needed."
+		) | report -u "$NEWSCTL space shortage"
+		dor=yes
+		opts="$opts -r"
+	else
+		dor=no
+	fi
+	;;
+esac
+case "$dor" in
+yes)	aux=no	;;
+esac
+
+expire $opts $NEWSCTL/explist 2>/tmp/doex$$
+
+# don't run auxiliaries if this is a panic expire
+case "$aux" in
+no)	;;
+*)	upact 2>>/tmp/doex$$
+	expov 2>>/tmp/doex$$
+	;;
+esac
+
+if test -s /tmp/doex$$
+then
+	report -u 'possible expire problems' </tmp/doex$$
+else
+	status=0
+fi
+rm -f /tmp/doex$$
+# don't remove history.o -- it reserves space for the next rebuild's history.n

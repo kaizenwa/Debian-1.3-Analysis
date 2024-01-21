@@ -1,0 +1,76 @@
+#! /usr/local/bin/bash
+# Date: Fri, 11 Feb 1994 13:12:15 -0500
+# From: norm@ora.com (Norman Walsh)
+#
+# Usage: gs-eps epsfile <outputfile> <resolution> <device>
+#
+# Where: epsfile is the encapsulated postscript file
+#        outputfile is the output file (default=<basename epsfile>.device)
+#        <resolution> is the output resolution desired (default=300dpi)
+#        <device> is the GS driver to use (default=pbm)
+
+EPSFILE=$1
+OUTPUTFILE=$2
+RES=$3
+DEVICE=$4
+
+if [ "$RES" = "" ]; then
+  RES=300
+fi
+
+if [ "$DEVICE" = "" ]; then
+  DEVICE=pbm
+fi
+
+if [ "$EPSFILE" = "" ]; then
+  echo "Usage: `basename $0` epsfile <outputfile> <resolution> <gsdriver>" 
+  echo "Note: parameters are positional, to specify a driver you must also"
+  echo "specify the outputfile and resolution."
+  exit 1
+fi
+
+if [ "$OUTPUTFILE" = "" ]; then
+  OUTPUTFILE=`basename $EPSFILE .eps`.$DEVICE
+fi
+
+echo "Converting $EPSFILE to $DEVICE at ${RES}dpi..." 
+
+BBOX=`egrep -i "^%%BoundingBox:[ ]*[0-9]+ [0-9]+ [0-9]+ [0-9]+[ ]*" $EPSFILE`
+
+if [ "$BBOX" = "" ]; then
+  echo "Cannot find bounding box in $EPSFILE"
+  exit 1
+fi
+
+# move $BBOX into $1, $2, etc...
+set $BBOX
+
+LLX=$2
+LLY=$3
+URX=$4
+URY=$5
+
+XSIZE=`expr $URX - $LLX`
+YSIZE=`expr $URY - $LLY`
+
+XSCALE=`expr $XSIZE "*" $RES`
+XSIZE=`expr $XSCALE / 72`
+
+YSCALE=`expr $YSIZE "*" $RES`
+YSIZE=`expr $YSCALE / 72`
+
+echo $LLX neg $LLY neg translate > gs-eps-a.$$
+echo "quit" > gs-eps-b.$$
+
+SHOWPG=`grep -i showpage $EPSFILE`
+if [ "$SHOWPG" = "" ]; then
+  echo "$EPSFILE does not seem to include a PostScript \"showpage\" command."
+  echo "so I'm appending one for you.  If this is incorrect...???"
+  echo "showpage" > gs-eps-b.$$
+  echo "quit" >> gs-eps-b.$$
+fi
+
+gs -sDEVICE=$DEVICE -q -sOutputFile=$OUTPUTFILE -g${XSIZE}x${YSIZE} \
+   -r$RES gs-eps-a.$$ $EPSFILE - < gs-eps-b.$$
+
+rm -f gs-eps-a.$$ gs-eps-b.$$

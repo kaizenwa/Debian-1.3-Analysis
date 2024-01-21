@@ -1,0 +1,114 @@
+############################################################################
+#
+#       File:     capture.icn
+#
+#       Subject:  Procedures to echo output
+#
+#       Author:   David A. Gamey
+#
+#       Date:     March 31, 1994
+#
+############################################################################
+#
+#       Version:  1.0
+#
+############################################################################
+#
+#  Capture is initially called by the user with one argument, the open file
+#  to contain the echoed output. Then it places itself and several shadow
+#  procedures between all calls to write, writes & stop.  The user never
+#  need call capture again.
+#
+#  Subsequently, during calls to write, writes, and stop, the approprate
+#  shadow procedure gains control and calls capture internally.  Capture
+#  then constructs a list of only those elements that direct output to
+#  &output and calls the original builtin function via the saved name. 
+#  The shadow routine then returns calling the the original builtin
+#  function with the full list.  
+#
+#  Notes:
+#  1.   stop must be handled specially in its shadow function
+#  2.   capture is not designed to be turned off
+#  3.   This may be most useful in systems other than Unix
+#       (i.e. that don't have a "tee" command)
+# 
+#  Example:
+#
+#  otherfile := open(...,"w")
+#  capfile :=  capture(open(filename,"w"))
+#  write("Hello there.",var1,var2," - this should be echoed",
+#        otherfile,"This should appear once in the other file only")
+#  close(capfile)
+#  close(otherfile)
+#
+############################################################################
+#
+#  Change History:
+# 
+############################################################################
+
+procedure capture(p,x)
+
+local  deletey                  # switch used in list copy
+local  xi                       # equivalent to x[i]
+
+static y                        # list to hold what needs be echoed
+static f                        # alternate file to echo to
+
+initial {                       # switch places with the regular routines
+   write  :=: write_capture_
+   writes :=: writes_capture_
+   stop   :=: stop_capture_
+   y := list()                  # establish a list
+   }
+
+while get(y)                    # clear list
+
+case type(p) of {
+
+   "procedure" : {
+     
+      deletey := &null                  # default is to keep elements
+
+      every xi := x[1 to *x] do {     
+
+         if xi === &output then
+            deletey := &null            # copying arguments after &output
+         else
+            if type(xi) == "file" then
+               deletey := 1             # ignore arguments after non-&output
+            else
+               if /deletey then         # if copying ...
+                  put(y,xi)             # append data element from x to y
+
+         }
+
+      if *y > 0 then {                  # anything to process
+         push(y,f)                      # target output to second file
+         return p!y                     # write it
+         }
+      }
+  
+   "file" :
+      return f := p             # save file for future use
+     
+   }
+end
+
+# these procedures get capture to echo text destined for &output
+# then call the original routine.
+
+procedure write_capture_(x[])
+capture(write_capture_,x)
+return write_capture_!x
+end
+
+procedure writes_capture_(x[])
+capture(writes_capture_,x)
+return writes_capture_!x
+end
+
+procedure stop_capture_(x[])
+capture(write_capture_,x)               # otherwise we stop too soon
+return stop_capture_!x
+end

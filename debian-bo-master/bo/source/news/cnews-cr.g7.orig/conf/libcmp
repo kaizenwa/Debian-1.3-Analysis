@@ -1,0 +1,37 @@
+#! /bin/sh
+# compare files to those in a library
+# -i means don't get upset about mismatches
+ignore=n
+while test " $1" = " -i"
+do
+	ignore=y
+	shift
+done
+case "$#" in
+0|1)	echo "Usage: $0 [-i] library file ..." >&2 ; exit 2	;;
+esac
+
+lib="$1"
+shift
+if test ! -r "$lib"
+then
+	echo "$0: library \`$lib' does not exist or is unreadable" >&2
+	exit 1
+fi
+
+status=0
+for f
+do
+	base="`echo $f | sed 's/\.o$//'`"
+	tmp=$base.t
+	save=$base.x
+	trap '' 1 2 15
+	mv $f $save
+	ar x $lib $f
+	mv $f $tmp
+	mv $save $f
+	cmp $f $tmp || test " $ignore" = " y" || status=1
+	rm -f $tmp
+	trap 1 2 15
+done
+exit $status

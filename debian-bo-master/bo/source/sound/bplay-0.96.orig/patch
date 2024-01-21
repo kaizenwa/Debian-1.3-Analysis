@@ -1,0 +1,168 @@
+diff -ur bplay-0.95/Makefile bplay-0.96/Makefile
+--- bplay-0.95/Makefile Tue Apr  2 21:58:25 1996
++++ bplay-0.96/Makefile Fri Jan  3 18:44:52 1997
+@@ -3,7 +3,7 @@
+ SRCS = bplay.c sndfunc.o shmbuf.c
+ 
+ CC = gcc
+-CFLAGS = -Wall -O2 -m486 # -DDEBUG # -DUSEBUFFLOCK
++CFLAGS = -Wall -O2 -m486 -DUSEBUFFLOCK -DDEBUG
+ LDFLAGS = 
+ LIBS =
+ 
+diff -ur bplay-0.95/README bplay-0.96/README
+--- bplay-0.95/README   Tue Apr  2 22:10:12 1996
++++ bplay-0.96/README   Sun Feb  9 21:22:43 1997
+@@ -1,4 +1,4 @@
+-This is version 0.95 of my buffered audio play/record program for Linux.
++This is version 0.96 of my buffered audio play/record program for Linux.
+ Note that this is BETA software and may not work for you.
+ Please mail me with any bugs/feature enhancements etc.
+ 
+@@ -26,7 +26,7 @@
+ also runs at the highest possible priority. Using this method it is
+ possible to record at full speed (44.1kHz 16 bit stero, or about
+ 176Kb/s) without overruns on 486DX/33 using 8bit DMA with a slow IDE
+-disk in multiuser mode untill the disk gets very close to full (ie the
++disk in multiuser mode until the disk gets very close to full (ie the
+ head is seeking all over the disk to find free blocks and can't keep
+ up).
+ 
+@@ -70,4 +70,4 @@
+ Provide a Tk front end.
+ 
+ David Monro
+-davidm@gh.cs.usyd.edu.au
++davidm@cs.usyd.edu.au
+diff -ur bplay-0.95/bplay.1 bplay-0.96/bplay.1
+--- bplay-0.95/bplay.1  Tue Apr  2 21:30:10 1996
++++ bplay-0.96/bplay.1  Thu Jan  2 18:26:48 1997
+@@ -54,24 +54,22 @@
+ The \-t, \-T, \-j and \-J options may do strange things when playing VOC
+ files.
+ .PP
+-There are limitations on recording WAV and VOC format files - in
+-particular, WAV files may not be more than 16Mb long. VOC files are only
++There are limitations on recording VOC format files - specifically
++VOC files are only
+ recorded in the newer 1.20 version of the format, which older player
+ programs may choke on. These limitations should be fixed in v1.0.
+ .PP
+ 12 bit samples are not currently supported. This may be fixed if someone
+ tells me the format used for 12 bit samples - my sound card doesn't
+-support 12 bit mode.
++support 12 bit mode. I'm not sure that the sound driver supports them
++either though.
+ .PP
+ This program runs setuid root. This is required because it uses
+ setpriority() to run at the highest possible priority, and also locks
+ down the buffers it uses to avoid them being swapped out.
+-.PP
+-Currently, the buffers are not locked down, as this appears to be a
+-surefire way to bring down the machine.
+ .SH AUTHOR
+ David Monro
+-davem@gh.cs.usyd.edu.au
++davidm@cs.usyd.edu.au
+ .PP
+ The option parsing code was originally taken from
+ .B vplay
+diff -ur bplay-0.95/bplay.lsm bplay-0.96/bplay.lsm
+--- bplay-0.95/bplay.lsm    Tue Apr  2 22:13:14 1996
++++ bplay-0.96/bplay.lsm    Sun Feb  9 21:46:38 1997
+@@ -1,17 +1,19 @@
+ Begin3
+ Title:          bplay
+-Version:        0.95
+-Entered-date:   Tue Apr  2
+-Description:    A buffered audio play/record program
++Version:        0.96
++Entered-date:   Sun Feb 9, 1997
++Description:    A buffered audio play/record program. Handles WAV, VOC
++                and raw sound files. Should allow glith-free recording
++                at 44100kHz/16 bit stereo on most hardware.
+ Keywords:       audio play record
+-Author:         davidm@gh.cs.usyd.edu.au (David Monro)
+-Maintained-by:  davidm@gh.cs.usyd.edu.au (David Monro)
+-Primary-site:   milawa.gh.cs.usyd.edu.au /pub/davidm
+-       18kB    bplay-0.95.tar.gz
+-       542 bplay.lsm
++Author:         davidm@cs.usyd.edu.au (David Monro)
++Maintained-by:  davidm@cs.usyd.edu.au (David Monro)
++Primary-site:   milawa.psrg.cs.usyd.edu.au /pub/davidm
++       18kB    bplay-0.96.tar.gz
++       1kB bplay.lsm
+ Alternate-site: sunsite.unc.edu /pub/linux/apps/sound/players
+-       18kB    bplay-0.95.tar.gz
+-       542 bplay.lsm
++       18kB    bplay-0.96.tar.gz
++       1kB bplay.lsm
+ Platform:       Linux and supported sound card
+ Copying-policy: GPL
+ End
+diff -ur bplay-0.95/fmtheaders.h bplay-0.96/fmtheaders.h
+--- bplay-0.95/fmtheaders.h Tue Apr  2 20:04:29 1996
++++ bplay-0.96/fmtheaders.h Fri Jan  3 15:53:12 1997
+@@ -5,7 +5,7 @@
+ 
+ /* Definitions for .VOC files */
+ 
+-#define VOC_MAGIC  "Creative Voice File\0x1A"
++#define VOC_MAGIC  "Creative Voice File\032"
+ 
+ #define DATALEN(bp)    ((u_long)(bp.BlockLen[0]) | \
+                          ((u_long)(bp.BlockLen[1]) << 8) | \
+diff -ur bplay-0.95/shmbuf.c bplay-0.96/shmbuf.c
+--- bplay-0.95/shmbuf.c Tue Apr  2 20:34:12 1996
++++ bplay-0.96/shmbuf.c Sat Nov 23 17:57:40 1996
+@@ -102,7 +102,7 @@
+    ErrDie("shmctl");
+ 
+ #if USEBUFFLOCK
+-   /* Ok, go su to lock the buffers down */
++   /* Ok, go root to lock the buffers down */
+     if(setreuid(geteuid(), getuid()) == -1)
+     {
+    fprintf(stderr, "%s: setreuid: %s: continuing anyway\n",
+diff -ur bplay-0.95/sndfunc.c bplay-0.96/sndfunc.c
+--- bplay-0.95/sndfunc.c    Tue Apr  2 20:44:09 1996
++++ bplay-0.96/sndfunc.c    Sun Dec 22 18:38:37 1996
+@@ -59,11 +59,11 @@
+    sync_audio();
+ 
+    /* Set the sample speed, size and stereoness */
+-   if (ioctl(audio, SNDCTL_DSP_SPEED, &speed) < 0)
+-       ErrDie(AUDIO);
+    if (ioctl(audio, SNDCTL_DSP_SAMPLESIZE, &bits) < 0)
+        ErrDie(AUDIO);
+    if (ioctl(audio, SNDCTL_DSP_STEREO, &stereo) < 0)
++       ErrDie(AUDIO);
++   if (ioctl(audio, SNDCTL_DSP_SPEED, &speed) < 0)
+        ErrDie(AUDIO);
+     }
+     oldspeed = speed; oldbits = bits; oldstereo = stereo;
+
+--1317126497-1710661401-855486428=:9124--
+
+(END) Command ('i' to return to index):  void init_modules(void)
+ {
++       struct module_symbol *start;
++
+        kernel_module.nsyms = __stop___ksymtab - __start___ksymtab;
++
++       /* Work around a bug in binutils < 2.7.0.4 ish that doesn't match
++          up magic section symbols with the section they belong with.  */
++
++       start = __stop___ksymtab - kernel_module.nsyms;
++       if (start != __start___ksymtab) {
++               printk(KERN_WARNING "Binutils broken -- "
++                      "ksymtab start symbol not aligned\n");
++
++               kernel_module.syms = start;
++               kernel_module.ex_table_start = __stop___ex_table -
++                       (__stop___ex_table - __start___ex_table);
++       }
+
+ #ifdef __alpha__
+        {
+

@@ -1,0 +1,164 @@
+.\"
+.\" Copyright (c) 1993 Michael Haardt (u31b3hs@pool.informatik.rwth-aachen.de), Fri Apr  2 11:32:09 MET DST 1993
+.\"
+.\" This is free documentation; you can redistribute it and/or
+.\" modify it under the terms of the GNU General Public License as
+.\" published by the Free Software Foundation; either version 2 of
+.\" the License, or (at your option) any later version.
+.\"
+.\" The GNU General Public License's references to "object code"
+.\" and "executables" are to be interpreted as the output of any
+.\" document formatting or typesetting system, including
+.\" intermediate and printed output.
+.\"
+.\" This manual is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public
+.\" License along with this manual; if not, write to the Free
+.\" Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139,
+.\" USA.
+.\"
+.\" Tue Jul  6 12:42:46 MDT 1993 (dminer@nyx.cs.du.edu)
+.\" Added "Calling Directly" and supporting paragraphs
+.\"
+.\" Modified Sat Jul 24 15:19:12 1993 by Rik Faith (faith@cs.unc.edu)
+.\"
+.\" Modified 21 Aug 1994 by Michael Chastain (mec@shell.portal.com):
+.\"   Added explanation of arg stacking when 6 or more args.
+.\"
+.\" Modified 10 June 1995 by Andries Brouwer (aeb@cwi.nl)
+.\" Translated into german by Martin Schulze (joey@infodrom.north.de)
+.\"
+.TH INTRO 2 "22. Mai 1996" "Linux 1.2.13" "Systemaufrufe"
+.SH BEZEICHNUNG
+intro \- Einführung in Systemaufrufe
+.SH BESCHREIBUNG
+Dieses Kapitel beschreibt Systemaufrufe unter Linux.
+.SS "Direkter Aufruf"
+In den meisten Fällen ist es nicht nötig, direkt auf die Systemfunktionen
+zuzugreifen, aber ab und an stößt man an einen Punkt, an dem die
+Standard C Bibliothek keinen netten Systemaufrufe für Dich
+implementiert hat.
+.SS "Übersicht"
+.B #include <linux/unistd.h>
+
+Das _syscall Makro erzeugt einen Systemaufruf.
+
+.SS Einrichtung
+Eine wichtige Sache, die man über Systemaufrufe wissen sollte, ist
+sein Prototyp.  Man muß die Anzahl der Argumente, dessen Typen
+und den Rückgabewert kennen.  Es gibt sechs Makros, die den Aufruf in
+das System einfacher gestalten.  Sie haben die folgende Form:
+.sp
+.RS
+.RI _syscall X ( type , name , type1 , arg1 , type2 , arg2 ,...)
+.RS
+.HP
+wobei 
+.IR X ,
+von 0\-5, die Anzahl der Argumente ist, die der
+Systemaufruf benötigt,
+.HP
+.I type
+der Rückgabewert des Systemaufrufs ist,
+.HP
+.I name
+der Name des Systemaufrufs ist,
+.HP
+.I typeN
+der Typ des Nten Arguments ist und
+.HP
+.I argN
+der Name des Nten Arguments ist.
+.RE
+.RE
+.sp
+Diese Makros erzeugen eine Funktion
+.IR name ,
+mit den angegebenen Argumenten.  Von der Stelle, an der das _syscall()
+Makro im Programmtext verwendet wird, kann der Systemaufruf mit
+.I name
+aufgerufen werden.
+
+.SH BEISPIEL
+.nf
+.sp
+#include <stdio.h>
+#include <linux/unistd.h>	/* für _syscallX Macros etc. */
+#include <linux/kernel.h>	/* für das struct sysinfo */
+
+_syscall1(int, sysinfo, struct sysinfo *, info);
+
+/* Beachte: Wenn direkt vom nroff Quellcode kopiert wird, müssen die
+zusätzlichen Backslashes in den printf-Anweisungen entfernt werden. */
+
+int main(void)
+{
+	struct sysinfo s_info;
+	int error;
+
+	error = sysinfo(&s_info);
+	printf("code error = %d\\n", error);
+        printf("Uptime = %ds\\nLoad: 1 min %d / 5 min %d / 15 min %d\\n"
+                "RAM: gesamt %d / frei %d / shared %d\\n"
+                "Speicher in Puffern = %d\\nSwap: gesamt %d / frei %d\\n"
+                "Anzahl der Prozesse = %d\\n",
+		s_info.uptime, s_info.loads[0],
+		s_info.loads[1], s_info.loads[2],
+		s_info.totalram, s_info.freeram,
+		s_info.sharedram, s_info.bufferram,
+		s_info.totalswap, s_info.freeswap,
+		s_info.procs);
+	return(0);
+}
+.fi
+.SH "Beispielausgabe"
+.nf
+code error = 0
+uptime = 502034s
+Load: 1 min 13376 / 5 min 5504 / 15 min 1152
+RAM: gesamt 15343616 / frei 827392 / shared 8237056
+Speicher in Puffern = 5066752
+Swap: gesamt 27881472 / frei 24698880
+Anzahl der Prozesse = 40
+.fi
+.SH ANMERKUNGEN
+Die _syscall() Makros erzeugen KEINEN Prototypen.  Diese müssen noch
+extra erzeugt werden, insbesondere, wenn mit C++ gearbeitet wird.
+.sp
+Systemaufrufe müssen nicht zwingend nur positive oder
+negative Fehlerwerte zurückgeben.  Um sicher zu sein, welche
+Werte im Fehlerfall zurückgeben werden, muß der Quellcode gelesen
+werden.  Normalerweise ist das der negative Wert eines
+Standardfehlercodes, z.B.
+.BR \-EPERM .
+Die _syscall() Makros geben das Ergebnis von
+.I r
+des Systemaufrufs zurück, wenn
+.I r
+nicht negativ ist, oder \-1 und setzen
+.IR errno " auf " r ,
+wenn
+.I r
+negativ ist.
+.\" The _syscall() macros will return the result \fIr\fP of the system call
+.\" when \fIr\fP is nonnegative, but will return \-1 and set the variable
+.\" .I errno to \-\fIr\fP when \fIr\fP is negative.
+.sp
+Einige Systemaufrufe, wie z.B.
+.BR mmap ,
+benötigen mehr als fünf Argumente.  Diese werden besonders
+behandelt.  Sie werden komplett auf den Stack gelegt und ein Zeiger
+auf diesen Block wird übergeben.
+.sp
+Wenn ein Systemaufruf definiert wird, MÜSSEN die Argumente by-value
+oder by-pointer (z.B. für structs) durchgereicht werden.
+.SH DATEIEN
+.I /usr/include/linux/unistd.h
+.SH AUTOREN
+Sehen Sie bitten in den Kopf der jeweiligen Handbuchseite nach
+Autor(en) und Copyright-Vermerk. Bitte beachten Sie, daß diese von
+Seite zu Seite unterschiedlich sein können!

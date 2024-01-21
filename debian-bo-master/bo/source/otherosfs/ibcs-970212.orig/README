@@ -1,0 +1,271 @@
+                       iBCS Emulation for Linux
+
+
+The Intel Binary Compatibility Specification, or iBCS, specifies the
+interfaces between application programs and the surrounding operating
+system environment for i386 based systems. There are however several
+flavours of iBCS in use - SVR4, SVR3 plus several vendor specific
+extensions to SVR3 which are slightly different and incompatible. The
+iBCS emulator for Linux supports all flavours known so far.
+
+
+SUPPORTED CPU ARCHITECTURES
+
+	* Intel 386/486/Pentium and compatibles
+	* Sparc
+
+
+SUPPORTED BINARY FORMATS
+
+	* A.OUT (using standard Linux loader unless using BSD support)
+	* ELF	(using standard Linux loader)
+	* COFF
+	* XOUT
+
+
+SUPPORTED OS EMULATIONS
+
+	* Sparc Solaris
+	* i386 BSD (386BSD, FreeBSD, NetBSD, BSDI/386)
+	  - very alpha, very old.
+	* SVR4 (Interactive, Unixware, USL, Dell etc.)
+	* SVR3 generic
+	* SCO (SVR3 with extensions for symlinks and long filenames)
+	* SCO OpenServer 5
+	* Wyse V/386 (SVR3 with extensions for symlinks)
+	* Xenix V/386 (386 small model binaries only)
+	* Xenix 286
+
+Unrecognised binaries will default to the Linux personality for ELF or
+the SVR3 personality for COFF binaries. COFF binaries which have had
+their .comment section completely removed will default to the SCO
+personality. If there are non-standard extensions which require handling
+a new personality may need creating in the emulator.
+
+
+SUPPORTED SUBSYSTEM EMULATIONS
+
+	* SYSV IPC
+
+	* /dev/socksys socket interface as used by the Lachman STREAMS
+	  based networking implementation.
+
+	* BSD and Wyse V/386 system call socket interface.
+
+	* /dev/spx STREAMS device (limited server support).
+
+	* XTI/TLI transports for TCP, UDP and related protocols - client
+	  only (outgoing connections). Accepting connections untested.
+
+
+LIMITATIONS
+
+Unix variants with non-standard extensions which are not SVr4, SCO or Wyse
+will not be recognised and may fail unexpectedly. A new personality may
+need to be built.
+
+The recognition of COFF binaries is dependent on comment strings
+embedded in the binary at compile time. If these strings are missing or
+not as expected the binary will not be recognised correctly and may
+fail unexpectedly. It is also possible that binaries from other systems
+may be misrecognised although given the strings used this should be
+unlikely.
+
+Some Xenix functions are unimplemented, in particular Xenix semaphores.
+
+SVr4 local connections are made using the same named pipes that linux
+uses.  SVr4 networking should be working if you use the libnsl.so and
+libsocket.so shared libraries that come with the libc_s package.
+
+There is little STREAMS support. Programs that rely on STREAMS features and
+functionality may not work.
+
+Programs, applications or packages which require modules or device drivers
+to be linked in to the kernel will not work. Linux is *not* based on SYSV
+code and does not have SYSV internals. The driver would need rewriting for
+use under Linux.
+
+
+MAILING LIST
+
+The mail list for this project is located at linux-ibcs2@vger.rutgers.edu.
+To subscribe send mail to majordomo@vger.rutgers.edu with the text
+"subscribe linux-ibcs2" in the body. This mailing list is also carried
+on sme news servers as linux.ibcs2.
+
+
+INSTALLATION
+
+1. Extract the archive (you have already done this of course). It doesn't
+   matter where you put this source. You will need the "insmod" program
+   from the modutils archive to load the compiled emulator module
+   (available on all major Linux archive sites).
+
+2. There may be optional patches - check the options in the Makefile and
+   the patches in the Patches directory. If you are using a non-current
+   2.1 kernel you should upgrade it. The 2.1 series is a development kernel
+   and liable to frequent changes. The kernel supported by iBCS is always
+   the current "stable" kernel release however it may work with one or
+   more contemporary development releases and may require a development
+   release in order to support some functionality.
+
+	# patch -d /usr/src/linux -p1 < Patches/<whatever>
+
+3. Link or copy one of the architecture specific configurations
+   (CONFIG.i386, CONFIG.sparc etc.) to CONFIG and edit it to make
+   any changes you wish.
+
+	# cp CONFIG.i386 CONFIG
+	# vi CONFIG
+
+4. Do a 'make' in the ibcs directory. A 'make install' will then
+   install the iBCS module in /usr/lib/modules/iBCS and the x286emul
+   Xenix 286 emulation overlay in /usr/lib/x286emul. The Xenix 286
+   overlay will only compile if you have an ELF development system
+   and have installed the a.out compiler support. If you have a
+   pre-ELF development system comment out the BINTYPE definition
+   at the beginning of x286emul/Makefile. If you are unable to
+   compile x286emul don't worry. It is *only* required if you need
+   to run Xenix 286 programs.
+
+5. The interfaces to some subsystems occur at the device layer and thus
+   you need to create some device files in order to use them. A 'make
+   install' will create them automatically replacing any that you had
+   from a previous version of iBCS (which may be different from what
+   the current iBCS requires). You can recreate devices at any time
+   by doing a 'make devices' in the top level ibcs directory or by
+   running the MAKEDEV.ibcs script in /dev/.
+
+6. Load the iBCS emulator using "modprobe iBCS". If it fails to load
+   the most likely explanations are that you either got the CONFIG
+   wrong or you compiled against a different kernel from the one
+   you are running. If iBCS loads successfully and you are running
+   kerneld you can "rmmod iBCS" again - kerneld will load it as
+   needed.
+
+7. Run the SVr4, SCO or other x86 programs. Pay attention to the COMPAT
+   file, the HINTS file and any patches that may be in PROD.Patches.
+   Just because they are commercial doesn't make them perfect :-(.
+
+
+UTILITIES
+
+The emulator has the ability to trace the events which it processes. The
+program to enable the tracing function is contained in the Tools directory.
+
+To make the trace utility, go to the Tools directory and do a make.
+
+Run 'trace' with no arguments to get a list of capabilities. Full tracing
+is enabled using 'trace all'. This is extremely verbose - you probably
+want to kill syslogd and use 'tail -f' to dump /proc/kmsg directly to
+a file as quickly as possible if you enable this.
+
+If you have no intention of ever using the trace facilities (and will
+never complain that something doesn't work) you can remove the IBCS_TRACE
+option and recompile the emulator without the tracing facilities. This
+makes the emulator about a third smaller but ensures that there is no
+way for you to find out if program failures are directly due to faults
+in the emulator.
+
+
+LIBRARIES
+
+Many programs require shared libraries. You can use the shared libraries
+from an existing non-Linux system under Linux, but it is your responsibility
+to check whether your license allows you to do this whether directly or
+using NFS.
+
+A shared libc is being developed by Eric Youngdale and can be compiled
+both as ELF (for SVR4) and COFF (for SVR3/SCO). Replacements for
+the SVR3/SCO libnsl_s and protlib_s are under development by Mike
+Jagdis. All the available replacement shared libraries should be
+available from the same place you got the iBCS module. The replacement
+shared libraries are not perfect but largely usable.
+
+The SVr4 X11 libraries are not part of this package, but precompiled
+libraries for X11 can be obtained from the binary sites for XFree86.
+
+No shared library replacements for COFF X libraries are currently
+available. There are quite a few variations so many programs simply
+don't use them. It is theoretically possible to recreate the necessary
+jump tables and compile the relevant version of the X libraries.
+(The X code is public anyway of course...)
+
+
+BUG HUNTING
+
+If you find a program which produces warnings about unsupported syscalls
+or ioctls please look at available header files and/or man pages and
+try and identify what should be happening. If we know what the program
+expects to happen we can emulate it.
+
+If you find a program which runs but crashes at some point then try and
+reproduce the problem. Once you can crash it at will you can generate
+a trace of the relevant section. Run the program and bring it to a point
+a little before it crashes then enable tracing in the emulator and dump
+the trace to a file by running (on a different VT or xterm):
+
+	# killall syslogd syslogk klogd
+	# dmesg -c > /dev/null
+	# tail -f /proc/kmsg > /tmp/log &
+	# .../ibcs/Tools/trace all
+
+Then do whatever it is that causes the crash, disable the emulator tracing
+and kill the tail:
+
+	# .../ibcs/Tools/trace off
+	# killall tail
+
+and examine the log.
+
+If the program is trying to access a device that doesn't exist and whose
+intended behaviour is not readily apparent (not all devices are devices,
+take a look at /dev/socksys which implements the socket system calls
+behind ioctls) you may wish to use the devtrace module. Firstly, if
+you aren't using a recent (1.1.45+?) kernel you will need to edit the
+file devtrace.c and define a fixed major number. Build the module
+using 'make devtrace' and load it with insmod. If you left the major
+number as zero look up the allocated number in /proc/devices then
+create whatever device nodes your program is trying to access. The
+devtrace module simply writes kernel syslog messages for all operations
+performed on it and pretends that everything succeeds. This will
+cause your program to die horribly but should leave you with enough
+information to find out what was expected of the real device.
+
+If you can fix the problem do so and post the fix to the IBCS2 mailing
+list, otherwise post the *relevant* details you have - parts of the log
+file, ioctl details, syscall details etc. Remember, it's better to post
+too little initially and then post further details when asked than it
+is to post too much and annoy people who may be able to help!
+
+
+LIMITATIONS
+
+Until and unless the COFF X library is implemented, COFF X windows
+applications probably will not work on this system. However statically
+linked binaries will work. WordPerfect ship a statically linked
+version of their SCO port which is known to work with Linux+iBCS.
+
+For SVr4, you can obtain the X11 shared libraries from the binary
+distribution sites of XFree86.
+
+
+REFERENCES
+
+The Intel Binary Compatibility Specification, version 2 is described in
+the "McGraw Hill book".
+
+	Intel Binary Compatibility Specification
+		McGraw-Hill, Inc.
+		1221 Avenue of the Americas
+		New York, NY 10020
+		ISBN 0-07-031219-2
+
+The McGraw Hill order desk can be reached on 1-800-722-4726 or
+1-614-755-4151.
+
+Vendor specific extensions were determined through a combination of
+header files, man pages, manuals and the behaviour of existing programs.
+To the best of my knowledge no developer of the iBCS emulator has ever
+had access to controlled Unix source - never mind used it as a reference.
+To be honest it probably wouldn't have helped...

@@ -1,0 +1,174 @@
+.\" -*- nroff -*-
+.TH SCSIDEV 25 "February 1996" "Version 1.30"
+.SH NAME
+scsidev \- populate /dev/scsi with device names that are independent of reconfiguration.
+.SH SYNOPSIS
+.B scsidev
+[
+.B \-f
+]
+[
+.B \-l
+]
+[
+.B \-m
+]
+[
+.B \-s
+]
+[
+.B \-v
+]
+.SH DESCRIPTION
+.B scsidev
+is a utility that is used to guarantee that the same device node can be used
+for the same scsi device, no matter what other scsi devices are added or
+removed from the scsi chain.  The need for this tool arose because device
+numbers are assigned dynamicly at boot time, and if a new disk were added
+to the system (or if some disk didn't spin up), then fixed device nodes would
+cause the wrong filesystems to be mounted, checked, etc.  This can also result
+in security holes, as some device nodes may have permissions that allow
+general users access to the raw device, and if the mappings were to change,
+users would be able to access different devices.
+.PP
+.B scsidev
+is designed to be used once each time the system boots.  It will scan all
+of the detected devices on the system, and determine a immutable name
+that will represent the device.  It first checks to see if a node by this name
+already exists - if this is the case, then it checks to see if the major/minor
+numbers are correct.  If a change in the minor number is required, then
+a new device is created with the correct major/minor numbers, and in addition,
+any ownership and permissions for the old device are applied to the new device.
+.PP
+Once this process is complete, then
+.B scsidev
+will scan all of the entries in the /dev/scsi directory, and see if
+any of them are for devices nodes which were added for devices that
+are not active.  These devices are modified to have a minor number of
+255 as a security precaution, since these might have permissions that
+would allow people to access devices that they should not be able to
+access.  When it becomes possible for the kernel to rescan the bus
+after the system is booted, then you will have to rerun scsidev
+so that the device nodes for the newly detected devices are
+properly updated.
+.PP
+The device nodes that
+.B scsidev
+creates look something like "sdh4-334c0i0l0p1".  In this case,
+the various components of the name represent physical attributes
+about the device or the host adapter to which it is connected.
+To begin with, the "h4" indicates that it is connected to
+an Adaptec 1542.  The "-334" is a means of identifying which 1542
+the device is attached to (since linux supports more than one 1542 in
+the system at the same time).  The "c0" represents the channel number
+(since some host adapters can drive multiple scsi busses).  The
+"i0l0" indicates that this device is scsi ID 0, with lun 0.  Finally
+the "p1" indicated partition number 1.
+.SH OPTIONS
+.TP
+.I \-f
+Flush everything from /dev/scsi prior to scanning the devices detected
+at boot time.  All non-default ownership/permissions that may have
+been set will be lost.
+.TP
+.I \-l
+Symbolic link mode.  Instead of creating nodes, symbolic links are created
+which point to the older /dev/sda1 types of device nodes.  The usage
+of this switch is not recommended.
+.TP
+.I \-m mode
+Specifies the mode for new entries that need to be created.
+.TP
+.I \-s
+Tells scsidev to print out the device serial numbers of all detected
+devices on the system.  This string can be useful for forming aliases.
+.TP
+.I \-v
+Verbosity.  Mainly used for debugging purposes.  Use multiple times for
+more verbosity.
+.SH ALIASES
+It was intended that
+.B scsidev
+be useful without any configuration at all.  There are times when it is
+much more convenient to have symbolic names for various devices.
+These symbolic names should track devices as they get moved from
+controller to another, or even if the SCSI id number is changed.
+.P
+The general idea is that there is a configuration file
+.B /etc/scsi.alias
+which lists the aliases that
+.B scsidev
+will attempt to create.  Each line represents a separate alias,
+and consists of a series of tokens.  Here are a couple of example
+entries:
+.nf
+serial_number="DX908FK", devtype=disk, alias=fourgig
+manufacturer=WANGTEK, devtype=tape, alias=qictape
+id=2, devtype=generic, alias=cdwriter
+.fi
+The minimum requirements are that each line have a alias and a devtype
+field.  The alias will be used to build the pathnames, and the devtype
+must be one of disk, tape, cdrom or generic.
+.P
+The additional qualifiers are optional, and you must specify a
+sufficient number of them such that the alias will match only one
+device.  The allowable qualifiers are:
+.TP
+.I manufacturer=
+Specifies the name of the manufacturer.  This is the same string
+that is printed at boot time, and is also available through /proc/scsi.
+.TP
+.I model=
+Specifies the model number of the device.  This is the same string
+that is printed at boot time, and is also available through /proc/scsi.
+.TP
+.I serial_number=
+Specifies the serial number of the device.  Not all devices implement
+this, but for those that do it provides a convenient mechanism to
+uniquely identify a device no matter where it is found on the
+scsi chain.
+.TP
+.I id=
+Specifies the scsi id number for the device.
+.TP
+.I lun=
+Specifies the lun for the device.  Most devices have a lun of 0,
+and it is only special devices such as cd changers that implement
+multiple lun devices.
+.TP
+.I chan=
+Specifies which channel (i.e. which bus) for host adapters that drive
+multiple channels.
+.TP
+.I partition=
+Specifies the partition number for disk drives.  If unspecified,
+the alias will match all partitions on the disk.
+.TP
+.I hostid=
+Specifies the host adapter id number.
+.TP
+.I hostnum=
+Specifies the unique number that each host adpater driver returns.
+Generally this number is always 0 except for cases where the driver
+supports more than one device of a given type on the system.
+.P
+Note that the specifiers which take string arguments can be quoted
+if the string contains whitespace.
+.SH AUTHOR
+.B scsidev
+was written by Eric Youngdale <eric@aib.com>
+.SH BUGS
+The only remaining issue that I know of is that booting will still be
+affected by adding/removing devices.  Since the device number would
+change as devices are added/removed, it means that you would be
+attempting to boot the wrong disk.  This can be worked around with
+lilo, of course, but a better solution is probably required.  We
+probably do not have room to store additional information besides the
+major/minor that we already use.  It would be preferable if we could
+map these numbers to real physical devices in some way.
+.SH AVAILABILITY
+.B scsidev
+is available for anonymous ftp from tsx-11.mit.edu in
+/pub/linux/ALPHA/scsi and many other mirror sites.  Technically it is
+not ALPHA, nor is it BETA.  This was just a convenient directory into
+which I could upload the utility.

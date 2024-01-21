@@ -1,0 +1,553 @@
+<!-- This HTML file has been created by texi2html 1.29
+     from manual.texinfo on 17 July 1996 -->
+
+<TITLE>ILU Reference Manual - Using ILU with Modula-3</TITLE>
+<BODY TEXT=#000000 BGCOLOR=#ffffff>
+<P>Go to the <A HREF="manual_5.html">previous</A>, <A HREF="manual_7.html">next</A> section.<P>
+<H1><A NAME="SEC114" HREF="manual_toc.html#SEC114">Using ILU with Modula-3</A></H1>
+<P>
+This document is for the Modula-3 programmer who wishes to use 
+ILU.  ILU currently supports only DEC SRC Modula-3 version 2.08.
+<P>
+<A NAME="IDX163"></A>
+<H2><A NAME="SEC115" HREF="manual_toc.html#SEC115">Mapping ILU ISL to Modula-3</A></H2>
+<P>
+<A NAME="IDX164"></A>
+<H3><A NAME="SEC116" HREF="manual_toc.html#SEC116">Names</A></H3>
+<P>
+An item named <CODE>Bar</CODE> in ISL interface <CODE>Foo</CODE> becomes an item named <CODE>Bar</CODE> in the Modula-3 interface <CODE>Foo</CODE>.  A hyphen in an ISL name becomes an underscore in the corresponding Modula-3 name.
+<P>
+<A NAME="IDX165"></A>
+<H3><A NAME="SEC117" HREF="manual_toc.html#SEC117">Types</A></H3>
+<P>
+ISL types appear in Modula-3 as follows:
+<P>
+<OL>
+<LI>
+<CODE>SHORT INTEGER</CODE> becomes <CODE>[-32768 .. 32767]</CODE>.
+<LI>
+<CODE>INTEGER</CODE> becomes <CODE>INTEGER</CODE>.
+<LI>
+<CODE>LONG INTEGER</CODE> becomes
+<PRE>
+TYPE LongInt = RECORD
+                 high: [-16_80000000 .. 2147483647];
+                 low : Word.T (*[0 ..  4294967295]*)
+               END;
+</PRE>
+This represents the number <CODE>high*2^32 + low</CODE>.  We always have the invariants <CODE>-2^31 &#60;= high &#60; 2^31</CODE> and <CODE>0 &#60;= low &#60; 2^32</CODE>, even on systems whose natural word size is greater than 32 bits.
+<LI>
+<CODE>BYTE</CODE> becomes <CODE>[0 .. 255]</CODE>.
+<LI>
+<CODE>SHORT CARDINAL</CODE> becomes <CODE>[0 .. 65535]</CODE>.
+<LI>
+<CODE>CARDINAL</CODE> becomes <CODE>Word.T</CODE>.
+<LI>
+<CODE>LONG CARDINAL</CODE> becomes <CODE>RECORD high, low: Word.T END</CODE>.  This representation works analogously to that for <CODE>LONG CARDINAL</CODE>.
+<LI>
+<CODE>SHORT REAL</CODE> becomes <CODE>REAL</CODE>.
+<LI>
+<CODE>REAL</CODE> becomes <CODE>LONGREAL</CODE>.
+<LI>
+<CODE>LONG REAL</CODE> becomes an opaque type.  Values of this type can only be handed around; no other operations are provided, not even equality testing.  <CODE>LONG REAL</CODE> is not really supported yet.
+<LI>
+<CODE>SHORT CHARACTER</CODE> becomes <CODE>['\000' .. '\377']</CODE>.
+<LI>
+<CODE>CHARACTER</CODE> becomes <CODE>[0 .. 65535]</CODE>.
+<LI>
+Variable-length <CODE>ARRAY</CODE>s of <CODE>SHORT CHARACTER</CODE> become <CODE>TEXT</CODE>.
+<LI>
+Other variable-length arrays become <CODE>REF ARRAY OF</CODE>.
+<LI>
+Fixed-length arrays of <CODE>SHORT CHARACTER</CODE> become arrays of <CODE>BITS 8 FOR ['\000' .. '\377']</CODE>.
+<LI>
+Fixed or variable-length <CODE>ARRAY</CODE>s of <CODE>BYTE</CODE> become arrays of <CODE>BITS 8 FOR [0 .. 255]</CODE>.
+<LI>
+No other arrays specify packing in the Modula-3.
+<LI>
+A fixed length array, <CODE>ARRAY OF <VAR>L1</VAR>, ... <VAR>Ln</VAR></CODE>, becomes <CODE>ARRAY [0 .. <VAR>L1</VAR>-1] OF ... ARRAY [0 .. <VAR>Ln</VAR>-1] OF</CODE>.
+<LI>
+An ISL record becomes a M3 record.
+<LI>
+An ISL union becomes a M3 object type and some subtypes.  The ISL
+<PRE>
+TYPE <VAR>Foo</VAR> = <VAR>DiscT</VAR> UNION
+    <VAR>case1</VAR>: <VAR>T1</VAR> = <VAR>val1-1</VAR>, ... <VAR>val1-j</VAR> END,
+    ...
+    <VAR>casen</VAR>: <VAR>Tn</VAR> = <VAR>valn-1</VAR>, ... <VAR>valn-k</VAR> END
+    END OTHERS;
+</PRE>
+maps to the Modula-3
+<PRE>
+TYPE <VAR>Foo</VAR> = BRANDED OBJECT d: <VAR>DiscT</VAR> END;
+TYPE  <VAR>Foo</VAR>_<VAR>case1</VAR> = <VAR>Foo</VAR> BRANDED OBJECT v: <VAR>T1</VAR> END;
+CONST <VAR>Foo</VAR>_<VAR>case1</VAR>__Code : <VAR>DiscT</VAR> = <VAR>val1-1</VAR>;
+...
+TYPE  <VAR>Foo</VAR>_<VAR>casen</VAR> = <VAR>Foo</VAR> BRANDED OBJECT v: <VAR>Tn</VAR> END;
+CONST <VAR>Foo</VAR>_<VAR>casen</VAR>__Code : <VAR>DiscT</VAR> = <VAR>valn-1</VAR>;
+TYPE  <VAR>Foo</VAR>_OTHERS = <VAR>Foo</VAR> BRANDED OBJECT END;
+(* Where every <VAR>Foo</VAR> is of one of the subtypes enumerated here,
+   and the tag field (d) is consistent with the subtype. *)
+</PRE>
+The <CODE><VAR>Foo</VAR>_OTHERS</CODE> subtype appears only for union constructions including the <CODE>OTHERS</CODE> keyword.
+If the ISL union has a <CODE>DEFAULT</CODE> arm
+<PRE>
+    <VAR>cased</VAR>: <VAR>Td</VAR> = DEFAULT
+</PRE>
+it maps to another subtype in Modula-3:
+<PRE>
+TYPE  <VAR>Foo</VAR>_<VAR>cased</VAR> = <VAR>Foo</VAR> BRANDED OBJECT v: <VAR>Td</VAR> END;
+</PRE>
+The <CODE><VAR>Foo</VAR>_<VAR>casen</VAR>__Code</CODE> constants are conveniences for filling in and decoding the <CODE>d</CODE> field.
+Note that code that creates a <VAR>Foo</VAR> is responsible for filling in the <CODE>d</CODE> field.
+<LI>
+An ISL enumeration becomes a M3 enumeration.  Due to the fact that Modula-3 offers no way to specify the codes used to represent enumerated values, the codes specified in ISL, if any, have no effect on the translation.
+<LI>
+When a <VAR>Foo</VAR> becomes a <VAR>Bar</VAR>, an <CODE>OPTIONAL <VAR>Foo</VAR></CODE> becomes a <CODE>REF <VAR>Bar</VAR></CODE>, unless <VAR>Bar</VAR> is a subtype of <CODE>REFANY</CODE>, in which case <CODE>OPTIONAL <VAR>Foo</VAR></CODE> becomes <VAR>Bar</VAR>; <CODE>NIL</CODE> encodes the <CODE>NULL</CODE> case.
+<LI>
+An ISL object type becomes a Modula-3 object type.  The ISL adjectives <CODE>SINGLETON</CODE>, <CODE>DOCUMENTATION</CODE>, <CODE>COLLECTIBLE</CODE>, <CODE>OPTIONAL</CODE>, <CODE>AUTHENTICATION</CODE>, and <CODE>BRAND</CODE> have no effect on the mapping into the Modula-3 type system.
+<P>
+<CODE>OUT</CODE> and <CODE>INOUT</CODE> method parameters in ISL become <CODE>VAR</CODE> parameters in Modula-3; <CODE>IN</CODE> parameters become <CODE>VALUE</CODE> (by default) parameters.  The <CODE>SIBLING</CODE> constraint in ISL has no manifestation in the Modula-3 type system.
+<P>
+The methods are declared to raise the exceptions <CODE>IluBasics.Failed</CODE> and <CODE>Thread.Alerted</CODE> in addition to the exceptions declared in the ISL.  Exception <CODE>IluBasics.Failed</CODE> is used to convey all the errors that can arise from the RPC mechanism, except <CODE>Thread.Alerted</CODE>.  Is the surrogate (and the other surrogates from the same server?) broken after either of these exceptions is raised?
+<P>
+Because ILU has multiple inheritance (i.e., an object type can have more than one direct supertype), the Modula-3 subtype relation is a sub-relation of the ILU subtype relation.    In general, an ILU object type is mapped to a suite of Modula-3 object types, and a cohort of Modula-3 objects (one of each of the suite of Modula-3 types) correspond to one ILU object.  There will be only one Modula-3 object (type) when only single-inheritance is used in constructing the ILU object type: when every ancestor type has at most one direct ancestor.  Except where the programmer knows this is the case, and plans for it to remain so, she must abandon the native Modula-3 <CODE>TYPECASE</CODE>/<CODE>NARROW</CODE>/automatic-widen facilities for explicit calls that invoke the ILU subtype relation.
+<P>
+To generalize the Modula-3 <CODE>TYPECASE</CODE>/<CODE>NARROW</CODE>/automatic-widen facilities, the Modula-3 object type <CODE>Ilu.Object</CODE> includes the following method:
+<PRE>
+PROCEDURE ILU_Qua_Type(ot: ObjectType): Object;
+</PRE>
+If the object has, in ILU, the given object type, the Modula-3 object of the appropriate Modula-3 type is returned; otherwise, NIL is returned.  As an added convenience, the Modula-3 mapping of interface <VAR>Foo</VAR> will contain, for each of its object types <VAR>Bar</VAR>:
+<PRE>
+PROCEDURE ILU_Qua_<VAR>Bar</VAR>(x: Ilu.Object): <VAR>Bar</VAR>;
+</PRE>
+This procedure takes a non-<CODE>NIL</CODE> argument.  If the argument is, in ILU, an instance of <VAR>Bar</VAR> or one of its subtypes, the corresponding language-specific object is returned; otherwise, <CODE>NIL</CODE> is returned.
+</OL>
+<P>
+<A NAME="IDX166"></A>
+<H3><A NAME="SEC118" HREF="manual_toc.html#SEC118">Exceptions</A></H3>
+<P>
+ISL exceptions are exactly like Modula-3 exceptions, and are mapped directly.
+<P>
+<A NAME="IDX167"></A>
+<H3><A NAME="SEC119" HREF="manual_toc.html#SEC119">Example</A></H3>
+<P>
+Here's a sample ISL spec, and the resulting Modula-3 mappings:
+<P>
+<PRE>
+INTERFACE Foo;
+
+TYPE String = ilu.CString;
+TYPE UInt = CARDINAL;
+
+TYPE E1 = ENUMERATION val1, val2, val3 = 40 END;
+TYPE R1 = RECORD field1 : CARDINAL, field2 : E1 END;
+TYPE FAB = ARRAY OF 200 BYTE;
+TYPE VAB = SEQUENCE OF BYTE;
+TYPE FASC = ARRAY OF 10 SHORT CHARACTER;
+TYPE VASC = SEQUENCE OF SHORT CHARACTER;
+TYPE FAC = ARRAY OF 5 CHARACTER;
+TYPE VAC = SEQUENCE OF CHARACTER;
+TYPE A2 = ARRAY OF 41, 3 R1;
+TYPE S1 = SEQUENCE OF E1;
+TYPE U1 = UNION R1, A2 END;
+
+EXCEPTION Except1 : String;
+
+CONSTANT Zero : CARDINAL = 0;
+
+TYPE O1 = OBJECT
+    METHODS
+        M1(r1: R1, INOUT v: VASC, OUT s1: S1): UInt RAISES Except1 END,
+        FUNCTIONAL Hash(v: VASC): FASC,
+        ASYNCHRONOUS Note(x: LONG REAL)
+    END;
+</PRE>
+<P>
+The Modula-3 mapping:
+<P>
+<PRE>
+INTERFACE Foo;
+
+IMPORT Ilu, IluBasics, Thread;
+IMPORT ilu; &#60;*NOWARN*&#62;
+
+TYPE UInt = CARDINAL;
+TYPE E1 = {
+  val1,
+  val2,
+  val3};
+TYPE R1 = RECORD
+   field1 : CARDINAL;
+   field2 : E1;
+END;
+TYPE VASC = TEXT;  (* NIL not allowed *)
+TYPE S1 = REF ARRAY OF E1;  (* NIL not allowed *)
+TYPE FASC = ARRAY [0..9] OF Ilu.PackedShortChar;
+
+
+(* declaration of M3 type "Foo.O1" from ILU class "Foo:O1"  *)
+
+TYPE O1 = Ilu.Object OBJECT
+  METHODS
+    M1 (r1: R1; VAR v: VASC; VAR s1: S1): UInt
+       RAISES {IluBasics.Failed, Thread.Alerted, Except1};
+    Hash (v: VASC): FASC RAISES {IluBasics.Failed, Thread.Alerted};
+    Note (x: Ilu.LongReal) RAISES {IluBasics.Failed, Thread.Alerted};
+  OVERRIDES
+    ILU_Get_Type := ILU_Get_Type_O1
+  END;
+
+PROCEDURE ILU_SBH_To_O1 (sbh: TEXT; mostSpecificTypeID: TEXT := NIL): O1
+  RAISES {IluBasics.Failed, Thread.Alerted};
+
+PROCEDURE ILU_Get_Type_O1 (self : Ilu.Object): Ilu.ObjectType;
+
+PROCEDURE ILU_Qua_O1 (x: Ilu.Object): O1;
+
+TYPE A2 = ARRAY [0..40] OF ARRAY [0..2] OF R1;
+TYPE  U1 = BRANDED OBJECT d: Ilu.ShortInt END;  (* NIL not allowed *)
+TYPE  U1_R1       = U1 BRANDED OBJECT v: R1 END;
+CONST U1_R1__Code : [-32768..32767] = 0;
+TYPE  U1_A2       = U1 BRANDED OBJECT v: A2 END;
+CONST U1_A2__Code : [-32768..32767] = 1;
+TYPE VAC = REF ARRAY OF Ilu.Character;  (* NIL not allowed *)
+TYPE FAC = ARRAY [0..4] OF Ilu.Character;
+TYPE VAB = REF ARRAY OF BITS 8 FOR Ilu.Byte;  (* NIL not allowed *)
+TYPE FAB = ARRAY [0..199] OF Ilu.PackedByte;
+TYPE String = TEXT;  (* NIL not allowed *)
+
+CONST Zero : CARDINAL = 0;
+
+(* Exceptions *)
+
+EXCEPTION Except1 (String);
+
+END Foo.
+</PRE>
+<P>
+<A NAME="IDX168"></A>
+<A NAME="IDX169"></A>
+<H2><A NAME="SEC120" HREF="manual_toc.html#SEC120">Importing an ILU interface in Modula-3</A></H2>
+<P>
+A client can acquire a Modula-3 language-specific object by calling the <CODE>ILU_SBH_To_...</CODE> stub procedure, passing the string binding handle and most specific type ID; these are typically obtained through some name service.  The Simple Binding facility is available in an integrated way, as exhibited later.
+<P>
+The client can then proceed to make calls on the object.
+<P>
+<A NAME="IDX170"></A>
+<A NAME="IDX171"></A>
+<H2><A NAME="SEC121" HREF="manual_toc.html#SEC121">Exporting an ILU interface in Modula-3</A></H2>
+<P>
+A server uses the following interface to expose itself to the ILU/M3 runtime.
+<P>
+<PRE>
+INTERFACE Ilu;
+IMPORT IluKernel, Word;
+FROM IluBasics IMPORT Failed, Failure;
+
+&#60;*PRAGMA lL, Ll, Main*&#62;
+
+
+(* Concurrency and locking:
+
+   As in iluExports.h.  The ILU/Modula-3 runtime adds the folloing
+   mutexes:
+| ssMu		global mutex for server registry;
+| srmu		global mutex for StrongRef implementation;
+| ocMu		global mutex for ObjectCreator registry;
+| Ilu.Server	each one is a mutex;
+
+   and the following ordering constraints:
+|  IluKernel.Server &#60; ssMu &#60; Ilu.Server
+|  IluKernel.Server &#60; srmu
+|  IluKernel.Server &#60; ocMu
+
+   *)
+
+(* RPC protocol failures *)
+
+TYPE
+  ProtocolFailure =
+    Failure BRANDED OBJECT case: ProtocolFailureCase; END;
+
+
+  ProtocolResultCode =
+    {Success, NoSuchTypeAtServer, TypeVersionMismatch,
+     NoSuchMethodOnType, GarbageArguments, Unknown, LostConnection,
+     RequestRejected, RequestTimeout};
+
+  ProtocolFailureCase = [ProtocolResultCode.NoSuchTypeAtServer ..
+                          ProtocolResultCode.RequestTimeout];
+
+
+(* Datatypes defined in ISL. *)
+
+TYPE Byte = [0 .. 255];
+TYPE PackedByte = BITS 8 FOR Byte;
+TYPE ShortInt = [-32768 .. 32767];
+TYPE Integer = INTEGER;
+TYPE
+  LongInt = RECORD
+              high: [-16_80000000 .. 2147483647];
+              low : Word.T (*[0 ..  4294967295]*)
+            END;
+TYPE ShortCard = [0 .. 65535];
+TYPE Cardinal = Word.T;
+TYPE LongCard = RECORD high, low: Word.T (*[0 ..  4294967295]*) END;
+TYPE ShortReal = REAL;
+TYPE Real = LONGREAL;
+TYPE LongReal &#60;: REFANY;
+TYPE ShortChar = ['\000' .. '\377'];
+TYPE PackedShortChar = BITS 8 FOR ShortChar;
+TYPE Character = ShortCard; (* In Unicode. *)
+TYPE String = TEXT; (* With no embedded '\000'. *)
+TYPE WString = REF ARRAY OF Character; (* With no embedded 0. *)
+TYPE Bytes = REF ARRAY OF PackedByte;
+
+
+(* The String Binding Handle. *)
+
+TYPE
+  SBH = TEXT;
+  (* A string that includes an instance ID and a contact-info *)
+
+TYPE
+  InstanceId = TEXT;
+  (* A unique identifier for an object; it is factored into a ServerId
+     and an ObjectHandle. *)
+
+TYPE
+  ServerId = TEXT;
+  (* A unique identifier for a server *)
+
+TYPE
+  ObjectHandle = TEXT;
+  (* A server-relative identifier for an object *)
+
+TYPE
+  ContactInfo = TEXT;
+  (* An encoding of how to reach a server *)
+
+
+(* ================ Server stuff ================ *)
+
+TYPE
+  ServerPrivate &#60;: ROOT;
+  Server = ServerPrivate OBJECT
+             &#60;*lL, Ll, Main unconstrained*&#62;
+             id: ServerId; (*READONLY*)
+           METHODS
+           END;
+  (* A data structure that represents a server, either local to this
+     program or remote.  Each server is actually one of the following
+     two types. *)
+
+TYPE SurrogateServer &#60;: Server;
+
+TYPE
+  TrueServer &#60;:
+    Server OBJECT
+    METHODS
+      &#60;*Main Invariant holds; Ll otherwise unconstrained*&#62;
+
+      HandleListenerFailure (f: Failure): FailureAction;
+      (* When there's a failure in a listener for this server, this
+         procedure is notified, and the result indicates whether the
+         listener is abandoned or continues listening. *)
+      HandleWorkerFailure (f: Failure): FailureAction;
+      (* When there's a failure in a worker for this server, this
+         procedure is notified, and the result indicates whether the
+         connection is abandoned or continues listening. *)
+    END;
+  (* A server local to this program. *)
+
+TYPE FailureAction = {Quit, Continue};
+
+&#60;*lL, Ll = {}*&#62;
+PROCEDURE DefaultHandleListenerFailure (self: TrueServer; f: Failure):
+  FailureAction;
+
+&#60;*lL, Ll = {}*&#62;
+PROCEDURE DefaultHandleWorkerFailure (self: TrueServer; f: Failure):
+  FailureAction;
+
+&#60;*Main Invariant holds; Ll otherwise unconstrained*&#62;
+
+PROCEDURE InitTrueServer (self  : TrueServer;
+                          id    : ServerId := NIL;
+                          objtab: ObjectTable := NIL ): TrueServer
+  RAISES {Failed};
+
+TYPE
+  ObjectTable =
+    OBJECT
+    METHODS
+      &#60;*lL &#62;= {the kernel server}*&#62;
+      &#60;*lL &#62;= {gcmu} if the object is collectible*&#62;
+      &#60;*Ll, Main unconstrained*&#62;
+
+      ObjectToHandle (o: Object): ObjectHandle;
+      (* Returns the handle associated with the given object, inventing
+         and recording a new handle if necessary. *)
+      HandleToObject (h: ObjectHandle): Object;
+      (* Returns the Object associated with the given handle, or NIL if
+         no such Object. *)
+    END;
+  (* An one-to-one association between Objects and ObjectHandles, such
+     as a server might maintain. *)
+
+PROCEDURE Export_Server (server: TrueServer;
+                         p     : ProtocolInfo;
+                         t     : TransportInfo ) RAISES {Failed};
+
+TYPE ProtocolInfo = BRANDED OBJECT END;
+TYPE SunRpc2 = ProtocolInfo BRANDED OBJECT prognum, version := 0 END;
+TYPE Courier = ProtocolInfo BRANDED OBJECT prognum, version := 0 END;
+
+TYPE TransportInfo = BRANDED OBJECT END;
+TYPE
+  TCP = TransportInfo BRANDED OBJECT host, port := 0 END;
+  UDP = TransportInfo BRANDED OBJECT host, port := 0 END;
+  (* host and port are in host, not network, byte order. *)
+TYPE SPP = TransportInfo BRANDED OBJECT addr := AnyXnsAddr END;
+
+TYPE
+  XnsAddr = RECORD
+              net   : XnsNet;
+              host  : XnsHost;
+              socket: XnsSocket
+            END;
+  XnsNet = Cardinal;
+  XnsHost = ARRAY [0 .. 5] OF PackedByte;
+  XnsSocket = ShortCard;
+CONST AnyXnsAddr = XnsAddr{0, XnsHost{0, ..}, 0};
+
+TYPE Root &#60;: ROOT;
+
+TYPE
+  Object &#60;: ObjectPublic;
+  ObjectPublic =
+    Root OBJECT
+      &#60;*lL, Ll, Main unconstrained*&#62;
+      ilu_is_surrogate: BOOLEAN := FALSE;
+    METHODS
+      &#60;*lL, Ll, Main unconstrained*&#62;
+
+      ILU_Get_Server (): Server;
+      ILU_Get_Type (): ObjectType;
+      (* Returns the most specific ILU type known to this program for
+         the ILU object represented by this Modula-3 object. *)
+      ILU_Qua_Type (ot: ObjectType): Object;
+
+      &#60;*Main Invariant holds; Ll otherwise unconstrained*&#62;
+
+      ILU_Close           () RAISES {};
+      ILU_Close_Surrogate () RAISES {};
+    END;
+
+TYPE ObjectType = IluKernel.ObjectType;
+
+PROCEDURE SbhFromObject (o: Object): SBH RAISES {Failed};
+  (* May be applied to any Object; returns a reference that can be
+     passed to other programs.  Export_Server must have been called on
+     the object's server. *)
+
+&#60;*lL, Ll, Main unconstrained*&#62;
+PROCEDURE IdOfObjectType (ot: ObjectType): TEXT;
+  (* Returns a shortish string that identifies this object type. *)
+
+
+END Ilu.
+</PRE>
+<P>
+A server module begins by creating an <CODE>Ilu.TrueServer</CODE> and calling <CODE>Ilu.InitTrueServer</CODE> on it.  The server module may either specify the server's ID in this call, or let the ILU runtime choose one.  The server module may specify how to handle errors arising in the server stubs, or let the ILU runtime handle them in the default way: print an error message to stdout and quit the listener or connection worker.  The server module may assert control over the association between <VAR>object-handle</VAR>s and objects in the server by supplying an <CODE>ObjectTable</CODE>, or let the ILU runtime manage the association in its default way.
+<P>
+The server module continues by calling <CODE>Ilu.Export_Server</CODE>, specifying the protocol and transport combinations through which the server should be contactable.  Due to internal restrictions in the current runtime, this procedure should be called exactly once.
+<P>
+Each true object should be a subtype of <CODE>Ilu.Object</CODE>; the implementor of the true object is responsible for ensuring that the <CODE>ilu_is_surrogate</CODE> is filled in with <CODE>FALSE</CODE> and that the <CODE>Ilu_Get_Server</CODE>, <CODE>Ilu_Get_Type</CODE>, and <CODE>ILU_Qua_Type</CODE> methods have reasonable behavior.  The <CODE>ilu_is_surrogate</CODE> field defaults to <CODE>FALSE</CODE>, and the object type declared in a Modula-3 interface generated by the <CODE>m3-stubber</CODE> from an ISL interface takes care of implementing <CODE>Ilu_Get_Type</CODE>, so a programmer using the stubs needs to worry only about <CODE>Ilu_Get_Server</CODE> and <CODE>ILU_Qua_Type</CODE>.
+<P>
+Once a true object has been created, and <CODE>Ilu.Export_Server</CODE> has been called, the server can export individual objects.  This can be done through a name service or by passing the object to another module among the arguments, results, or exception parameter contents of a call on a different language-specific object.  The Simple Binding facility described later is integrated with ILU.  To use a non-integrated name service, the object's string binding handle and most specific type ID are needed; they can be determined by calling <CODE>Ilu.SbhFromObject(<VAR>obj</VAR>)</CODE> and <CODE>Ilu.IdOfObjectType(<VAR>obj</VAR>.ILU_Get_Type())</CODE>.
+<P>
+<A NAME="IDX172"></A>
+<A NAME="IDX173"></A>
+<A NAME="IDX174"></A>
+<A NAME="IDX175"></A>
+<H2><A NAME="SEC122" HREF="manual_toc.html#SEC122">ILU API for Modula-3</A></H2>
+<P>
+The full API is presented in the previous section.
+<P>
+ILU currently supports DEC SRC Modula-3 version 2.08 -- which lacks finalization.  When an application program -- any combination of client and server modules -- knows it is done with a particular object, it can explicitly free the resources associated with that object.  This is done by invoking the <CODE>ILU_Close</CODE> method on that object.
+<P>
+It is always safe -- but may be expensive -- to invoke <CODE>ILU_Close</CODE> on a surrogate object or on a true object that will be found by the <CODE>HandleToObject</CODE> method of its server's <CODE>ObjectTable</CODE>.  The <CODE>HandleToObject</CODE> method of the default <CODE>ObjectTable</CODE> implementation will not find a true object after <CODE>ILU_Close</CODE> has been called on that object.
+<P>
+<H3><A NAME="SEC123" HREF="manual_toc.html#SEC123">Simple Binding</A></H3>
+<P>
+The Simple Binding functionality is available through the following interface.
+<P>
+<PRE>
+INTERFACE IluSimpleBind;
+FROM IluBasics IMPORT Failed;
+IMPORT Ilu;
+
+&#60;*PRAGMA lL, Ll, Main*&#62;
+
+&#60;*Main invariant holds*&#62;
+
+TYPE Cookie &#60;: REFANY;
+
+PROCEDURE Publish (obj: Ilu.Object): Cookie RAISES {Failed};
+
+PROCEDURE Withdraw (obj: Ilu.Object; c: Cookie) RAISES {Failed};
+
+PROCEDURE Lookup (iid: Ilu.InstanceId; ot: Ilu.ObjectType): Ilu.Object
+  RAISES {Failed};
+
+END IluSimpleBind.
+</PRE>
+<P>
+The instance ID used in the <CODE>Lookup</CODE> call is what's called an <VAR>object ID</VAR> in chapter 1.  It is the concatenation of: (1) the object handle, as determined by the server's <CODE>Ilu.ObjectTable</CODE>; (2) an at-sign (@); and (3) the server ID, determined in the call on <CODE>Ilu.InitTrueServer</CODE>.
+<P>
+<A NAME="IDX176"></A>
+<A NAME="IDX177"></A>
+<H2><A NAME="SEC124" HREF="manual_toc.html#SEC124">Generating ILU stubs for Modula-3</A></H2>
+<P>
+To generate Modula-3 stubs from an ISL file, you use the
+program m3-stubber.
+<A NAME="IDX178"></A>
+Five files are generated from the
+<TT>`.isl'</TT> file:
+<UL>
+<LI>
+<TT>`<VAR>interface-name</VAR>.i3'</TT> contains the Modula-3 renderings of the types, exceptions, and constants declared in the interface, plus some items needed to import or export objects of types declared in the interface;
+<LI>
+<TT>`<VAR>interface-name</VAR>_x.i3'</TT> is a private interface between the following three implementation modules;
+<LI>
+<TT>`<VAR>interface-name</VAR>_y.m3'</TT> contains code useful to both server and client stubs;
+<LI>
+<TT>`<VAR>interface-name</VAR>_c.m3'</TT> contains the client stubs; and
+<LI>
+<TT>`<VAR>interface-name</VAR>_s.m3'</TT> contains the server
+stubs for the interface.
+</UL>
+Typically, client and server programmers directly reference only the first of these five files.
+<P>
+<PRE>
+% <STRONG>m3-stubber foo.isl</STRONG>
+translating interface foo to ./foo.i3...
+private interface for foo to ./foo_x.i3...
+common code for interface foo to ./foo_y.m3...
+client stubs for interface foo to ./foo_c.m3...
+server stubs of interface foo to ./foo_s.m3...
+%
+</PRE>
+<P>
+<A NAME="IDX179"></A>
+<A NAME="IDX180"></A>
+<H2><A NAME="SEC125" HREF="manual_toc.html#SEC125">Libraries and Linking</A></H2>
+<P>
+Clients of an ILU interface need to link with all but the server stubs; servers need to link with all five modules.  It's convenient to make a library containing all five modules and let the linker worry about the details of which are needed; the <CODE>imake</CODE> macro <CODE>IluM3Files</CODE> (see later) conveniently generates the names of all five modules.
+<P>
+Both clients and servers also need to link with the libraries <TT>`<VAR>ILUHOME</VAR>/lib/libilu-m3.a'</TT> and <TT>`<VAR>ILUHOME</VAR>/lib/libilu.a'</TT> (in this
+order, as the former uses functions in the latter).  Because the former library contains only Modula-3 code, and the latter only C code, invocations of the <CODE>m3</CODE> command need to mention the latter library only when a complete program is being built.
+<P>
+<P>Go to the <A HREF="manual_5.html">previous</A>, <A HREF="manual_7.html">next</A> section.<P>

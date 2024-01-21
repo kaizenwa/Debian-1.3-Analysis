@@ -1,0 +1,460 @@
+<html>
+<head>
+<title>Présentation de Sed et Awk</title>
+</head>
+
+<body>
+
+<H1>Présentation de Sed et Awk</H1>
+
+<P>
+Article pour l'Echo de Linux (<em><b>Novembre 1996</b></em>) 
+<address><a href="mailto:dumas@linux.eu.org">Eric Dumas
+(dumas@linux.eu.org)</a></address> 
+
+<h1>Sommaire</h1>
+<ul> 
+	<li><a href="10">Introduction</a>
+	<li><a href="20">Introduction aux expressions régulières</a>
+	<li><a href="30">Sed : utilisation et syntaxe</a>
+	<ul>
+		<li> <a href="31">Introduction</a>
+		<li> <a href="32">Substitution</a>
+		<li> <a href="33">Destruction</a>
+		<li> <a href="34">Ajout, insertion et modification</a>
+		<li> <a href="35">Divers</a>
+	</ul>
+	<li><a href="40">Awk</a>
+	<ul>
+		<li><a href="41">Introduction</a>
+		<li><a href="42">Awk et C</a>
+		<li><a href="43">Structure d'un programme Awk</a>
+		<li><a href="44">Variables systèmes</a>
+		<li><a href="45">Passage de paramètres</a>
+		<li><a href="46">Le langage</a>
+		<li><a href="47">Écrire ses fonctions</a>
+	</ul>
+	<li><a href="50">Conclusion - Bibliographie</a>
+</ul>	
+
+
+<h1><a name="10"> Introduction</h1>
+
+<p>Sed et Awk sont deux outils que l'on rencontre sur la 
+plupart des plateformes Unix. Si cet article présente ces deux outils
+en même temps, c'est parce qu'ils sont assez souvent utilisés ensemble. 
+En plus, ils utilisent la même syntaxe au niveau des expressions 
+régulières.</p>
+
+<p>Le nom Sed provient du terme anglais <em><b>S</b>tream</em>
+<em><b>ED</b>itor</em>.  Cet outil est généralement utilisé pour 
+effectuer des modifications dans un fichier de données (comme remplacer 
+un mot ou une expression par une autre, ...).</p>
+
+<p>Awk provient de la contraction du nom de ses auteurs : 
+<b>A</b>ho, <b>W</b>einberger et <b>K</b>ernighan. Awk est 
+considéré comme un langage de programmation, langage qui n'est pas 
+compilé mais interprété par le programme <em>awk</em>. </p>
+
+<p>Cet article va décrire les versions GNU de ces deux outils, 
+c'est à dire les versions utilisées sous Linux. Toutefois, peu de choses
+divergent par rapport aux versions originales. Il est quand même conseillé 
+d'utiliser ces deux versions (sed et gawk) car leurs performances sont
+bien meilleures.</p>
+
+
+<h1><a name="20"> Introduction aux expressions régulières</h1>
+
+<p>Cette première partie a pour but d'introduire les expressions régulières.
+Si vous maîtrisez parfaitement cette syntaxe (qui est également utilisée avec 
+lex, grep, etc.), vous pouvez passer au chapitre suivant.</p>
+
+<p>Une expression régulière est composée bien souvent d'une valeur 
+(variable ou littéral) et d'un opérateur. Dans le cas de sed et awk, tout 
+caractère excepté les caractères spéciaux que nous verrons plus tard sont
+interprétés comme des caractères normaux. Ce qui fait le charme d'une 
+expression régulière (ou sa complexité), ce sont ses caractères 
+spéciaux (également appellés <em>méta-caractères</em>).</p>
+
+En voici la description :
+<ul>
+<li>. : correspond à un caractère, quelqu'il soit, sauf le retour chariot ;
+<li>* : n'importe quel nombre d'occurences du caractère précédent 
+l'astérisque ;
+<li>[...] : correspond à un caractère de l'ensemble des caractères 
+spécifiés entre crochets. Si un caractère ^ est présent en première 
+position à l'intérieur des crochets, alors il y a concordance avec 
+n'importe quel caractère sauf le retour chariot et les caractères 
+entre crochets. Un tiret peut être utilisé pour définir un intervalle 
+de caractères. 
+<li> ^ : en première position d'une expression : début de ligne ;
+<li> $ : en dernière position d'une expression : fin de ligne ;
+<li> \{n,m\} : un certain nombre de répétition du caractère qui précéde 
+immédiatement.
+	<ul>
+	<li>\{n\} : exactement n occurences
+        <li>\{n,\} : au moins n occurences ;
+        <li>\{n,m\} : entre n et m occurences ;
+        </ul>
+<li> \ : protection du caractère qui suit, pour spécifier un 
+méta-caractère comme caractère;
+<li> + : une occurence ou plus de l'expression régulière ;
+<li> ? : zéro ou une occurence de l'expression régulière ;
+<li> | : correspond soit à l'expression qui précède, soit à celle qui suit.
+<li> () : permet de regrouper des expressions régulières ;
+</ul>
+
+<p>Lors d'une première lecture, cela peut éventuellement paraître un peu
+trouble... voici donc quelques petits exemples :</p>
+
+<pre>
+a* : rien, a, aa, aaa, aaaa, ...(nombre infini de a)
+a(ab)+ : aab, aabab, aababab, ...
+[a-d] : a,b,c,d
+[a-c]-[1-3] : a,b,c,1,2,3
+^a(1de)+ : une ligne qui commence par a1de ou a1de1de, ...
+abde$ : une ligne qui se termine par abde
+toto\.txt : toto.txt  
+ab.d : abad, abbd, abcd, abdd, ... 
+[1-31]/[1-12]/[0-2000] : une date (1ère méthode)... 11/10/1972
+([1-9] | ( [1-2] [0-9] | [ 30 31] ) ) / ( [1-9] | [ 10-12 ] ) / [0-2000] : 2nde méthode ... toujours 11/10/1972
+[lL]iberté : liberté, Liberté
+[pP]age [12-99] : page 12, Page 12, ..., page 99, Page 99
+</pre>
+
+<p>Bien, voila en gros ce que l'on peut dire sur les expression régulières. 
+Passons maintenant à Sed !</p>
+
+
+<h1><a name="30"> Sed : utilisation et syntaxe</h1>
+
+
+<h2><a name="31"> Introduction</h2>
+
+<p>Sed possède comme avantage de pouvoir être utilisé en ligne de commande
+(ou via un fichier dans lequel on y a mis les commandes). Le principe d'une
+commande sed, est qu'elle contient une expression régulière désignant 
+les données devant être modifiées, une commande et éventuellement un 
+texte de remplacement et des options.</p>
+
+<p>Le point important est le terme <b>commande</b>. Sed définit un certain
+nombre de commandes qui permettent ainsi de manipuler facilement un tampon 
+de données. Il faut préciser qu'à la différence d'un éditeur de texte comme 
+emacs, lorsqu'une commande est appliquée, c'est sur tout le fichier : 
+il n'est pas possible de choisir de traiter telle ou telle partie du 
+fichier.</p>
+
+
+<h2><a name="32"> Substitution</h2>
+
+<p>La commande de substitution <b>s</b> permet de substituer à une
+expression régulière, un texte donné. Sa syntaxe est :</p>
+
+<p>sed [<em>adresse</em>]<b>s</b>/<em>expression</em>/<em>remplacement</em>/<em>options</em></p>
+
+<p>Par exemple :</p>
+<pre>
+sed s/soleil/lune fichier.in > fichier.out
+</pre>
+
+<p>Cette ligne de commande remplace tous les mots <em>soleil</em> par le
+mot <em>lune</em> du fichier fichier.in. Le résultat est alors renvoyé 
+dans le fichier fichier.out.</p>
+
+<p>On peut affiner le travail en choisissant de n'effectuer l'opération que 
+dans les lignes où se trouvent le mot rendez-vous :</p>
+
+<pre>
+sed /rendez\-vous/s/soleil/lune/g fichier.in > fichier.out
+</pre>
+
+
+<p>Nous avons ici utilisé une option particulière. En voici la liste :</p>
+
+<ul>
+<li>0...9 : indique que la substitution ne doit être effectuée que 
+pour la nième occurence du motif
+<li> g : effectue les modifications globalement sur toutes les occurences.
+            En principe, seule la 1ère occurence est traitée.
+<li> p : Affiche le contenu du tampon de travail (utilisé pour débogage) ;
+<li> w <em>fic</em> : écrit le résultat de la substitution dans le fichier 
+<em>fic</em>.
+</ul>
+
+<p> Cette commande est très utile. Par exemple, supposons que je 
+déplace le répertoire racine d'utilisateurs, de /krakatoa vers /fujiyama 
+(oui... certains se reconnaîtrons). Dans ce cas, il suffit de faire 
+au niveau du fichier /etc/passwd :</p>
+
+<pre>
+sed s!/krakatoa!/fujiyama!g /etc/passwd > /tmp/passwd.new
+</pre>
+
+<p> Ici, comme le caractère / est utilisé dans les expressions, j'ai 
+utilisé comme délimiteur le caractère !. C'est une bonne alternative. 
+Attention car avec certains interpréteurs de commandes (comme bash), 
+le caractère ! est vu comme un historique. Dans ce cas là, il suffit 
+d'en utiliser un autre :</p>
+
+<pre>
+sed s#/krakatoa#/fujiyama#g /etc/passwd > /tmp/passwd.new
+</pre>
+
+Tout autre caractère que retour chariot et backslash peut être utilisé
+à la place du délimiteur.
+
+
+<h2><a name="33"> Destruction</h2>
+
+	Là, c'est plus simple :
+
+<p>sed /<em>expressions</em>/<b>d</b></p>
+
+	Par exemple, pour détruire toutes les lignes vide d'un fichier :
+<pre>sed /^$/d</pre>
+
+
+<h2><a name="34">  Ajout, insertion et modification</h2>
+
+	Bienvenue dans une spécificité de sed ! Pour utiliser 
+ces commandes, il est nécessaire de les saisir sur plusieurs lignes,
+ce qui n'est pas vraiment très pratique.
+
+	<p>sed [<em>adresse</em>]<em>commande</em>\</p>
+        <p><em>expression</em></p>
+
+La commande peut être :
+<ul>
+	<li>a pour ajout ;
+	<li>i pour insertion ;
+	<li>c pour modification.
+</ul>
+
+Par exemple, rajouter une ligne EOF à la fin d'un fichier,
+il suffit d'utiliser le fichier suivant :
+<pre>
+#
+$a\
+EOF
+</pre>
+Pour l'exécuter, lancer <tt>cat /etc/passwd | sed -f /tmp/demo.sed</tt>.
+
+	Un autre exemple ?
+<pre>
+/postmaster/c\
+Ha que coucou
+</pre>
+	<p>Ce code va changer une ligne dans le fichier /etc/passwd.
+Avec la commande <sq>c</sq>, la ligne du postmaster est remplacée par le
+texte spécifié. Si l'on avait utilisé l'option <sq>i</sq>, alors une
+nouvelle ligne aurait été crée juste avant.</p>
+
+
+<h2><a name="35"> Divers</h2>
+
+<p>Quelques commandes de sed peuvent être assez pratiques, bien que moins
+utilisées. Par exemple la commande de numérotation de lignes (=).
+Supposons que dans un code C, on souhaite voir à quelle ligne est 
+utilisé la fonction <em>strcpy</em> (à mettre dans un fichier également) :</p>
+<pre>
+#n
+/strcpy/{
+=
+p
+}
+</pre>
+
+	
+<p>Il existe quelques commande supplémentaires dédiées à sed pour les 
+utilisateurs averties... Consultez la bibliographie en fin de cet 
+article pour plus de précisions.</p>
+
+
+<h1><a name="40"> Awk</h1>
+
+
+<h2><a name="41"> Introduction</h2>
+
+<p>La première fois que j'ai utilisé awk, c'était pour de 
+l'administration système, et plus précisément pour killer des 
+processus (très nombreux). Dans l'exemple qui va suivre en guise 
+d'introduction, le but est de killer tous les processus xload fonctionnant
+sur une machine. La différence principale avec la première utilisation
+que j'en avais fait, c'est que c'était sous Solaris avec un démon
+tftpd qui se multipliait comme des petits pains...
+
+<pre>
+for i in `ps -axu | grep xload | awk '{print $2 }'`
+do
+	kill -9 $i
+done
+</pre>
+
+<p>Bien... que fait donc ce petit exemple ? Il récupère tous les 
+processus xload et ne conserve que la colonne contenant son pid. 
+Ensuite, chacun d'entre eux est tué (oui, je sais, c'est très violent... 
+mais bon, faut ce qu'il faut parfois !).
+
+
+<h2><a name="42"> Awk et C</h2>
+
+<p>Awk est un langage très pratique car particulièrement simple 
+comparé au langage C ou à Perl. Toutefois, il existe certaines 
+similitudes par rapport au langage C. Les opérateurs arithmétiques et 
+d'affectations sont les même (Awk possède en plus l'opérateur 
+exponentiel ^) :</p>
+
+<pre>
+# Compte les lignes vides d'un fichier
+/^$/ {
+	x += 1
+}
+END {
+	print x 
+}
+</pre>
+
+<p>Du côté des opérateurs booléens, ce sont les même qu'en C, sauf 
+que les opérations bit à bit n'existent pas. L'opérateur ~ est 
+utilisé pour concorde et !~ pour ne concorde pas.
+
+<p>Il est à noter qu'à la différence du langage C, une 
+instruction ne se termine pas par le sacro-saint point-virgule. 
+Quelques fonctions tout droit rescapées du langage C sont 
+également utilisables. Citons par exemple la fonction 
+<em>printf</em> qui s'utilise exactement de la même manière, 
+les fonctions mathématiques, trigonométriques, génération de nombres
+aléatoires (rand() et srand()). A noter également la présence de la 
+fonction system() qui peut être fort utile dans certains cas.
+
+
+<h2><a name="43"> Structure d'un programme Awk</h2>
+
+<p>Un programme Awk est globalement composé de trois parties :
+<ul>
+<li>BEGIN : code exécuté dès le lancement du programme, avant le traitement du fichier. 
+	Cette partie permet d'initialiser des variables par exemples... 
+<li> END : code exécuté avant la terminaison du programme. Permet d'afficher des 
+	statistiques ou des résultats sur le fichier traité.
+<li> corps : le corps du programme.
+</ul></p>
+
+<p>Un exemple :</p>
+<pre>
+# Exemple de programme inutile qui compte le 
+# nombre d'occurences du mot toto dans un fichier
+BEGIN {
+	toto =0
+}
+
+/toto/ {
+	toto++
+}
+END {
+	print toto
+}
+</pre>
+
+
+<h2><a name="44"> Variables systèmes</h2>
+
+<p>	Un certain nombre de variables systèmes sont utilisables avec AWK :</p>
+<ul>
+<li>FS	: séparateur de champs lors de la lecture de données
+<li>OFS	: séparateur de champs pour l'affichage	
+<li>NF	: nombre de champs dans l'enregistrement courant
+<li>RS	: séparateur d'enregistrement en lecture (retour chariot généralement) ;
+<li>ORS	: idem mais pour l'affichage ;
+<li>NR	: numéro de l'enregistrement courant ;
+<li>FILENAME : nom du fichier de données ;
+<li>FNR	: numéro de l'enregristrement courant par rapport au fichier utilisé (sert 
+lorsque l'on traite plusieurs fichiers en même temps).
+</ul>
+
+
+<h2><a name="45"> Passage de paramètres</h2>
+
+<p>Le système de passage de paramètres ressemble à celui qu'utilise le langage 
+Java pour une applet. Le principe est de donner le nom de la variable 
+suivit de sa valeur :</p>
+
+<pre>
+awk -f zorglub.awk lieu=Bordeaux
+</pre>
+
+<p>A ce moment là, la variable lieu est définie dans le script awk, 
+comme une variable système.</p>
+
+
+<h2><a name="46"> Le langage</h2>
+
+<p>Awk ne serait pas un langage sans des conditionnelles, des boucles et 
+la possibilité de manipuler des tableaux.</p>
+
+<p>Le célèbre if possède la syntaxe courante :</p>
+<pre>
+if (expression)			if (expression) {
+	instruction1			bloc d'instructions
+[else				}
+	instruction2]                  [else ...]
+</pre>
+<p>Du côté des boucles, Awk possède le while, le do... while et le for.
+Les boucles while, do while et for ont une syntaxe à la C :</p>
+<pre>
+while(expression)		do
+	instruction			instruction
+				while (exression)
+
+	for (initialisation ; test ; incrémentation)
+		instruction
+</pre>
+<p>Par exemple :</p>
+<pre>
+# Affichage de tous les nombres pairs de 0 à 99
+for ( i = 0 ; i< 100 ; i++
+	if ((i % 2) == 0)
+		print $i
+</pre>
+
+<p>Du côté des tableaux, aucune allocation dynamique n'est nécessaire : 
+un tableau est directement accessible en spéciant : nom[<em>indice</em>].</p>
+
+
+<h2><a name="47"> Écrire ses fonctions</h2>
+
+<p>Nous arrivons enfin à la partie la plus intéressante qui consiste à pouvoir
+écrire ses propres fonctions. Lors du développement d'un programme, 
+il est possible de se passer de l'écriture de fonctions. Toutefois, la 
+lisibilité du code en souffre rapidement.</p>
+
+<p>Une fonction s'écrit très simplement :</p>
+
+<pre>
+function puissance2(nombre) {
+	return nombre * nombre
+}
+</pre>
+<p>A noter que la notion de typage n'existe pas vraiment... De plus, la 
+variable nombre est considérée comme étant locale à l'intérieur de la 
+fonction.</p>
+
+
+
+<h1><a name="50"> Conclusion - Bibliographie</h1>
+
+<p>Pour terminer ce court article sur les deux outils sed et awk, il
+est utile de remarquer que ces langages sont très utilisés car ils permettent
+d'éffectuer des opérations très puissantes d'une manière rapide et simple.</p>
+
+<p>Cette courte introduction vous permet de vous familiariser avec ces 
+deux outils. Pour aller plus loin, il peut être très utile de consulter 
+les documents suivants :</p>
+<ul>
+<li> pages de manuel de sed et awk ;
+<li> fichiers de documentation fournis avec les version Gnu de sed et awk (gawk) ;
+<li> <sq>Sed et Awk, programmation avancée</sq>, chez O'Reilly (traduction 
+de Marc Vauclair). Un excellent livre de référence.
+</ul>
+
+</body>
+</html>

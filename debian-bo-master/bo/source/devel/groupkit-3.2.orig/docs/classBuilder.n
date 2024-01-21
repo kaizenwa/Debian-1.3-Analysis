@@ -1,0 +1,325 @@
+.TH classBuilder n "30 May 1995" "GroupKit"
+.SH NAME
+classBuilder \- Syntax summary and overview of GroupKit's mega-widget 
+facilities.
+.SH REQUIREMENTS
+Tcl 7.3 and Tk 3.6 (or later versions)
+.SH AVAILABILITY
+This Tcl/Tk extension included in the GroupKit distribution
+.SH TERMINOLOGY
+.B Mega-widget
+.RS 10
+A widget composed of one or more widgets that
+behaves like a standard Tk widget.
+.RE
+.B Component Widgets
+.RS 10
+The individual widgets that a mega-widget is comprised of.
+.RE
+.B Root Window
+.RS 10
+The window which encompasses the entire mega-widget.
+.RE
+.B Classname
+.RS 10
+Throughout this manual page, 
+.I classname 
+refers to the name of the widget class or type 
+of the widget.
+
+.SH DESCRIPTION
+The GroupKit class builder makes building mega-widgets
+that behave like standard Tk widgets easier.
+A widget is defined by both its class data and widget 
+specific data. Class data includes all the options, subcommands
+and bindings that are identical for an entire class of widgets 
+whereas widget data may be different for different widgets.  The
+class builder initializes both sets of data.
+
+All Tk widgets have two main components: a data structure and
+a widget command.  Both of these have the same name as the widget's
+path name,  which can cause confusion. The one being
+referred to can be determined by the context.
+
+.B Class Data Structure
+.PP
+This is one of the two basic data structures used by the class builder;  
+it defines attributes for the class of widgets.  his array is
+created only once and the values are stored in the 
+.B global 
+array 
+.I classname.
+
+.B classname(inherit)
+.I inheritanceList
+.RS 10
+Denotes which class(es), if any,  a particular widget class inherits its 
+options and widget subcommands from.   What is inherited is based on the 
+order the classes appear in
+the list; the first one in the list is given highest priority.  Any widget 
+class defined by this class builder any standard Tcl/Tk classes and widgets
+defined by other class(widget) builders are valid entries.
+It is assumed that all widgets in the inheritance list are defined.
+For more information on option handling see
+.I classname_Config
+and for more inofmation on subcommands see
+.* classname_Methods
+.RE
+
+.B classname(rootOptions)
+.I optionList
+.RS 10
+The options that are not specific to the class itself.  Typically,  contains 
+the inherited options.  There is usually no need to add to the list, since by 
+specifying the inheritance the list will be created  automatically.
+.RE
+
+.B classname(options)
+.I optionList
+.RS 10
+The options that are unique to the particular class of widgets; these are not
+inherited.  See 
+.I classname(optionName) 
+for more information.
+.RE
+
+.B classname(methods)
+.I methodList
+.RS 10
+The  methods ( commands ) that can be applied to widgets whose class is
+.I classname.  
+It includes the methods that are inherited as well as the methods 
+that are unique to the class. See
+.I classname_Methods
+for more information.
+.RE
+
+.B classname(optionName)
+.I {abbreviation optionName}
+, or
+.B classname(optionName)
+.I {optionName objectName className classValue}
+.RS 10
+.B optionName 
+is a particular option  usually specified in either the root option
+list or the option list. There must be a class definition for each one of the 
+options of a class.  
+.RE
+
+.B classname(rootWindow)
+.I widgetClass
+.RS 10
+This specifies the type of root window. If it is not specified, then 
+a Tk frame widget is used for the root Window.
+.RE
+
+.B Widget Data Structure
+.PP
+This is the second data structure that is created by the class builder , and 
+it is created for each widget whose class is 
+.I classname.    
+It defines the properties of a particular widget and ( unlike the class data )
+it may change over time.   The widget record is an array whose 
+name is the same as the widget's window path name.  A useful technique is to 
+store the window path names of the subwidgets in the widget data structure;
+this makes it easy to retrieve the path names later.
+
+.B data(class) 
+.I class
+.RS 10
+The class type the widget belongs to.
+.RE
+
+.B data(className)
+.I className
+.RS 10
+The class name the widget belongs to.
+.RE
+
+.B data(rootCmd)
+.I pathName
+.RS 10
+The window path name of the root widget or window. This widget type is
+specified by 
+.I classname(rootWindow).  
+.RE
+
+.B data(optionName)
+.I objectValue
+.RS 10
+Defines the default object value for a particular option.  If none is 
+specified then the object option value is defined to be the class option 
+value which may have been inherited.
+.RE
+
+.B data(tmpOptionName)
+.I objectValue
+.RS 10
+The value of the object value is determined from the arguments given
+to a widget when it is created.  This allows access to the
+option/optionValue pairs given when the widget is created.  These
+variables exist from the time the request is made 
+to create the widget until it is completely constructed by the 
+widget builder.
+.RE
+
+.B Creating A Widget Class
+.PP
+There are a number of procedures that may or may not be defined in order to
+create a widget class.  The GroupKit class builder gets its information from 
+these procedures in order to create the new widget class.   However the
+widget builder need only define the
+.I classname
+procedure.
+Those that are not defined are defined automatically by the widget builder. 
+
+.B classname 
+.I pathName args
+.RS 10
+This procedure is called when a widget of the class 
+.I classname 
+is created.
+Typically it just calls 
+.I gkInt_CreateWidget
+with the appropriate arguments and
+returns the widget's path name.
+.RE
+
+.B classname_Cget 
+.I pathName optionName
+.RS 10
+This procedure allows the widget builder to over-ride the default 
+procedure for the cget command.  If an error occurs then the default
+behavior, returning the value stored in the widget record, is attempted.
+.RE
+
+.B classname_Config
+.I pathName optionName args
+.RS 10
+The configuration routine is activated whenever the 
+.I configure 
+command is
+invoked on a widget and specifies what is to be done when an option value is
+changed. Note that the 
+.B optionName and 
+.B args will each have a
+single value, not a list of values, this routine can only operate on a 
+single option at any given time.  If an error occurs in
+this routine and the option specified is valid, then
+an attempt will be made to apply the command to the root widget which is
+the default action of this procedure.
+.RE
+
+.B classname_ConstructWidget
+.I pathName
+.RS 10
+This procedure constructs the widget.  Often it consists of the
+creation and packing of a number of component widgets.  Normally, the
+component widgets are created within the root widget.
+It is useful, although not necessary, to store the path name for each of the 
+component widgets in the widget's data record.  The default procedure
+does nothing.
+.RE
+
+.B classname_CreateClassRec
+.I pathName class className
+.RS 10
+This procedure defines the class options, commands, inheritance,
+and the root window - all the items discussed in the class data structure
+section.
+Any of the undefined items are an empty list by default.  The class record must
+be made a 
+.B global 
+variable so that widgets of this type can be constructed.
+.RE
+
+.B classname_CreateWidgetRoot
+.I pathName 
+.RS 10
+This procedure allows the widget builder to over-ride the default mechanism
+for creating the root widget.  It allows any widget to be the root widget.
+The preferred method is to specify
+.I classname(rootWindow).
+.RE
+
+.B classname_DestroyWidget
+.I pathName
+.RS 10
+Defines what is to be done when a widget of the particular class is destroyed.
+The default method is to do nothing.
+.RE
+
+.B classname_InitWidgetRec
+.I pathName class className
+.RS 10
+Defines the default values for a widget's data structure.  Typically defines
+all of the items discussed in the 
+.I widget data structure
+section as well as other variables needed for the widget.
+.RE
+
+.B classname_Methods
+.I pathName command args
+.RS 10
+This procedure defines what action to take when any of the commands are
+invoked ( except for configure and cget ).  See
+.I classname_Config
+and 
+.I classname_Cget
+sections for more details on these commands.  If the application of this 
+method causes error then an attempt to apply the method to the root window
+is made.
+
+.RE
+
+.B classname_SetWidgetBindings
+.I pathName
+.RS 10
+Defines the various bindings for the class; the default procedure does
+nothing.
+.RE
+
+.B Using A New Widget Class
+.PP
+Mega-widgets designed with the class builder are used the same 
+way the standard Tk widgets are.
+.PP
+The syntax for creating a widget of a particular class:
+.RS 10
+class pathName 
+.I ?option OptionValue ....?
+.RE
+The syntax for using widget commands
+.RS 10
+pathName command
+.I ?args?
+.RE
+.SH FILES
+.PD 0
+.TP 40
+.B GroupKit/classBuilder/gkClassBuiler
+source file
+.PD
+.SH "SEE ALSO"
+.PD 0
+p.TP 40
+.B GroupKit/classBuilder/Label.tcl
+sample file
+.TP 
+.B GroupKit/classBuilder/FancyLabel.tcl
+sample file
+.TP 
+.B GroupKit/classBuiler/FrameLabel.tcl
+sample file
+.TP 
+.B GroupKit/docs/userman.ps
+user manual
+.TP 
+.B GroupKit/widgets/*
+.SMGroupKit widget set
+.PD
+.SH KEYWORDS
+Tcl, Tk, widget, mega-widget
+
+.SH AUTHOR
+Shannon Jaeger (jaeger@cpsc.ucalgary.ca)

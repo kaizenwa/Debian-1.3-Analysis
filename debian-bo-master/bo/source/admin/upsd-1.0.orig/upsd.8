@@ -1,0 +1,152 @@
+.TH UPSD 8 "Nov 26, 1996" "" "Linux System Administrator's Manual"
+.SH NAME
+.\" upsd \(em UPS monitor daemon
+upsd -- UPS monitor daemon.
+.SH SYNOPSIS
+.B /sbin/upsd
+.RB " [options] serial-device | host-name"
+.SH DESCRIPTION
+Upsd is a daemon process that sits in the background and monitors the
+state of the DCD and CTS lines of the specified serial device.  These
+lines are to be connected to a UPS (Uninterruptible Power Supply) so
+that the computer can monitor the state of the UPS.  The DCD line
+monitors for a \fBpower fail\fP condition, while CTS monitors for a
+\fBlow battery\fP condition.  RTS may be optionally used to shut down
+the UPS, if that feature is supported by the UPS.  CTS and RTS may be left
+unconnected if the UPS does not support the corresponding features.
+
+Upsd can also run in \fBslave mode\fP.  In this mode, upsd polls another
+copy of itself running on a remote host.  This can be used to give a
+controlled shutdown capability to all of the hosts on a network, even
+ones which do not have a hardwired monitor connection to the UPS.
+
+When upsd senses that the power is failing, it notifies \fBinit\fP(8),
+which will execute the \fBpowerwait\fP and \fBpowerfail\fP entries in
+\fB/etc/inittab\fP.  If upsd senses that the power has been restored, it
+notifies init again and init will execute the \fBpowerokwait\fP entry.
+
+Upsd uses the \fBsyslog\fP(2) facility for status reporting when
+running as a daemon.
+.SH ARGUMENTS
+.TP
+.B serial-device
+Some serial port that is not being used by another device, and does
+not share an interrupt with any other serial port.  Not valid with \fB-s\fP.
+.TP
+.B host-name
+A host name or IP address.  Only valid if the \fB-s\fP option is used.
+.SH OPTIONS
+.TP
+.B -c count
+Wait \fBcount\fP poll intervals before shutdown.  The default is 2.
+This option is intended to prevent users on the system from being
+bothered by alerts caused by short power glitches.  It should probably
+be set to 0 (signal right away) on slave machines.
+.TP
+.B -h
+Print a short usage message and exit.
+.TP
+.B -i time
+Set the poll interval to \fBtime\fP seconds.  Default is 10 seconds.
+This should probably be shorter on the master machine and longer on the
+slaves.  Times less than 0 are interpreted to mean that upsd
+should get the UPS status and exit immediately (this is useful in a
+"halt" script).  The UPS status is returned in the exit code.
+.TP
+.B -k
+Kill the UPS power.  Most brands of UPS will honor this signal only if
+they are running on battery power.  Causes RTS to go high for 5 seconds.
+.TP
+.B -l
+Don't shut down until a low battery indication appears.  Should only be
+used on standalone machines, and only with init set up for immediate
+shutdown.  On battery indications will still be logged, but won't cause 
+a shutdown.
+.TP
+.B -m
+Disable master mode.  Do not respond to polls from slave machines.  Do
+not listen on a TCP port.  Do monitor the UPS and signal power failures
+to init.  This mode is intended for standalone machines.
+.TP
+.B -p port
+Listen on \fBport\fP in master mode, try to contact \fBport\fP for
+updates in slave mode.  Default is port 401.
+.TP
+.B -s
+Run in \fBslave\fP mode.  Poll a master host for UPS status.  The host
+name or IP replaces the device name on the command line if this flag is
+specified.
+.TP
+.B -t
+Test mode.  Do not become a daemon, do not send SIGPWR to init.  This
+mode is intended for testing your setup.
+.SH RETURN CODES
+Normally, upsd does not return status codes, because it does not exit.
+If upsd does exit abnormally, it will return a status of 1.  If killed by
+SIGTERM, it will return a status of 0.  If upsd is run with a poll
+interval (\fB-i\fP) value less than zero, it will get the UPS status and
+exit.  The return codes are as follows:
+.TP
+.B 100
+Power is OK.
+.TP
+.B 101
+UPS is on battery, but the battery is ok.
+.TP
+.B 102
+UPS is on battery, and the battery is low.
+.TP
+.B 103
+There was a UPS connection error.  Cound not contact the host (in slave
+mode), or the monitor cable is disconnected (in master mode).
+.SH DIAGNOSTICS
+Upsd regularly checks the DSR line to see if it is high.  DSR should be
+directly connected to DTR and upsd keeps that line high, so if DSR is
+low then something is wrong with the connection.  Upsd will notify you
+about this fact.  When it sees that the connection has been restored it
+will say so.
+.SH HOWTO
+It's pretty simple to connect your UPS to a Linux machine. The steps
+are as follows:
+.TP
+.B 1.
+Make sure you have an UPS with a simple relay output; it should close
+its connections (make) if the power is gone, and it should open its
+connections (break) if the power is good.
+.TP
+.B 2.
+Buy a serial plug. Connect the DTR line to the DSR line directly.
+Connect the DTR line and the DCD line with a 10 kOhm resistor.  Connect
+the CTS line and the DTR line with another 10 kOhm resistor.  Now
+connect the (normally open) ON BATTERY relay of the UPS to the DCD line
+and the (normally open) LOW BATTERY relay to the CTS line.  Connect the
+RTS line to the SHUTDOWN input on the UPS.  Connect the return side of
+the relays to GROUND.
+.TP
+.B 3.
+You're all set.  It is also safe to use this setup with a UPS having
+\fBopen collector\fP outputs, like the APC SmartUPS v/s series, but be
+very careful to not exceed the current limit of the output transistors.
+It is possible, though unlikely, that you may need to increase the
+resistor values for some units.
+.SH FILES
+.TP
+.B /etc/inittab
+Control file for init(8).
+.TP
+.B /etc/powerstatus
+Power status file read by init(8) after receiving SIGPOWER.
+.SH CREDITS
+Miquel van Smoorenburg developed the original \fBpowerd\fP program that
+inspired upsd.  Some of his words are still in this man page.  Jan 
+Vilhuber's version of powerd for the APC Back-UPS contributed some ideas
+for the automatic power-down and network monitor features.
+.SH BUGS
+No way to specify the polarity of the SHUTDOWN signal (always goes high
+for shutdown).  Could probably handle connection errors better.  There's
+probably a standard for UPS monitoring on a network somewhere, but if so
+I don't know about it.
+.SH SEE ALSO
+shutdown(8), init(8), inittab(5).
+.SH AUTHOR
+Bob Hauck, bobh@wasatch.com

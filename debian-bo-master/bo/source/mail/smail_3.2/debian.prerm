@@ -1,0 +1,30 @@
+#!/usr/bin/perl --
+
+$etc='/etc';
+
+if (open(OI,"$etc/inetd.conf")) {
+    open(NI,">$etc/inetd.conf.prermnew") || die "Creating new inetd.conf: $!\n";
+    while(<OI>) {
+        if (m/^smtp\s+.*\W(in\.smtpd|smail|sendmail)\W/) {
+            $mod=1; s/\n$//;
+            $_= "# $_ (will be restored by smail postinst)\n";
+        }
+        print NI || die "Writing new inetd.conf: $!\n";
+    }
+    close(NI) || die "Closing new inetd.conf: $!\n";
+    if ($mod) {
+        rename("$etc/inetd.conf.prermnew","$etc/inetd.conf") ||
+            die "Installing new inetd.conf: $!\n";
+    } else {
+        unlink("$etc/inetd.conf.prermnew") || die "Aborting new inetd.conf: $!\n";
+    }
+}
+
+$!=0; $foo= `crontab -u mail -r 2>&1`;
+exit 0 unless $?;
+exit 0 if $foo eq "no crontab for mail\n";
+
+print STDERR "ran crontab to remove crontab for \`mail', exit code $? $!\n"
+    unless length($foo);
+print STDERR $foo;
+exit(1);

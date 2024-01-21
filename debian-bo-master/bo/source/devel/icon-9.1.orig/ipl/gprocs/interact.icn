@@ -1,0 +1,197 @@
+############################################################################
+#
+#	File:     interact.icn
+#
+#	Subject:  Procedures to support interactive applications
+#
+#	Author:   Ralph E. Griswold
+#
+#	Date:     July 17, 1995
+#
+############################################################################
+#
+#  snapshot(win, x, y, w, h, n) writes an image file for the specified portion 
+#  of the window.  The name for the file is requested from the user via a
+#  dialog box.  If there already is a file by the specified name, the
+#  user is given the option of overwriting it or selecting another
+#  name.  The procedure fails if the user cancels.  n sets the width of the
+#  text-entry field.
+#
+#  load_file(s) presents a standard open dialog with the caption s.  If the
+#  user specifies a file that can be opened, dialog_value is set to it.
+#  Otherwise, the dialog is presented again.  The name of the selected
+#  button is returned.
+#
+#  save_file(s, n) presents a standard save dialog with the caption s and
+#  suggested name n.  If the user specifies a file that can be written,
+#  the file is returned.  Otherwise, save_as() is called.  The name of
+#  the selected button is returned.
+#
+#  save_as(s, n) presents a standard save dialog with the caption s and
+#  suggested name n.  If the user specifies a file that can be written,
+#  the file is assigned to dialog_value.  Otherwise the dialog is presented
+#  again.  save_as() fails if the user cancels.
+#
+############################################################################
+#
+#  Links:  exists
+#
+############################################################################
+#
+#  Requires:  Version 9 graphics
+#
+############################################################################
+
+link exists
+
+procedure load_file(caption, n)		#: load dialog
+   local button
+
+   repeat {
+      (button := OpenDialog(caption, n)) == "Okay" | return button
+      dialog_value := open(dialog_value) | {
+         Notice("Can't open " || dialog_value)
+         next
+         }
+      return button
+      }
+
+end
+
+procedure save_file(caption, name, n)	#: save dialog
+   local button
+
+   (button := SaveDialog(caption, name, n)) == "Yes" | return button
+   dialog_value := open(dialog_value, "w") | {
+      Notice("Can't write file")
+      return save_as("Save:", dialog_value, n)
+      }
+
+   return button
+
+end
+
+procedure save_as(caption, name, n)	# save-as dialog
+   local button, file
+
+   repeat {
+      if (button :=  SaveDialog(caption, name, n)) == "Yes" then {
+         file := dialog_value
+         if exists(file) then {
+            if TextDialog("Overwrite existing file?") == "Cancel" then next
+            }
+         dialog_value := open(file, "w") | {
+            Notice("Can't write " || dialog_value)
+            next
+            }
+         }
+      return button
+      }
+
+end
+
+procedure snapshot(win, x, y, w, h, n)	# snapshot dialog
+   local name
+
+   if type(win) ~== "window" then {
+      win :=: x :=: y :=: w :=: h
+      win := &window
+      }
+
+   repeat {
+      if OpenDialog("Image file name", , n) == "Okay" then {
+         name := dialog_value
+         if exists(dialog_value) then {
+            if TextDialog("Overwrite existing file?", , , ,
+               ["Okay", "Cancel"]) == "Cancel" then next
+            }
+         WriteImage(win, name, x, y, w, h) | {
+            Notice("Cannot write image")
+            fail
+            }
+         return
+         }
+      else fail
+      }
+      
+   return
+
+end
+
+procedure unsupported()			#: unsupported feature alert
+
+   return notice("Unsupported feature")
+
+end
+
+procedure notice(s[])			#: notice that fails
+
+   Notice ! s
+
+   fail					# important to fail; passed back
+
+end
+
+procedure save_list(caption, lst)	#: save list dialog
+   local output
+
+   OpenDialog(caption, , 30) == "Okay" | fail
+   if dialog_value == "-" then output := &output	# "-" means &output
+   else output := open(dialog_value, "w") |
+      return notice("Cannot open " || dialog_value)
+
+   every write(output, !lst)
+
+   close(output)
+
+   return
+
+end
+
+#  This procedure handles selection from long lists by producing
+#  a succession of dialogs to the user's choice of "More".
+
+$define Choices 30		# maximum choices per dialog
+
+procedure select_dialog(caption, lst, dflt)	#: select dialog for many items
+
+   if *lst = 0 then {
+      Notice("No selections available")
+      fail
+      }
+   until *lst <= Choices do {
+      case SelectDialog(caption, lst[1+:Choices], dflt,
+         ["Okay", "More", "Cancel"]) of {
+            "Cancel":  fail
+            "Okay":    return
+            "More":    lst := lst[Choices + 1:0]
+            }
+      }
+
+   if *lst > 0 then {
+      SelectDialog(caption, lst, dflt) == "Okay" | fail
+      return dialog_value
+      }
+
+   else fail
+
+end
+
+procedure edit(name)			#: editor launch
+   local editor
+
+   TextDialog("Edit:", , name, 30) == "Okay" | fail
+
+   editor := getenv("EDITOR") | "vi"
+
+   return system(editor || " " || dialog_value[1])
+
+end
+
+procedure execute()			#: command-line launch
+
+   TextDialog("Command line:", , , 50) == "Okay"  | fail
+
+   return system(dialog_value[1])
+
+end

@@ -1,0 +1,133 @@
+# A sample DIP script to dial into Digital Pathways
+# Remote Defender Validator in callback mode.
+#
+# Written by me (uri@watson.ibm.com) - but you knew THAT (:-).
+#
+# The idea in short is like this:
+#
+# 1. You dial the Defender number. It responds in
+#    VOICE. Most likely you won't be able to parse
+#    that response in software, so you pretend it
+#    told you to go on.
+# 
+# 2. You send a touch-tone-coded id. It again
+#    responds with some words, you assume it said
+#    you may go ahead.
+# 
+# 3. You type in your password in touch-tone. Now you
+#    just hope everything's fine, let it speak out 
+#    whatever it's about to and you hang up the
+#    line.
+# 
+# 4. Now you're waiting for it to call you back at the
+#    number stored in it's database....
+#
+# 5. OK, it did call you back. Now you got the CONNECT
+#    from it, a nice digital line and you acknowledge 
+#    it by sending "\n" up there.
+#
+# 6. It prompts you for your ID, you parse it and give
+#    your id (send it up). Mind you - this ID will be
+#    mighty different from the one you gave to the
+#    Defender!
+#
+# 7. From now on you assume the remote/server end will
+#    do it's job (i.e. configure your pre-assigned
+#    IP address, bring SLIP up and such). So now
+#    you make sure the line's 8-bit clean, and
+#    do "mode SLIP" yourself.
+
+main:
+	port  ttyS1
+	speed 57600
+	echo on
+	get $local  myslip      # configure this
+	get $remote serverslip  # and this
+	netmask 255.255.255.0   # and maybe this
+	default                 # this?
+	timeout 0               # Do you want idle cutoff?
+
+	databits 7              # To be able to talk
+	parity   e              # digital, needed later.
+
+	send ATZ\r
+#	wait OK 2
+#	if $errlvl != 0 goto error1
+	sleep 3
+	send AT+FCLASS=0\r      # My crap...
+	wait OK 2
+	if $errlvl != 0 goto error2
+	send ATQ0V1E1X1\r
+	wait OK 2
+	if $errlvl != 0 goto error3
+	dial 555-1212;         # ";" because of voice response
+	if $errlvl != 0 goto error4
+	sleep 22
+	dial your_id;   # configure this
+	sleep 10
+	dial your_passwd;
+	sleep 10
+	send ATH\r
+	sleep 3
+	send ATZ\r
+	sleep 3
+	send AT+FCLASS=0\r
+	sleep 3
+	wait RING 80
+	if $errlvl != 0 goto error5
+	wait RING 10
+	if $errlvl != 0 goto error5
+	send ATA\r
+	wait CONNECT 25
+	if $errlvl != 0 goto error6
+
+# We are connected.  Login to the system.
+login:
+	sleep 5
+	send \n		 # Because it waits for "\n" to proceed
+	wait SLIP 25     # or wait for whatever prompt it gives 
+	if $errlvl != 0 goto error7
+	sleep 5
+	send uri\n       # Since you're not Uri - send whatever 
+                         # is appropriate for YOU.
+	sleep 1
+	parity   n	 # Just as I said - establish 8-bit clean
+	databits 8	 # line now, after all the chatting's over
+	sleep 3
+
+done:
+	print "\n"
+	print Connected to $remote address
+	mode CSLIP
+	goto exit
+
+error1:
+	print ERROR! send ATZ failed!
+	quit
+
+error2:
+	print ERROR! send AT+FCLASS=0 failed!
+	quit
+
+error3:
+	print ERROR! send ATQ0V1E1X1 failed!
+	quit
+
+error4:
+	print ERROR! dial command failed!
+	quit
+
+error5:
+	print ERROR! it did not call me back!
+	quit
+
+error6:
+	print ERROR! Attempt fo connect to $remote failed! [No CONNECT]
+	quit
+	
+error7:
+	print ERROR! Attempt fo connect to $remote failed! [No "tlip"]
+	quit
+	
+exit:
+

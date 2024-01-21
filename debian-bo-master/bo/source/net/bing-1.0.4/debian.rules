@@ -1,0 +1,76 @@
+#! /usr/bin/make -f
+
+CC = gcc
+CFLAGS = -O2
+LDFLAGS = -s
+
+# The name of the package (for example, `emacs').
+p = bing
+# The version of the package (for example, `19.28').
+v = 1.0.4
+# The Debian revision of the package (for example, `2').
+d = 4
+
+build:
+# Builds the binary package.
+	$(MAKE) CC="$(CC)" CFLAGS="$(CFLAGS)" CLIBS="$(LDFLAGS)"
+	touch stamp-build
+
+clean:
+# Undoes the effect of `make -f debian.rules build'.
+	$(MAKE) -C src distclean
+	rm -f stamp-build stamp-config
+	rm -rf debian-tmp
+
+binary:
+# Makes a binary package.
+	test -f stamp-build || $(MAKE) -f debian.rules build
+	rm -rf debian-tmp
+	install -d -g root -m 755 -o root debian-tmp
+	chmod g-s debian-tmp
+	install -d -g root -m 755 -o root debian-tmp/DEBIAN
+	install -d -g root -m 755 -o root debian-tmp/usr/bin
+	install -g root -m 4755 -o root bing debian-tmp/usr/bin/bing
+	install -d -g root -m 755 -o root debian-tmp/usr/man/man8
+	install -g root -m 644 -o root bing.8 debian-tmp/usr/man/man8/bing.8
+	install -d -g root -m 755 -o root debian-tmp/usr/doc/copyright
+	install -g root -m 644 -o root debian.README \
+	  debian-tmp/usr/doc/copyright/$(p)
+	install -g root -m 644 -o root README debian-tmp/usr/doc/bing
+	#install -d -g root -m 755 -o root debian-tmp/usr/doc/examples
+	#cp -a examples debian-tmp/usr/doc/examples/$(p)
+	#chmod -R g-sw debian-tmp/usr/doc/examples/$(p)
+	#chown -R root.root debian-tmp/usr/doc/examples/$(p)
+	#rm -f debian-tmp/usr/info/$(p).info*.gz
+	#gzip -9f debian-tmp/usr/info/$(p).info*
+	sed -e 's/=P/$(p)/' -e 's/=VD/$(v)-$(d)/' \
+	  -e "s/=A/`dpkg --print-architecture`/" \
+	  debian.control > debian-tmp/DEBIAN/control
+	chmod 644 debian-tmp/DEBIAN/control
+	#install -g root -m 644 -o root debian.conffiles \
+	#  debian-tmp/DEBIAN/conffiles
+	#install -g root -m 755 -o root debian.preinst \
+	#  debian-tmp/DEBIAN/preinst
+	#install -g root -m 755 -o root debian.postinst \
+	#  debian-tmp/DEBIAN/postinst
+	#install -g root -m 755 -o root debian.prerm \
+	#  debian-tmp/DEBIAN/prerm
+	#install -g root -m 755 -o root debian.postrm \
+	#  debian-tmp/DEBIAN/postrm
+	dpkg --build debian-tmp
+	dpkg-name -o -s .. debian-tmp.deb
+
+source:
+# Makes a source package.
+	cvs export -d $(p)-$(v) -r`echo deb_$(v)_$(d) | tr . _` $(p)
+	tar cf - $(p)-$(v) | gzip -9f > ../$(p)_$(v)-$(d).tar.gz
+	rm -rf $(p)-$(v)
+
+diff:
+# Makes a context diff.
+	cvs rdiff -c \
+	  -r`echo $(p)_$(v) | tr . _` -r`echo deb_$(v)_$(d) | tr . _` $(p) \
+	  | gzip -9f > ../$(p)_$(v)-$(d).diff.gz
+
+dist: binary source diff
+# Prepares the package for distribution.

@@ -1,0 +1,264 @@
+
+	     NewsX - An NNTP client for posting and fetching news
+	     ====================================================
+
+			      Version 0.1
+		       Written by Egil Kvaleberg
+				    
+				 ------
+
+NewsX is an NNTP client for Unix. It will connect to a remote NNTP server
+and post outgoing articles batched by the news system, as well as fetch
+incoming articles.
+
+It provides the NNTP capabilities required for small local news spools on
+installations with NNTP access only through limited ISP accounts. It works
+well via a dialup SLIP/PPP connection.
+
+- Compatible with Cnews and INN local news servers.
+
+- Comprehensive error recovery for posting as well as for fetching. Failed
+  postings will be retried at the next opportunity, while fetching will
+  resume at the point where it stopped.
+
+- Very little user configuration required, it relies on the standard
+  Cnews and INN mechanisms (active and sys or newsfeeds files) for
+  setting up newsservers and newsgroups.
+
+- Logging to syslog of errors that occurred, as well as article transfer
+  statistics.
+
+- Optional log file for actual articles posted, and collection of posted
+  articles in folders.
+
+- Has been designed to be nice, so as not to overload the remote news 
+  server.
+
+- Uses only standard RFC-977 functions, so should be compatible with the
+  vast majority of news servers.
+
+- Refers to news history database to prevent fetching of articles already 
+  in the local spool. Will not fetch crossposted articles more than once. 
+  Does not rely on Xref, since many sites does not provide it.
+
+NewsX was written in C under Linux, and should be quite portable.  
+Unassisted system configuration via autoconf.
+
+
+PULLING NEWS
+------------
+
+News transfer via fetching (sucking, slurping, pulling) to local news
+spools is sometimes claimed to be an inefficient way of transferring news.
+
+The fact of the matter is that if set up and used correctly, exactly the 
+opposite is the case. 
+
+A local news spool allows news transfer to occur at off-peak hours, 
+thereby decreasing the host server load in the critical period. This will 
+tie up less modems at peak hours, as well as decreasing the connect time 
+since the actual transfer will run much quicker.
+
+Much of the problems connected with news pulling is connected to the use 
+of the RFC-977 NEWNEWS command. Most news servers has implemented this
+command in an inefficient manner, which will put severe loads on the 
+newsserver. NewsX does not use NEWNEWS.
+
+
+ARCHIVE
+-------
+
+In this archive you should find the following files:
+
+README		To you what "Drink Me" was to Alice.
+COPYING 	The GNU General Public License
+HISTORY 	Versions.
+configure	For making "Makefile"
+Makefile.in	Input to configure
+newsx.8 	NewsX manpage
+newsx		NewsX executable for Linux ELF
+tune.h		Tunable parameters: You "might" want to modify this
+common.h	General header
+nntp.h		NNTP header
+proto.h 	Function prototypes
+news.h		News system filename conventions
+main.c		Main program
+auth.c		Authorization
+despool.c	Routines for reading the outgoing batch 
+putarticle.c	Routines for actually posting articles
+pull.c		Routines for pulling to the incoming spool
+getarticle.c	Routines for actually fetching articles
+socket.c	Socket interface
+server.c	For socket.c 
+logmsg.c	Log messages 
+lock.c		Lock file handling
+active.c	Handling of active file
+sys.c		Handling of sys or newsfeeds file
+msgid.c 	Message ID repository
+history.c	Interface to news history database
+hash.c		Hashing function
+dbz.c		Standard database manager
+dbz.h		Standard database manager
+hash.c		Hashing function
+sock.c		Socket descriptor
+telnet.c	Telnet protocol
+script.c	Connect script
+title.c 	Info for "ps"
+.depend 	Source file dependencies
+newsx.man	Manpage source
+README.in	README original
+tiny.server	A tiny news server 
+newsxstat.rc	For running display of NewsX status
+check.rc	For testing
+configure.in	For autoconf
+config.h.in	For autoconf
+newsx.lsm	NewsX summary for sunsite
+IAFA-PACKAGE	Alternative summary
+
+
+COMPILE AND INSTALL
+-------------------
+
+To install the supplied binary, simply go directly to step 4.
+
+1. First, type './configure' to produce a suitable "Makefile".
+
+2. Review the first part of the "Makefile" to see if everything looks 
+   all right.
+
+3. Type 'make' and hopefully you will get the newsx executable.
+
+4. Type 'su' to become root, and then 'make install' to install the
+   executables and the manual page.
+
+
+QUICK START WITH CNEWS
+----------------------
+
+We assume that you already have Cnews installed. As a quick start, what
+you have to do is:
+
+ 1. Do all maintenance of the news system as user "news". Ensure
+    that the ".profile" of this user defines a path that includes
+    "/usr/lib/newsbin". E.g.:
+
+	export PATH="$PATH:/usr/lib/newsbin"
+
+ 2. Ensure that an outgoing batch has been configured in "/usr/lib/news/sys". 
+    If the NNTP host is named "news.acme.net", a minimum configuration 
+    might be:
+
+	ME:all/all::
+	acme/acme.net:all,!junk/all:FL:
+
+    The outgoing batch will be named "foo". The "acme.net" is the string
+    that this NNTP site places in the beginning of the "Path:" of each
+    news article it sends. The L-flag is a double insurance that only
+    local postings will be batched.
+
+ 3. If you haven't done so already, define one or more newsgroups that 
+    will appear in the "active" file:
+
+	addgroup acme.test y
+
+ 4. Try to fetch news articles for these groups by doing:
+
+	newsx -ddd news.acme.net acme
+
+ 5. The articles should now appear in the incoming batch
+    "/var/spool/news/in.coming". If you invoke:
+
+	newsrun 
+
+    the incoming articles should appear in the news spool. In the
+    example, you may look for them in "/var/spool/news/acme/test".
+
+ 6. Using a newsreader, post an article to a suitable test group. Try to 
+    use a group with as small distribution as possible, preferably local 
+    to the external newsserver you are using. If you haven't done so 
+    already, the group must be in the "active" file.
+
+    The next time that newsrun is invoked, the articles will be output to
+    the spool file "/var/spool/news/out.going/acme/togo" specified in the
+    "/usr/lib/news/sys" file.     
+
+ 7. Run:
+
+	newsx -dddn news.acme.net acme
+
+    to do a "dry test" to ensure that everything is set up correctly. No
+    external connection is required.
+
+ 8. Now, fire up the connection and do it for real:
+
+	newsx -d news.acme.net acme
+
+    Check that everything runs smoothly. The "-d" may be removed when you
+    are sure everything works as expected. To maintain a log of posted
+    articles, as well as a folder containing all articles, you can do:
+
+	newsx -l posted.log -f posted news.acme.net acme
+
+ 9. You may want to arrange for automatic news exchange by using "crontab".
+    It is usually good to invoke newsrun before and after the newsx session.
+
+10. For more information about how to set up news and other subjects related
+    to use of ordinary ISP accounts, you might want to try:
+
+	ftp://ftp.sn.no/user/egilk/ISP-Hookup-HOWTO.txt
+
+
+LEGAL MATTER
+------------
+
+Copyright 1996 Egil Kvaleberg
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+ 
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+
+ACKNOWLEDGMENTS
+---------------
+
+The DBZ database manager is included in this distribution under the
+following terms:
+	Copyright 1988 Jon Zeeff (zeeff@b-tech.ann-arbor.mi.us)
+	You can use this code in any manner, as long as you leave my name
+	on it and don't hold me responsible for any problems with it.
+
+The NNTP header file is copyright (c) 1994 David Alden and The Ohio State
+University.
+
+Thanks to the following for comments and improvements:
+	Greg Wooledge <wooledge@kellnet.com>
+	Riku Saikkonen <rjs@isil.lloke.dna.fi>
+	Simon J Mudd <sjmudd@bitmailer.net>
+	Laurent Frigault <frigault@isicom.fr>
+	Gerhard Zuber <zuber@berlin.snafu.de>
+
+
+CONTACT INFORMATION
+-------------------
+
+All comments, changes you had to make for specific systems, bug 
+reports, bug fixes, etc. can be sent to:
+	egilk@sn.no
+
+Although not a requirement of the license terms, you are according 
+to ancient news software tradition encouraged to send a postcard to 
+the following address if you find the program useful:
+	Egil Kvaleberg
+	Husebybakken 14A
+	N-0379 Oslo
+	Norway	       

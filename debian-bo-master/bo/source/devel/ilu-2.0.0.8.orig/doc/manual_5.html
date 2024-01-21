@@ -1,0 +1,1160 @@
+<!-- This HTML file has been created by texi2html 1.29
+     from manual.texinfo on 17 July 1996 -->
+
+<TITLE>ILU Reference Manual - Using ILU with ANSI C</TITLE>
+<BODY TEXT=#000000 BGCOLOR=#ffffff>
+<P>Go to the <A HREF="manual_4.html">previous</A>, <A HREF="manual_6.html">next</A> section.<P>
+<H1><A NAME="SEC88" HREF="manual_toc.html#SEC88">Using ILU with ANSI C</A></H1>
+<P>
+<A NAME="IDX93"></A>
+<H2><A NAME="SEC89" HREF="manual_toc.html#SEC89">Introduction</A></H2>
+<P>
+This document is for the ANSI C programmer who wishes to use 
+ILU. The following sections will show how ILU is
+mapped into ANSI C constructs and how both ANSI C
+clients and servers are generated and built.
+<A NAME="IDX94"></A>
+<P>
+Using ILU with ANSI C is intended to be compatible
+with the OMG CORBA specification.  That is, all of the naming
+and stub generation comply with the Common Object Request Broker
+Architecture, revision 2.0.
+<A NAME="FOOT9" HREF="manual_foot.html#FOOT9">(9)</A>
+<P>
+Note that ILU does not support non-ANSI variants of
+the C language.  In particular, it relies on having
+prototypes, all ANSI C library functions, and the
+capabilities of the ANSI C pre-processor.
+<P>
+When functions are described in this section,
+they are sometimes accompanied by 
+<A NAME="IDX95"></A>
+<I>locking comments</I>,
+which describe the locking invariants maintained by ILU on a threaded system.
+See the file <TT>`<VAR>ILUHOME</VAR>/include/iluxport.h'</TT>
+for more information on this locking scheme, and the types of locking comments used.
+<P>
+A number of macros are used in function descriptions, to indicated optional arguments, and ownership of potentially
+malloc'ed objects.  The macro <CODE>OPTIONAL(<VAR>type</VAR>)</CODE> means that the value
+is either of the type indicated by <VAR>type</VAR>, or the value <CODE>NULL</CODE>.  This macro
+may only be used with pointer types.  The macro <CODE>RETAIN(<VAR>type</VAR>)</CODE>
+indicates, when used on a parameter, that the caller retains ownership of the value,
+and when used in the result position, that the called function retains ownership of the
+value.  The macro <CODE>PASS(<VAR>type</VAR>)</CODE> indicates, when used on a parameter,
+that the caller is passing ownership of the storage to the called function, and when
+used in the result position, that the called function is passing ownership of the called
+value to the caller.  The macro <CODE>GLOBAL(<VAR>type</VAR>)</CODE> means that neither
+the caller nor the calling function owns the storage.
+<H2><A NAME="SEC90" HREF="manual_toc.html#SEC90">The ISL Mapping to ANSI C</A></H2>
+<P>
+<A NAME="IDX96"></A>
+<H3><A NAME="SEC91" HREF="manual_toc.html#SEC91">Names</A></H3>
+<P>
+In general, ILU constructs ANSI C names from 
+ISL names by replacing hyphens with underscores.  Type names and class
+names are prepended with their interface name. For example, for
+the ISL type <CODE>T-1</CODE> in interface <CODE>I</CODE>,
+the generated name of the ANSI C type would be <CODE>I_T_1</CODE>.
+<P>
+Enumeration value names are formed by prepending the interface
+name and "_" to the ISL enumeration value name.
+Enumeration names and values are then cast into ANSI C
+<CODE>enum</CODE> statements.
+<P>
+Constant names are prepended with their interface name.  They are
+implemented with the <CODE>const</CODE> declaration statements.
+<A NAME="IDX97"></A>
+<P>
+Method name prefixes are specified by CORBA to be 
+<CODE><VAR>module-name</VAR>_<VAR>interface-name</VAR></CODE>.
+ANSI C function names for ISL methods are composed of the generated class name prepended to
+the method name. For example, if the interface name is <CODE>X</CODE> and the
+class type name is <CODE>Y</CODE> and the ISL method name is <CODE>Z</CODE> then the
+ANSI C callable method name will be <CODE>X_Y_Z</CODE>.
+ILU ANSI C servers for this method must implement a function called <CODE>server_X_Y_Z</CODE>.
+<P>
+For field names within records, hyphens are replaced with underscores.
+<P>
+<A NAME="IDX98"></A>
+<H3><A NAME="SEC92" HREF="manual_toc.html#SEC92">Mapping Type Constructs Into ANSI C</A></H3>
+<P>
+<H4><A NAME="SEC93" HREF="manual_toc.html#SEC93">Basic Types</A></H4>
+<P>
+The following basic ISL types have the corresponding mappings in ANSI C, as
+specified by the CORBA 2.0 standard mapping for C:
+<P>
+<UL>
+<LI>
+<CODE>BOOLEAN</CODE> =&#62; <CODE>CORBA_boolean</CODE>
+<LI>
+<CODE>BYTE</CODE> =&#62; <CODE>CORBA_octet</CODE>
+<LI>
+<CODE>CHARACTER</CODE> =&#62; <CODE>ilu_character</CODE>
+<LI>
+<CODE>SHORT CHARACTER</CODE> =&#62; <CODE>CORBA_char</CODE>
+<LI>
+<CODE>CARDINAL</CODE> =&#62; <CODE>CORBA_unsigned_long</CODE>
+<LI>
+<CODE>SHORT CARDINAL</CODE> =&#62; <CODE>CORBA_unsigned_short</CODE>
+<LI>
+<CODE>LONG CARDINAL</CODE> =&#62; <CODE>ilu_longcardinal</CODE>
+<LI>
+<CODE>INTEGER</CODE> =&#62; <CODE>CORBA_long</CODE>
+<LI>
+<CODE>SHORT INTEGER</CODE> =&#62; <CODE>CORBA_short</CODE>
+<LI>
+<CODE>LONG INTEGER</CODE> =&#62; <CODE>ilu_longinteger</CODE>
+<LI>
+<CODE>REAL</CODE> =&#62; <CODE>CORBA_double</CODE>
+<LI>
+<CODE>SHORT REAL</CODE> =&#62; <CODE>CORBA_float</CODE>
+<LI>
+<CODE>LONG REAL</CODE> =&#62; <CODE>ilu_longreal</CODE>
+</UL>
+<P>
+<A NAME="IDX99"></A>
+<H4><A NAME="SEC94" HREF="manual_toc.html#SEC94">Records</A></H4>
+Records map directly into corresponding ANSI C structures.
+<P>
+<A NAME="IDX100"></A>
+<H4><A NAME="SEC95" HREF="manual_toc.html#SEC95">Unions</A></H4>
+Because of the somewhat baroque CORBA specification,
+unions may take one of several forms.
+<P>
+Generally, ILU unions in ANSI C consist of a struct with two members:  the type discriminator 
+(a member named "_d"),
+and a union (a member named "_u") of the possible values.  In a simple ISL union that does not
+name the elements, the union member names are derived from the
+ISL data types which compose the union. For example, if the
+ISL type in interface <CODE>I</CODE> is <CODE>TYPE u1 = UNION INTEGER, SHORT REAL END;</CODE>
+the generated ANSI C struct would be
+<PRE>
+typedef struct _I_u1_union I_u1;
+enum I_u1_allowableTypes {
+  I_u1_integer,
+  I_u1_shortreal
+};
+struct _I_u1_union {
+  enum I_u1_allowableTypes _d;
+  union {
+    ilu_integer integer;
+    ilu_shortreal shortreal;
+  } _u;
+};
+</PRE>
+<P>
+Note the discriminator <CODE>_d</CODE> may take on the values of <CODE>I_u1_integer</CODE>
+or <CODE>u_u1_shortreal</CODE> indicating how to interpret the data in the union.
+Also note how the enumerated names are formed:  with the interface name
+and the type name prepended to the enumeration element name.
+<P>
+In more complex union forms, the user may specify the type of the discriminator as
+well as the member names and which member corresponds to which discriminator
+value. Consider the following ISL example:
+<P>
+<PRE>
+INTERFACE I;
+TYPE e1 = ENUMERATION red, blue, green, yellow, orange END;
+TYPE u1 = e1 UNION 
+ a : INTEGER = red, green END,
+ b : SHORT REAL = blue END,
+ c : REAL
+END;
+</PRE>
+<P>
+The generated union is:
+<P>
+<PRE>
+typedef struct _I_u1_union I_u1;
+typedef enum {
+  I_red = 0, 
+  I_blue = 1, 
+  I_green = 2, 
+  I_yellow = 3, 
+  I_orange = 4
+} I_e1;
+struct _I_u1_union {
+  I_e1 _d;
+  union {
+    ilu_integer a;
+    ilu_shortreal b;
+    ilu_real c;
+  } _u;
+};
+</PRE>
+<P>
+This example shows that the discriminator type is to be <CODE>I_e1</CODE> and that
+the member names are to be <CODE>a</CODE>, <CODE>b</CODE>, and <CODE>c</CODE>. When the discriminator
+has the value <CODE>I_red</CODE> or <CODE>I_green</CODE> the member <CODE>a</CODE> has a valid value
+and the type is interpreted to be integer. When the discriminator has
+the value <CODE>I_green</CODE> the member <CODE>b</CODE> has a valid value and the type is
+interpreted to be shortreal. If the discriminator has any other value,
+the member <CODE>c</CODE> is expected to have a valid value and the type is interpreted
+to be ilu_real (double).
+<P>
+Discriminator types may be <CODE>INTEGER</CODE>, <CODE>ENUMERATION</CODE>, or <CODE>SHORT INTEGER</CODE>.
+The default for an unspecified discriminator is <CODE>SHORT INTEGER</CODE>.
+<P>
+<A NAME="IDX101"></A>
+<H4><A NAME="SEC96" HREF="manual_toc.html#SEC96">Floating Point Values</A></H4>
+The ISL <CODE>SHORT REAL</CODE> primitive type maps to the
+ANSI C <CODE>float</CODE> data type while <CODE>REAL</CODE>
+maps to <CODE>double</CODE>. The ISL <CODE>LONG REAL</CODE> 
+primitive type currently doesn't map to anything real.
+ 
+<A NAME="IDX102"></A>
+<H4><A NAME="SEC97" HREF="manual_toc.html#SEC97">Sequences</A></H4>
+Sequence type names, as most type definitions, are formed with the interface name
+and the type name. 
+Sequence instances are represented to the ANSI C programmer
+as a pointer to the sequence descriptor structure.
+For each sequence type declared in the interface description, a pseudo-object sequence type
+is defined in ANSI C.  These sequence types will hold any number of
+values of type sequence's 
+<A NAME="IDX103"></A>
+<I>primary type</I>.
+For the sequence<BR>
+<CODE>INTERFACE I;</CODE><BR>
+<CODE>TYPE <VAR>T2</VAR> = SEQUENCE OF <VAR>T1</VAR>;</CODE><BR>
+the following functions are defined:
+<P>
+<A NAME="IDX104"></A>
+<U>[ANSI C]:</U> <VAR>I</VAR>_<VAR>T2</VAR> <B>*</B> <I><VAR>I</VAR>_<VAR>T2</VAR>_Create ( OPTIONAL(unsigned long) <VAR>length</VAR>, OPTIONAL(<VAR>T1</VAR> *) <VAR>initial-values</VAR> )</I><P>
+<P>
+This function creates and returns a pointer to a newly allocated
+instance of <VAR>T2</VAR>.  If <VAR>length</VAR> is specified,
+but <VAR>initial-values</VAR> is not specified, enough space for <VAR>length</VAR> values of type <VAR>T1</VAR>
+is allocated in the sequence.  If <VAR>initial-values</VAR> is specified, <VAR>length</VAR> is assumed
+to be the number of values pointed to by <VAR>initial-values</VAR>, and must be specified.
+Note that if type <VAR>T1</VAR> is a <CODE>character</CODE> or <CODE>short character</CODE> type, a pointer
+to a NIL-terminated sequence will be returned; otherwise, a normal CORBA sequence structure
+will be returned by reference.
+<P>
+<A NAME="IDX105"></A>
+<U>[ANSI C]:</U> CORBA_unsigned_long <B><VAR>I</VAR>_<VAR>T2</VAR>_Length</B> <I>( <VAR>I</VAR>_<VAR>T2</VAR> * <VAR>s</VAR> )</I><P>
+<P>
+Returns the length of <VAR>s</VAR>.
+ 
+<P>
+<A NAME="IDX106"></A>
+<U>[ANSI C]:</U> void <B><VAR>I</VAR>_<VAR>T2</VAR>_Append</B> <I>( <VAR>I</VAR>_<VAR>T2</VAR> * <VAR>s</VAR>, <VAR>T1</VAR> <VAR>value</VAR> )</I><P>
+<P>
+Appends <VAR>value</VAR> to the end of <VAR>s</VAR>.  This function will reallocate space and copy, if necessary.
+<P>
+<A NAME="IDX107"></A>
+<U>[ANSI C]:</U> void <B><VAR>I</VAR>_<VAR>T2</VAR>_Push</B> <I>( <VAR>I</VAR>_<VAR>T2</VAR> * <VAR>s</VAR>, <VAR>T1</VAR> <VAR>value</VAR> )</I><P>
+<P>
+Pushes <VAR>value</VAR> on to the beginning of the sequence.  This function will reallocate space and copy, if necessary.
+ 
+<P>
+<A NAME="IDX108"></A>
+<U>[ANSI C]:</U> void <B><VAR>I</VAR>_<VAR>T2</VAR>_Pop</B> <I>( <VAR>I</VAR>_<VAR>T2</VAR> * <VAR>s</VAR>, <VAR>T1</VAR> * <VAR>value-ptr</VAR> )</I><P>
+<P>
+Removes the first value from the sequence <VAR>s</VAR>, and places it in the location
+pointed to by <VAR>value-ptr</VAR>.
+<P>
+<A NAME="IDX109"></A>
+<U>[ANSI C]:</U> void <B><VAR>I</VAR>_<VAR>T2</VAR>_Every</B> <I>( <VAR>I</VAR>_<VAR>T2</VAR> * <VAR>s</VAR>, void (*<VAR>func</VAR>)(<VAR>T1</VAR>, void *), void * <VAR>data</VAR> )</I><P>
+<P>
+Calls the function <VAR>func</VAR> on each element of <VAR>s</VAR> in sequence, passing <VAR>data</VAR>
+as the second argument to <VAR>func</VAR>.
+<P>
+<A NAME="IDX110"></A>
+<U>[ANSI C]:</U> <VAR>I</VAR>_<VAR>T1 <B>*</VAR></B> <I><VAR>I</VAR>_<VAR>T2</VAR>_Nth ( <VAR>I</VAR>_<VAR>T2</VAR> * <VAR>s</VAR>, CORBA_unsigned_long <VAR>n</VAR> )</I><P>
+<P>
+Returns the address of the <VAR>n</VAR>th element of the sequence <VAR>s</VAR>.  Returns <CODE>ILU_NIL</CODE>
+if <VAR>n</VAR> is out of range.
+<P>
+<A NAME="IDX111"></A>
+<U>[ANSI C]:</U> void <B><VAR>I</VAR>_<VAR>T2</VAR>_Init</B> <I>( <VAR>I</VAR>_<VAR>T2</VAR> * <VAR>s</VAR>, OPTIONAL(CORBA_unsigned_long) <VAR>length</VAR>, OPTIONAL(<VAR>T1</VAR> *) <VAR>initial-values</VAR> )</I><P>
+<P>
+This function works like <CODE><VAR>T2</VAR>_Create</CODE>, except that it takes
+a the address of an already-existing <VAR>T2</VAR> to initialize.  This can be used
+to initialize instances of <VAR>T2</VAR> that have been stack-allocated.
+<P>
+<A NAME="IDX112"></A>
+<U>[ANSI C]:</U> void <B><VAR>I</VAR>_<VAR>T2</VAR>__Free</B> <I>( <VAR>I</VAR>_<VAR>T2</VAR> * <VAR>s</VAR> )</I><P>
+<P>
+Frees allocated storage used internally by <VAR>s</VAR>.  Does not free <VAR>s</VAR> itself.
+<P>
+String sequences (<CODE>SEQUENCE OF SHORT CHARACTER</CODE> or <CODE>SEQUENCE OF CHARACTER</CODE>)
+are just arrays of the character codes for the characters, using either Latin-1 codes (for
+<CODE>SEQUENCE OF SHORT CHARACTER</CODE>), or ISO 10646 Unicode codes (for <CODE>SEQUENCE OF CHARACTER</CODE>).
+These sequences are terminated with a character code of zero.  The terminating code is not
+counted in the length of the sequence.  All other sequence types have a record structure, mandated by CORBA:
+<P>
+<PRE>
+typedef struct <VAR>I</VAR>_<VAR>T2</VAR> {
+  unsigned long _maximum;
+  unsigned long _length;
+  long *_buffer;
+} <VAR>I</VAR>_<VAR>T2</VAR>;
+</PRE>
+<P>
+The field <CODE>_maximum</CODE> contains the number of elements pointed to by
+<CODE>_buffer</CODE>. The field <CODE>_length</CODE> indicates the number of valid or
+useful elements pointed to by <CODE>_buffer</CODE>.
+<P>
+For example, the ISL specification
+<PRE>
+INTERFACE I;
+ 
+TYPE iseq = SEQUENCE OF INTEGER;
+</PRE>
+would have in its ANSI C mapping the type
+<PRE>
+typedef struct I_iseq {
+  unsigned long _maximum;
+  unsigned long _length;
+  ilu_integer *_buffer;
+} I_iseq;
+</PRE>
+In a client program, a pointer to this type would be instantiated and
+initialized by calling the type specific sequence creation function generated
+for the sequence, e.g.
+<PRE>
+        ...
+    I_O h;
+    ILU_C_ENVIRONMENT s;
+    I_iseq sq;
+        ... 
+    sq = I_iseq_Create (0, NULL);
+    I_iseq_Append (&#38;sq, 4);
+        ...
+</PRE>
+<P>
+<A NAME="IDX113"></A>
+<H3><A NAME="SEC98" HREF="manual_toc.html#SEC98">Objects and Methods</A></H3>
+<P>
+As indicated earlier, method names are generated by prepending the
+interface name and the
+class name to the method name. 
+<A NAME="IDX114"></A>
+The first argument to a method is
+an object instance.  The object instance is an opaque pointer value returned from
+a class specific constructor function.  All object types are subtypes 
+for the type defined by <CODE>ILU_C_OBJECT</CODE>, a macro which
+expands to the appropriate CORBA object type for the version of CORBA
+being used.  CORBA also
+specifies that the type of the handle be called <CODE><VAR>interface-name</VAR>_<VAR>type-name</VAR></CODE>.
+A typedef of the CORBA-specified name to the <CODE>ILU_C_OBJECT</CODE> type
+is therefore generated for each object type.
+In the example above, the type of the object instance would be <CODE>I_O</CODE>.
+<A NAME="IDX115"></A>
+<P>
+Two binding procedures are specified for each object type.  A 
+<A NAME="IDX116"></A>
+<I>binding procedure</I>
+is a procedure that takes some name for an object instance, and returns the
+actual instance.  Users of a module typically use a surrogate-side binding
+procedure, which takes the string binding handle of the object, and the most specific
+type ID of the object's type (if known).
+Suppliers of a module
+typically bind objects with a creation procedure, which takes an instance ID, a server on which
+to maintain the object, and arbitrary user data, and creates and returns
+the true instance of the object.
+<P>
+In general, for any object type <VAR>T</VAR>, the following ANSI C functions
+are defined:
+<P>
+<A NAME="IDX117"></A>
+<U>[ANSI C]:</U> OPTIONAL(<VAR>T</VAR>) <B><VAR>T</VAR>__CreateTrue</B> <I>( OPTIONAL(RETAIN(char *)) <VAR>instance-id</VAR>, OPTIONAL(GLOBAL(ilu_Server)) <VAR>server</VAR>, OPTIONAL(PASS(void *)) <VAR>user-data</VAR> )</I><P>
+<P>
+Locking:  Main Invariant holds
+<P>
+Creates a true instance of type <VAR>T</VAR>, exporting it with instance-id <VAR>instance-id</VAR>, exporting it
+via server <VAR>server</VAR>, associating the value <VAR>user-data</VAR> with it.  If <VAR>instance-id</VAR>
+is not specified, a server-relative instance-id will be assigned automatically.  If <VAR>server</VAR> is not specified,
+a default server will be created automatically.
+<P>
+<A NAME="IDX118"></A>
+<U>[ANSI C]:</U> OPTIONAL(<VAR>T</VAR>) <B><VAR>T</VAR>__OTCreateTrue</B> <I>( RETAIN(char *) <VAR>instance-id</VAR>, GLOBAL(ilu_Server) <VAR>server</VAR>, OPTIONAL(PASS(void *)) <VAR>user-data</VAR> )</I><P>
+<P>
+Locking:  Inside(<VAR>server</VAR>, <VAR>T</VAR>)
+<P>
+Similar to <CODE><VAR>T</VAR>__CreateTrue()</CODE>, but designed to be used within the <CODE>ot_object_of_ih</CODE>
+function of an object table (section <A HREF="manual_5.html#SEC112">Using C Object Tables</A>).  Requires kernel server locks to be held
+before invocation.
+<P>
+Creates a true instance of type <VAR>T</VAR>, exporting it with instance-id <VAR>instance-id</VAR>, exporting it
+via server <VAR>server</VAR>, associating the value <VAR>user-data</VAR> with it.
+<P>
+<A NAME="IDX119"></A>
+<U>[ANSI C]:</U> OPTIONAL(<VAR>T</VAR>) <B><VAR>T</VAR>__CreateFromSBH</B> <I>( RETAIN(char *) <VAR>sbh</VAR>, RETAIN(CORBA_Environment *) <VAR>Env</VAR>)</I><P>
+<P>
+Locking:  Main Invariant holds
+<P>
+Finds or creates an instance of <VAR>T</VAR>, using the given object reference.  
+<P>
+<A NAME="IDX120"></A>
+<U>[ANSI C]:</U> extern <B><CODE>ilu_Class</CODE></B> <I><VAR>T</VAR>__MSType</I><P>
+<P>
+A value of type <CODE>ilu_Class</CODE> which identifies the most specific ILU type of the type <VAR>T</VAR>.
+<P>
+In the following example, the ILU definition is:
+<PRE>
+INTERFACE I;
+ 
+TYPE T = OBJECT
+  METHODS
+    M ( r : REAL ) : INTEGER
+  END;
+</PRE>
+<P>
+This definition defines an interface <CODE>I</CODE>, an object type <CODE>T</CODE>, and a
+method <CODE>M</CODE>. The method <CODE>M</CODE> takes a <CODE>REAL</CODE> as an
+argument and returns an <CODE>INTEGER</CODE> result. The generated
+ANSI C header file would include the following statements:
+<P>
+<PRE>
+typedef ILU_C_OBJECT I_T;
+
+I_T I_T__CreateTrue (ilu_string ih, ilu_Server server, void *user_data);
+I_T I_T__CreateFromSBH (char *sbh, ILU_C_ENVIRONMENT *Env);
+
+ilu_integer I_T_M (I_T, ilu_real, ILU_C_ENVIRONMENT *);
+</PRE>
+<P>
+The functions <CODE>I_T__CreateTrue</CODE> and <CODE>I_T__CreateFromSBH</CODE>
+are used to create instances
+of the class <CODE>I_T</CODE>.  <CODE>I_T__CreateTrue</CODE> is used by servers
+while <CODE>I_T__CreateFromSBH</CODE> is used by clients. The pointer
+returned in each case is the object instance and must be
+passed with each method invocation.
+<P>
+In addition to its specified arguments, the method <CODE>I_T_M</CODE> takes an
+instance of the type <CODE>I_T</CODE> and a reference to a variable of type
+<CODE>ILU_C_ENVIRONMENT *</CODE>, which is a macro defined to be the appropriate
+CORBA environment type, and is used to return exception codes.  The environment
+struct pointed to by the environment argument must be instantiated in a client; its
+address is passed as the last argument to each method.  True procedures
+must expect a pointer to this structure as the last
+argument.
+ 
+Finally, the ANSI C client calling the method for <CODE>M</CODE> 
+might be as follows:
+<PRE>
+#include "I.h"
+ 
+int main (int ac, char **av)
+{
+  double atof( );
+  I_T inst;
+  int xx;
+  double f;
+  ILU_C_ENVIRONMENT ev;
+ 
+  I__Initialize( );
+  f = atof (av[1]);
+  inst = I_T__CreateFromSBH (av[2], &#38;ev);
+  if (!ILU_C_SUCCESSFUL(&#38;ev)) {
+    printf( "CreateFromSBH raised exception &#60;%s&#62;\n",
+      ILU_C_EXCEPTION_ID(&#38;ev));
+    return(1);
+  }
+  xx = I_T_M (inst, f, &#38;ev);
+  if (!ILU_C_SUCCESSFUL(&#38;ev)) {
+    printf( "exception &#60;%s&#62; signalled on call to I_T_M\n",
+      ILU_C_EXCEPTION_ID(&#38;ev));
+    return(2);
+  }
+  printf( "result is %d\n", xx );
+  return(0);
+}
+</PRE>
+<P>
+Note the call on the interface-specific client initialization procdedure <CODE>I__Initialize</CODE>; these are described in a later section.
+<P>
+In this example, the
+string binding handle is obtained from standard input along
+with some floating-point value.
+<P>
+The class specific function <CODE>I_T__CreateFromSBH</CODE> is called to
+obtain the object instance.  This function was passed
+the string binding handle,
+and a CORBA environment in which to report exceptions.
+The returned object instance is then passed as the first argument
+to the method <CODE>I_T_M</CODE>, along with the environment <CODE>ev</CODE>,
+and the single actual <CODE>ilu_real</CODE> argument <CODE>f</CODE>.  <CODE>I_T_M</CODE> returns
+an <CODE>ilu_integer</CODE> value which is placed in <CODE>xx</CODE>.
+<P>
+The true implementation of the method <CODE>M</CODE> might be as follows:
+<PRE>
+ilu_integer server_I_T_M ( I_T h, ilu_real u, ILU_C_ENVIRONMENT *s )
+{
+  return( (ilu_integer) (u + 1) );
+}
+</PRE>
+<P>
+In this simple example, the corresponding server, or true, method computes
+some value to be returned.  In this case it adds one
+to its <CODE>ilu_real</CODE> argument <CODE>u</CODE>, converts the value to an integer,
+and returns that value.  Note that the server method, if not signalling
+any exceptions, may ignore the environment parameter.
+<P>
+<A NAME="IDX121"></A>
+<H4><A NAME="SEC99" HREF="manual_toc.html#SEC99">Interface Inheritance</A></H4>
+Through interface inheritance, an object type may participate in the behaviors
+of several different types that it inherits from.  These types are called
+<A NAME="IDX122"></A>
+<P>
+<I>ancestors</I> of the object type.  In ANSI C, an object type supplies
+all methods either defined directly on that type, or on any of its
+ancestor types.
+<P>
+Consider the following example:
+<PRE>
+INTERFACE I2;
+ 
+EXCEPTION E1;
+
+TYPE T1 = OBJECT
+  METHODS
+    M1 (a : ilu.CString) : REAL RAISES E1 END
+  END;
+
+TYPE T2 = OBJECT
+  METHODS
+    M2 ( a : INTEGER, Out b : INTEGER )
+  END;
+ 
+TYPE T3 = OBJECT SUPERTYPES T1, T2 END
+  METHODS
+    M3 ( a : INTEGER )
+  END;
+</PRE>
+<P>
+The object type <CODE>T3</CODE> inherits from the object type <CODE>T2</CODE>. Thus, five ANSI C methods
+are relevant to the interface <CODE>I2</CODE>:  <CODE>server_I2_T1_M1</CODE>, <CODE>server_I2_T2_M2</CODE>,
+<CODE>server_I2_T3_M1</CODE>, <CODE>server_I2_T3_M2</CODE>, and <CODE>server_I2_T3_M3</CODE>.
+A module that implements true instances of <CODE>T3</CODE> would have to define
+the last three true methods.  A client uses only three generic functions: <CODE>I2_T1_M1</CODE>, <CODE>I2_T2_M2</CODE>, and <CODE>I2_T3_M3</CODE>.
+<P>
+<A NAME="IDX123"></A>
+<H4><A NAME="SEC100" HREF="manual_toc.html#SEC100">Object Implementation</A></H4>
+<EM>This information is provided for those interested in the
+implementation of the ANSI C object system.  It is <STRONG>not</STRONG> guaranteed
+to remain the same from release to release.</EM>
+<P>
+Each object type is represented by a 
+<A NAME="IDX124"></A>
+<I>TypeVector</I>, which is a vector
+of pointers to 
+<A NAME="IDX125"></A>
+<I>MethodBlock</I> structs, one for each component type of
+the object type, ordered in the proper class precedence for that object
+type.  Each MethodBlock struct contains a <CODE>ilu_Class</CODE> value, followed
+by a vector of pointers to the methods directly defined by that
+<CODE>ilu_Class</CODE>.  There are two different TypeVectors for each object
+type, one for the surrogate class of the type, and the other for the
+true class of the type.  The TypeVector for the surrogate class uses the
+MethodBlocks of its supertypes; the TypeVector for the true class uses
+its own MethodBlocks for both direct and inherited methods, as true
+classes in the ANSI C implementation override all of their
+methods.  The TypeVectors, and MethodBlocks for true classes, are not
+exported; the MethodBlocks for surrogate classes are, as they are used
+by their subclasses.
+<P>
+For each method directly defined in the type, a generic function is
+defined in the common code for its interface, which dispatches to the
+appropriate method.  It does this by walking down the TypeVector for the
+object, till it finds a MethodBlock which contains the appropriate
+ilu_Class on which this method is directly defined), then calling the
+method pointer which is indexed in the MethodBlock's vector of method
+pointers by the index of the method.  The generic functions have the
+correct type signature for the method.  They can be referenced with the <CODE>&#38;</CODE> operator.
+<P>
+<A NAME="IDX126"></A>
+<H3><A NAME="SEC101" HREF="manual_toc.html#SEC101">Exceptions</A></H3>
+<P>
+ANSI C has no defined
+exception mechanism. As already indicated, exceptions are passed in ILU ANSI C by adding to the end of each method 
+an additional status argument
+that can convey an exception code and a value of a type associated with that exception.
+To signal an exception, a method implementation sets the exception code and supplies the parameter value (if any).
+<P>
+An exception parameter is conveyed in the status argument as a C pointer; the parameter-conveying member is declared to be a <CODE>void *</CODE>.  In particular, this pointer is a pointer to a value of the type that is the ANSI C mapping of the exception's ISL parameter.  For an exception that has no parameter, the parameter-conveying member is not meaningful.
+<P>
+In the following example, the <CODE>div</CODE> method can raise the exception
+<CODE>DivideByZero</CODE>:
+<PRE>
+INTERFACE calc;
+ 
+TYPE numerator = INTEGER;
+ 
+EXCEPTION DivideByZero : numerator;
+ 
+TYPE self = OBJECT
+  METHODS
+    Div( v1 : INTEGER, v2 : INTEGER ) : INTEGER RAISES DivideByZero END
+  END;
+</PRE>
+<P>
+The generated include file <TT>`calc.h'</TT> contains the exception definitions:
+<P>
+<PRE>
+#ifndef __calc_h_
+#define __calc_h_
+/*
+** this file was automatically generated for C
+** from the interface spec calc.isl.
+*/
+ 
+#ifndef __ilu_c_h_
+#include "ilu-c.h"
+#endif
+ 
+extern ILU_C_ExceptionCode    _calc__Exception_DivideByZero;
+#define ex_calc_DivideByZero _calc__Exception_DivideByZero
+ 
+typedef ilu_integer calc_numerator;
+typedef calc_numerator calc_DivideByZero;
+ 
+typedef ILU_C_OBJECT calc_self;
+ 
+calc_self calc_self__CreateTrue ( char *id, ilu_Server server,
+   void * user_data);
+calc_self calc_self__CreateFromSBH ( char * sbh, ILU_C_ENVIRONMENT *Env );
+
+ilu_integer calc_self_Div( calc_self, ilu_integer, ilu_integer,
+   ILU_C_ENVIRONMENT *Env );
+
+extern void calc__BindExceptionValue (ILU_C_ENVIRONMENT *, ilu_Exception, ...);
+
+#endif 
+</PRE>
+<P>
+The method implementation for <CODE>Div</CODE> in the true module must detect the
+divide-by-zero condition and raise the exception:
+<P>
+<PRE>
+long server_calc_self_Div (calc_self h, ilu_integer u, ilu_integer v,
+                           ILU_C_ENVIRONMENT *s)
+{
+  calc_numerator n = 9;
+
+  if ( v == 0 )
+    {
+      s-&#62;_major = ILU_C_USER_EXCEPTION;
+      s-&#62;returnCode = ex_calc_DivideByZero;
+      s-&#62;ptr = (void *) malloc(sizeof(calc_numerator));
+      *((calc_numerator *) (s-&#62;ptr)) = n;
+      s-&#62;freeRoutine = (void (*) (void *)) 0;
+      return( u );
+    }
+  else
+    return( u / v );
+}
+</PRE>
+<P>
+When freeing the parameter requires more than just freeing <CODE>s-&#62;ptr</CODE>, a non-NULL <CODE>s-&#62;freeRoutine</CODE> is provided that does the additional freeing; <CODE>s-&#62;freeRoutine</CODE> is given one argument, <CODE>s-&#62;ptr</CODE>, and returns <CODE>void</CODE>.
+<P>
+The generated stubs offer as a convenience a variadic procedure (<CODE>calc__BindExceptionValue</CODE>) that can be used to raise any exception declared in the interface.  For an exception that has no parameter, this procedure takes just two actual arguments.  For an exception with a parameter, the parameter value is given as the third actual argument, using the usual calling convention for passing <CODE>IN</CODE> arguments of its type.  Using this procedure, the above code would be:
+<P>
+<PRE>
+long server_calc_self_Div (calc_self h, ilu_integer u, ilu_integer v,
+                           ILU_C_ENVIRONMENT *s)
+{
+  calc_numerator n = 9;
+
+  if ( v == 0 )
+    {
+      calc__BindExceptionValue(s, ex_calc_DivideByZero, n);
+      return( u );
+    }
+  else
+    return( u / v );
+}
+</PRE>
+<P>
+The exception is sent back to the client, which can detect it thusly:
+<PRE>
+  ...
+  calc_self instance;
+  ILU_C_ENVIRONMENT s;
+  ilu_integer i, j;
+  ilu_integer val;
+  ...
+  instance = calc_self__CreateFromSBH (sbh, &#38;s);
+  
+  if (! ILU_C_SUCCESSFUL(&#38;s)) {
+    fprintf (stderr, "CreateFromSBH(%s) raised %s\n",
+      sbh, ILU_C_EXCEPTION_ID (&#38;s) );
+    exit(1);
+  }
+
+  val = calc_self_Div (instance, i, j, &#38;s);
+
+  /* check to see if an exception occured */
+
+  if (! ILU_C_SUCCESSFUL(&#38;s)) {
+    /* report exception to user */
+    char *p;
+
+    p = ILU_C_EXCEPTION_ID (&#38;s);
+
+    if (p == ex_calc_DivideByZero) {
+      calc_numerator *ip;
+      ip = (calc_numerator *) ILU_C_EXCEPTION_VALUE (&#38;s);
+      fprintf (stderr, "%s signaled:  numerator = %d\n", p, *ip);
+      }
+    else {
+      /* odd exception at this point */
+      fprintf (stderr, "Unexpected &#60;%s&#62; on call to Div.\n", p);
+      }
+    /* free up any transient exception data */
+    ILU_C_EXCEPTION_FREE (&#38;s);
+    }
+  else {
+    /* no exception - print the result */
+    printf( "result is %d \n", val );
+    }
+  ...
+</PRE>
+<P>
+<A NAME="IDX127"></A>
+<H3><A NAME="SEC102" HREF="manual_toc.html#SEC102">Parameter Passing Considerations</A></H3>
+<P>
+Here is ILU's version of table 20 from the CORBA 2.0 spec.
+<P>
+<PRE>
+DataType        In      InOut   Out        Return    Exn
+--------        --      -----   --        ------    ---
+scalar          T       T*      T*         T         T*
+optional        T       T*      T*         T         T*
+object          T       T*      T*         T         T*
+record, fixed   T*      T*      T*         T         T*
+record, var     T*      T*      T**        T*        T*
+union, fixed    T*      T*      T*         T         T*
+union, var      T*      T*      T**        T*        T*
+string          T       T*      T*         T         T*
+other sequence  T*      T*      T**        T*        T*
+array, fixed    T       T       T          T_slice*  T*
+array, var      T       T       T_slice**  T_slice*  T*
+</PRE>
+<P>
+Here <CODE>T</CODE> is the ANSI C mapping of the type in question.
+<P>
+The <CODE>Exn</CODE> column describes how exception parameters appear in the parameter-conveying member of a status struct.
+<P>
+<A NAME="IDX128"></A>
+<H3><A NAME="SEC103" HREF="manual_toc.html#SEC103">True Module Construction</A></H3>
+<P>
+This section will outline the construction of a true module exported by an address space.
+For the example, we will demonstrate the calculator interface described above.
+We will also use the CORBA 2.0 names for standard types and exceptions,
+to show that it can be done. 
+<P>
+First, some runtime initialization of the server stubs must be done.  Call <CODE><VAR>Foo</VAR>__InitializeServer</CODE> for every ISL interface <VAR>Foo</VAR> containing an object type implemented by the address space.  Also call any client initialization procedures needed (see next section).  These server and client initialization calls can be made in any order, and each initialization procedure can be called more than once.  However, no two calls may be done concurrently (this is an issue only for those using some sort of multi-threading package).
+<P>
+Then we create an instance of <CODE>calc_self</CODE>.
+We then make the string binding handle of the object available by printing it to stdout.
+Finally the <CODE>ILU_C_Run</CODE> procedure is called. This procedure listens for connections
+and dispatches server methods.
+<P>
+The main program for the server is as follows:
+<PRE>
+#include "I2.h"
+ 
+CORBA_long
+  server_calc_self_Div (calc_self h,
+                        CORBA_long u,
+                        CORBA_long v,
+                        CORBA_Environment *s)
+{
+  calc_numerator n = 9;
+
+  if ( v == 0 )
+    {
+      calc__BindExceptionValue(s, ex_calc_DivideByZero, n);
+      return( u );
+    }
+  else
+    return( u / v );
+}
+
+main ()
+{
+  calc_self s;
+  char * sbh;
+  CORBA_Environment ev;
+
+  calc__InitializeServer( );
+
+  s = calc_self__CreateTrue (NULL, NULL, NULL);
+  if (s == NULL)
+    {
+      fprintf (stderr, "Unable to create instance of calc_self.\n");
+      exit(1);
+    }
+  else
+    {
+      sbh = CORBA_ORB_object_to_string (ILU_C_ORB, &#38;ev, s);
+      if (ev._major == CORBA_NO_EXCEPTION)
+        {
+          printf ("%s\n", sbh);
+          ILU_C_Run (); /* enter main loop; hang processing requests */
+        }
+      else
+        {
+          fprintf (stderr,
+                   "Attempt to obtain sbh of object %p signalled &#60;%s&#62;.\n",
+                   s, CORBA_exception_id(&#38;ev));
+          exit(1);
+        }
+    }
+}
+</PRE>
+<P>
+<A NAME="IDX129"></A>
+<H3><A NAME="SEC104" HREF="manual_toc.html#SEC104">Using ILU Modules</A></H3>
+<P>
+Before manipulating surrogate objects, a client module must first call a runtime initialization procedure <CODE><VAR>Foo</VAR>__Initialize</CODE> for each ISL interface <VAR>Foo</VAR> that declares object types whose surrogates are to be manipulated.  Additionally, server modules must also call server initialization procedures (see previous section).  These initialization calls may be made in any order, and each procedure may be called more than once.  However, no two calls may be done concurrently (this is an issue only for those using some sort of multi-threading package).
+<P>
+A client of an exported module may obtain an object instance
+either by calling a method which returns the instance,
+or by calling <CODE><VAR>TYPE</VAR>__CreateFromSBH()</CODE> on the string
+binding handle of an instance.  Once the object instance,
+which is typically a surrogate instance, but may in fact
+be a true instance, is held by the client, it can be used
+simply by making method calls on it, as shown above.
+<P>
+<A NAME="IDX130"></A>
+<H3><A NAME="SEC105" HREF="manual_toc.html#SEC105">Stub Generation</A></H3>
+<P>
+To generate ANSI C stubs from an ISL file, use the
+program c-stubber.
+<A NAME="IDX131"></A>
+Four files are generated from the
+<TT>`.isl'</TT> file:
+<UL>
+<LI>
+<TT>`<VAR>interface-name</VAR>.h'</TT> contains the definitions for the types
+and procedures defined by the interface and used by the generated stubs.
+<LI>
+<TT>`<VAR>interface-name</VAR>-common.c'</TT> contains the general code used
+by both client and server; and
+<LI>
+<TT>`<VAR>interface-name</VAR>-surrogate.c'</TT> contains the client-side and general code
+for the interface; and
+<LI>
+<TT>`<VAR>interface-name</VAR>-true.c'</TT> contains the server-side
+stubs and code for the interface.
+</UL>
+Typically, clients of a module never have a need for the 
+<TT>`<VAR>interface-name</VAR>-true.c'</TT> file.
+<P>
+<PRE>
+% <STRONG>c-stubber foo.isl</STRONG>
+header file interface foo to ./foo.h...
+code for interface foo to ./foo-common.c...
+code for interface foo to ./foo-surrogate.c...
+code for server stubs of interface foo to ./foo-true.c...
+%
+</PRE>
+<P>
+<A NAME="IDX132"></A>
+<H3><A NAME="SEC106" HREF="manual_toc.html#SEC106">Tailoring Identifier Names</A></H3>
+<P>
+The option <CODE>-renames <VAR>renames-filename</VAR></CODE> may be used with 
+<CODE>c-stubber</CODE> to specify particular ANSI C names for 
+ISL types. 
+<P>
+It is sometimes necessary to have the ANSI C names of an 
+ILU interface
+match some other naming scheme.  A mechanism is provided to allow the programmer to
+specify the names of ANSI C language artifacts directly, and thus 
+override the automatic ISL to ANSI C name mappings.
+<P>
+To do this, you place a set of synonyms for ISL names in a
+<A NAME="IDX133"></A>
+<P>
+<I>renames-file</I>, and invoke the <CODE>c-stubber</CODE> 
+program with the switch <CODE>-renames</CODE>,
+specifying the name of the renames-file.  The lines in the file are of the form
+<PRE>
+<VAR>construct</VAR> <VAR>ISL-name</VAR> <VAR>ANSI C-name</VAR>
+</PRE>
+where <VAR>construct</VAR> is one of <CODE>method</CODE>, <CODE>exception</CODE>, 
+<CODE>type</CODE>, <CODE>interface</CODE>,
+or <CODE>constant</CODE>; <VAR>ISL-name</VAR> is the name of the 
+construct, expressed either
+as the simple name, for interface names, the concatenation
+<CODE><VAR>interface-name</VAR>.<VAR>construct-name</VAR></CODE> for exceptions, 
+types, and constants,
+or <CODE><VAR>interface-name</VAR>.<VAR>type-name</VAR>.<VAR>method-name</VAR></CODE> 
+for methods;
+and <VAR>ANSI C-name</VAR> is the name the construct should have 
+in the generated
+ANSI C code.  For example:
+<P>
+<PRE>
+# change "foo_r1" to plain "R1"
+type foo_r1 r1
+# change name of method "m1" to "method1"
+method foo_o1_m1 method1
+</PRE>
+<P>
+Lines beginning with the `sharp' character <SAMP>`#'</SAMP> are treated as comment lines,
+and ignored, in the renames-file.
+<P>
+This feature of the <CODE>c-stubber</CODE> should be used as little and as carefully
+as possible, as it can cause confusion for readers of the ISL interface,
+in trying to follow the ANSI C code.  It can also create name conflicts
+between different modules, unless names are carefully chosen.
+<P>
+<A NAME="IDX134"></A>
+<H2><A NAME="SEC107" HREF="manual_toc.html#SEC107">Libraries and Linking</A></H2>
+<P>
+For clients of an ILU module, it is only necessary to link
+with the <TT>`<VAR>interface-name</VAR>-surrogate.o'</TT> and <TT>`<VAR>interface-name</VAR>-common.o'</TT>
+files generated from the
+ANSI C files generated for the interface or interfaces
+being used, and with the two libraries
+<TT>`<VAR>ILUHOME</VAR>/lib/libilu-c.a'</TT> and <TT>`<VAR>ILUHOME</VAR>/lib/libilu.a'</TT> 
+(in this order, as <TT>`libilu-c.a'</TT> uses functions in <TT>`libilu.a'</TT>).
+<P>
+For implementors of servers, the code for the server-side
+stubs, in the file <TT>`<VAR>interface-name</VAR>-true.o'</TT> compiled
+from <TT>`<VAR>interface-name</VAR>-true.c'</TT>, and
+in the file <TT>`<VAR>interface-name</VAR>-common.o'</TT> compiled
+from <TT>`<VAR>interface-name</VAR>-common.c'</TT>, should be included along
+with the other files and libraries.
+<P>
+<A NAME="IDX135"></A>
+<H2><A NAME="SEC108" HREF="manual_toc.html#SEC108">ILU C API</A></H2>
+<P>
+In addition to the functions defined by the CORBA mapping, the ILU ANSI C
+mapping provides some other functions, chiefly for type manipulation, object manipulation,
+and server manipulation.  There are also a number of macros provided for compatibility
+with both versions of CORBA (revision 2.0).
+<P>
+<H3><A NAME="SEC109" HREF="manual_toc.html#SEC109">Type Manipulation</A></H3>
+<P>
+<A NAME="IDX136"></A>
+<U>[ILU C API]:</U> OPTIONAL(ilu_Class) <B>ILU_C_FindILUClassByTypeName</B> <I>( RETAIN(ilu_string) <VAR>type-name</VAR> )</I><P>
+<P>
+Locking:  L1_sup &#60; otmu, L2, Main unconstrained.
+<P>
+Given the <VAR>type-name</VAR> of an ILU object type, of the form <CODE>"Interface.Typename"</CODE>,
+returns the <CODE>ilu_Class</CODE> value for it.  This value can be used to compare
+types for equality.
+<P>
+<A NAME="IDX137"></A>
+<U>[ILU C API]:</U> OPTIONAL(ilu_Class) <B>ILU_C_FindILUClassByTypeID</B> <I>( RETAIN(ilu_string) <VAR>type-id</VAR>)</I><P>
+<P>
+Locking:  L1_sup &#60; otmu; L2, Main unconstrained.
+<P>
+Given the <VAR>type-id</VAR> of an ILU object type, of the form <CODE>"ilu:gfbSCM7tsK9vVYjKfLole1HOBDc"</CODE>,
+returns the <CODE>ilu_Class</CODE> value for it.  This value can be used to compare
+types for equality.
+<P>
+<A NAME="IDX138"></A>
+<U>[ILU C API]:</U> GLOBAL(OPTIONAL(ilu_string)) <B>ILU_C_ClassName</B> <I>( RETAIN(CORBA_Object) )</I><P>
+<P>
+Locking:  unconstrained.
+<P>
+Returns the ILU name for the most specific type of an object instance.
+<P>
+<A NAME="IDX139"></A>
+<U>[ILU C API]:</U> GLOBAL(OPTIONAL(ilu_string)) <B>ILU_C_ClassID</B> <I>( RETAIN(CORBA_Object) )</I><P>
+<P>
+Locking:  unconstrained.
+<P>
+Returns the ILU type ID for the most specific type of an object instance.
+<P>
+<A NAME="IDX140"></A>
+<U>[ILU C API]:</U> ilu_Class <B>ILU_C_ClassRecordOfInstance</B> <I>(CORBA_Object)</I><P>
+<P>
+Locking:  unconstrained.
+<P>
+Returns the <CODE>ilu_Class</CODE> value for the most specific type of an object instance.
+<P>
+<H3><A NAME="SEC110" HREF="manual_toc.html#SEC110">Object Manipulation</A></H3>
+<P>
+<A NAME="IDX141"></A>
+<U>[ILU C API]:</U> ilu_string <B>ILU_C_SBHOfObject</B> <I>( CORBA_Object <VAR>instance</VAR> )</I><P>
+<P>
+Locking:  Main invariant holds.
+<P>
+Given an <VAR>instance</VAR>, returns a reference to that instance.  The CORBA-specified
+routine <CODE>CORBA_ORB_object_to_string()</CODE> should typically be used instead.
+<P>
+<A NAME="IDX142"></A>
+<U>[ILU C API]:</U> OPTIONAL(CORBA_Object) <B>ILU_C_SBHToObject</B> <I>(char * <VAR>sbh</VAR>, ilu_Class <VAR>static_type</VAR>, RETAIN(CORBA_Environment *) Env)</I><P>
+<P>
+Locking:  Main invariant holds.
+<P>
+Takes an object reference and returns the object.
+<VAR>static_type</VAR> is a type the caller knows the object to have.
+<P>
+<A NAME="IDX143"></A>
+<U>[ILU C API]:</U> OPTIONAL(PASS(char*)) <B>ILU_C_PublishObject</B> <I>( CORBA_Object <VAR>instance</VAR> )</I><P>
+<P>
+Locking:  Main invariant holds.
+<P>
+Publishes the OID of the <VAR>instance</VAR> in a domain-wide registry.  This is an experimental
+interface, and may change in the future.
+<P>
+<A NAME="IDX144"></A>
+<U>[ILU C API]:</U> ilu_boolean <B>ILU_C_WithdrawObject</B> <I>( CORBA_Object <VAR>instance</VAR>, PASS(char *) <VAR>proof</VAR>)</I><P>
+<P>
+Locking:  Main invariant holds.
+<P>
+Removes the OID of the <VAR>instance</VAR> from the domain-wide registry.
+<VAR>proof</VAR> is the string returned from the call to <CODE>ILU_C_PublishObject()</CODE>.
+<P>
+<A NAME="IDX145"></A>
+<U>[ILU C API]:</U> OPTIONAL(GLOBAL(CORBA_Object)) <B>ILU_C_LookupObject</B> <I>( RETAIN(char *) <VAR>sid</VAR>, RETAIN(char *) <VAR>ih</VAR>, ilu_Class <VAR>static-class</VAR> )</I><P>
+<P>
+Locking:  Main invariant holds.
+<P>
+Using the local registry, find and return the object specified by the given
+Server ID and server-relative Instance Handle.
+<VAR>static_type</VAR> is one you know the actual object must have;
+it may also have more refined types.
+For an already-reified surrogate this procedure will reconsider
+what contact info to use for reaching the server.
+<P>
+<A NAME="IDX146"></A>
+<U>[ILU C API]:</U> OPTIONAL(GLOBAL(CORBA_Object)) <B>ILU_C_CreateSurrogateObject</B> <I>( ilu_Class <VAR>type</VAR>, RETAIN(char *) <VAR>ih</VAR>, ilu_Server <VAR>server</VAR>, ILU_C_ENVIRONMENT *<VAR>env</VAR> )</I><P>
+<P>
+Locking:  Main invariant holds.
+<P>
+Create a new object instance of the specified <VAR>type</VAR>
+on the specified <VAR>server</VAR>, with the specified <VAR>ih</VAR>.
+If unable to create such an object, return <CODE>ILU_NIL</CODE>, and signal
+the error in <VAR>env</VAR>.
+<P>
+This procedure can be used to create new client-side objects for
+which no true object yet exists.  This is the way a client using
+a server with an object table causes the server to create new instances
+`on the fly'.  When used in this way, the <VAR>ih</VAR> must contain
+all information necessary to allow the server to create the proper
+true object, as it is the only information passed to the object table's
+object creation procedure.
+<P>
+<H3><A NAME="SEC111" HREF="manual_toc.html#SEC111">Server Manipulation</A></H3>
+<P>
+<A NAME="IDX147"></A>
+<U>[ILU C API]:</U> ilu_boolean <B>ILU_C_ENABLE_THREADS</B><P>
+<P>
+Locking:  Main invariant holds.
+<P>
+This macro expands to a function call.
+If ILU has been configured with os-level thread support, calling this
+routine will `turn on' that thread support for use with C.  This
+means that a new thread will be forked to handle each incoming connection,
+in servers, and if the wire protocol being used permits it, a thread will
+be forked to handle each incoming request.  This routine returns FALSE,
+and emits an error message, if something goes wrong with enabling thread
+support.  It must be called before making any other ILU calls, and before
+initializing any interfaces via calls to <CODE><VAR>interface</VAR>__Initialize</CODE>
+or <CODE><VAR>interface</VAR>__InitializeServer</CODE>.
+<P>
+<A NAME="IDX148"></A>
+<U>[ILU C API]:</U> void <B>ILU_C_FINISH_MAIN_THREAD</B> <I>( int <VAR>returnvalue</VAR> )</I><P>
+<P>
+Locking:  Main invariant holds.
+<P>
+This routine will return from the `main' thread with the specified value.  If the main thread
+cannot be terminated until the program ends, the call will block appropriately.
+<P>
+<A NAME="IDX149"></A>
+<U>[ILU C API]:</U> void <B>ILU_C_Run</B> <I>(void)</I><P>
+<P>
+Locking:  Main invariant holds.
+<P>
+Called to animate a server and/or other parts of the program.  Used only in single-threaded mode.  Invokes the event handling loop.  Never returns.
+<P>
+<A NAME="IDX150"></A>
+<U>[ILU C API]:</U> OPTIONAL(ilu_Server) <B>ILU_C_InitializeServer</B> <I>(OPTIONAL(RETAIN(char *)) <VAR>serverID</VAR>, OPTIONAL(GLOBAL(ILU_C_ObjectTable)) <VAR>obj_tab</VAR>, OPTIONAL(RETAIN(char *)) <VAR>protocol</VAR>, OPTIONAL(RETAIN(ilu_TransportInfo)) <VAR>transport</VAR>, OPTIONAL(RETAIN(ilu_Passport)) <VAR>identity</VAR>, ilu_boolean <VAR>setdefaultport</VAR>)</I><P>
+<P>
+Locking:  Main invariant holds.
+<P>
+Creates and returns an <CODE>ilu_Server</CODE> with ID <VAR>serverID</VAR>, object mapping table <VAR>obj_tab</VAR>, using protocol <VAR>protocol</VAR> over a transport stack specified by <VAR>transport</VAR>.  If <VAR>serverID</VAR> is specified as <CODE>NULL</CODE>, a unique string is generated automatically for the server ID.  If <VAR>obj_tab</VAR> is specified as <CODE>NULL</CODE>, the default hash table object table is used.
+<P>
+If either <VAR>protocol</VAR> or <VAR>transport</VAR> is specified, or if <VAR>setdefaultport</VAR>, an <CODE>ilu_Port</CODE> will automatically be created and added to the <CODE>ilu_Server</CODE>.  <VAR>protocol</VAR>, if not <CODE>NULL</CODE>,
+is a string that specifies which RPC protocol to use on the port; <CODE>NULL</CODE> causes use of <CODE>Sun RPC</CODE>.  <VAR>transport</VAR>, if not <CODE>NULL</CODE>, is a sequence of strings that specifies the transport stack to use below the RPC protocol; <CODE>NULL</CODE> signifies use of SunRPC Record Marking over TCP to/from one of the IP addresses of this host.  Chapter 8 gives details on protocol and transport strings.  If an <VAR>identity</VAR> is specified, it may be used for communications security purposes.  If <VAR>setdefaultport</VAR> is true, the newly created <CODE>ilu_Port</CODE> will become the default port of the <CODE>ilu_Server</CODE>.
+<P>
+<H4><A NAME="SEC112" HREF="manual_toc.html#SEC112">Using C Object Tables</A></H4>
+<P>
+It is sometimes useful to have a server create true objects only when they are
+mentioned by a client's actual invocation of a method on them.  This is allowed
+in ILU by an interface called an 
+<A NAME="IDX151"></A>
+<I>object table</I>.  A value of type <CODE>ILU_C_ObjectTable</CODE>
+may be created by a call on
+<P>
+<A NAME="IDX152"></A>
+<U>[ILU C API]:</U> ILU_C_ObjectTable <B>ILU_C_CreateObjectTable</B> <I>(CORBA_Object (*<VAR>object_of_ih</VAR>)(ilu_string instance-handle, ilu_private user-data), void (*<VAR>free_user_data</VAR>)(ilu_private user-data), ilu_private <VAR>user-data</VAR> )</I><P>
+<P>
+Locking:  Main invariant holds.
+@br
+Locking for <VAR>object_of_ih</VAR>:  L1 &#62;= {server}, L1 &#62;= {gcmu} if result is true and collectible; L2, Main unconstrained.
+@br
+Locking for <VAR>free_user_data</VAR>:  L1 &#62;= {server}; L2, Main unconstrained.
+<P>
+Creates and returns a value of type <CODE>ILU_C_ObjectTable</CODE> encapsulating the two procedures <VAR>object_of_ih</VAR> and <VAR>free_user_data</VAR>, and the user-specified data element <VAR>user-data</VAR>.  When <VAR>object_of_ih</VAR> is called, it should create an appropriate <CODE>CORBA_Object</CODE> with the specified instance handle, and return it.  When <VAR>free_user_data</VAR> is called, it indicates the end of the object table, and <VAR>free_user_data</VAR> should free up any storage associated with <VAR>user-data</VAR>.
+<P>
+An object table is associated with a kernel server by passing the object table as
+a parameter to the function <CODE>ILU_C_InitializeServer</CODE>.  A single object
+table may be used with multiple different <CODE>ilu_Server</CODE> instances.
+<P>
+<H3><A NAME="SEC113" HREF="manual_toc.html#SEC113">CORBA Compatibility Macros</A></H3>
+<P>
+ILU supports CORBA 2.0, and formerly supported either 1.1 or 1.2, depending
+on how it was installed at your site.  A number of macros are defined
+to make programs less dependent on which version they use.
+<P>
+<A NAME="IDX153"></A>
+<U>Macro:</U> <B>ILU_C_OBJECT</B><P>
+<P>
+Expands to <CODE>CORBA_Object</CODE>.
+<P>
+<A NAME="IDX154"></A>
+<U>Macro:</U> <B>ILU_C_ENVIRONMENT</B><P>
+<P>
+Expands to <CODE>CORBA_Environment</CODE>.
+<P>
+<A NAME="IDX155"></A>
+<U>Macro:</U> <B>ILU_C_NO_EXCEPTION</B><P>
+<P>
+Expands to <CODE>CORBA_NO_EXCEPTION</CODE>.
+<P>
+<A NAME="IDX156"></A>
+<U>Macro:</U> <B>ILU_C_USER_EXCEPTION</B><P>
+<P>
+Expands to <CODE>CORBA_USER_EXCEPTION</CODE>.
+<P>
+<A NAME="IDX157"></A>
+<U>Macro:</U> <B>ILU_C_SYSTEM_EXCEPTION</B><P>
+<P>
+Expands to <CODE>CORBA_SYSTEM_EXCEPTION</CODE>.
+<P>
+<A NAME="IDX158"></A>
+<U>Macro:</U> <B>ILU_C_SUCCESSFUL</B> <I>( ILU_C_ENVIRONMENT * <VAR>ev</VAR> )</I><P>
+<P>
+Evaluates to true if no exception has been raised.
+<P>
+<A NAME="IDX159"></A>
+<U>Macro:</U> <B>ILU_C_SET_SUCCESSFUL</B> <I>( ILU_C_ENVIRONMENT * <VAR>ev</VAR> )</I><P>
+<P>
+Sets <VAR>ev</VAR> to a successful result.
+<P>
+<A NAME="IDX160"></A>
+<U>Macro:</U> <B>ILU_C_EXCEPTION_ID</B> <I>( ILU_C_ENVIRONMENT * <VAR>ev</VAR> )</I><P>
+<P>
+Returns the <CODE>char *</CODE> value that is the exception's ID.
+<P>
+<A NAME="IDX161"></A>
+<U>Macro:</U> <B>ILU_C_EXCEPTION_VALUE</B> <I>( ILU_C_ENVIRONMENT * <VAR>ev</VAR> )</I><P>
+<P>
+Expands to <CODE>CORBA_exception_value(<VAR>ev</VAR>)</CODE>.
+<P>
+<A NAME="IDX162"></A>
+<U>Macro:</U> <B>ILU_C_EXCEPTION_FREE</B> <I>( ILU_C_ENVIRONMENT * <VAR>ev</VAR> )</I><P>
+<P>
+Expands to <CODE>CORBA_exception_free(<VAR>ev</VAR>)</CODE>.
+<P>
+<P>Go to the <A HREF="manual_4.html">previous</A>, <A HREF="manual_6.html">next</A> section.<P>

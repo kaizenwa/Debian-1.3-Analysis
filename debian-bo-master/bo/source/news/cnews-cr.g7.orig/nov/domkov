@@ -1,0 +1,23 @@
+#! /bin/sh
+# domkov - update all relevant .overview files from header stream
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/nov:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+lock -o LOCKoverview $$ || exit 0	# if can't get lock, leave until later
+trap "unlock LOCKoverview ; trap 0 ; exit 0" 0 1 2 15
+
+cd $NEWSCTL
+lock LOCK $$
+trap '' 1 2 15
+mv headers headers.old		# move headers stream out of harm's way
+touch headers
+unlock LOCK
+trap "unlock LOCKoverview ; trap 0 ; exit 0" 0 1 2 15
+
+mkov headers.old | sort -t'	' +0 -1 +1n -2 |
+	( cd $NEWSARTS ; ovsplit $NEWSOV )
+rm -f headers.old

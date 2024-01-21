@@ -1,0 +1,71 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+done - moves a todo item from the todo list to the changelog.
+
+
+=head1 SYNOPSIS
+
+done [text] ...
+
+
+=head1 DESCRIPTION
+
+This is a tool to manage todolists. It is supposed to be invoked from anywhere
+within a debian package source tree, and if it is it will find the debian 
+directory containing the chnagelog och the TODO file. 
+
+If it's first argument is  the format "#<Nr>", the todo item number <Nr> (as
+listed by todo), will taked from the TODO file and passed on to dch, which
+adds it to the chnagelog file.
+
+In othere cases it will simply pass all it's arguments to dch.
+
+=cut
+
+
+$TmpFile = "/tmp/done.$$";
+$todofile="debian/TODO";
+
+
+# Look for the debian directory
+until (-e "debian/changelog")
+{
+	chdir "..";
+	if (`pwd` eq "/\n")
+	{
+		printf "Cannot find a todo file to edit anywhere\n";
+		exit(1);
+	}
+}
+
+if ($ARGV[0] =~ /^\#(\d+)$/) {
+    $Nr=$1;
+    open (TODO, "<$todofile");
+    open (T, ">$TmpFile");
+    
+    $i=1;
+    while (<TODO>){       
+	if ($i == $Nr){chop; $Ide="$_ -- Done.";} else {print T $_;}
+	$i++;
+    }
+
+    close (T);
+    close (TODO);
+    system("mv $TmpFile $todofile");    
+} else {
+    $Ide=join(" ", @ARGV);
+}
+system("dch $Ide");
+
+=head1 SEE ALSO
+
+deb-make(1)
+
+
+=head1 AUTHOR
+
+Hakan Ardo <hakan@debian.org>
+
+=cut

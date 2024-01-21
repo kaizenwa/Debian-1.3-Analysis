@@ -1,0 +1,95 @@
+lookup_switch.optdate lookup_switch.c lookup_switch.err lookup_switch.o : lookup_switch.m \
+	assoc_list.int \
+	bool.int \
+	code_gen.int \
+	code_info.int \
+	dense_switch.int \
+	exprn_aux.int \
+	getopt.int \
+	globals.int \
+	hlds_data.int \
+	hlds_goal.int \
+	instmap.int \
+	int.int \
+	list.int \
+	llds.int \
+	map.int \
+	mercury_builtin.int \
+	mode_util.int \
+	options.int \
+	prog_data.int \
+	require.int \
+	set.int \
+	std_util.int \
+	switch_gen.int \
+	tree.int \
+	type_util.int \
+	char.int2 \
+	code_util.int2 \
+	delay_info.int2 \
+	float.int2 \
+	hlds_module.int2 \
+	hlds_pred.int2 \
+	io.int2 \
+	mode_errors.int2 \
+	mode_info.int2 \
+	modes.int2 \
+	ops.int2 \
+	relation.int2 \
+	shapes.int2 \
+	special_pred.int2 \
+	string.int2 \
+	term.int2 \
+	tree234.int2 \
+	unify_proc.int2 \
+	varset.int2
+
+lookup_switch.date : lookup_switch.m \
+	assoc_list.int3 \
+	bool.int3 \
+	code_gen.int3 \
+	code_info.int3 \
+	dense_switch.int3 \
+	exprn_aux.int3 \
+	getopt.int3 \
+	globals.int3 \
+	hlds_data.int3 \
+	hlds_goal.int3 \
+	instmap.int3 \
+	int.int3 \
+	list.int3 \
+	llds.int3 \
+	map.int3 \
+	mercury_builtin.int3 \
+	mode_util.int3 \
+	options.int3 \
+	prog_data.int3 \
+	require.int3 \
+	set.int3 \
+	std_util.int3 \
+	switch_gen.int3 \
+	tree.int3 \
+	type_util.int3 \
+	char.int3 \
+	code_util.int3 \
+	delay_info.int3 \
+	float.int3 \
+	hlds_module.int3 \
+	hlds_pred.int3 \
+	io.int3 \
+	mode_errors.int3 \
+	mode_info.int3 \
+	modes.int3 \
+	ops.int3 \
+	relation.int3 \
+	shapes.int3 \
+	special_pred.int3 \
+	string.int3 \
+	term.int3 \
+	tree234.int3 \
+	unify_proc.int3 \
+	varset.int3
+
+lookup_switch.dir/lookup_switch_000.o: lookup_switch.m
+	rm -rf lookup_switch.dir
+	$(MCS) -s$(GRADE) $(MCSFLAGS) lookup_switch.m

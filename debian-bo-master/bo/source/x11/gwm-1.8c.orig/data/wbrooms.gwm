@@ -1,0 +1,766 @@
+;; William Burdick's attempt at icon groups/rooms
+;; The idea is like dvrooms, except that a room is a bar of buttons
+;;=============================================================================
+;; Date: Thu, 01 Jul 1993 00:08:26 EST
+;; From: William R Burdick <burdick@ecn.purdue.edu>
+;; 
+;; I'm not sure whether the way I did things was totally correct
+;; (particularly the justifying of menu items and the user event
+;; handling), so please look over the code, if you have time.  I also
+;; messed around with the standard menus and their behavior near the end
+;; of the file.  Some things I did may not be done right.
+;; 
+;; I had a little time to clean up this thing, but not too much, so some
+;; of my original hacks may still be around.  Let me know if you have any
+;; questions or if you have better ways to do some things.  In
+;; particular, I learned about user-events halfway through this project.
+;; I might have been able to do some of the earlier things better with
+;; user-events.  I like user-events, by the way -- they're like message
+;; passing in OO languages.
+;; 
+;; 	-- Bill Burdick
+;; 	burdick@octopus.ecn.purdue.edu
+;; 
+;; A few explanations...
+;; 
+;; (load 'wbrooms)
+;; 	put this in your .profile.gwm after the standard behaviors are
+;; 	reparsed (just like with dvrooms)
+;; 
+;; (wb-add-to-named-room "roomName.barName")
+;; 	adds a window to a room.  This implicitly creates the
+;; 	room and bar if they are not already there.
+;; 
+;; (wb-find-room "roomName" "barName")
+;; 	gets a room by name
+;; 
+;; (wb-add-to-room room)
+;; 	adds a window to a room when you already have the room
+;; 
+;; (wb-make-named-room "roomName.barName")
+;; 	makes a room (and a bar if that bar doesn't exist, yet).
+;; 
+;; (wb-reattach)
+;; 	reattaches all windows to their rooms
+;; 
+;; wbroom.background.name (it's a string)
+;; 	the name of a 4-shade color (like Thistle or RosyBrown)
+;; 	for the background color of room bars
+;; 
+;; New rooms are added to the right side of their bar.
+;;=============================================================================
+;;
+;; objects
+;; type: room-bar
+;;	a menu with a bar in it containing rooms
+;; property: name
+;;	the name of the room-bar
+;; property: rooms
+;;	a list of the rooms in the room-bar
+;; property: plugs
+;;	a list of the room plugs in the room-bar
+;;
+;; type: room
+;;	a plug
+;; property: name
+;;	the name of the room-bar
+;; property: members
+;;	the windows in the room
+;; property: closed
+;;	the pixmap for the picture displayed when the room is closed
+;; property: open
+;;	the pixmap for the picture displayed when the room is open
+;; property: openp
+;;	whether the room is open
+
+
+;; variables
+(defaults-to
+  wbroom.horizontal-margin 5
+  wbroom.vertical-margin 5
+  wbroom.font (font-make "8x13")
+  wbroom.background.name "RosyBrown"	; this color should be a 4-shade color
+; wbroom.background.name "DodgerBlue"
+  wbroom.foreground black
+  wbroom.borderwidth borderwidth
+  wbroom.current ()
+  wbroom.loaded ()
+  wbroom.room-bars ()
+  wbroom.x 0
+  wbroom.y 0
+  wbroom.item-height ()
+  wbroom.item-width ()
+  wbroom.menu-item.background.name "NavajoWhite"
+  wbroom.menu-label.background.name "goldenrod"
+)
+
+
+;(with (m (menu-wob tools-pop) menu-width (width m)) (? "send\n") (send-user-event 'expand m))
+;wb-simple-label-make
+;	make a simple label with name centered in pixmap
+(defun wb-simple-label-make (name wd ht fnt)
+  (with (l (if (and wd ht)
+	       (with (l (label-make name fnt)
+			w (width l)
+			h (height l)
+			pix (pixmap-make wd ht))
+		     (draw-rectangle pix 0 0 wd ht 0 2)
+		     (draw-text pix
+				wbroom.horizontal-margin ;(/ (- wd w) 2))
+				12
+				fnt
+				name)
+		     pix)
+	     (label-make name fnt)))
+	l))
+
+
+(defun wb-draw-borders (p1 p2 c1 c2 x y w h)
+  (with (w-1 (- w 1)
+	 h-1 (- h 1)
+	 x+1 (+ x 1)
+	 y+1 (+ y 1))
+	(setq foreground c1)
+	(draw-line p1 x y w y)
+	(draw-line p1 x+1 y+1 w-1 1)
+	(draw-line p1 x y x h)
+	(draw-line p1 x+1 y+1 x+1 h-1)
+	(draw-line p2 w h w y)
+	(draw-line p2 w-1 h-1 w-1 y+1)
+	(draw-line p2 w h x h)
+	(draw-line p2 w-1 h-1 x+1 h-1)
+	(setq foreground c2)
+	(draw-line p1 w h w y)
+	(draw-line p1 w-1 h-1 w-1 y+1)
+	(draw-line p1 w h x h)
+	(draw-line p1 w-1 h-1 x+1 h-1)
+	(draw-line p2 x y w y)
+	(draw-line p2 x+1 x+1 w-1 x+1)
+	(draw-line p2 x y x h)
+	(draw-line p2 x+1 y+1 x+1 h-1)))
+  
+
+
+;wb-labels-make
+;	makes two 2.5d pixmaps for name (on off)
+(defun wb-labels-make (name wd ht fnt)
+  (with (label-horizontal-margin wbroom.horizontal-margin
+	 label-vertical-margin wbroom.vertical-margin
+	 borderwidth 0
+	 foreground black
+	 background (color-make (+ wbroom.background.name "2"))
+	 offpix (wb-simple-label-make name wd ht fnt)
+	 background (color-make (+ wbroom.background.name "3"))
+	 onpix (wb-simple-label-make name wd ht fnt))
+	 (wb-draw-borders offpix onpix (color-make (+ wbroom.background.name "1")) (color-make (+ wbroom.background.name "4")) 0 0 (- (width onpix) 1) (- (height onpix) 1))
+	(list offpix onpix)))
+
+; wb-plug-make
+;	makes a 2.5d plug
+;	properties of plug on return:
+;		on: on pixmap
+;		off: off pixmap
+;		name: name given to wb-plug-make
+(defun wb-plug-make args
+  (with (name (# 0 args)
+	 wd (# 1 args)
+	 ht (# 2 args)
+	 font wbroom.font
+	 pix (wb-labels-make name wd ht font)
+	 offpix (# 0 pix)
+	 onpix (# 1 pix)
+	 property (+ (list 'off offpix
+			   'on onpix
+			   'name name) property))
+	(plug-make offpix)))
+
+
+; wb-make-room
+;	makes a room
+(defun wb-make-room (name)
+  (with (property (+ (list 'members ()
+			   'openp t
+			   'registered ())
+		     property)
+	 borderwidth 0
+	 fsm (fsm-make
+	      (state-make (on map-notify (wb-register-room) open))
+	      (: open (state-make
+		     (on (user-event 'raise) (wb-raise-room))
+		     (on (user-event 'lower) (wb-lower-room))
+		     (on (user-event 'disable) (wb-disable) disabled-open)
+		     (on (buttonpress 1 any) (wb-raise-room))
+		     (on (buttonpress 2 any) (wb-close-room) closed)
+		     (on (buttonpress 3 any) (wb-lower-room))))
+	      (: closed (state-make
+ 		     (on (user-event 'disable) (wb-disable) disabled-closed)
+		     (on (buttonpress 2 any) (wb-open-room) open)))
+	      (: disabled-open (state-make
+		     (on (user-event 'enable) (wb-enable) open)))
+	      (: disabled-closed (state-make
+		     (on (user-event 'enable) (wb-enable) closed)))))
+	(wb-plug-make name)))
+
+
+; wb-make-room-control
+;	makes a room control
+(defun wb-make-room-control ()
+  (with (borderwidth 0
+	 fsm (fsm-make
+	      (: s2 (state-make
+		     (on (buttonpress 1 any) (wb-raise-rooms))
+		     (on (buttonpress 2 any) (wb-close-rooms) s1)
+		     (on (buttonpress 3 any) (wb-lower-rooms))))
+	      (: s1 (state-make (on (buttonpress 2 any) (wb-open-rooms) s2))))
+	 label-horizontal-margin wbroom.horizontal-margin
+	 label-vertical-margin wbroom.vertical-margin
+	 background (color-make (+ wbroom.background.name "2"))
+	 font wbroom.font
+	 offpix (label-make " ")
+	 background (color-make (+ wbroom.background.name "3"))
+	 onpix (label-make " ")
+	 property (+ (list 'off offpix
+			   'on onpix
+			   'openp t)
+		     property))
+	(wb-draw-borders offpix onpix (color-make (+ wbroom.background.name "1")) (color-make (+ wbroom.background.name "4")) 0 0 (- (width onpix) 1) (- (height onpix) 1))
+	(wb-draw-borders offpix onpix (color-make (+ wbroom.background.name "1")) (color-make (+ wbroom.background.name "4")) 4 4 (- (width onpix) 5) (- (height onpix) 5))
+	(plug-make offpix)))
+
+
+; wb-is-room-bar
+;	returns whether wob is a room-bar
+(defun wb-is-room-bar (obj)
+  (member obj wbroom.room-bars))
+
+
+; wb-register-room
+;	register room in menu
+(defun wb-register-room ()
+  (if (not (# 'registered wob))
+      (progn
+	(## 'registered wob t)
+	(wb-set-bar-rooms window (+ (wb-bar-rooms window) (list wob))))))
+
+
+; wb-room-members
+;	returns all the members of a room
+(defun wb-room-members (room)
+  (# 'members room))
+
+
+; wb-set-room-members
+;	returns all the members of a room
+(defun wb-set-room-members (room mems)
+  (## 'members room mems))
+
+
+; wb-bar-members
+;	returns all the members of a bar
+(defun wb-bar-members (bar)
+  (: mems ())
+  (for room (# 'rooms bar)
+       (: mems (+ mems (# 'members room))))
+  mems)
+
+
+; wb-bar-rooms
+;	returns the rooms in a room-bar
+(defun wb-bar-rooms (bar)
+  (# 'rooms bar))
+
+
+; wb-set-bar-rooms
+;	sets the rooms in a bar
+(defun wb-set-bar-rooms (bar rooms)
+  (## 'rooms bar rooms))
+
+
+;wb-enable
+(defun wb-enable ()
+  (if (# 'openp wob)
+      (wb-open-room)))
+
+
+;wb-disable
+(defun wb-disable ()
+  (with (oldwob wob)
+	(if (# 'openp oldwob)
+	    (progn
+	      (wb-close-room)
+	      (## 'openp oldwob t)))))
+
+
+; wb-open-room
+;	map all the windows in the room
+(defun wb-open-room ()
+  (with (oldwob wob
+	 wob wob)
+	(wob-tile (# 'off oldwob))
+	(## 'openp oldwob t)
+	(wb-map-wins (wb-room-members oldwob))
+	(: wbroom.current wob)))
+
+
+; wb-map-room-members
+;	map each member of the room
+(defun wb-map-wins (wins)
+  (for window wins
+       (if (# 'wbroom-state window)
+	   (wb-map-window window)
+	 (map-window window-icon)))
+  (wb-raise-wins wins))
+
+
+
+; wb-close-room
+;	unmap all the windows in the room
+(defun wb-close-room ()
+  (wob-tile (# 'on wob))
+  (## 'openp wob ())
+  (: wbroom.current wob)
+  (wb-unmap-wins (wb-room-members wob)))
+
+
+
+; wb-unmap-room-members
+;	map each member of the room
+(defun wb-unmap-wins (wins)
+  (for window wins
+       (## 'wbroom-state window window-is-mapped)
+       (if window-is-mapped (wb-unmap-window window))
+       (if (window-icon?)
+	   (with (window window-icon)
+		 (if  window-is-mapped (unmap-window window))))))
+
+
+; wb-add-to-room
+;	add this window to a room
+(defun wb-add-to-room (room)
+  (if (not (member window (wb-room-members room)))
+      (with (win window
+	     wob room)
+	    (wb-set-room-members room (+ (wb-room-members room) (list win)))
+	    (## 'wbroom-state window window-is-mapped)
+	    (with (bar window
+		   window win)
+		  (set-x-property "GWM_WBROOM"
+				  (+ (# 'name room)
+				     "."
+				     (# 'name bar)))))))
+
+
+; wb-remove-from-room
+;	remove this window from the room
+(defun wb-remove-from-room (room)
+  (with (pos (member window (wb-room-members room)))
+	(if pos (delete-nth pos (wb-room-members room)))))
+
+
+; wb-add-room-to-bar
+;	adds a room to a room-bar
+(defun wb-add-room-to-bar (room bar)
+  (## 'plugs bar (+ (# 'plugs bar) (list room)))
+  (wb-set-bar-rooms bar ())
+  (with (plug-separator 1
+	 borderwidth 0
+	 newb (menu-make (eval (+ '(bar-make) (list (wb-make-room-control)) (# 'plugs bar))))
+	 x (with (wob bar) window-x)
+	 y (with (wob bar) window-y)
+	 property (with (wob bar) wob-property)
+	 newbar (place-menu "wbroombar" newb x y))
+	(## (member bar wbroom.room-bars) wbroom.room-bars newbar)
+	(with (wob bar)
+	      (delete-window))))
+	      
+	 
+; wb-add-room-to-named-bar
+;	makes a room-bar containing only this room or adds the room
+;	to the existing room-bar
+(defun wb-add-room-to-named-bar (room name)
+  (: b (wb-find-room-bar name))
+  (if b (wb-add-room-to-bar room b)
+    (with (borderwidth 0
+	   b (menu-make (bar-make (wb-make-room-control) room))
+	   property (+ (list 'name name
+			     'plugs (list room)
+			     'rooms ())
+		       property)
+	   bar (place-menu "wbroombar" b wbroom.x wbroom.y))
+	  (: wbroom.room-bars (+ wbroom.room-bars (list bar))))))
+
+
+(defun wb-add-named-room-to-named-bar (rname bname)
+  (wb-add-room-to-named-bar (wb-make-room rname) bname))
+
+
+; wb-find-room-bar
+;	gets the room bar named name
+(defun wb-find-room-bar (name)
+  (with (ret ())
+	(for b wbroom.room-bars
+	     (if (= (# 'name b) name) (: ret b)))
+	ret))
+
+
+; wb-find-room
+;	finds a room in a bar
+(defun wb-find-room (rname bname)
+  (with (bar (wb-find-room-bar bname)
+	 ret ())
+	(for r (wb-bar-rooms bar)
+	     (if (= (# 'name r) rname) (: ret r)))
+	ret))
+	
+
+; wb-flush-rooms
+;	removes a window from all the rooms
+;	add wb-flush-rooms to the global closing code
+;	wbrooms should be loaded before the set-{window,icon} calls
+;	in .profile.gwm
+(if (not wbroom.loaded)
+    (progn
+      (: wbroom.loaded t)
+      (: closing (+ closing '((wb-flush-rooms))))))
+(defun wb-flush-rooms ()
+  (for bar wbroom.room-bars
+       (for room (wb-bar-rooms bar)
+	    (if (member window (wb-room-members room))
+		(wb-remove-from-room room))))
+  (with (pos (member window wbroom.room-bars))
+	(if pos
+	    (progn
+	      (wb-map-wins (wb-bar-members window))
+	      (delete-nth pos wbroom.room-bars))))
+  (: wbroom.current ()))
+
+
+; wb-unmap-window
+;	unmap a window and all of its members
+(defun wb-unmap-window (win)
+  (if (wb-is-room-bar win)
+      (wb-unmap-wins (wb-bar-members win)))
+  (unmap-window win))
+
+
+; wb-map-window
+;	map a window and all of its members
+(defun wb-map-window (win)
+  (if (wb-is-room-bar win)
+      (for room (wb-bar-rooms win)
+	   (if (# 'openp room)
+	       (wb-map-wins (wb-bar-members win)))))
+  (map-window win))
+
+
+(if (not (boundp 'wb-previous-iconify-window))
+    (setq wb-previous-iconify-window iconify-window))
+(defun iconify-window ()
+  (if (wb-is-room-bar window-window)
+	; (de)iconifing a room bar
+      (with (window window-window)
+	    (: wbroom.current ())
+	    (if window-is-mapped
+		; iconifing (closing) a dvroom manager
+		  (wb-unmap-wins (wb-bar-members window))
+		; deiconifing (opening) a dvroom manager
+		(for room (wb-bar-rooms window-window)
+		     (if (# 'openp room)
+			 (wb-map-wins (wb-room-members room)))))))
+		; (de)iconifing other windows
+  (wb-previous-iconify-window))
+
+
+;wb-add-to-named-room
+;	adds window to room named room.bar
+(defun wb-add-to-named-room (name)
+  (with (names (wb-get-room-and-bar name)
+	 rname (# 0 names)
+	 bname (# 1 names)
+	 room (wb-find-room rname bname))
+	(if room (wb-add-to-room room))))
+
+
+(defun wb-make-named-room (name)
+  (with (names (wb-get-room-and-bar name)
+	 rname (# 0 names)
+	 bname (# 1 names))
+	(wb-add-named-room-to-named-bar rname bname)))
+
+; wb-get-room-and-bar
+;	returns list of room and bar names from string
+(defun wb-get-room-and-bar (name)
+  (list (match "\\([^.]*\\)" name 1)
+	(match "\\.\\(.*\\)" name 1)))
+
+(defun reverse (l)
+  (: res (list-make (length l)))
+  (: ind (length l))
+  (for item l
+    (: ind (- ind 1))
+    (## ind res item))
+  res)
+
+(defun wb-reorder-wins (windows)
+  (: wins ())
+  (for w (list-of-windows 'stacking-order)
+       (if (member w windows)
+	   (: wins (+ wins (list w)))))
+  wins)
+
+
+;control functions
+(defun wb-raise-rooms ()
+  (send-user-event 'raise window))
+
+
+(defun wb-lower-rooms ()
+  (send-user-event 'lower window))
+
+
+(defun wb-open-rooms ()
+  (wob-tile (# 'off wob))
+  (## 'openp wob t)
+  (send-user-event 'enable window))
+
+
+(defun wb-close-rooms ()
+  (wob-tile (# 'on wob))
+  (## 'openp wob ())
+  (send-user-event 'disable window))
+
+
+;room functions
+(defun wb-raise-room ()
+  (wb-raise-wins (wb-room-members wob)))
+
+(defun wb-lower-room ()
+  (wb-lower-wins (wb-room-members wob)))
+
+(defun wb-raise-wins (wins)
+  (with (w (wb-reorder-wins wins))
+	(for window w
+	     (if (and (member window wbroom.room-bars)
+		      window-is-mapped)
+		 (for room (wb-bar-rooms window)
+		      (if (# 'openp window)
+			  (wb-raise-wins (wb-room-members room))))
+	       (with (window (if (window-is-mapped) window window-icon))
+		     (raise-window))))))
+
+
+(defun wb-lower-wins (wins)
+  (with (w (wb-reorder-wins wins))
+	(for window (reverse w)
+	     (if (and (member window wbroom.room-bars)
+		      window-is-mapped)
+		 (for room (wb-bar-rooms window)
+		      (if (# 'openp window)
+			  (with (window room)
+				(wb-lower-wins (wb-room-members room)))))
+	       (with (window (if (window-is-mapped) window window-icon))
+		     (lower-window))))))
+
+
+(defun wb-reattach ()
+  (for bar wbroom.room-bars
+       (for room (wb-bar-rooms bar)
+	    (wb-set-room-members room ())))
+  (for window (list-of-windows)
+       (with (window window-window
+	      name (get-x-property "GWM_WBROOM"))
+	     (if (< 0 (length name))
+		 (progn
+		   (wb-add-to-named-room name)
+		   (if (and window-is-mapped
+			    (not (# 'wbroom-state window)))
+		       (unmap-window))
+		   (if (and (not window-is-mapped)
+			    (# 'wbroom-state window))
+		       (map-window)))))))
+
+
+(de menu-plug-make (label)
+  (if (# (type label) string-types)
+      (with (wbroom.horizontal-margin label-horizontal-margin
+	     wbroom.vertical-margin label-vertical-margin)
+	    (wb-plug-make label)); wbroom.item-width wbroom.item-height))
+    
+    (= 'pixmap (type label))
+    (plug-make label)
+    
+    (= 'list (type label))
+    (plug-make (eval label))
+    
+    (trigger-error "Bad menu item declaration")
+    ))
+
+
+(defun wb-popups-trigger (arg)
+  (wb-wob-off)
+  (std-popups.trigger arg))
+
+
+(defun std-popups.trigger (multi)
+  (with (calling-wob wob-parent
+	 wob wob)
+    (setq std-popups.action
+      (# 'action wob-property))
+    (wob wob-parent)
+    (if multi (wob wob-parent))
+    (send-user-event 'depop wob t)
+    (eval std-popups.action)))
+
+
+
+(setq std-popups.fsm
+      (fsm-make 
+       (: closed
+	  (state-make 
+	   (on (user-event 'expand)
+	       (wb-expand-item))
+	   (on enter-window (wb-wob-on) opened)
+	   (on (buttonrelease any any) (std-popups.trigger ()))))
+       (: opened
+	  (state-make
+	   (on (user-event 'expand)
+	       (wb-expand-item))
+	   (on (buttonrelease any any)
+	       (wb-popups-trigger ())
+	       closed)
+	   (on enter-window (wb-wob-on))
+	   (on leave-window (wb-wob-off))))))
+
+
+;; fsm for multi-items (plugs in bar)
+(setq std-popups.multi-fsm
+      (fsm-make 
+       (: closed 
+	  (state-make 
+	   (on enter-window (wb-wob-on) opened)
+	   (on (buttonrelease any any) (std-popups.trigger t))))
+       (: opened
+	  (state-make
+	   (on (buttonrelease any any)
+	       (wb-popups-trigger t)
+	       closed)
+	   (on enter-window (wb-wob-on))
+	   (on leave-window (wb-wob-off))))))
+
+
+(df item-make (label action)
+    (with (borderwidth 0
+	   borderpixel pop-label.background
+	   background pop-item.background
+	   wbroom.background.name wbroom.menu-item.background.name
+	   foreground pop-item.foreground
+	   item (with (fsm std-popups.fsm
+			   property (+ (list 'action action) property)
+			   borderwidth 0
+			   font pop-item.font
+			   bar-min-width pop-item.height)
+		      (menu-plug-make label))
+	   property (+ (list 'item item) property))
+	  (bar-make
+	   ()
+	   item
+	   ())))
+
+    
+(de wb-wob-on ()
+    (with (wob wob)
+	  (if (# 'on wob)
+	      (wob-tile (# 'on wob))
+	    (progn
+	      (wob-invert)))))
+
+
+(de wb-wob-off ()
+    (with (wob wob)
+	  (if (# 'off wob)
+	      (wob-tile (# 'off wob))
+	    (wob-invert))))
+
+
+(if (not (boundp 'old-menu-make-from-list))
+    (: old-menu-make-from-list menu-make-from-list))
+(de menu-make-from-list (l)
+    (with (m (old-menu-make-from-list l)
+	   menu-width (width (menu-wob m)))
+	  (send-user-event 'expand (menu-wob m))
+	  m))
+
+(de wb-register-item ()
+    (if (not (# 'registered wob))
+	(progn
+	  (## 'registered wob t)
+	  (## 'wobs window (+ (# 'wobs window) (list wob))))))
+
+
+(de wb-expand-wob ()
+    (if (# 'name wob)
+	(with (pix (wb-labels-make
+		    (# 'name wob)
+		    (- menu-width 2)
+		    pop-item.height
+		    wbroom.font))
+	      (## 'off wob (# 0 pix))
+	      (## 'on wob (# 1 pix))
+	      (wb-wob-off))))
+
+
+(df wb-expand-item ()
+    (with (wbroom.background.name wbroom.menu-item.background.name)
+	  (wb-expand-wob)))
+
+
+(df wb-expand-label ()
+    (with (wbroom.background.name wbroom.menu-label.background.name)
+	  (wb-expand-wob)))
+
+
+(df pop-label-make (label)
+  (with (fsm (fsm-make (state-make
+			(on (user-event 'expand)
+			    (wb-expand-label))))
+	 borderwidth 0
+	 borderpixel pop-label.background
+	 background pop-label.background
+	 wbroom.background.name wbroom.menu-label.background.name
+	 foreground pop-label.foreground) 
+	(bar-make
+	 (with (borderwidth 0 font pop-label.font) 
+	       (menu-plug-make label)))))
+
+
+(df multi-item-make list-of-buttons
+  (with (
+      wbroom.background.name wbroom.menu-item.background.name
+      fsm ()
+      borderwidth 0 borderpixel pop-label.background
+      background pop-item.background
+      foreground pop-item.foreground
+    )		       
+    (eval (+ '(bar-make)
+	(with (
+	    borderwidth 1
+	    fsm std-popups.multi-fsm
+	    font pop-item.font
+	    bar-min-width pop-item.height
+	  )
+	  (mapfor button list-of-buttons
+	    (if (and (= 'list (type button))
+		(= (length button) 2))
+	      (with (
+		  label (# 0 button)
+		  action (# 1 button)
+		  property (+ (list 'action action) property)
+		)
+		(if label
+		  (menu-plug-make label)))
+	      (if button
+		(with (fsm () borderwidth 0)
+		  (menu-plug-make button)))
+)))))))
+
+;End of wbrooms.gwm

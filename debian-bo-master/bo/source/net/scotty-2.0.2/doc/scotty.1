@@ -1,0 +1,1379 @@
+.TH scotty 1 "12 June 1995" "Tkined" "Tkined Reference Manual"
+
+.SH NAME
+scotty \- a Tcl interpreter with TCP/IP extensions
+
+.SH SYNOPSIS
+.B scotty
+[
+.B -c
+.I query
+]
+[
+.B -f
+.I file
+]
+[
+.B -n
+]
+[
+.B -i
+]
+
+.SH DESCRIPTION
+
+scotty is a Tcl interpreter with extensions to obtain status and
+configuration information about TCP/IP networks.  After startup,
+scotty evaluates the commands stored in $HOME/.scottyrc.
+
+.SH OPTIONS
+
+.TP
+.BI "-c " command
+Process 
+.I command
+and exit. This is useful for writing shell scripts.
+
+.TP
+.BI "-f " filename
+Evaluate the commands contained in 
+.I filename. 
+
+.TP
+.B -n
+Don't read the file $HOME/.scottyrc.
+
+.TP
+.B -i
+Initialize the interpreter to run a script for the tkined(1) editor.
+This option will set up the correct search path. 
+
+.SH VARIABLES
+Scotty sets the following Tcl variables:
+.TP 18
+\fBargc\fR
+Contains a count of the number of \fIarg\fR arguments (0 if none),
+not including the name of the script file.
+.TP 18
+\fBargv\fR
+Contains a Tcl list whose elements are the \fIarg\fR arguments,
+in order, or an empty string if there are no \fIarg\fR arguments.
+.TP 18
+\fBargv0\fR
+Contains \fIfileName\fR if it was specified.
+Otherwise, contains the name by which scotty was invoked.
+.TP 18
+\fBtcl_interactive\fR
+Contains 1 if scotty is running interactively (no
+\fIfileName\fR was specified and standard input is a terminal-like
+device), 0 otherwise.
+.TP 18
+\fBscotty_library\fR
+The path to the scotty library directory. This variable is
+initialized to the compiled in default. You can overwrite this
+default by setting the SCOTTY_LIBRARY environment variable.
+.TP 18
+\fBscotty_version\fR
+The scotty version number.
+.TP 18
+\fBscotty_arch\fR
+A string that identifies the architecture and operating system.
+Note, this will only work with Tcl version 7.5 and higher.
+.TP 18
+\fBscotty_RcFileName\fR
+The file name that contains scotty specific startup commands.
+
+
+.SH PROMPTS
+When scotty is invoked interactively it normally prompts for each
+command with ``\fB% \fR''.  You can change the prompt by setting the
+variables \fBtcl_prompt1\fR and \fBtcl_prompt2\fR.  If variable
+\fBtcl_prompt1\fR exists then it must consist of a Tcl script
+to output a prompt;  instead of outputting a prompt scotty
+will evaluate the script in \fBtcl_prompt1\fR.
+The variable \fBtcl_prompt2\fR is used in a similar way when
+a newline is typed but the current command isn't yet complete;
+if \fBtcl_prompt2\fR isn't set then no prompt is output for
+incomplete commands.
+
+.SH TCL COMMANDS
+scotty is based on Tcl version 7.4 and hence it understands all of the
+commands provided by Tcl 7.4. The following is a description of the 
+extensions provided by scotty.
+
+.SS BASIC EVENT HANDLING
+.TP
+.B after \fIargs\fR
+.ns
+.TP
+.B update \fIargs\fR
+.ns
+.TP
+.B tkwait \fIargs\fR
+.ns
+.TP
+.B fileevent \fIargs\fR
+These commands allow basic event handling inside scotty. See the Tk
+documentation for a description of how these commands work.
+
+.SS TIME AND DATE
+.TP
+.B getclock \fR[\fIdate\fR]
+Return the number of seconds since 1970. This is the same as the
+getclock command of extended Tcl. The optional argument forces
+getclock to convert \fIdate\fR. \fIdate\fR should have the format
+as returned by getdate (see below).
+
+.TP
+.B getdate \fR[\fIclock\fR]
+Returns the date in human readable format. The optional argument
+\fIclock\fR specifies the time in seconds since 1970 which will be
+converted to a format like 'Tue Apr 26 20:32:23 1994'. The command
+returns the current date if no argument is given.
+
+.SS JOB SCHEDULING
+The job scheduler provides a convenient mechanism to implement Tcl
+procedures that are invoked at regular intervals. The job command
+allows to associate attributes to individual jobs. This can be used
+to keep state information without using global variables.
+
+.TP
+.B job create \fIcommand\fR \fIinterval\fR [\fIiterations\fR]
+The job create command creates a new job for the given Tcl
+\fIcommand\fR. The command will be evaluated every \fIinterval\fR
+milliseconds. The optional argument defines the number of
+\fIiterations\fR until the job is destroyed. A job will not
+automatically destroyed if the \fIiterations\fR argument is missing.,
+The job create command returns a jobs handle which can be used later
+to modify the job object.
+.TP
+.B job current
+Get the name of the currently running job. An empty string will 
+be returned if no job is running. This command is useful if a job 
+should modify itself.
+.TP
+.B job info
+Returns a list of all job names. The list will be empty if there are
+no jobs in this interpreter.
+.TP
+.B job schedule
+Invoke the scheduler. This is usually done automatically. This command
+may be used during long computations since the scheduler is not
+preemptive.
+.TP
+.B job wait
+The job wait command waits until all jobs have been finished. Note,
+the command will wait infinite if there is at least one job that has
+no iterations count set. Scotty processes events while waiting for
+the jobs to complete.
+
+.TP
+.B job# status [\fIvalue\fR]
+ Get or set the status of a job. Allowed status values are
+\fIrunning\fR, \fIwaiting\fR, \fIsuspended\fR and
+\fIexpired\fR. Setting the job state \fIsuspended\fR will take the job out
+of the scheduler and setting the job state to \fIexpired\fR will
+terminate the job at the next scheduling point.
+.TP
+.B job# command [\fIvalue\fR]
+Get or set the Tcl command associated with a job.
+.TP
+.B job# interval [\fIvalue\fR]
+Get or set the interval of a job. The value is the time interval between
+two invocations and given in milliseconds.
+.TP
+.B job# iterations [\fIvalue\fR]
+Get or set the remaining number of iterations for this job.
+.TP
+.B job# time
+This command returns the time left til the next invocation of the job.
+.TP
+.B job# wait
+Wait until the job is destroyed. This can happen because the number of
+iterations reaches zero or because the job is terminated by setting the
+job state to \fIexpired\fR.
+
+.TP
+.B job# attribute \fR[\fIname [\fIvalue\fR]\fR]
+The attribute option allows to save job related data as job attributes.
+If called without any arguments, all attribute names will be returned.
+If called with a name argument, the current value of the attribute
+will be returned. Note, non existing attributes do not produce an
+error. Instead, an empty string is returned. Calling the option with
+a name and a value causes value to be saved in the named attribute.
+
+.SS EVENT LOGGING
+.TP
+.BI syslog " level message"
+Write \fImessage\fR to the system log using priority \fIlevel\fR. You
+can use the following levels:
+.RS
+.TP 14
+.SB emergency
+A panic condition.  This is normally broadcast to all users.
+.TP
+.SB alert
+A condition that should be corrected immediately,
+such as a corrupted system database.
+.TP
+.SB critical
+Critical conditions, such as hard device errors.
+.TP
+.SB error
+Errors.
+.TP
+.SB warning
+Warning messages.
+.TP
+.SB notice
+Conditions that are not error conditions,
+but that may require special handling.
+.TP
+.SB info
+Informational messages.
+.TP
+.SB debug
+Messages that contain information
+normally of use only when debugging a program.
+.RE
+
+.SS NETWORK DATABASES
+The netdb command provides access to network information that is
+either stored in configuration files (usually in /etc), the Network
+Information Service (NIS) or in the domain name system (DNS). The
+result of these commands usually reflects local configuration. If
+you want to make sure to use the DNS, please use the dns command
+described below.
+
+.TP 
+\fBnetdb hosts\fR
+.ns
+.TP 
+\fBnetdb hosts name \fIaddress\fR
+.ns
+.TP
+\fBnetdb hosts address \fIname\fR
+The first command returns a list of known hosts. Each element contains
+a host name and its IP address. The result is an empty list on many
+systems that are configured to use the DNS to lookup hostnames.  The
+second command converts an IP \fIaddress\fR into a host name and the
+third command takes a host \fIname\fR and returns the corresponding IP
+address.
+
+.TP 
+\fBnetdb networks\fR
+.ns
+.TP 
+\fBnetdb networks name \fIaddress\fR
+.ns
+.TP
+\fBnetdb networks address \fIname\fR
+The first command returns a list of known networks. Each element contains
+the network name and its IP network address. The seconds command returns
+the name that belongs to \fIaddress\fR and the third command returns
+the network address that belongs to a given \fIname\fR.
+
+.TP 
+\fBnetdb protocols\fR
+.ns
+.TP 
+\fBnetdb protocols name \fInumber\fR
+.ns
+.TP
+\fBnetdb protocols number \fIname\fR
+The first command returns a list of known Internet protocols. Each element
+contains the protocol name and its protocol number. The second command
+returns the protocol name that belongs to \fInumber\fR and the third command
+returns the protocol number that belongs to \fIname\fR.
+
+.TP 
+\fBnetdb services\fR
+.ns
+.TP 
+\fBnetdb services name \fInumber\fR
+.ns
+.TP
+\fBnetdb services number \fIname\fR
+The first command returns the list of known services. The list contains
+elements where each element contains the service name, the service
+number and the transport protocol. The second command returns the
+service name for the service given by \fInumber\fR, which must be a
+list containing the service number and the transport protocol.  For
+example, netdb services name "21 tcp" will return ftp.  The third
+command accepts a list containing a service name and its transport
+protocol and returns the protocol number. To follow the example, 
+netdb services number "ftp tcp" will return 21.
+
+.TP 
+\fBnetdb sunrpcs\fR
+.ns
+.TP 
+\fBnetdb sunrpcs name \fInumber\fR
+.ns
+.TP
+\fBnetdb sunrpcs number \fIname\fR
+The first command lists all known Sun RPCs. For each RPC, a list
+containing the RPC name and its registration number is returned. The
+second command returns the RPC name that belongs to \fInumber\fR and
+the third command returns the RPC number that belongs to the given
+\fIname\fR.
+
+.SS INTERNET CONTROL MESSAGES (ICMP)
+You need the ntping(1) program to use the icmp command since sending 
+icmp packets requires root permissions.  ntping must be installed set
+uid root.
+
+.TP
+\fBicmp\fR [\fIoptions\fR] \fBecho\fR \fIhosts\fR
+This icmp command can be used to test the reachability of IP devices
+by sending an ICMP echo request to the hosts given in \fIhosts\fR.
+The command returns a list of host / round trip time pairs.
+
+.TP
+\fBicmp\fR [\fIoptions\fR] \fBmask\fR \fIhosts\fR
+This icmp query returns a list of host / netmask pairs. It can
+be used to locate subnetworks. The mask will be set to 0.0.0.0
+if the host does not respond to mask requests.
+
+.TP
+\fBicmp\fR [\fIoptions\fR] \fBtimestamp\fR \fIhosts\fR
+Ask hosts for their timestamps. This command returns an estimate of the
+time difference between local time and the time on the hosts given in
+\fIhosts\fR. The command returns a list of host / time pairs.
+
+.TP
+\fBicmp\fR [\fIoptions\fR] \fBttl\fR \fInum\fR \fIhosts\fR
+The ttl option, which may not be supported on every unix system, 
+causes scotty to send an udp packet to an unused port number with
+the time to live set to \fInum\fR. The result is a list of host / 
+round trip time pairs, where the host is the IP device being 
+\fInum\fR hops away.
+
+.TP
+\fBicmp\fR [\fIoptions\fR] \fBtrace\fR \fInum\fR \fIhosts\fR
+The trace option works similar to the ttl option but it always
+returns the destination address even when the responding 
+host chooses another interface with a different ip address to send 
+the reply. This can be used to trace a route to a host since
+the command returns the host that discards the packet if it does 
+not reach the recipient.
+
+.RS 5
+The available \fIoptions\fR are:
+.RE
+
+.RS
+.TP 20
+.BI "-timeout " time
+The timeout \fItime\fR is given in seconds with a default of 5 seconds. 
+.TP
+.BI "-retries " number
+Unanswered icmp echo request will be resent \fInumber\fR times with a 
+default of 2. 
+.TP
+.BI "-delay " time
+Icmp packets will be send with a minimum delay between successive
+packets. The default delay is 0 milliseconds. You can change
+this delay using this option to \fItime\fR milliseconds. Delays are
+useful to reduce load on intermediate hosts like gateways or bridges.
+.TP
+.BI "-size " number
+Set the size of outgoing icmp packets to \fInumber\fR bytes. The default
+packet size is 64 bytes. Sizes smaller than 64 bytes are silently rounded 
+to 64 bytes.
+.RE
+
+.SS DOMAIN NAME SYSTEM (DNS)
+.TP
+\fBdns\fR [\fIoptions\fR] \fBaddress\fR \fIhost\fR
+The dns command sends a query to the domain name system (DNS) resolver 
+for the specified \fIhost\fR. The first form of this command asks for
+the ip address contained in the A record. If \fIhost\fR is something 
+like ra.ibr.cs.tu-bs.de, you will get the result 134.169.34.12 
+134.169.246.34.
+
+.TP 
+\fBdns\fR [\fIoptions\fR] \fBptr\fR \fIname\fR
+Send a query for the domain name pointer. Pointer records are used
+to map an ip address into a fully qualified host name. If \fIname\fR
+is something like 134.169.34.12, then the result schould be RA.IBR.CS.TU-BS.DE.
+
+.TP
+\fBdns\fR [\fIoptions\fR] \fBhinfo\fR \fIname\fR
+Retrieve the host information record. If \fIname\fR is something like 
+ra.ibr.cs.tu-bs.de, you will get the result SUN-4/75 SunOS.
+
+.TP
+\fBdns\fR [\fIoptions\fR] \fBmx\fR \fIname\fR
+Send a query for a mail exchanger record (MX). If \fIname\fR is a
+domain name for which an MX record exists, you will get a list of mail
+exchanger host. Each element contains a hostname and its priority. For
+example, when called with the domain name ibr.cs.tu-bs.de, you will
+get {ra.ibr.cs.tu-bs.de 0} {jupiter.ibr.cs.tu-bs.de 10}.
+
+.TP
+\fBdns\fR [\fIoptions\fR] \fBsoa\fR \fIname\fR
+Ask the DNS for the start of authority (SOA). If \fIname\fR
+is something like cs.tu-bs.de, you will get the answer 
+infbssys.ips.cs.tu-bs.de.
+
+.RS 5
+The available \fIoptions\fR are:
+.RE
+
+.RS 
+.TP 20
+.BI "-server " server
+Send the query to the specified \fIserver\fR
+instead to the default server(s) of the system.
+.TP
+.BI "-timeout " time
+Set the timeout to \fItime\fR seconds. 
+The default timeout is 2 seconds.
+.TP
+.BI "-retries " number
+Set the number of retries to \fInumber\fR. The default number of 
+retries is 2. Please note, that the resolver doubles the last timeout 
+after every retry.
+.RE
+
+.SS NETWORK TIME PROTOCOL (NTP)
+.TP
+\fBntp\fR [\fIoptions\fR] \fBhost\fR \fIarrayName\fR
+This command sends an ntp version 3 mode 6 request to \fIhost\fR and
+writes status information into \fIarrayName\fR. The array will contain 
+the elements peer.delay, peer.dispersion, peer.offset, peer.precision,
+peer.reach, peer.srcadr, peer.stratum, peer.valid, sys.peer,
+sys.precision, sys.refid, sys.rootdelay, sys.rootdispersion,
+sys.stratum and sys.system.  See RFC 1305 for the meaning of these
+variables.
+
+.RS 5
+The available \fIoptions\fR are:
+.RE
+
+.RS 
+.TP 20
+.BI "-timeout " time
+Set the timeout to \fItime\fR seconds. 
+The default timeout is 2 seconds.
+.TP
+.BI "-retries " number
+Set the number of retries to \fInumber\fR. The default number of 
+retries is 2.
+.RE
+
+.SS USER DATAGRAM PROTOCOL (UDP)
+.TP
+.B udp open \fR[\fIport\fR]
+The udp commands described below provide access to the udp protocol. 
+The first one creates a udp datagram socket and associates it with a 
+Tcl file handle which will be returned on command completion. The 
+optional argument defines the port number to use. The command 
+will search for an unused port if no port is given.
+
+.TP
+.B udp connect \fIhost\fR \fIport\fR
+Open a datagram file handle that is connected to \fIhost\fR
+and \fIport\fR. This makes frequent message exchanges faster since 
+there is no need to give the host and port arguments to the send 
+command once the udp file handle is connected to a target.
+
+.TP
+.B udp send \fIfile\fR [\fIhost port\fR] \fImessage\fR
+Send a datagram containing \fImessage\fR. The \fIhost\fR and \fIport\fR 
+arguments may not be used if the udp file handle is already connected to
+a remote host. If the udp file handle is not connected, you must use
+these optional arguments to identify the destination of the datagram.
+
+.TP
+.B udp receive \fIfile\fR
+Receive a datagram from the udp file handle \fIfile\fR. This command 
+blocks until a message is received. In most cases, it might be a good
+idea to check for pending datagrams using the fileevent command.
+
+.TP
+.B udp close \fIfile\fR
+Close the udp file handle \fIfile\fR.
+
+.TP
+.B udp info \fR[\fIfile\fR]
+Calling udp info without any arguments returns a list of all Tcl file
+handles that have been created using the udp create command. Info about
+the current connection of a udp file handle \fIfile\fR is returned
+by using the optional argument. The result is a list containing the 
+source ip address, source port, destination ip address and destination 
+port.
+
+.SS TRANSMISSION CONTROL PROTOCOL (TCP)
+.TP
+.B tcp connect \fIhost\fR \fIport\fR
+The tcp commands below are used to manage tcp connections. The tcp 
+connect command creates a connection to a remote tcp server. The
+returned identifier may be used in commands like read, write, gets, 
+puts and close. \fIhost\fR gives the name of the host to connect
+to. \fIport\fR gives the desired port.
+
+Even if every socket is opened for both reading and writing, seek must
+not be invoked between a read and a write. As Tcl file I/O is
+implemented on top of the stdio library, communication over a TCP file
+handle may require a call to flush whenever you change the direction
+(e.g. after a puts and before a gets on the TCP handle). Note,
+although many systems can handle this situation automatically, it is
+still a nice idea to call flush for those machines who need it.
+
+.TP
+.B tcp listen \fR[\fIport\fR]
+A listening tcp socket is set up. If \fIport\fR is empty or 0, then
+the system will select a port number for you. The returned identifier 
+may be used in commands like accept, shutdown and close. 
+
+.TP
+.B tcp accept \fIfile\fR
+Accepts a connection on an existing server \fIfile\fR (created with the
+tcp listen command) and returns an identifier which may be used in 
+commands like read, write, gets, puts and close.
+
+.TP
+.B tcp shutdown \fIfile\fR \fIhow\fR
+Shutdown a connection for reading, writing or both. If \fIhow\fR
+is "0", "read" or "receives", then further receives on \fIfile\fR
+will be disabled. If \fIhow\fR is "1", "write" or "sends", then 
+further sends on \fIfile\fR will be disabled and eof will be send 
+on the socket. If \fIhow\fR is "2", "all" or "both", then further 
+sends and receives on \fIfile\fR will be disabled.
+
+.TP
+.B tcp close \fIfile\fR
+Close the tcp file handle \fIfile\fR.
+
+.TP
+.B tcp info \fR[\fIfile\fR]
+Calling tcp info without any arguments returns a list of all Tcl file
+handles that have been created using the tcp listen and tcp connect
+command. Info about the current connection of a tcp file handle 
+\fIfile\fR is returned by using the optional argument. The result is a
+list containing the source ip address, source port, destination ip
+address and destination port.
+
+.SS HYPERTEXT TRANSFER PROTOCOL (HTTP)
+Scotty provides some basic access to HTTP server. This allows
+applications to retrieve documents with a http uniform ressource
+locator (URL) (see RFC 1738 for details about URLs). You can get access 
+to documents with non http URLs by using a proxy http server. 
+.TP
+.B http head \fIurl\fR
+This command retrieves the header information of the document with the
+given URL \fIurl\fR. The header is returned as a list of key-value pairs.
+
+.TP
+.B http get \fIurl\fR \fIfileName\fR
+Retrieve the document with the URL \fIurl\fR. The body of the document
+is written to the file \fIfileName\fR. The command returns the header
+as described by the http head command above.
+
+.TP
+.B http post \fIurl\fR \fIdocFileName\fR \fIfileName\fR
+Post the document given by \fIdocFileName\fR to the URL \fIurl\fR. The
+body of the document is written to the file \fIfileName\fR. The
+command returns the header as described by the http head command
+above.
+
+.TP
+.B http put \fIurl\fR \fIfileName\fR
+Put the document under the URL \fIurl\fR. The body of the document is
+read from the file \fIfileName\fR. The command returns the header as
+described by the http head command above.
+
+.TP
+.B http delete \fIurl\fR
+Delete the document with the URL \fIurl\fR. The command returns status
+information.
+
+.TP
+.B http proxy \fR[\fIurl\fR]
+All subsequent http requests are send to the proxy server given by
+\fIurl\fR. Without the \fIurl\fR argument, the currently used proxy
+server is returned. Setting the proxy server to an empty string turns
+the proxy feature off.
+
+.TP
+.B http server \fR[\fIport\fR]
+Turn scotty into a simple http server listening on port \fIport\fR.
+If called without a \fIport\fR argument, the currently used port number
+or an empty string is returned.
+
+.TP
+.B http mime \fItype\fR \fIextension\fR
+This option can be used to add mime type definitions to the internal
+table that maps file name extension to mime types. If called without
+an argument, the list of all mime type mappings is returned. A new
+mapping is created by supplying a mime \fItype\fR and the file name
+\fIextension\fR.
+
+.TP
+.B http bind \fIpattern\fR \fImethod\fR \fR[\fIscript\fR]
+This option binds a Tcl script to a http request indicated by
+\fImethod\fR where the URL matches \fIpattern\fR. Whenever a HTTP
+request is received that matches the pattern, \fIscript\fR is evaluated 
+and the returned values is send back to the client. Errors during the
+evaluation of \fIscript\fR will result in an error response.
+
+Some % sequences will be substituted before the command is evaluated:
+
+.RS
+.TP 6
+.B %A
+the network address of the client
+.TP
+.B %P
+the URL path requested by the client
+.TP
+.B %S
+the search path contained in the URL path
+.RE
+
+.SS SUN REMOTE PROCEDURE CALL (SUNRPC)
+.TP
+.B sunrpc info \fIhost\fR
+Return a list of all registered Sun RPC services on
+.I host.
+The list elements are strings each containing the program number, program
+version, protocol name, port number and the name of one RPC service.
+The command fails, if 
+.I host
+is an incorrect name or if the portmapper is not available.
+
+.TP
+.B sunrcp probe \fIhost\fR \fIprogram\fR \fIversion\fR \fIprotocol\fR
+You can test a Sun RPC service using the sunrpc probe command. This calls
+procedure 0 that simply returns. Additional arguments to sunrpc probe
+will be ignored allowing one to write simple loops to test all
+registered RPC services of a host.
+
+.TP
+.B sunrpc stat \fIhost\fR
+Make a rstat RPC call to \fIhost\fR and return a list of name type
+value triples describing the status of the machine. This command fails
+if \fIhost\fR is not reachable or does not support the rstat service.
+
+.TP
+.B sunrpc mount \fIhost\fR
+Get a list of all NFS file systems mounted from \fIhost\fR.
+
+.TP
+.B sunrpc exports \fIhost\fR
+Get a list of all NFS file systems exported by \fIhost\fR.
+
+.TP
+.B sunrpc ether \fIhost\fR \fBopen
+.ns
+.TP
+.B sunrpc ether \fIhost\fR
+.ns
+.TP
+.B sunrpc ether \fIhost\fR \fBclose
+Query the etherd daemon. First you have to set up a connection to
+the etherd on \fIhost\fR using sunrpc ether \fIhost\fR open.
+Afterwards you can query the etherd which will return a list of name
+type value triples describing the packets counted since the last
+query. You should close the connection using sunrpc ether \fIhost\fR 
+close.
+
+.SS SIMPLE NETWORK MANAGEMENT PROTOCOL (SNMP)
+Access to the Simple Network Management Protocol (SNMP) version 1 and
+version 2 is provided by two new Tcl commands. The first command
+handles queries to the MIB definitions and the second is used to
+create SNMP sessions. All interactions with SNMP agents are done using
+SNMP session handles. The differences between version 1 and version 2
+are mostly hidden by this SNMP implementation (e.g. getbulk requests
+are mapped to getnext requests and version 1 traps are signalled as
+version 2 traps) once you have configured a valid session handle.
+
+SNMP data types are mapped to a Tcl string representation
+automatically. Below is a short description how the basic SNMP
+types are mapped to Tcl:
+
+.TP 20
+OCTET STRING
+A primitive OCTET STRING is represended as a number of hexadecimal
+octets separated by colons, e.g. 6e:61:73:65.
+.TP
+OBJECT IDENTIFIER
+An OBJECT IDENTIFIER is represented in the dotted notation. Each 
+subidentifier is converted to an unsigned integer. The integer 
+subidentifier are separated by dots, e.g. 1.3.6.1.2.1.1. It is
+also allowed to have hexadicimal octets as subidentifiers if they
+are preceeded by a colon instead of a dot, e.g. 1.3.6.1:02:01:01.
+.TP
+IpAddress
+An IpAddress is converted to the usual dotted notation, e.g. 134.169.34.15.
+.TP
+TimeTicks
+A TimeTicks value is converted to a string of the form nd hh:mm:ss:cc
+where n is the number of days, hh is the number hours, mm is the
+number of minutes, ss is the number of seconds and cc is the number of
+hundreds of a seconds, e.g. 7d 2:04:37.84.
+.TP
+INTEGER, Integer32
+.ns
+.TP
+Counter, Counter32
+.ns
+.TP
+Gauge, Gauge32
+All these numeric values are converted into an integer number. Note,
+the label of an enumeration will be returned instead of a number if
+there is an enumeration defined for the value of an object.
+.TP
+Counter64
+A Counter64 value is mapped to an integer value on 64 Bit machines
+and to a floating point value on 32 Bit machines. 
+.PP
+
+Display hints and enumerations defined in textual conventions are also
+applied automatically. This allows to use the application specific
+representation or the label of an enumeration in your Tcl code.
+Explicit conversions are possible using the mib format and mib scan
+commands described below.
+
+.TP
+.B mib load \fIfile\fR
+This command loads the MIB definitions contained in \fIfile\fR. The
+file should contain a valid ASN.1 MIB definition. The builtin parser
+reads the file and writes a condensed format which will be used
+by future load commands. Parsing errors are written to stderr. If
+a file is not found in the current directory, it will be searched
+automatically in $scotty_library/site and $scotty_library/mibs in 
+this order.
+
+.TP
+.B mib name \fR[\fI-exact\fR] \fIname\fR
+The mib name command returns the shortname of a MIB object. The
+argument \fIname\fR may be either a name like sysUpTime or an object
+identifier like 1.3.6.1.2.1.1.3. The -exact switch forces strict
+lookups where it is not allowed that \fIname\fR contains an instance
+identifier. For example, mib name 1.3.6.1.2.1.1.3.0 will return
+sysUpTime.0 while mib -exact name 1.3.6.1.2.1.1.3.0 will fail. It is
+also legal to have hexadecimal components in an object identifier.  A
+colon instead of a dot is used to identify a hexadecimal
+subidentifier. For example, mib name 1.3.6.1.2.1.4.21.1.7:86:A9:22:01
+will return ipRouteNextHop.134.169.34.1. Note, that the shortname
+returned is not unique in all cases.
+
+.TP
+.B mib oid \fR[\fI-exact\fR] \fIname\fR
+The mib oid command is the counterpart to mib name and converts a name
+to the associated object identifier. For example, mib oid sysUpTime.0
+will return 1.3.6.1.2.1.1.3.0. If a name is not unique within the
+loaded MIB definitions, the object identifier of the first matching
+name will be returned. It is possible to make names unique by
+prepending portions of the MIB path like mib-2.system.sysUpTime. The
+-exact option has the same meaning as described for the mib name
+command.
+
+.TP
+.B mib syntax \fR[\fI-exact\fR] \fIname\fR
+The syntax of a mib object is retrieved using the mib syntax command.
+\fIname\fR is allowed to be either an object name or an object
+identifier. The syntax returned is the syntax name as defined in the
+MIB definition. Hence, you will get the syntax DisplayString for
+sysDescr although it is only a textual convention which is encoded as
+an octet string. The -exact option has the same meaning
+as described for the mib name command.
+
+.TP
+.B mib description \fR[\fI-exact\fR] \fIname\fR
+The mib description command retrieves the textual description of a MIB
+object. \fIname\fR is allowed to be either an object name or an object
+identifier. The -exact option has the same meaning as described for
+the mib name command.
+
+.TP
+.B mib successor \fR[\fI-exact\fR] \fIname\fR 
+The mib successor command returns a list of all known successors of
+the MIB node given by \fIname\fR. \fIname\fR is allowed to be
+either an object name or an object identifier. The format of the
+result depends on the format of \fIname\fR: If \fIname\fR is an object
+identifier, then the result will also be a list of object identifier.
+A list of names is returned if \fIname\fR is a mib name. For example,
+mib successor system will return the Tcl list "sysDescr sysObjectID
+sysUpTime sysContact sysName sysLocation sysServices". The -exact
+option has the same meaning as described for the mib name command.
+
+.TP
+.B mib access \fR[\fI-exact\fR] \fIname\fR
+The max-access definition of a mib object given by \fIname\fR can be
+retrieved using the mib access command. The returned access mode will
+be one of not-accessible, read-only, read-create, read-write,
+write-only.  The -exact option has the same meaning as described for
+the mib name command.
+
+.TP
+.B mib index \fR[\fI-exact\fR] \fIname\fR
+This command returns the list of names of index variables that are
+used as keys in a conceptual table. The command returns an empty
+result if the given \fIname\fR does not have an associated index.
+
+.TP
+.B mib format \fIname\fR \fIvalue\fR
+The mib format command can be used to apply textual conventions that
+are defined for \fIname\fR to \fIvalue\fR. This is used internally
+to return readable values from a SNMP request but may be helpful in
+situations where it is appropriate to format values by hand. The
+format command can also be used to render integer values into time 
+tick format.
+
+.TP
+.B mib scan \fIname\fR \fIvalue\fR
+The mib scan command implements the inverse operations to mib format
+and converts a readable value into the underlying format. This may be
+useful in situations where you are interested to get the primitive
+value rather than the readable representation. The scan command
+returns the \fIvalue\fR unaltered if no textual convention or
+enumeration applies to \fIname\fR. The scan command can also be used
+to convert the time tick format into the corresponding integer format.
+
+.TP
+.B mib tc \fR[\fI-exact\fR] \fIname\fR
+The mib tc command returns a list which describes the textual
+convention defined for \fIname\fR. The first element is the name of
+the textual convention and the second is the name of the underlying
+base type. The third element is the format string and the fourth a
+list of name value pairs for integer enumeration. An empty string is
+returned if there is no textual convention defined for \fIname\fR.
+
+.TP
+.B mib file \fR[\fI-exact\fR] \fIname\fR
+The mib file command returns the file name that contains the definition
+of the mib tree node given by \fIname\fR.
+
+.TP
+.B mib \fR[\fI-exact\fR] walk \fIvarname name body\fR
+The mib walk command evaluates the Tcl script \fIbody\fR for each 
+known MIB node below the node given by \fIname\fR. Leaf nodes are
+assigned to \fIvarname\fR before the \fIbody\fR is evaluated.
+
+.TP
+\fBsnmp session\fR [\fIoptions\fR]
+The snmp session command creates session handles. All snmp
+communication is done using session handles. If called without
+any options, a version 1 session handle to localhost is created.
+The format of the options is explained in the description of the
+configure command (see below).
+
+.TP
+\fBsnmp alias\fR [\fIname\fR [\fIoptions\fR]]
+The snmp alias command allows to define aliases for configuration
+options. This can be used to define short names for complex session
+configurations needed for SNMPv2 session. There is an alias configure 
+option that accepts a previously defined alias.
+
+Below is an examples that creates an SNMPv1 alias private which
+defines the SNMPv1 community string in use. The alias sulu creates a
+SNMPv1 session to address 1.2.3.4 using the parameters defined in the
+alias private and the alias sulu/1701 extends the checkov alias with a
+non standard port number.
+
+snmp alias private "-community ncc1701"
+.br
+snmp alias sulu "-address 1.2.3.4 -alias private"
+.br
+snmp alias sulu/1701 "-alias sulu -port 1701"
+
+More complex aliases can be used to define SNMPv2 party/party/context
+sessions. Here is an example: The definition of alias sulu/c1
+determines a context to be used on the agent on host 1.2.3.4. The
+second alias sulu/a1 defines a noAuth/noPriv agent party for the host
+with address 1.2.3.4 and the third alias sulu/m1 defines a manager
+party to talk to host 1.2.3.4. The final alias sulu/v2 combines both
+parties and the context definitions to setup a noAuth/ noPriv snmp 
+session to host 1.2.3.4.
+
+set ip 1.2.3.4
+.br
+set iPId [mib oid initialPartyId]
+.br
+set iCId [mib oid initialContextId]
+
+snmp alias sulu/c1 "-context $iCId.$ip.1"
+
+snmp alias sulu/a1 [list -dstparty \\
+.br
+    [list $iPId.$ip.1 UDP $ip 161 484]]
+
+snmp alias sulu/m1 [list -srcparty \\
+.br
+    [list $iPId.$ip.2 UDP 0.0.0.0 161 484]]
+
+snmp alias sulu/v2 \\
+.br
+    "-alias sulu/a1 -alias sulu/m1 -alias sulu/c1"
+
+.TP
+.B snmp info
+snmp info returns a list of all active sessions. 
+
+.TP
+.B snmp watch \fItoggle\fR
+The snmp watch command turns hex printing of SNMP packets on or off.
+This is mostly a debugging aid.
+
+.TP
+.B snmp wait
+Wait until all asynchronous requests have been processed.  All events
+are processed in the normal fashion while waiting for outstanding
+responses.
+
+.RE
+SNMP varbind lists are represented as Tcl lists where each list
+element itself is a list describing one varbind element. A varbind
+element is usually a triple of the object identifier, the associated
+type and a value. An example might be {1.3.6.1.2.1.1.5.0 {OCTET
+STRING} ciscobs.rz.tu-bs.de} {1.3.6.1.2.1.1.7.0 INTEGER 6}. Type
+conversion is done using very simple rules: All numeric values are
+converted into numerical Tcl values. Octet strings are represented as
+ASCII hex string where each hex value is separated by a colon,
+e.g. 6e:61:73:65. Textual conventions containing display hints or
+enumerations will be applied automatically. Therefore, a DisplayString
+will be represented as ordinary ASCII text like "nase". A typical
+example for an enumeration is {ifType.1 INTEGER ethernet-csmacd}.
+TimeTicks are represented as "0d 7:06:47.82", that is the number of
+days followed by the hours, minutes, seconds and deci-seconds.
+
+Most SNMP commands described below allow asynchronous SNMP operations
+by providing callbacks, which is nothing more than a Tcl command to
+execute when the answer or and error is received. Some special format
+characters can be used to access the varbind or other information from
+the SNMP message. The format escapes are:
+
+.TP 6
+.B %V 
+the varbind list (containing name, syntax and value for each varbind)
+.TP
+.B %R 
+the request id
+.TP
+.B %S
+the session id
+.TP
+.B %E
+the error status
+.TP
+.B %I
+the error index
+.TP
+.B %A
+the network address of the peer sending the packet
+.TP
+.B %P
+the port number of the peer sending the packet
+.TP
+.B %T
+the SNMP packet type
+.PP
+
+.TP
+.B snmp# configure \fR[\fIoptions\fR]
+The configure session command can be used to query the current
+configuration or to change configuration options. The options
+determine if the session uses SNMP version 1 messages or version 2
+messages with or without authentication. 
+
+The options specific to SNMP version 1 session are:
+
+.BI -address " address"
+.br
+.BI -port " port"
+.br
+.BI -community " string"
+
+The \fIaddress\fR may be an IP address in dot notation like
+134.169.34.1 or a hostname that can be resolved to an IP address.  The
+\fIport\fR argument defines the port on which the agent listens for
+SNMP messages. The \fIstring\fR is the community used to identify the
+communication peers. The default setup when a new session handle is
+created is \fIaddress\fR = localhost, \fIport\fR = 161 and
+\fIcommunity\fR = public.
+
+Options to configure SNMP version 2 CLASSIC sessions are:
+
+.BI -srcparty " {party-oid domain address port messagesize}"
+.br
+.BI -dstparty " {party-oid domain address port messagesize}"
+.br
+.BI -srcpartyauth " {clock lifetime key}"
+.br
+.BI -dstpartyauth " {clock lifetime key}"
+.br
+.BI -context " context-oid"
+.br
+
+Options to configure SNMP version 2 USEC session are:
+
+.BI -address " address"
+.br
+.BI -port " port"
+.br
+.BI -user " username"
+.br
+.BI -context " context"
+.br
+.BI -auth " key"
+
+The remaining options determine the retry and timeout settings and are
+valid for SNMP version 1 and version 2 sessions:
+
+.BI -retries " number"
+.br
+.BI -timeout " seconds"
+
+A timeout of n \fIseconds\fR means that a SNMP request fails if no
+answer is received during this time interval. A retry count
+\fInumber\fR means that the message will be resent \fInumber\fR times
+during the \fIseconds\fR timeout interval.
+
+.BI -version " number"
+
+The SNMP version can be set explicitely by using the -version option:
+The currently supported version numbers are SNMPv1 (RFC 1157 style
+SNMP), SNMPv2CLASSIC (RFC 1441 style SNMP), SNMPv2USEC (an
+experimental draft version of the user based security model) and
+SNMPv2C (community based SNMPv2).
+
+.BI -alias " name"
+
+This option substitues the configuration options associated with
+\fIname\fR. You can define configuration option aliases with the snmp
+alias command (see the alias command option above). It is possible to
+alias options within alias options. However, you must take care to
+avoid any loops within alias options. Assuming the aliases defined
+above, you would be able to create a noAuth/noPriv SNMPv2 session
+to host 1.2.3.4 using the command "snmp session -alias sulu/v2".
+
+.BI -agent " interp"
+
+This option turns the SNMP session into an SNMP agent. The \fIinterp\fR
+argument defines the Tcl interpreter which will be used to evaluate
+bindings associated with MIB nodes. You can use safe Tcl interpreter if
+your Tcl configuration supports the safe Tcl extension. If you do not
+want to use a safe Tcl interpreter, you should use an empty string.
+
+.TP
+.B snmp# cget \fIoption\fR
+Returns the current value of the configuration option given by option.
+Option may have any of the values accepted by the configure command.
+
+
+.TP
+.B snmp# get \fIvarlist\fR [\fIcallback\fR]
+The get session command retrieves the list of instances given in
+\fIvarlist\fR from the agent identified by the snmphandle. The
+\fIvarlist\fR must contain the instance identifiers (either as object
+identifier or as a name that can be resolved to an instance
+identifier). The syntax and value fields are optional. The following
+examples all retrieve the same instance:
+
+$s get {{sysDescr.0 DisplayString ""}}
+.br
+$s get {{1.3.6.1.2.1.1.1.0 DisplayString}}
+.br
+$s get sysDescr.0
+
+The first is a complete \fIvarlist\fR using a name, the second is a
+shortened \fIvarlist\fR where the value is omitted and the third is a
+degenerated \fIvarlist\fR which just contains an instance name. The
+degenerated form is very handy and can also be used to retrieve
+several variables in one request easily:
+
+$s get "sysDescr.0 sysName.0 sysContact.0"
+
+The get command will be done synchronously if the optional callback
+argument is missing. In this case, the command returns the result as a
+varbind list.
+
+If the command contains a \fIcallback\fR argument, a request will be
+send to the agent and the command returns immediately. The result of
+the command is the request id for this request. The \fIcallback\fR
+will be evaluated from the event loop when a response is received. All
+format escapes (see above) will be expanded before \fIcallback\fR is
+evaluated:
+
+$s get sysDescr.0 {puts "%V"}
+
+.TP
+.B snmp# getnext \fIvarlist\fR [\fIcallback\fR]
+The getnext session command retrieves the values of the
+lexicographical successors to the named objects in \fIvarlist\fR.
+To successively retrieve a subtree of the MIB tree, you can put
+the result of one getnext request into the next getnext request:
+
+set jtk [$s getnext system]; puts $jtk
+.br
+set jtk [$s getnext $jtk]; puts $jtk
+
+Note, that the walk command described below provides a faster and even
+simpler way to walk tables. The \fIcallback\fR argument is used for
+asynchronous requests as described above.
+
+.TP
+.B snmp# getbulk \fInr\fR \fImr\fR \fIvarlist\fR [\fIcallback\fR]
+The getbulk session command can be used to implement fast table
+retrieval. The getbulk operation does a getnext on the first \fInr\fR
+elements given in \fIvarlist\fR. For the remaining elements, the agent
+is asked to repeat the getnext operation mostly \fImr\fR times. Note,
+that SNMP version 1 sessions will map a getbulk to a getnext request.
+An example of the getbulk request might be:
+
+$s getbulk 1 2 "sysUpTime ifIndex ifDescr"
+
+This will return sysUpTime.0 and the values for ifIndex.1, ifDescr.1,
+ifIndex.2 and ifDescr.2 assuming the device has 2 interfaces and
+implements snmp version 2. The \fIcallback\fR argument is used for
+asynchronous requests as described above.
+
+.TP
+.B snmp# set \fIvarlist\fR [\fIcallback\fR]
+The set session command can be used to set SNMP variables. The varbind
+list should usually contain object identifier, syntax, value triples
+as described above. Note that it is legal to omit the syntax
+part if the syntax can be found in the MIB database. This allows
+shorter argument lists. The following example is a valid set request
+to set the sysContact to "Bert Nase":
+
+$s set [list [list sysContact.0 "Bert Nase"] ]
+
+The \fIcallback\fR argument is used for asynchronous requests as
+described above.
+
+.TP
+.B snmp# walk \fIvarname\fR \fIvarlist\fR \fIbody\fR
+The walk session command walks through a whole MIB tree. The command
+repeats sending getbulk requests using \fIsnmphandle\fR until the
+returned varbind list is not contained in the subtree given by
+\fIvarlist\fR. Foreach valid varbind list, the \fIbody\fR is evaluated
+after the variable given by \fIvarname\fR has been set to the actual
+varbind list. A simple example to walk the interface table may look
+like:
+
+$s walk x "ifIndex ifDescr" { puts $x }
+
+.TP
+.B snmp# trap \fIsnmpTrapOid\fR \fIvarlist\fR
+Send a trap to the destination given by \fIsnmphandle\fR. The trap
+type is defined by the \fIsnmpTrapOid\fR which should be one of 
+coldStart, warmStart, linkDown, linkUp, authenticationFailure, and
+egpNeighborLoss (see RFC 1450). The \fIvarlist\fR may contain a
+varbind with additional information. Note, that sysUpTime.0 is
+appended automatically. However, it is up to the user to provide any
+required additional varbinds like the ifIndex for linkUp and linkDown
+traps.
+
+$s trap coldStart {{sysDescr.0 "Fridge"}}
+
+If you want to send a SNMPv1 trap defined by an enterprise object
+identifier and a generic and specific trap number, you should build a
+trap type object identidier by append the generic and specific number
+to the enterprise object identifier. As an example, to send a SNMPv1
+trap using enterprise 1.3.6.1.4.1.1701.42 generic 6 and specific 0,
+you would use the trap identifier 1.3.6.1.4.1.1701.42.6.0.
+
+.TP
+.B snmp# inform \fIsnmpTrapOid\fR \fIvarlist\fR [\fIcallback\fR]
+
+Send an information request to the destination given by
+\fIsnmphandle\fR. In contrast to a trap, an information request is
+confirmed with a response message. The information request type is
+defined by the \fIsnmpTrapOid\fR which should be an object identifier
+defined by a notification type macro like coldStart, warmStart,
+linkDown, linkUp, authenticationFailure, and egpNeighborLoss (see RFC
+1450). The \fIvarlist\fR may contain a varbind with additional
+information. Note, that sysUpTime.0 is appended
+automatically. However, it is up to the user to provide any required
+additional varbinds.
+
+$s inform tooHot {{sysDescr.0 "Fridge"}}
+
+.TP
+.B snmp# bind {} trap \fR[\fIcommand\fR]
+This command installs a trap handler. Traps received by the straps(8)
+trap forwarder that are valid for the snmp handle snmp# will invoke
+the \fIcallback\fR procedure. The format escapes described above can
+be used to get the address of the trap sending device.
+
+.TP
+.B snmp# bind {} inform \fR[\fIcommand\fR]
+This command is only available for SNMPv2 session. It arranges to
+evaluate the \fIcallback\fR whenever an inform message is received.
+The format escapes described above can be used to get the address of
+the trap sending device. Note, the response is created automatically
+by the SNMP protocol machine.
+
+.TP
+.B snmp# bind {} send \fR[\fIcommand\fR]
+.ns
+.TP
+.B snmp# bind {} recv \fR[\fIcommand\fR]
+This command allows to install bindings that are evaluated whenever
+a SNMP message is send from or received by the SNMP session snmp#.
+It is typically used to implement a SNMP packet watching interface.
+Note that the command is only evaluated once for every SNMP message 
+send. Retransmissions will not result in a command evaluation.
+
+.TP
+.B snmp bind \fIlabel\fR \fIevent\fR [\fIcommand\fR]
+The bind command associates a Tcl \fIcommand\fR with the MIB node
+given by \fIlabel\fR and is only valid for session in agent mode. The
+\fIevent\fR argument defines the SNMP operation that triggers the
+evaluation of \fIcommand\fR. Supported events are get, set, create,
+check, commit, rollback, begin and end.  The begin and end bindings are
+evaluate before PDU processing starts and after PDU processing has
+finished. The label for begin and end bindings should be empty. The
+bind command returns the currently defined binding if the
+\fIcommand\fR argument is missing.  All the format escapes for SNMP
+callbacks described above will be expanded before the command is
+evaluated. In addition, there are three more escapes defined for snmp
+bind callbacks:
+
+.RS
+.TP 6
+.B %o
+the object identifier of the variable that triggered the event.
+.TP
+.B %i
+the instance identifier of the variable that triggered the event.
+.TP
+.B %v
+the value for the variable that triggered the event.
+.RE
+
+.RS
+It is allowed and sometimes useful to bind commands to non-leaf nodes
+of the MIB tree. All bindings starting from the leaf node up to the
+root of the MIB tree are processed. You can use the Tcl break command
+to disable further binding processing. Error returned by the callback
+will result in an error message send back to the agent. If the error
+message consists of a valid SNMP error code (e.g. inconsistentValue),
+a response packet will be created with the error code set to this
+error. Otherwise, the generic error code (genErr) will be used.
+.RE
+
+.TP
+.B snmp# wait \fR[\fIrequest\fR]
+This command waits until all pending requests on the handle snmp# have
+been processed. It returns immediately, if there are no asynchronous
+requests pending. All events are processed in the normal fashion while
+waiting for outstanding responses.
+
+.TP
+.B snmp# instance \fIlabel\fR \fIvarName\fR [\fIdefault\fR]
+The instance command creates a new variable instance if you the sesion
+is configured as an SNMP agent. The MIB variable given by \fIlabel\fR
+is linked to the global Tcl variable \fIvarName\fR. Scotty will lookup
+the value of \fIvarName\fR and convert it into the required type while
+processing incoming requests. You should make sure to have the right 
+format in the Tcl variable \fIvarName\fR. The optional argument
+\fIdefault\fR defines the initial value of \fIvarName\fR.
+
+.TP
+.B snmp# agent \fR[\fIinterp\fR]
+Turn the session into an agent session. Scotty will now respond to
+get, getnext and getbulk messages that are send to this session. The
+optional argument is the name of a Tcl interpreter that is used to
+evaluate bindings in the agent. This feature is only available if
+you are using the safe tcl extension (stcl). 
+
+.TP
+.B snmp# destroy
+This command destroys the session given by the session handle. It
+cleans up all data associated with the handle and de-installs all file
+handlers belonging to this handle.
+
+.SS SCOTTY'S REMOTE PROCEDURE CALL (RPC)
+.TP
+.B rpc server \fIport\fR
+Set up an RPC server listening an port \fIport\fR. This command
+returns a rpc handle that be used to register Tcl procs that will 
+be exported by a trivial RPC protocol on top of TCP. This RPC
+mechanism allows us to write cooperating scripts without
+worrying much about the communication protocol.
+
+.TP
+.B rpc client \fIhost\fR \fIport\fR
+Connect to the RPC server running on \fIhost\fR with port \fIport\fR.
+The returned client handle can be used to invoke an exported proc
+on the server host.
+
+.TP
+.B rpc delete \fIhandle\fR
+Delete a server or a client RPC handle. All connections associated
+with the handle will be closed.
+
+.TP
+.B rpc register \fIrpchandle\fR \fIproc\fR
+Export \fIproc\fR as an RPC callable proc using the server handle
+\fIrpchandle\fR. Only registered procs can be called by RPC clients.
+
+.TP
+.B rpc unregister \fIrpchandle\fR \fIproc\fR
+Remove \fIproc\fR from the list of exported procs on server handle
+\fIrpchandle\fR.
+
+.TP
+.B rpc info \fR[\fIrpchandle\fR]
+Calling rpc info without any arguments returns a list of all rpc handles
+that have been created using the rpc server and rpc client command.
+Info about a specific rpc file handle \fIrpchandle\fR is returned by
+using the optional argument. The result is a list containing the tcp
+file handle used for the communication and the list of registered
+commands for a rpc handle and a list of all files that represent
+connections to an rpc server. This list is empty if \fIrpchandle\fR
+belongs to a rpc client.
+
+.TP
+.B rpc# [-async] \fIproc\fR \fIarg1\fR \fIarg2\fR ...
+To invoke a remote procedure \fIproc\fR, use the same syntax as used
+with a local invocation preceeded by a client \fIrpchandle\fR. The
+result of the remote procedure call will be returned or an error if the
+underlying communication channel signals errors. The -async options can be
+used to invoke \fIproc\fR without waiting for it to complete. The
+async option will never return a result.
+
+.SH ENVIRONMENT VARIABLES
+SCOTTY_LIBRARY		path to the scotty library directory
+.br
+SCOTTY_NTPING		path and name of ntping executable
+.br
+SCOTTY_STRAPS		path and name of straps executable
+
+.SH FILES
+$scotty_RcFileName			personal initialization file
+.br
+$scotty_library/init.tcl		global initialization file
+.br
+$scotty_library/site/init.tcl	site initialization file
+.br
+$scotty_library/mibs/		archive of MIB files
+.br
+$scotty_library/mibs/		archive of GDMO files
+.br
+$scotty_library/library/		archive of Tcl files
+.br
+$scotty_library/$scotty_arch	archive of Tcl files
+
+.SH SEE ALSO
+tkined(1), ntping(8), Tcl(n)
+
+.SH AUTHORS
+Juergen Schoenwaelder (schoenw@ibr.cs.tu-bs.de). The tcp connect,
+accept and shutdown commands are based on an older version written by
+Pekka Nikander, Telecom Finland (Pekka.Nikander@ajk.tele.fi) and
+extended by Tim MacKenzie (tym@dibbler.cs.monash.edu.au). Many thanks
+to Erik Schoenfelder (schoenfr@ibr.cs.tu-bs.de) who wrote the DNS
+command and ntping(1).
+
+The initial SNMP protocol implementation was done by Sven Schmidt
+(vschmidt@ibr.cs.tu-bs.de). It was revised and opimized by Juergen
+Schoenwaelder (schoenw@ibr.cs.tu-bs.de). Erik Schoenfelder
+(schoenfr@ibr.cs.tu-bs.de) provided code to handle textual conventions
+and enumerations.

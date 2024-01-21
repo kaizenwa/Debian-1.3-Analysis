@@ -1,0 +1,234 @@
+############################################################################
+#
+#	File:     lists.icn
+#
+#	Subject:  Procedures to manipulate lists
+#
+#	Author:   Ralph E. Griswold
+#
+#	Date:     December 16, 1994
+#
+############################################################################
+#
+#  See also:  structs.icn
+#
+############################################################################
+
+procedure lreverse(L)
+   local i
+
+   L := copy(L)
+
+   every i := 1 to *L / 2 do
+      L[i] :=: L[-i]
+
+   return L
+
+end
+
+procedure lrtrim(L, S)
+
+   L := copy(L)
+
+   while member(S, L[-1]) do
+      pull(L)
+
+    return L
+
+end
+
+procedure lltrim(L, S)
+
+   L := copy(L)
+
+   while member(S, L[1]) do
+      get(L)
+
+    return L
+
+end
+
+procedure lrpad(L, i, x)
+
+   L := copy(L)
+
+   while *L < i do put(L, x)
+
+   return L
+
+end
+
+procedure llpad(L, i, x)
+
+   L := copy(L)
+
+   while *L < i do push(L, x)
+
+   return L
+
+end
+
+procedure lswap(L)
+   local i
+
+   L := copy(L)
+
+   every i := 1 to *L by 2 do
+      L[i] :=: L[i + 1]
+
+   return L
+
+end
+
+procedure lextend(L, i)
+   local j, k
+
+   if *L >= i then return L
+
+   L := copy(L)
+
+   j := *L
+
+   every k := 1 to j do {
+      if *L = i then return L
+      put(L, L[k])
+      }
+ 
+end
+
+procedure lblock(L1, L2)
+   local L3, i, j
+
+   if *L1 < *L2 then L1 := lextend(L1, *L2)
+   else if *L2 < *L1 then L2 := lextend(L2, *L1)
+
+   L3 := []
+
+    every i := 1 to *L1 do
+       every j := 1 to L2[i] do
+          put(L3, L2[i])
+
+      return L3
+
+end
+
+procedure lrepl(L, i)
+   local j, k
+
+   L := copy(L)
+
+   j := *L
+
+   every 1 to i do
+      every k := 1 to j do
+         put(L, L[k])
+
+   return L
+
+end
+
+procedure lpalin(L, x)
+
+   L |||:= lreverse(L)
+
+   if /x then pull(L)
+
+   return L
+
+end
+
+procedure linterl(L1, L2)
+   local L3, i
+
+   if *L1 < *L2 then L1 := lextend(L1, *L2)
+   else if *L2 < *L1 then L2 := lextend(L2, *L1)
+
+   L3 := []
+
+   every i := 1 to *L1 do
+      put(L3, L1[i], L2[i])
+
+   return L3
+
+end
+
+procedure lrotate(L, i)
+
+   /i := 1
+
+   L := copy(L)
+
+   if i > 0 then
+      every 1 to i do
+         put(L, get(L))
+   else
+      every 1 to -i do
+         push(L, pull(L))
+
+   return L
+
+end
+
+#  The procedure lmap(L1,L2,L3) maps elements of L1 according to L2
+#  and L3.  This procedure is the analog for lists of the built-in
+#  string-mapping function map(s1,s2,s3). Elements in L1 that are
+#  the same as elements in L2 are mapped into the corresponding ele-
+#  ments of L3. For example, given the lists
+#  
+#     L1 := [1,2,3,4]
+#     L2 := [4,3,2,1]
+#     L3 := ["a","b","c","d"]
+#  
+#  then
+#  
+#     lmap(L1,L2,L3)
+#  
+#  produces a new list
+#  
+#     ["d","c","b","a"]
+#  
+#     Lists that are mapped can have any kinds of elements. The
+#  operation
+#  
+#     x === y
+#  
+#  is used to determine if elements x and y are equivalent.
+#  
+#     All cases in lmap are handled as they are in map, except that
+#  no defaults are provided for omitted arguments. As with map, lmap
+#  can be used for transposition as well as substitution.
+#  
+#  Warning:
+#
+#     If lmap is called with the same lists L2 and L3 as in
+#  the immediately preceding call, the same mapping is performed,
+#  even if the values in L2 and L3 have been changed. This improves
+#  performance, but it may cause unexpected effects.
+#  
+#     This ``caching'' of the mapping table based on L2 and L3
+#  can be easily removed to avoid this potential problem.
+#  
+############################################################################
+
+procedure lmap(L1,L2,L3)
+   static lmem2, lmem3, lmaptbl, tdefault
+   local i, a
+
+   initial tdefault := []
+
+   if type(a := L1 | L2 | L3) ~== "list" then runerr(108,a)
+   if *L2 ~= *L3 then runerr(208,L2)
+
+   L1 := copy(L1)
+
+   if not(lmem2 === L2 & lmem3 === L3) then {	# if an argument is new, rebuild
+      lmem2 := L2				# save for future reference
+      lmem3 := L3
+      lmaptbl := table(tdefault)		# new mapping table
+      every i := 1 to *L2 do			# build the map
+         lmaptbl[L2[i]] := L3[i]
+      }
+   every i := 1 to *L1 do			# map the values
+      L1[i] := (tdefault ~=== lmaptbl[L1[i]])
+   return L1
+end

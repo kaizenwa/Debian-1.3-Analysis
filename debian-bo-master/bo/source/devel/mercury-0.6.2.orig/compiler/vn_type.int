@@ -1,0 +1,87 @@
+:- module vn_type.
+:- interface.
+:- import_module llds, livemap, options.
+:- import_module getopt, set, list, std_util.
+:- type (vn_type:vn) == int.
+:- type (vn_type:vnlval)
+	--->	vn_reg((llds:reg))
+	;	vn_stackvar(int)
+	;	vn_framevar(int)
+	;	vn_succip
+	;	vn_maxfr
+	;	vn_curfr
+	;	vn_succfr((vn_type:vn))
+	;	vn_prevfr((vn_type:vn))
+	;	vn_redoip((vn_type:vn))
+	;	vn_succip((vn_type:vn))
+	;	vn_hp
+	;	vn_sp
+	;	vn_field((llds:tag), (vn_type:vn), (vn_type:vn))
+	;	vn_temp((llds:reg)).
+:- type (vn_type:vnrval)
+	--->	vn_origlval((vn_type:vnlval))
+	;	vn_mkword((llds:tag), (vn_type:vn))
+	;	vn_const((llds:rval_const))
+	;	vn_create((llds:tag), (mercury_builtin:list((std_util:maybe((llds:rval))))), (bool:bool), int)
+	;	vn_unop((llds:unary_op), (vn_type:vn))
+	;	vn_binop((llds:binary_op), (vn_type:vn), (vn_type:vn)).
+:- pred vn_type:vn_type__vnlval_type((vn_type:vnlval), (llds:llds_type)).
+:- mode vn_type:vn_type__vnlval_type(mercury_builtin:in, mercury_builtin:out) is det.
+:- pred vn_type:vn_type__vnrval_type((vn_type:vnrval), (llds:llds_type)).
+:- mode vn_type:vn_type__vnrval_type(mercury_builtin:in, mercury_builtin:out) is det.
+:- type (vn_type:vn_src)
+	--->	src_ctrl(int)
+	;	src_liveval((vn_type:vnlval))
+	;	src_access((vn_type:vnlval))
+	;	src_vn(int).
+:- type (vn_type:vn_node)
+	--->	node_shared((vn_type:vn))
+	;	node_lval((vn_type:vnlval))
+	;	node_origlval((vn_type:vnlval))
+	;	node_ctrl(int).
+:- type (vn_type:vn_instr)
+	--->	vn_livevals((livemap:lvalset))
+	;	vn_call((llds:code_addr), (llds:code_addr), (mercury_builtin:list((llds:liveinfo))), (llds:call_model))
+	;	vn_mkframe(string, int, (llds:code_addr))
+	;	vn_label((llds:label))
+	;	vn_goto((llds:code_addr))
+	;	vn_computed_goto((vn_type:vn), (mercury_builtin:list((llds:label))))
+	;	vn_if_val((vn_type:vn), (llds:code_addr))
+	;	vn_mark_hp((vn_type:vnlval))
+	;	vn_restore_hp((vn_type:vn))
+	;	vn_store_ticket((vn_type:vnlval))
+	;	vn_restore_ticket((vn_type:vn))
+	;	vn_discard_ticket
+	;	vn_incr_sp(int, string)
+	;	vn_decr_sp(int).
+:- type (vn_type:parentry) == (std_util:pair((llds:lval), (mercury_builtin:list((llds:rval))))).
+:- type (vn_type:parallel)
+	--->	parallel((llds:label), (llds:label), (mercury_builtin:list((vn_type:parentry)))).
+:- type (vn_type:vnlvalset) == (set:set((vn_type:vnlval))).
+:- type (vn_type:ctrlmap) == (map:map(int, (vn_type:vn_instr))).
+:- type (vn_type:flushmap) == (map:map(int, (vn_type:flushmapentry))).
+:- type (vn_type:flushmapentry) == (map:map((vn_type:vnlval), (vn_type:vn))).
+:- type (vn_type:parmap) == (map:map(int, (mercury_builtin:list((vn_type:parallel))))).
+:- type (vn_type:vn_ctrl_tuple)
+	--->	tuple(int, (vn_type:ctrlmap), (vn_type:flushmap), int, (vn_type:parmap)).
+:- type (vn_type:vn_params).
+:- pred vn_type:vn_type__init_params((getopt:option_table((options:option))), (vn_type:vn_params)).
+:- mode vn_type:vn_type__init_params(mercury_builtin:in, mercury_builtin:out) is det.
+:- pred vn_type:vn_type__bytes_per_word((vn_type:vn_params), int).
+:- mode vn_type:vn_type__bytes_per_word(mercury_builtin:in, mercury_builtin:out) is det.
+:- pred vn_type:vn_type__real_r_regs((vn_type:vn_params), int).
+:- mode vn_type:vn_type__real_r_regs(mercury_builtin:in, mercury_builtin:out) is det.
+:- pred vn_type:vn_type__real_f_regs((vn_type:vn_params), int).
+:- mode vn_type:vn_type__real_f_regs(mercury_builtin:in, mercury_builtin:out) is det.
+:- pred vn_type:vn_type__real_r_temps((vn_type:vn_params), int).
+:- mode vn_type:vn_type__real_r_temps(mercury_builtin:in, mercury_builtin:out) is det.
+:- pred vn_type:vn_type__real_f_temps((vn_type:vn_params), int).
+:- mode vn_type:vn_type__real_f_temps(mercury_builtin:in, mercury_builtin:out) is det.
+:- pred vn_type:vn_type__costof_assign((vn_type:vn_params), int).
+:- mode vn_type:vn_type__costof_assign(mercury_builtin:in, mercury_builtin:out) is det.
+:- pred vn_type:vn_type__costof_intops((vn_type:vn_params), int).
+:- mode vn_type:vn_type__costof_intops(mercury_builtin:in, mercury_builtin:out) is det.
+:- pred vn_type:vn_type__costof_stackref((vn_type:vn_params), int).
+:- mode vn_type:vn_type__costof_stackref(mercury_builtin:in, mercury_builtin:out) is det.
+:- pred vn_type:vn_type__costof_heapref((vn_type:vn_params), int).
+:- mode vn_type:vn_type__costof_heapref(mercury_builtin:in, mercury_builtin:out) is det.

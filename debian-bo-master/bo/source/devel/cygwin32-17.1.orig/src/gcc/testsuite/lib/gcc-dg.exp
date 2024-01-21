@@ -1,0 +1,69 @@
+# Define gcc callbacks for dg.exp.
+
+load_lib dg.exp
+
+proc gcc-dg-test { prog do_what extra_tool_flags } {
+    # Set up the compiler flags, based on what we're going to do.
+
+    switch $do_what {
+	"preprocess" {
+	    set output_file "[file rootname [file tail $prog]].i"
+	    append extra_tool_flags " -E"
+	    append extra_tool_flags " -o $output_file"
+	}
+	"compile" {
+	    set output_file "[file rootname [file tail $prog]].s"
+	    append extra_tool_flags " -S"
+	}
+	"assemble" {
+	    set output_file "[file rootname [file tail $prog]].o"
+	    append extra_tool_flags " -c"
+	}
+	"link" {
+	    set output_file "a.out"
+	    # The following line is needed for targets like the i960 where
+	    # the default output file is b.out.  Sigh.
+	    append tool_flags " -o a.out"
+	}
+	"run" {
+	    # FIXME: "./" is to cope with "." not being in $PATH.
+	    # Should this be handled elsewhere?
+	    set output_file "./a.out"
+	    # The following line is needed for targets like the i960 where
+	    # the default output file is b.out.  Sigh.
+	    append tool_flags " -o a.out"
+	    # This is the only place where we care if an executable was
+	    # created or not.  If it was, dg.exp will try to run it.
+	    catch "exec rm -f $output_file"
+	}
+	default {
+	    perror "$do_what: not a valid dg-do keyword"
+	    return ""
+	}
+    }
+
+    global CFLAGS
+    set orig_cflags $CFLAGS
+    append CFLAGS $extra_tool_flags
+
+    gcc_start $prog
+
+    set CFLAGS $orig_cflags
+
+    return $output_file
+}
+
+
+proc gcc-dg-prune { system text } {
+    set text [prune_gcc_output $text]
+
+    # If we see "region xxx is full" then the testcase is too big for ram.
+    # This is tricky to deal with in a large testsuite like c-torture so
+    # deal with it here.  Just mark the testcase as unsupported.
+    if [regexp "(^|\n)\[^\n\]*: region \[^\n\]* is full" $text] {
+	# The format here is important.  See dg.exp.
+	return "::unsupported::memory full"
+    }
+
+    return $text
+}

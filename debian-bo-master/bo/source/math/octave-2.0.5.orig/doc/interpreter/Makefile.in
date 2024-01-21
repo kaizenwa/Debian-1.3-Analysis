@@ -1,0 +1,159 @@
+#
+# Makefile for octave's doc/interpreter directory
+#
+# John W. Eaton
+# jwe@bevo.che.wisc.edu
+# University of Wisconsin-Madison
+# Department of Chemical Engineering
+
+TOPDIR = ../..
+
+srcdir = @srcdir@
+top_srcdir = @top_srcdir@
+VPATH = @srcdir@
+
+include $(TOPDIR)/Makeconf
+
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
+
+SOURCES =
+
+TEXINFO = arith.texi audio.texi basics.texi bugs.texi control.texi \
+	cp-idx.texi data.texi diffeq.texi emacs.texi errors.texi \
+	eval.texi expr.texi fn-idx.texi func.texi gpl.texi \
+	grammar.texi image.texi install.texi intro.texi io.texi \
+	linalg.texi matrix.texi nonlin.texi numbers.texi octave.texi \
+	op-idx.texi optim.texi plot.texi poly.texi preface.texi \
+	quad.texi set.texi signal.texi stats.texi stmt.texi \
+	strings.texi struct.texi system.texi tips.texi var.texi \
+	vr-idx.texi
+
+FORMATTED = octave.dvi octave.ps octave.info octave.info-[0-9]*
+
+DISTFILES = Makefile.in dir octave.1 $(TEXINFO) $(FORMATTED)
+
+ifeq ($(wildcard octave.info), )
+  BINDISTFILES = $(srcdir)/octave.1 $(srcdir)/octave.info \
+	$(wildcard $(srcdir)/octave.info-[0-9]*)
+else
+  BINDISTFILES = $(srcdir)/octave.1 octave.info octave.info-[0-9]*
+endif
+
+# Look for version.h to get version information.
+xfiles := $(TOPDIR)/src/version.h $(srcdir)/$(TOPDIR)/src/version.h
+
+version_file := $(firstword $(foreach file, $(xfiles), $(wildcard $(file))))
+
+SPELL = $(patsubst %.texi, %.spell, $(TEXINFO))
+
+%.spell : %.texi
+	rm -f $@
+	sed -e 's/@@/ at /g' -e 's/@[a-zA-Z]*//g' $< | spell > $@.tmp
+	mv $@.tmp $@
+
+all: octave.info octave.dvi octave.ps
+.PHONY: all
+
+octave.info: $(TEXINFO) ../conf.texi
+	-makeinfo -I$(srcdir) -I$(srcdir)/.. $(srcdir)/octave.texi
+
+octave.dvi: $(TEXINFO) ../conf.texi
+	-TEXINPUTS="$(srcdir):$(srcdir)/..:$(TEXINPUTS):" ; \
+	  export TEXINPUTS ; \
+	  $(TEXI2DVI) $(srcdir)/octave.texi
+
+octave.ps: octave.dvi
+	-dvips -o octave.ps octave.dvi
+
+../../INSTALL.OCTAVE: install.texi
+	-makeinfo -D INSTALLONLY --no-headers --no-split --output INSTALL \
+	  -I$(srcdir) -I$(srcdir)/.. $(srcdir)/install.texi
+	mv INSTALL ../../INSTALL.OCTAVE
+
+../../BUGS: bugs.texi
+	-makeinfo -D BUGSONLY --no-headers --no-split --output BUGS \
+	  -I$(srcdir) -I$(srcdir)/.. $(srcdir)/bugs.texi
+	mv BUGS ../../BUGS
+
+check: all
+.PHONY: check
+
+install: all
+	$(top_srcdir)/mkinstalldirs $(man1dir) $(infodir)
+	@if test -d $(man1dir) ; then \
+	  rm -f $(man1dir)/octave$(man1ext) ; \
+	  echo "installing $(srcdir)/octave.1 in $(man1dir)" ; \
+	  $(INSTALL_DATA) $(srcdir)/octave.1 $(man1dir)/octave$(man1ext) ; \
+	fi
+	@if test -d $(infodir) ; then \
+	  rm -f $(infodir)/octave.info* ; \
+	  echo "installing info files in $(infodir)" ; \
+	  if test -f octave.info ; then \
+	    for f in octave.info* ; do \
+	      $(INSTALL_DATA) $$f $(infodir)/$$f ; \
+	    done ; \
+	  else \
+	    for f in $(srcdir)/octave.info* ; do \
+	      $(INSTALL_DATA) $$f $(infodir)/`basename $$f` ; \
+	    done ; \
+	  fi ; \
+	  if test -f $(infodir)/dir ; then \
+	    if grep "^\* Octave: (octave)." $(infodir)/dir > /dev/null ; then \
+	      true ; \
+	    else \
+	      echo "" ; \
+	      echo "You should add the following entry" ; \
+	      echo "" ; \
+	      echo "* Octave: (octave)." ; \
+	      echo "	Interactive language for numerical computations." ; \
+	      echo "" ; \
+	      echo "to $(infodir)/dir." ; \
+	      echo "" ; \
+	    fi ; \
+	  else \
+	    echo "installing $(srcdir)/dir in $(infodir)" ; \
+	    $(INSTALL_DATA) $(srcdir)/dir $(infodir)/dir ; \
+	  fi ; \
+	fi
+.PHONY: install
+
+uninstall:
+	rm -f $(infodir)/octave.info* $(man1dir)/octave$(man1ext)
+.PHONY: uninstall
+
+tags: $(SOURCES)
+	ctags $(SOURCES)
+
+TAGS: $(SOURCES)
+	etags $(SOURCES)
+
+spell: $(SPELL)
+.PHONY: spell
+
+mostlyclean clean:
+	rm -f octave.cp octave.fn octave.in \
+	octave.ky octave.op octave.pg octave.rd octave.tp octave.vr \
+	octave.cps octave.fns octave.ins octave.kys octave.ops \
+	octave.pgs octave.rds octave.tps octave.vrs octave.aux \
+	octave.log octave.toc
+.PHONY: mostlyclean clean
+
+distclean: clean
+	rm -f Makefile
+.PHONY: distclean
+
+maintainer-clean: distclean
+	rm -f tags TAGS octave.info octave.info-* octave.dvi octave.ps \
+.PHONY: maintainer-clean
+
+dist: all
+	ln $(DISTFILES) ../../`cat ../../.fname`/doc/interpreter
+.PHONY: dist
+
+bin-dist:
+	if [ -n "$(BINDISTFILES)" ]; then \
+	  ln $(BINDISTFILES) ../../`cat ../../.fname`/doc/interpreter ; \
+	fi
+.PHONY: bin-dist

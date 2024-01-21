@@ -1,0 +1,73 @@
+[ from Rob Head: ]
+
+	Okay, I have preliminary version of the multithreaded Python
+runtime is available for your scrutiny.  Here are instructions that
+will hopefully get it working on your system:
+(1) download "http://sonic.digicool.com/robh/threaded_mainloop.tar.gz"
+(2) make sure that "runtime/kernel/locks.c" is setting "new_*mu" equal
+to "ilu_*mu" if the ilu_SetLockTech succeeds (this was still broken in
+alpha 5)
+(3) edit the Makefiles in the three subdirectories to reflect the
+location of the ILU source tree on your system, and whether you're
+using Solaris threads or pthreads (if you're using pthreads but not on
+OSF/1, you'll probably have to change some command-line switches.)
+(4) type make; if all goes well this will build the libraries and also
+a sample multithreaded C client and server
+(5) substitute threaded_iluPrmodule.c and threaded_ilualobject.c in
+"runtime/python/" 
+(6) to your Imakefile add:
+THREADSHOME=<wherever you unpakced it>
+LOCALINCLUDES=<previous value> -I$(THREADSHOME)/kernel -I$(THREADSHOME)/python -D{PTHREAD,SOLARIS}_MAINLOOP -DTHREAD_SUPPORT
+ILU_LIB=../kernel/libilu.a $(THREADSHOME)/python/libpythreads.a
+
+	Okay, I _think_ this is all that's needed to install it
+against the standard alpha 5 distribution, but I have a bad habit of
+going through changing things and not remembering what I did, then not
+being able to reproduce it later :-). 
+
+	At any rate, here is my assessment on things that I still need
+to work on:
+
+(1) Perform memory-leak checking; it's easy to make mistakes with all
+those INCREFs and DECREFs (I am having a terrible time trying to get
+the debugging malloc I usually use to work with Python/ILU/the threads
+extension libraries coexisting, so I'm going to try out the Boehm GC.)
+(2) Integrate threads support with the ILU configuration/installation
+process.  Do you feel that this should distributed separately (or in
+some sort of contrib directory) or as part of the main ILU
+distribution (in a "runtime/threaded", for example)?  This also
+includes figuring out the correct compilation switches for more of the
+pthreads platforms (I only have access to OSF/1 here.) 
+(3) SGI threads?
+(4) NT threads.  I was looking at NT threads for a while, but it was
+pretty slow going as I still haven't gotten the hang of the MSVC
+environment.  I sent an e-mail to the guy in Japan who was doing
+multithreaded ILU on NT asking if he would donate some of his code.
+If that doesn't pan out, I'll just have to bite the bullet and sit
+down with NT for a day or so.  [optimist!]
+(5) I'm assuming that the argument marshalling functions are
+potentially blocking, as they could lead to the buffer being emptied
+down through the transport stack and out through a blocking socket
+call.  If this assumption is bogus, skip to (6).
+
+To optimize performance in a multithreaded Python environment, it is
+necessary to streamline the activity that takes place inside the
+global interpreter lock, and do to as much asynchronously as possible
+(hence my dialogue with Guido: "Hey, can I do this outside of the
+interpreter lock?" "No, you'd better not." "Okay, well what about
+this?" "Ummm, no I don't think that would be safe." :-)  The current
+design of having one Python function call per argument to be
+marshalled makes it necessary to release and reacquire the interpreter
+lock a number of times over the course of a single ILU function call.
+This is in addition to the expense of making a number of Python calls,
+and the possibility that another thread will steal the interpreter
+lock, causing the first thread to block needlessly.
+
+I'm sure you can see where I'm going with this: moving the marshalling
+of arguments into the iluPrmodule and accessing it through a "generic
+call" interface similar to the one used by the C surrogate stubs.
+Python is very well suited to this, and it could even be done easily
+on the true object side.  [reasonable idea]
+
+(6) general cleanup and further testing (including testing the caller
+passport stuff which I neglected to consider in the example)

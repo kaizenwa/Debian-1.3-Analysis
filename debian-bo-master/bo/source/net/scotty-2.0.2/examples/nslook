@@ -1,0 +1,43 @@
+#!/bin/sh
+# Tcl sees the next lines as an assignment to variable `kludge'.
+# For sh, the two shifts cancel the effect of the set, and then we
+# run scotty on this script.
+
+set kludge { $*
+    shift
+    shift
+    if test -f ../scotty ; then
+      exec ../scotty -nf $0 $*
+    else
+      exec scotty -nf $0 $*
+    fi
+}
+
+##
+## Check the argument. If it is an IP address, lookup the hostname, 
+## else lookup the address.
+##
+
+foreach arg $argv {
+    if {[regexp "^\[0-9\]+\.\[0-9\]+\.\[0-9\]+\.\[0-9\]+$" $arg]} {
+	set code [catch {netdb hosts name $arg} res]
+	if $code {
+	    set code [catch {dns ptr $arg} res]
+	}
+    } else {
+	set code [catch {netdb hosts address $arg} res]
+	if $code {
+	    set code [catch {dns a $arg} res]
+	}
+    }
+    if $code {
+	set res "<lookup failed>"
+    }
+    if {[regexp "^\[0-9\]+\.\[0-9\]+\.\[0-9\]+\.\[0-9\]+$" $arg]} {
+	puts [format "%-16s %s" $arg $res]
+    } else {
+	puts [format "%-16s %s" $res $arg]
+    }
+}
+
+exit

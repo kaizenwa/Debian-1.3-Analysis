@@ -1,0 +1,79 @@
+From john@linux.demon.co.uk Sun Jan 28 05:30:00 1996
+Subject: DIP and PPP - help!
+e9026329@stud1.tuwien.ac.at (Martina Umlauft) writes:
+
+>The only thing is: on dip's manpage there is only briefly mentioned 
+>that there is a "mode PPP", but no HOWTO / FAQ / book explains how to 
+>actually use dip + PPP.
+
+Since you already know how dip supports [C]SLIP, these points are
+relative to a working [C}SLIP set-up.
+
+1.  You need dip-3.3.7m-uri or later (I use 3.3.7n).  Of course, you
+need PPP compiled into the kernel, and pppd somewhere on your machine.
+Earlier versions of dip will not work without patching.
+
+2.  Make sure pppd is where dip thinks it is: /usr/sbin/pppd probably
+(you can check how dip calls pppd by applying the 'strings' command to
+the dip binary).  Since pppd was actually /usr/lib/ppp/pppd on my
+system, I made a link from /usr/sbin/pppd to /usr/lib/ppp/pppd.  (Or you
+could re-compile dip to tell it where pppd is on your system - see
+pathnames.h).
+
+3.  The key differences between the dip script for PPP, compared to one
+for CSLIP are:
+
+    a.  Use "mode PPP" instead of "mode CSLIP"
+
+    b.  Don't set certain options such as mtu and default - these are
+    set by pppd from the file /etc/ppp/options.  Set up /etc/ppp/options
+    for your own requirements, but mine looks like this:
+
+        crtscts
+        modem
+        defaultroute
+        asyncmap 0x00000000
+        mru 576
+        mtu 576
+
+    The actual parameters and values may depend on your IP supplier and
+    his set-up.
+
+    c. Tell your IP supplier's start-up code to use ppp:  I use "send
+    ppp,nolqm,idle=240\n" at a "protocol: " prompt.  ("nolqm" asks for
+    ppp without the link quality monitoring protocol, which is not - I
+    think - supported in Linux PPP.)  This prompt may be different (or
+    absent) with another IP supplier.
+
+    d. You don't need "get $local ...", since ppp negotiates this at
+    start-up.  You still need "get $remote ..." in dip-3.3.7m-uri, but
+    from dip-3.3.7n-uri you no longer need it (again, ppp negotiates
+    this).  For your IP supplier you may need to put parameters in
+    /etc/ppp/options to set the local and remote IP addresses - see "man
+    pppd" for details of the options supported by pppd.
+
+    e. You actually MAY submit parameters with "mode PPP" command, but
+       unless you really know what you're doing (and can verify what
+       I'm saying by the DIP source) - leave this alone. Defaults 
+       should be good enough.
+
+4.  The dip script will exit after dialling and starting up pppd.  When
+ppp negotiation is completed and IP comes up, pppd runs /etc/ppp/ip-up.
+This is an executable shell script, and can contain things you want to
+run when the network comes up (e.g. running the mail queue).  However
+BEWARE.  There is a bug in some out-of-date pppd versions that will
+cause the ip-up script to hang if it calls sleep, either directly or
+indirectly (i.e. sleep() called by an application).  If this problem
+bites you, it is better to use ip-up to send a signal to another waiting
+process, so that it can start up your applications.
+
+5.  When IP goes down (e.g. after closing down the link with "dip -k"),
+pppd runs /etc/ppp/ip-down, which can contain things you want to do on
+close-down.  I don't do this in my set-up, but the comment above about
+sleep (see point 4) may also apply.
+
+6.  That's it, as far as I remember, for converting dip from CSLIP to
+PPP.
+-- 
+John Phillips          john@linux.demon.co.uk
+

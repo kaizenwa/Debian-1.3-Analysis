@@ -1,0 +1,148 @@
+;; load-icon-mgr.gwm --- Install and setup use of icon manager
+;;
+;; Author: Anders Holst  (aho@sans.kth.se)  
+;; Copyright (C) 1995  Anders Holst
+;; Last change: 9/2
+;;
+;; This file is copyrighted under the same terms as the rest of GWM
+;; (see the X Inc license for details). There is no warranty that it
+;; works. 
+;;
+;; --------------------------------------------------------------------- 
+;;
+;; This file is intended for use with *other* profiles than VTWM. 
+;; It sets up the necessary things to use the multiple icon managers
+;; defined in "vtwm-icon-mgr.gwm".
+;;
+;; Load it from somewhere at the end of your *rc.gwm. 
+;;
+
+
+;; First some necessary functions
+(if (not (boundp 'defname-in-screen))
+    (defunq defname-in-screen args
+      (for var args
+           (defname var screen.))))
+(if (not (boundp 'black)) (: black (color-make "Black")))
+(if (not (boundp 'white)) (: white (color-make "White")))
+(if (or (not (boundp 'defaults-to))
+        (not (boundp 'declare-screen-dependent)))
+    (load "utils"))
+
+;;
+;;  Some reasonable user defaults.
+;;  ------------------------------
+;;  Change these in your own profile. Check "vtwm-icon-mgr.gwm" for 
+;;  more customization variables.
+;;  
+(defaults-to
+  icon-mgr-xpos -6
+  icon-mgr-ypos 6
+  icon-mgr-sort t
+  icon-mgr-omit-list '(XLoad XClock XBiff Gwm (window-is-transient-for))
+)
+(declare-screen-dependent icon-mgr-background icon-mgr-title-background)
+(for screen (list-of-screens)
+  (if (= screen-type 'color)
+      (progn 
+        (defaults-to icon-mgr-background  (color-make "tan")
+                     icon-mgr-title-background (color-make "peru")))))
+
+
+;; Don't touch this one
+(setq icon-mgr-window-feedback ())  ; Only VTWM windows provide focus feedback
+
+;;----------------------------------------------------------------------------
+
+(defunq add-hook (hook expr)
+  (if (not (boundp hook))
+        (set hook expr)
+      (= (# 0 (eval hook)) 'progn)
+        (set hook (+ (eval hook) (list expr)))
+        (set hook (+ '(progn) (list (eval hook)) (list expr)))))
+
+(add-hook opening (icon-mgr-add))
+
+(add-hook closing (icon-mgr-remove))
+
+(add-hook screen-opening (icon-mgr-show))
+
+
+(if (or (not (boundp 'matches-token))
+        (not (boundp 'matches-list)))
+    (progn
+
+(defun matches-token (token)
+  (if (not token)                 ; True and false are literary
+         ()
+      (= token t)
+         t
+      (= (type token) 'atom)      ; Atom is client class
+         (= window-client-class token)
+      (= (type token) 'string)    ; String is regexp matching name
+         (match token window-name)
+      (and (= (type token) 'list) ; Lisp expression
+           (= (type (# 0 token)) 'atom)
+           (boundp (# 0 token))
+           (member (type (eval (# 0 token))) '(subr fsubr expr fexpr)))
+         (eval token)
+      (and (= (type token) 'list) ; Windowspec
+           (= (type (# 0 token)) 'atom))
+         (match-windowspec token)
+         ()))                     ; Else no match
+
+(defun matches-list (lst)
+  (tag return
+    (for ele lst
+       (if (matches-token ele)
+           (exit return t)))
+    ()))
+
+(defun matches-cond (condlst)
+  (tag return
+    (for lst condlst
+       (if (matches-token (# 0 lst))
+           (exit return 
+                 (sublist 1 (length lst) lst))))
+    ()))
+
+))          
+
+;; Some variables from the vtwm-profile that "vtwm-icon-mgr.gwm" uses. 
+(if (not (boundp 'setup-done))
+    (setq setup-done t))
+(if (not (boundp 'raise-on-iconify))
+    (setq raise-on-iconify ()))
+(if (not (boundp 'raise-window-orig))
+    (setq raise-window-orig raise-window))
+(if (not (boundp 'virtual-update))
+    (setq virtual-update ()))
+(if (boundp 'no-set-focus)
+      (setq autofocus (not no-set-focus))
+    (and (boundp 'keyboardFocusPolicy) (boundp 'autoKeyFocus))
+      (setq autofocus (not (= keyboardFocusPolicy 'explicit)))
+    (not (boundp autofocus))
+      (setq autofocus ()))
+
+;; Sorry, have to do this to make it work in the MWM-profile.
+(if (boundp 'tooClose)
+    (setq tooClose 0))
+
+;; This is a piece of surgery to get around the case when "load-virtual"
+;; is loaded before "load-icon-mgr". The icon manager has to modify the
+;; original function, not the wrapped one.
+(if (and (boundp 'iconify-window-orig)
+         (= (type iconify-window-orig) 'subr)
+         (not (= (type iconify-window) 'subr)))
+    (progn
+      (: saved-wrapped-iconify-window iconify-window)
+      (: iconify-window iconify-window-orig)
+
+      (load "vtwm-icon-mgr")
+
+      (: iconify-window-orig iconify-window)
+      (: iconify-window saved-wrapped-iconify-window))
+
+  ;; Else
+  (load "vtwm-icon-mgr"))
+

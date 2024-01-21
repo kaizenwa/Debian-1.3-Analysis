@@ -1,0 +1,334 @@
+IMPORTANT! From now on, the FORMAT OF /ETC/DIPHOSTS file
+is CHANGED!! Two new fields are added, they are:
+	- local IP address (or hostname)
+	- local netmask
+
+So from now on, /etc/diphosts will look like:
+
+user : password : remote host : local host : netmask : comments : protocol,MTU
+
+
+Fields "local host" and "netmask" can be empty, but THEY MUST BE
+THERE! Example:
+
+fool::makaka:::Silly DIP client:SLIP,296
+smart::ass:istant:255.255.0.0:CSLIP,296
+great:s/key:ass:istant:255.255.0.0:CSLIP,296
+
+Also, please DON'T pester Fred van Kempen with questions about
+this version of DIP, OK?
+
+Also, please note: my experience shows smaller blocks (i.e.
+smaller MTU) work BETTER. You *can* define MTU 1500, but it
+won't vouch for your sanity.
+
+As of today, DIP compiles and runs on Linux-1.1.68.
+
+I somewhat modified this package, adding support for a few
+commands:
+
+1. quit - this was needed to prevent DIP from just dropping
+   the tty device in some weird state, in case it couldn't
+   succeed establishing connection (like, the phone was
+   busy).
+
+2. netmask xxx.xxx.xxx.xxx - obviously, if you have some
+   specific netmask in mind, you put this into your 
+   profile... Otherwise it won't specify "netmask ..." in
+   it's "ifconfig" and may G-d help you.
+
+3. default - this tells DIP that it should set up the
+   default route to the remote host it made a connection to.
+   If this command isn't present in the command file,
+   default route won't be set/changed.
+
+4. exit - not really needed, just for the cleanness of the
+   script... Instead of just falling through the bottom,
+   you can use this command and it will nicely exit
+   leaving established [C]SLIP connection intact and
+   running. I didn't add the code for this command,
+   just spotted it in the source (:-).
+
+   Also, Pauline added error code to this command, so "exit 4"
+   should return exit status 4... You got the idea, right? (:-)
+
+5. Added "tty_notlocal()" call (provided by Rob Janssen) and
+   a few other patches by him (after some verification and
+   clean-up).
+
+6. Now DIP server behaves somewhat differently from DIP
+   client, and it improves the reliability somewhat. It
+   means, there are essentially two "tty_notlocal()"
+   thingies in the code, one for user-requested
+   hangup, and the other for line drop. 
+
+7. A few patches, by Erik Olson, Neal Becker, Rob Janssen,
+   Michael N. Lipp, Joerg Schlaeger, probably some others
+   I was too silly to record (and I apologize for that!).
+
+8. This DIP is now S/Key-capable. I'm adding some S/Key sources
+   in here, but retrieve the whole package, just to be safe.
+   Thanks to Stephen Shortland!
+
+   Also, Mike Norman added "SecureId" capability to DIP.
+
+9. IP address can now be assigned either by user login name,
+   or by tty line the call came in. If the user login name 
+   is "ttyS1", for example... See below for a brief
+   explanation/example how to use it.
+
+10. Locking mechanism was changed a little - now it's supposed to
+    detect if somebody else holds the lock on the tty line and
+    leave it alone in that case. 
+
+11. An option "-l ttySn" was added, so you can specify what DIP
+    exactly you want to kill. If you didn't use this flag, DIP
+    will kill the last started DIP.
+
+12. Quite a few upgrades by  Bill Reynolds,  Pauline Middelink,
+    Paul Cadach...If I missed you, a nice contributor - please
+    forgive me! It's not because of lack of appreciation! Also,
+    thanks to Daniel Suman for quite a few bug fixes, and help
+    debugging the thing.
+
+    Oh, Pauline's patches add the ability not to have DIP users
+    listed in /etc/passwd file at all, being completely defined
+    in /etc/diphosts, a-la taylor UUCP...  I don't like it, but 
+    if you want it, you get it.  I believe it's "-a" option, or
+    "diplogini" invokation.
+
+13. Please note, "dial" command in DIP script is slightly different
+    now - it "eats" the string the modem responds with to your dial!
+    Thus, DON'T expect "CONNECT" after successful dial, not any more.
+    Instead - check "$errlvl" value, just like this:
+
+	dial 555-1212
+	if $errlvl != 1 goto error
+
+    Note, that standardly, 
+	0 - OK
+	1 - CONNECT
+	2 - ERROR
+	3 - BUSY
+	4 - NO CARRIER
+
+14. VARIABLES. Please note, that "$locip" was designed to retrieve
+    local IP address (dotted decimal notation), and "$local" was
+    designed for host name *or* IP address... It's hoped, that
+    when you do "get $locip ..." it will skip over all the
+    crap until it hits something that looks like dotted
+    decimal notation. Maybe it's not working yet in
+    this release, but it's how things are designed
+    to work, and thus how they certainly will, at
+    some point. Please get back to me, if this
+    doesn't work the way I said, or it should. Thanks!
+
+15. Now DIP understands PPP - a major move, thanks to Peter Wassenaar.
+
+16. Some smarta**es are scared to death, when they see "ifconfig"
+    [an older release, mind you!] telling them something like:
+
+|> sl0       Link encap Serial Line IP  
+|>           inet addr 192.67.245.42  P-t-P 192.67.245.1  Mask 255.255.255.0
+|>           UP POINTOPOINT RUNNING  MTU 1500  Metric 1
+|>           RX packets 1233379 errors 1 dropped 0 overrun 709
+|>           TX packets 1513719 errors 0 dropped 1388 overrun 869
+
+    Please, there's nothing to be afraid of, don't run for Mylanta
+    just yet... Those are *not* overruns reported. 
+
+17. DIP now understands BOOTP protocol (thanks to
+    Colten Edwards <edwac@sasknet.sk.ca>. He
+    also added the ability to send "break" command.
+    I don't have time/desire to update the man page,
+    so please excuse me and take a look at the source.
+
+    He also added support for "term" protocol and fixed
+    one or two bugs in PPP invokation.
+
+18. Please be aware, that [normally] you need "databits 8" and
+    "parity n" for SLIP/CSLIP link. But often, in order to
+    talk to the SLIP server *during* the login procedure,
+    one has to set "databits 7" and "parity e". Make
+    sure you have the right setting for the login
+    negotiation, and make absolutely sure that
+    before "mode CSLIP" or such you have
+    returned to the right 8N1 link!!
+
+19. Often, if your server speaks SLIP and you try CSLIP, or
+    wise-versa, you may be able to ping, but nothing else
+    (like telnet or ftp) will work. Take care of this!
+
+
+TAKE A LOOK at "sample.dip" file - it's there for a purpose. (:-)
+SAME IS TRUE for "diphosts".
+
+ALSO, PLEASE IGNORE MOST OF THE HOWTO AND SUCH: THEY'RE HOPELESSLY
+OUT OF DATE. [Or at least, *were* out of date in September 1994.]
+
+
+HOW TO INSTALL DIP.
+
+1. Create a new group "dip" in "/etc/group" and place
+   each person you want to allow to dial OUT in that 
+   special group.
+
+2. Dial-IN isn't that dangerous, as incomers can't [I think]
+   force DIP to do their bidding, nothing more, than is in
+   "/etc/diphosts".  Still, check what you put in there!
+
+3. "chown root.dip /usr/sbin/dip"
+
+4. "chmod u=rx,g=x,o= /usr/sbin/dip"
+
+5. Now you can "chmod u+s /usr/sbin/dip"
+
+
+I'm not sure Fred will support these changes of mine, nor
+can I guarantee I didn't introduce new bugs with my patch.
+Use it on your own risk. At least it works for me, for
+Compressed SLIP with MTU 296 and a LOT of remote X11
+and FTPing and so on.
+
+Oh, as a matter of fact, I did introduce one bug - with
+password checking. I think it's fixed in 3.3.7l release
+but you're encouraged to check it and get back to me.
+
+Enjoy!
+uri@watson.ibm.com
+
+DYNAMIC IP ADDRESS ALLOCATION.
+
+OK, before I forgot: here's how to use dynamic IP address
+allocation:
+
+DIP-3.3.7-uri supports dynamic IP address allocation. That means
+in uri-speak, that IP addresses are allocated for tty lines, not
+for users (or rather, that you can have at the same time *BOTH*
+per-user IP address allocation and per-line IP addr allocation).
+So the IP address you get, dynamically depends on what line you
+happen to catch (:-).
+
+
+How does it work? Simply by the way you configure your DIP server,
+via "/etc/diphosts" file. 
+
+1. First put there all the entries for per-user IP addr allocation
+   and remember, that these are NOT getting "dynamic" IP, these
+   are privilleged enough to have their own static IP addresses.
+   Of course, you may have no such entries, or your whole file
+   may contain them (then you'll hardly have anybody left to be
+   "dynamically allocated" :-).
+
+2. Then put in all the entries for per-line IP allocation. Thus, if
+   you have two incoming tty lines (two modems) and want to have
+   two IP addresses for them, you'd put in a user "/dev/ttyS1"
+   and "/dev/ttyS2"... DIP-3.3.7d and up will allow you to
+   put in "ttyS1" and "ttyS2" (without that slash :-).
+
+   Probably it will work with pty's as well, but I have never
+   tested it.
+
+3. Don't forget to put in all the info 
+	- local_host  (what your server looks like for those incomers)
+	  and for your own sake - try to make this local_host DIFFERENT
+          from your Ethernet/Token Ring/FDDI/whatever other IPs your
+ 	  host may have;
+	- remote_host (what IP address you grace them with);
+	- netmask     (rather useful)
+	- of course, protocol (SLIP, CSLIP) and MTU. But that's trivial...
+
+4. You're all set. Now you add those users who are supposed to be allowed
+   to dial in, into your "/etc/passwd" (well, the standard procedure - I'm
+   sure you know how to do that, and if not, you aren't qualified to run a
+   SLIP server :-), and put "/usr/sbin/diplogin" as a shell for them.
+
+5. Example: user "fred" should be allowed to DIP in, and should get line-based
+   IP address. There are only two modems, for example, thus at most two lines
+   incoming.
+
+   The user name/login name is "fred", the "ttyS1" line should have server IP
+   address 43.65.86.23 and remote end should get IP address "3.4.5.6",and the
+   "ttyS2" line should be server "43.65.86.33" and it's remote end should
+   get "4.5.6.7" IP addr. 
+
+   Then "/etc/passwd" will have an entry:
+
+        fred:*:1976:96:Inbound SLIP:/tmp:/usr/sbin/diplogin
+
+    And in the "/etc/diphosts" the last two entries will be:
+
+  ttyS1::3.4.5.6:43.65.86.23:255.255.255.0:Modem 1 incoming SLIP entry:CSLIP,296
+  ttyS2::4.5.6.7:43.65.86.33:255.255.255.0:Modem 2 incoming SLIP entry:CSLIP,296	
+
+6. Same as previous example, but we add user "pete", that has static IP 
+   address "9.8.7.6" and server address "43.65.86.43" - then:
+
+   In "/etc/passwd" will be:
+
+        fred:*:1976:96:Inbound SLIP:/tmp:/usr/sbin/diplogin
+        pete:*:1976:96:Inbound SLIP:/tmp:/usr/sbin/diplogin
+
+   And in "/etc/diphosts" we'll have:
+
+  pete::9.8.7.6:43.65.86.43:255.255.255.0:Pete's personal entry:CSLIP,296
+  ttyS1::3.4.5.6:43.65.86.23:255.255.255.0:Modem 1 incoming SLIP entry:CSLIP,296
+  ttyS2::4.5.6.7:43.65.86.33:255.255.255.0:Modem 2 incoming SLIP entry:CSLIP,296	
+
+
+
+#if 0
+
+This is the last version of DIP using the "/etc/diphosts" file.
+It has been updated to use the "databits" serial patches, the
+"speed" setting bugfix, Jim Seagrave's "echo" and "init" adds,
+and Paul Mossip's "dynamic address" patches, as sent to me by
+Jeff Uphoff.  Here is his README:
+
+-----------------------------------------------------------------------------
+For those of us that have our SLIP IP addresses assigned dynamically,
+here is a patch for dip that will trap the address when the remote
+host 'displays' it.  (This is an option--those that don't want this
+need not enable it.)
+
+The meat of this patch was written by Paul Mossip (mossip@vizlab.rutgers.edu)
+Someone mentioned the existance of his patch, so I emailed him requesting
+a copy and he anonymously ftp'd it into my linux box.  
+
+I have been using it heavily for several days now, and it works
+beautifully.  Bravo to the author!  (And many thanks)
+
+I extended his patch a slight bit; whenever I initiated a slip connection,
+dip executed a 'route' command that assigned the remote machine's IP
+address as both my Destination net/address and my Gateway address.
+My connection would not function unless I deleted that route and created
+a new one specifying my Destination net/address as 'default'.
+I have added 'default' to the set of commands that dip accepts--
+if you use it, your Destination net/address will be set to 'default',
+if you don't use it, dip sets up the route as it did before.  (This
+command, like the ones that Paul added, can either be entered in
+dip's command mode, or read in from a script file.)
+
+The abilites that Paul's patch added to dip allowed me to totally
+automate my SLIP connections, with the exception of the routing change.
+This patch has taken the last step; everything is done from a script
+file and I haven't had a problem with the address assignment trapping once.
+
+Those that have to deal with dynamically assigned IP address will
+find this very useful.
+
+Thanks once again to Paul Mossip--he put all of the real work into
+this patch.
+-----------------------------------------------------------------------------
+
+The next release of DIP will use a much more powerful scripting
+language (derived from the Minicom communications package), and
+it will use the "/etc/diptab" "termcap"-like database for its
+client hosts.  This will allow for a much more flexible setup
+of hosts, and it will allow me to implement a Dynamic Address
+Server for DIP, making it usable as a "real" SLIP/PPP dialin
+server.
+
+Fred, 07/20/93
+
+#endif

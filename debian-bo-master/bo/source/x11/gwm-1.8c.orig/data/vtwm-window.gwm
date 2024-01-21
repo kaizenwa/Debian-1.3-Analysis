@@ -1,0 +1,425 @@
+;; vtwm-window.gwm --- Default windows and icons for VTWM profile.
+;;
+;; Author: Anders Holst  (aho@sans.kth.se)  
+;; Copyright (C) 1995  Anders Holst
+;; Version: vtwm-1.0
+;; Last change: 31/5 1995
+;;
+;; This file is copyrighted under the same terms as the rest of GWM
+;; (see the X Inc license for details). There is no warranty that it
+;; works. 
+;;
+;; --------------------------------------------------------------------- 
+;;
+;; This file defines the normal windows and icons for the VTWM profile.
+;;
+;; This file is highly inspired by, and in large parts stolen
+;; directly from, the file "twm-titled-win.gwm" by Arup Mukherjee.
+;; 
+
+(declare-screen-dependent
+    vtwm-borderwidth
+    vtwm-bordercolor
+    vtwm-active-bordercolor
+    vtwm-title-background
+    vtwm-title-foreground
+    vtwm-title-font
+    vtwm-icon-foreground
+    vtwm-icon-background
+    vtwm-fancy-colors
+    vtwm-notitle-list
+    vtwm-left-plugs
+    vtwm-right-plugs
+    iconify-pixmap-name
+    resize-pixmap-name
+    hilite-pixmap-name
+    default-icon-pixmap-name
+)
+
+;;
+;;    USER CUSTOMIZABLE VARIABLES
+;;    ---------------------------  
+;;    Adjust these in your own profile
+;;
+(for screen (list-of-screens)
+     (defaults-to
+       vtwm-borderwidth 2             ; Borderwidth of most windows
+       vtwm-bordercolor black         ; Color of border (inactive window)
+       vtwm-active-bordercolor white  ; Color of active window border
+       vtwm-title-background white    ; Default background of titlebar
+       vtwm-title-foreground black    ; Default foreground of titlebar
+       vtwm-title-font (font-make "9x15")   ; Font in titlebar
+       vtwm-icon-foreground black     ; Default background of icons
+       vtwm-icon-background white     ; Default foreground of icons
+       vtwm-fancy-colors ()           ; List of (wintype fg bg) specifications
+       vtwm-notitle-list '(Gwm (window-is-transient-for)) ; Untitled windows
+       default-icon-pixmap-name ()    ; Pixmap filename for default icon
+       hilite-pixmap-name "gray"      ; Filename for active titlebar pattern
+       vtwm-left-plugs '(("iconify2" (iconify-window)))
+       vtwm-right-plugs '(("resize2" (twm-resize-window) t))
+           ; Left and right plugs in the titlebar, a list of pairs
+           ; or tripplets:  ( <pixmap-file> <action> [<on-press>] )
+           ; The optional third element <on-press> signals that the action
+           ; should be run on button-press, rather than button-release.
+       )
+)
+
+;; 
+;;    USER CUSTOMIZABLE BEHAVIORS
+;;    ---------------------------
+;;    Adjust these in your own profile
+;;    
+
+(if (not (boundp 'standard-title-behavior))
+    (: standard-title-behavior
+       ()))
+
+(if (not (boundp 'window-behavior))
+    (: window-behavior
+       ()))
+
+(if (not (boundp 'icon-behavior))
+    (: icon-behavior
+       (state-make
+           (on (buttonpress any alone) (iconify-window))
+           )))
+
+(if (not (boundp 'standard-behavior))
+    (: standard-behavior
+       (state-make
+           (on (buttonpress 1 any) (raise-lower-move-window))
+           (on (buttonpress 2 any) (move-window))
+           (on (buttonpress 3 any) (lower-window))
+           )))
+
+
+;;--------------------------------------------------------------------------
+;;   End of user customizable things. Here starts the real code.
+;;--------------------------------------------------------------------------
+
+
+;; VTWM Titled Window
+
+(: vtwm-window-behavior
+    (state-make
+	(on name-change 
+            (progn
+              (send-user-event 'name-change)
+              (icon-mgr-update)
+              (if (window-icon?)
+                  (send-user-event 'icon-name-change window-icon))))
+        (on focus-in
+            (progn 
+              (if autoraise (raise-window))
+              (send-user-event 'focus-in)
+              (wob-borderpixel vtwm-active-bordercolor)
+              (icon-mgr-focusin)))
+        (on focus-out
+            (progn 
+              (send-user-event 'focus-out)
+              (wob-borderpixel vtwm-bordercolor)
+              (icon-mgr-focusout)))
+	(on enter-window 
+            (if (not autofocus)
+                (if autoraise (raise-window))
+              (progn (if autoraise (raise-window))
+                     (set-focus)
+                     (if autocolormap (set-colormap-focus)))))
+	(on leave-window (if autofocus
+                             (progn 
+                               (set-focus ())
+                               (if autocolormap (set-colormap-focus ())))))
+	(on (property-change "WM_ICON_NAME")
+            (progn
+              (icon-mgr-update)
+              (if (window-icon?)
+                  (send-user-event 'icon-name-change window-icon))))
+	(on window-icon-pixmap-change 
+	    (if (window-icon?)
+		(send-user-event 'icon-pixmap-change window-icon)))
+        ))
+
+(defun vtwm-get-color ()
+  (if vtwm-fancy-colors
+      (with (wob window-window)
+        (matches-cond vtwm-fancy-colors))))
+
+(defun vtwm-hilite-pixmap ()
+  (or (# 'hp wob)
+      (# 'hp (## 'hp wob
+               (pixmap-make vtwm-title-background
+                            hilite-pixmap-name
+                            vtwm-title-foreground)))))
+
+(defun vtwm-no-hilite-pixmap ()
+  (or (# 'np wob)
+      (# 'np (## 'np wob
+               (pixmap-make vtwm-title-background
+                            hilite-pixmap-name
+                            vtwm-title-background)))))
+
+(defun vtwm-titlebar-plug (pixmap-file expr press)
+  (with (pixmap (if (= (type pixmap-file) 'pixmap)
+                    pixmap-file
+                  (pixmap-make vtwm-title-background
+                               (eval pixmap-file)
+                               vtwm-title-foreground))
+         fsm (if (= (type expr) 'fsm)
+                 expr
+               (fsm-make 
+                 (state-make
+                   (eval (list 'on
+                               (if press 
+                                   '(buttonpress any alone)
+                                 '(buttonrelease any alone))
+                               expr)))))
+         borderwidth 0
+         background vtwm-title-background)
+    (plug-make pixmap)))
+
+(defun vtwm-make-pluglist (lst)
+  (mapfor ele lst
+    (vtwm-titlebar-plug (# 0 ele) (# 1 ele) (# 2 ele))))
+
+(: vtwm-name-fsm  
+    (fsm-make 
+       (state-make
+         (on (user-event 'name-change)
+             (progn
+               (with (borderwidth 0 
+		      background (or (# 'bg wob-parent) vtwm-title-background)
+                      foreground (or (# 'fg wob-parent) vtwm-title-foreground)
+                      font vtwm-title-font
+                      label-horizontal-margin 6
+                      label-vertical-margin 1)
+                 (wob-tile (label-make window-name)))
+               )))))
+
+(defun vtwm-name-plug ()
+  (with (background vtwm-title-background 
+         foreground vtwm-title-foreground
+         font vtwm-title-font
+         fsm vtwm-name-fsm
+         borderwidth 0 
+         label-horizontal-margin 6
+         label-vertical-margin 1)
+    (plug-make (label-make window-name))))
+
+(defun vtwm-space-plug (wdt)
+  (with (background vtwm-title-background 
+         foreground vtwm-title-background
+         borderwidth 0
+         bar-min-width wdt
+         fsm ())
+    (bar-make )))
+		
+    
+(: vtwm-titlebar-behavior 
+   (state-make
+    (on (user-event 'focus-in)
+        (wob-borderpixel vtwm-active-bordercolor))
+    (on (user-event 'focus-out)
+        (wob-borderpixel vtwm-bordercolor))))
+    
+(defun vtwm-titlebar-fsm  ()
+  (fsm-make
+    (state-make
+     vtwm-titlebar-behavior
+     standard-title-behavior)))
+
+(: vtwm-titlebar-inner-behavior
+   (state-make
+    (on (user-event 'focus-in)
+        (with (vtwm-title-background (or (# 'bg wob) vtwm-title-background)
+               vtwm-title-foreground (or (# 'fg wob) vtwm-title-foreground))
+          (wob-tile (vtwm-hilite-pixmap))))
+    (on (user-event 'focus-out)
+        (with (vtwm-title-background (or (# 'bg wob) vtwm-title-background)
+               vtwm-title-foreground (or (# 'fg wob) vtwm-title-foreground))
+          (wob-tile (vtwm-no-hilite-pixmap))))
+    ))
+ 
+(defun vtwm-titlebar-inner-fsm  ()
+  (fsm-make
+     vtwm-titlebar-inner-behavior))
+
+    
+(defun vtwm-middle-bar ()
+  (with (borderwidth 0
+         property ()
+         background vtwm-title-background
+         fsm ())
+    (bar-make (bar-make (vtwm-space-plug 5)
+                        (vtwm-name-plug) 
+                        (vtwm-space-plug 3)
+                        (bar-make (with (borderwidth 3
+                                         borderpixel vtwm-title-background
+                                         fsm (vtwm-titlebar-inner-fsm))
+                                    (bar-make ())))
+                        (vtwm-space-plug 3)))))
+
+(defun vtwm-titlebar ()
+  (with (borderwidth vtwm-borderwidth
+         cols (vtwm-get-color)
+         vtwm-title-foreground (or (# 0 cols) vtwm-title-foreground)
+         vtwm-title-background (or (# 1 cols) vtwm-title-background)
+         property (+ (list 'fg vtwm-title-foreground
+                           'bg vtwm-title-background)
+                     property)
+         background vtwm-title-background
+         fsm (vtwm-titlebar-fsm) 
+         plug-separator 0
+         borderpixel vtwm-bordercolor
+         bar-min-width 1 bar-max-width 30
+         bar-list (+ (vtwm-make-pluglist vtwm-left-plugs)
+                     (list (vtwm-middle-bar))
+                     (vtwm-make-pluglist vtwm-right-plugs)))
+    (apply bar-make bar-list)))
+
+(: vtwm-borderbar-behavior
+   (state-make
+      (on (user-event 'focus-in)
+          (wob-background vtwm-active-bordercolor))
+      (on (user-event 'focus-out)
+          (wob-background vtwm-bordercolor))))
+
+(defun vtwm-borderbar-fsm ()
+  (fsm-make
+    (state-make
+     vtwm-borderbar-behavior
+     standard-title-behavior)))
+
+(defun vtwm-borderbar ()
+  (with (borderwidth 0
+         background vtwm-bordercolor
+         fsm (vtwm-borderbar-fsm)
+         plug-separator 0
+         bar-min-width vtwm-borderwidth
+         bar-max-width vtwm-borderwidth)
+    (bar-make )))
+
+(defun vtwm-titled-window-fsm ()
+  (fsm-make
+    (state-make
+     window-behavior
+     standard-behavior
+     vtwm-window-behavior
+     )))
+
+(defun vtwm-titled-window ()
+  (with (inner-borderwidth 0
+         borderwidth 0
+         fsm (vtwm-titled-window-fsm)
+         borderpixel vtwm-bordercolor)
+    (window-make (vtwm-titlebar)
+                 (vtwm-borderbar)
+                 (vtwm-borderbar)
+                 (vtwm-borderbar)
+                 ())))
+
+
+;; VTWM Simple Window
+
+(defun vtwm-simple-window-fsm ()
+  (fsm-make
+    (state-make
+     window-behavior
+     standard-behavior
+     vtwm-window-behavior
+     )))
+
+(defun vtwm-simple-window ()
+  (with (inner-borderwidth 0
+         borderwidth vtwm-borderwidth
+         fsm (vtwm-simple-window-fsm)
+         borderpixel vtwm-bordercolor)
+    (window-make () () () () ())))
+
+
+;; VTWM Simple Icon
+
+(: vtwm-icon-behavior
+    (state-make
+      ()  ; Nothing, as for now. Most things are handled from the window.
+      ))
+
+(defun vtwm-smart-icon-name ()
+  (if (= window-icon-name "icon") ; Means that no icon name was specified
+      window-name
+    window-icon-name))
+
+(defun vtwm-simple-icon-fsm ()
+  (fsm-make
+    (state-make
+     icon-behavior
+     standard-behavior
+     vtwm-icon-behavior
+     )))
+
+(: vtwm-icon-label-fsm
+   (fsm-make
+     (state-make
+       (on (user-event 'icon-name-change)
+           (with (foreground vtwm-icon-foreground
+                  background vtwm-icon-background)
+             (wob-tile (label-make (vtwm-smart-icon-name))))))))
+
+(: vtwm-icon-pixmap-fsm
+   (fsm-make
+     (state-make
+       (on (user-event 'icon-pixmap-change)
+           (with (foreground vtwm-icon-foreground
+                  background vtwm-icon-background)
+             (wob-tile (window-icon-pixmap)))))))
+
+(defun vtwm-icon-get-plug ()
+  (or (window-icon-window)
+      (with (foreground vtwm-icon-foreground
+             background vtwm-icon-background
+             borderwidth 0
+             pm ()
+             fsm vtwm-icon-pixmap-fsm)
+        (if (setq pm (std-resource-get 'GwmIconPixmap))
+            (plug-make (pixmap-make pm))
+          (setq pm (window-icon-pixmap))
+            (plug-make pm)
+          default-icon-pixmap-name
+            (plug-make (pixmap-make default-icon-pixmap-name))
+            ()))))
+
+(defun vtwm-icon-get-label ()
+  (with (foreground vtwm-icon-foreground
+         background vtwm-icon-background
+         borderwidth 0
+         fsm vtwm-icon-label-fsm)
+    (plug-make (label-make (vtwm-smart-icon-name)))))
+
+(defun vtwm-simple-icon ()
+  (with (borderwidth 0
+         inner-borderwidth vtwm-borderwidth
+         cols (vtwm-get-color)
+         vtwm-icon-foreground (or (# 0 cols) vtwm-icon-foreground)
+         vtwm-icon-background (or (# 1 cols) vtwm-icon-background)
+         foreground vtwm-icon-foreground
+         background vtwm-icon-background
+         borderpixel vtwm-bordercolor
+         fsm (vtwm-simple-icon-fsm)
+         center-plug (vtwm-icon-get-plug)
+         label-plug (vtwm-icon-get-label))
+    (if center-plug
+        (with (tile t)
+          (window-make ()
+                       (bar-make ())
+                       (bar-make ())
+                       (bar-make () label-plug ())
+                       center-plug))
+      (window-make () () () () label-plug))))
+
+
+;; VTWM Window 
+
+(defun vtwm-window ()
+  (if (matches-list vtwm-notitle-list)
+      (vtwm-simple-window)
+    (vtwm-titled-window)))
+

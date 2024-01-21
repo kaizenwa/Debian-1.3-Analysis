@@ -1,0 +1,101 @@
+#!/usr/cluster/bin/wish -f
+
+proc bringUpHelp helpScreen {
+    global currentScreen
+    global previousScreen
+    global FileArray
+    global noHelp
+    toplevel .help
+    frame .help.f1
+    button .help.f1.b1 -text "Quit Help" -command { 
+	.infowin.menuframe.help configure -state normal
+	destroy .help }
+    button .help.f1.b2 -text "Previous Screen" -command { 
+	if {[string length $previousScreen] != 0} {
+	    followHypertext $previousScreen
+	} else {
+	    tk_dialog .no_prev_help "No Previous Help Screen" "There are no Help screens previous to this in the current Help session" "" 0 "OK"
+	}
+    }
+    text .help.text -yscrollcommand ".help.scroll set" -wrap word
+    .help.text tag configure inBold -font -*-*-bold-R-Normal--*-120-*
+    scrollbar .help.scroll -relief flat -command ".help.text yview"
+    
+    set previousScreen ""
+    set currentScreen $helpScreen
+
+    loadHelpFile $helpScreen
+    
+    .help.text tag bind hypertext <Double-ButtonRelease-1> { 
+	followHypertext $FileArray([lindex [lsort -ascii [.help.text tag names current]] 0]) 
+    } 
+    
+    pack append .help.f1 .help.f1.b1 {left expand} .help.f1.b2 {left expand}
+    pack append .help  .help.f1 {top fillx} .help.scroll {right filly} .help.text {expand fill} 
+    wm minsize .help 200 200
+    wm title .help "Help for dbDraw"
+    .help.text yview 0
+    .help.text tag configure hypertext -underline 1 
+    .help.text tag configure title -font -adobe-helvetica-bold-r-normal--34-240-100-100-p-182-iso8859-1 -underline 1
+    .help.text tag configure sdout -font -adobe-times-bold-r-normal--14-100-100-100-p-76-iso8859-1
+    .help.text tag configure sechd -font -adobe-times-bold-r-normal--20-140-100-100-p-100-iso8859-1
+    focus none
+}
+
+proc loadHelpFile fileName {
+    set tagArrIndex -1
+
+    set fileID [open $fileName r]
+    
+    for {} { [gets $fileID lineToParse] != -1 } {} {
+	if {![string first .ht $lineToParse]} {
+	    set tagName [string range $lineToParse 4 11]
+	    set tex [string range $lineToParse 13 end]
+	    set startTag [.help.text index end]
+	    eval ".help.text insert end \"$tex\""
+	    set endTag [.help.text index end]
+	    set tagArr([incr tagArrIndex]) " .help.text tag add $tagName $startTag $endTag "
+	    set tagArr([incr tagArrIndex]) " .help.text tag add hypertext $startTag $endTag "
+	} else { 
+	    if {![string first .ft $lineToParse]} {
+		set tagName [string range $lineToParse 4 8]
+		set tex [string range $lineToParse 10 end]
+		set startTag [.help.text index end]
+		eval ".help.text insert end \"$tex\""
+		set endTag [.help.text index end]
+		set tagArr([incr tagArrIndex]) ".help.text tag add $tagName $startTag $endTag "
+	    } else {
+		eval ".help.text insert end \"$lineToParse\""
+	    }
+	}
+    }
+	  
+    for {set i 0} {$i <= $tagArrIndex} {incr i} {
+	eval $tagArr($i)
+    }
+}
+    
+proc followHypertext fileName {
+    global previousScreen
+    global currentScreen
+    set previousScreen $currentScreen
+    set currentScreen $fileName
+    .help.text delete 0.0 end
+    loadHelpFile $fileName
+}
+
+proc getHelp { screenName } {
+    global currentScreen
+    global previousScreen
+    global FileArray
+    if { [winfo exists .help] } {
+	set previousScreen $currentScreen
+	raise .help
+	followHypertext $FileArray($screenName)
+    } else {
+	bringUpHelp $FileArray($screenName) 
+    }
+}
+
+ 
+

@@ -1,0 +1,120 @@
+
+#
+# psptools.pl: common routines for the psptools tools.
+#
+# Copyright (C) 1995, 1996, Yves Arrouye <Yves.Arrouye@marin.fdn.fr>
+# 
+# This package and its included files may be redistributed under the
+# terms of the GNU General Public License, a copy of which can be
+# found in the file GPL.
+#
+# I ask you to email me (preferrably in the form of context diffs)
+# any changes you make to this code. This is a wish, not an obligation,
+# but it will make maintaining the tools easier. Thanks!
+# 
+
+sub which {
+    local($what) = @_;
+    local($dir);
+
+    return '' if !$what;
+
+    foreach $dir (split(/:/, $ENV{'PATH'})) {
+	if (-x "$dir/$what") {
+	    return "$dir/$what";
+	}
+    }
+
+    return '';
+}
+
+# Set only one of the two below, so that psplpr can know whether to look
+# at the -P or -d option for the printer name. Please note that lp(1)
+# options are not supported, and that lpr(1) options are still used if
+# lp(1) is used (sorry, I don't have lp(1) so I can't make a nice
+# thing here).
+
+$prog_lpr = '@BSD_LPR@' unless defined($prog_lpr);
+$prog_lp = '@SYSV_LP@' unless defined($prog_lp);
+
+$prog_lpr = which($prog_lpr) unless $prog_lpr =~ q,^/|\./|\.\./,;
+$prog_lp = which($prog_lp) unless $prog_lp =~ q,^/|\./|\.\./,;
+
+# Decide which spooler to use by default.
+
+if ($prog_lpr && $prog_lp) {
+    if (!defined($no_psplpr_options) && $ENV{'PSPLPR_PRINTER'}) {
+	$used_prog_lpr = $prog_lpr;
+    } elsif (!defined($no_psplpr_options) && $ENV{'PSPLPR_LPDEST'}) {
+	$used_prog_lpr = $prog_lp;
+    } elsif ($ENV{'PRINTER'}) {
+	$used_prog_lpr = $prog_lpr;
+    } elsif ($ENV{'LPDEST'}) {
+	$used_prog_lpr = $prog_lp;
+    }
+} elsif ($prog_lpr) {
+    $used_prog_lpr = $prog_lpr;
+} elsif ($prog_lp) {
+    $used_prog_lpr = $prog_lp;
+}
+
+#
+# default_printer()
+#
+
+sub spooler_name {
+    local($prog) = $used_prog_lpr;
+
+    $prog =~ s,^.*/,,;
+    return $prog;
+}
+
+sub default_printer {
+    return $dflt_printer{&spooler_name};
+}
+
+#
+# set_printer(envvar)
+#
+# Choose a printer and eventually set the environment.
+#
+
+sub set_printer {
+    local($envvar) = @_;
+    local($printer);
+
+    $printer = $ENV{"PSPLPR_$envvar"};
+    if ($printer) {
+	$ENV{$envvar} = $printer;
+    } else {
+	$printer = $ENV{$envvar};
+    }
+
+    return $printer;
+}
+
+sub choose_printer {
+    local($printer);
+
+    if ($used_prog_lpr eq $prog_lpr) {
+        $printer = &set_printer('PRINTER');
+    } elsif ($used_prog_lpr eq $prog_lp) {
+        $printer = &set_printer('LPDEST');
+    }
+
+    return $printer;
+}
+
+#
+# choose_default_printer()
+#
+
+sub choose_default_printer {
+    local($printer) = &choose_printer();
+    $printer = &default_printer() unless $printer;
+
+    return $printer;
+}
+
+1;
+

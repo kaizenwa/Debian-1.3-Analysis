@@ -1,0 +1,296 @@
+/*							j0l.c
+ *
+ *	Bessel function of order zero
+ *
+ *
+ *
+ * SYNOPSIS:
+ *
+ * long double x, y, j0l();
+ *
+ * y = j0l( x );
+ *
+ *
+ *
+ * DESCRIPTION:
+ *
+ * Returns Bessel function of first kind, order zero of the argument.
+ *
+ * The domain is divided into the intervals [0, 9] and
+ * (9, infinity). In the first interval the rational approximation
+ * is (x^2 - r^2) (x^2 - s^2) (x^2 - t^2) P7(x^2) / Q8(x^2),
+ * where r, s, t are the first three zeros of the function.
+ * In the second interval the expansion is in terms of the
+ * modulus M0(x) = sqrt(J0(x)^2 + Y0(x)^2) and phase  P0(x)
+ * = atan(Y0(x)/J0(x)).  M0 is approximated by sqrt(1/x)P7(1/x)/Q7(1/x).
+ * The approximation to J0 is M0 * cos(x -  pi/4 + 1/x P5(1/x^2)/Q6(1/x^2)).
+ *
+ *
+ * ACCURACY:
+ *
+ *                      Absolute error:
+ * arithmetic   domain      # trials      peak         rms
+ *    IEEE      0, 30       10000       2.7e-19      7.3e-20
+ *
+ *
+ */
+/*							y0l.c
+ *
+ *	Bessel function of the second kind, order zero
+ *
+ *
+ *
+ * SYNOPSIS:
+ *
+ * double x, y, y0l();
+ *
+ * y = y0l( x );
+ *
+ *
+ *
+ * DESCRIPTION:
+ *
+ * Returns Bessel function of the second kind, of order
+ * zero, of the argument.
+ *
+ * The domain is divided into the intervals [0, 5>, [5,9> and
+ * [9, infinity). In the first interval a rational approximation
+ * R(x) is employed to compute y0(x)  = R(x) + 2/pi * log(x) * j0(x).
+ *
+ * In the second interval, the approximation is
+ *     (x - p)(x - q)(x - r)(x - s)P7(x)/Q7(x)
+ * where p, q, r, s are zeros of y0(x).
+ *
+ * The third interval uses the same approximations to modulus
+ * and phase as j0(x), whence y0(x) = modulus * sin(phase).
+ *
+ * ACCURACY:
+ *
+ *  Absolute error, when y0(x) < 1; else relative error:
+ *
+ * arithmetic   domain     # trials      peak         rms
+ *    IEEE      0, 30       25000       3.0e-19     7.6e-20
+ *
+ */
+
+/* Copyright 1994 by Stephen L. Moshier (moshier@world.std.com).  */
+
+#include "mathl.h"
+extern long double __polevll ( long double, long double *, int );
+extern long double __p1evll ( long double, long double *, int );
+
+/*
+j0(x) = (x^2-JZ1)(x^2-JZ2)(x^2-JZ3)P(x**2)/Q(x**2)
+0 <= x <= 9
+Relative error
+n=7, d=8
+Peak error =  8.49e-22
+Relative error spread =  2.2e-3
+*/
+static long double j0n[] = {
+ 1.296848754518641770562068596970917461302E0L,
+-3.239201943301299801017988814490822973468E3L,
+ 3.490002040733471400106951588156446469843E6L,
+-2.076797068740966813172740536268762823178E9L,
+ 7.283696461857171054940603724292997493661E11L,
+-1.487926133645291056388093978451001239544E14L,
+ 1.620335009643150402367970862340822012501E16L,
+-7.173386747526788067407034559506246493841E17L
+ };
+static long double j0d[] = {
+/* 1.000000000000000000000000000000000000000E0*/
+ 2.281959869176887763844919265666715670624E3L,
+ 2.910386840401647706984290219401654268412E6L,
+ 2.608400226578100610990921977837307261661E9L,
+ 1.752689035792859338859788285894079836315E12L,
+ 8.879132373286001289461351204912522718368E14L,
+ 3.265560832845194013668975527943185616740E17L,
+ 7.881340554308432241891814409857299717887E19L,
+ 9.466475654163919450527627558766493397282E21L
+};
+/*
+sqrt(j0^2(1/x^2) + y0^2(1/x^2)) = z P(z**2)/Q(z**2)
+z(x) = 1/sqrt(x)
+Relative error
+n=7, d=7
+Peak error =  1.80e-20
+Relative error spread =  5.1e-2
+*/
+static long double modulusn[] = {
+ 3.947542376069224461532136552047845797185E-1L,
+ 6.864682945702134624126371301477343341825E0L,
+ 1.021369773577974343843959835514109613368E1L,
+ 7.626141421290849630522661034590426845035E0L,
+ 2.842537511425216145635344663341056100390E0L,
+ 7.162842530423205720961523942028933535254E-1L,
+ 9.036664453160200052295692999857254683255E-2L,
+ 8.461833426898867839659448202505801120140E-3L
+};
+static long double modulusd[] = {
+/* 1.000000000000000000000000000000000000000E0 */
+ 9.117176038171821115904394138261429005561E0L,
+ 1.301235226061478261480860548640027632230E1L,
+ 9.613002539386213788182145213835341179345E0L,
+ 3.569671060989910901903283335065262208244E0L,
+ 8.983920141407590632423345373045592707789E-1L,
+ 1.132577931332212304985636383878157848593E-1L,
+ 1.060533546154121770441529910796331563105E-2L
+ };
+/*
+atan(y0(x)/j0(x)) = x - pi/4 + x P(x**2)/Q(x**2)
+Absolute error
+n=5, d=6
+Peak error =  2.80e-21
+Relative error spread =  5.5e-1
+*/
+static long double phasen[] = {
+-7.356766355393571519038139469135140406247E-1L,
+-5.001635199922493694706241245828396845424E-1L,
+-7.737323518141516881715220488195636681899E-2L,
+-3.998893155826990642730404602407242779985E-3L,
+-7.496317036829964150970102768499885677420E-5L,
+-4.290885090773112963541732090289084223939E-7L
+};
+static long double phased[] = {
+/* 1.000000000000000000000000000000000000000E0 */
+ 7.377856408614376072744766256586157817057E0L,
+ 4.285043297797736118068767291405925283657E0L,
+ 6.348446472935245102890369628706013793370E-1L,
+ 3.229866782185025048457458026131873133385E-2L,
+ 6.014932317342190404134448927950191465063E-4L,
+ 3.432708072618490390094952090444729316515E-6L
+ };
+
+#define JZ1 5.783185962946784521175995758L
+#define JZ2 30.471262343662086399078163175L
+#define JZ3 7.4887006790695183444889041310136808274810908E1L
+
+#define PIO4L 0.78539816339744830961566L
+
+long double j0l(long double x)
+{
+long double xx, y, z, modulus, phase;
+
+xx = x * x;
+if( xx < 81.0L )
+  {
+    y = (xx - JZ1) * (xx - JZ2) * (xx -JZ3);
+    y *= __polevll( xx, j0n, 7 ) / __p1evll( xx, j0d, 8 );
+    return y;
+  }
+
+y = fabsl(x);
+xx = 1.0/xx;
+phase = __polevll( xx, phasen, 5 ) / __p1evll( xx, phased, 6 );
+
+z = 1.0/y;
+modulus = __polevll( z, modulusn, 7 ) / __p1evll( z, modulusd, 7 );
+
+y = modulus * cosl( y -  PIO4L + z*phase) / sqrtl(y);
+return y;
+}
+
+
+/*
+y0(x) = 2/pi * log(x) * j0(x) + P(z**2)/Q(z**2)
+0 <= x <= 5
+Absolute error
+n=7, d=7
+Peak error =  8.55e-22
+Relative error spread =  2.7e-1
+*/
+static long double y0n[] = {
+ 1.556909814120445353690558903926596922430E4L,
+-1.464324149797947303150684329851271736158E7L,
+ 5.427926320587133391307283047780685085060E9L,
+-9.808510181632626683952255657533575381882E11L,
+ 8.747842804834934784972498894571266988554E13L,
+-3.461898868011666236538997563917952308530E15L,
+ 4.421767595991969611983299917018735928270E16L,
+-1.847183690384811186958417431043844288483E16L
+};
+static long double y0d[] = {
+/* 1.000000000000000000000000000000000000000E0 */
+ 1.040792201755841697888585281350416537990E3L,
+ 6.256391154086099882301995151394816098690E5L,
+ 2.686702051957904669677256742116961716912E8L,
+ 8.630939306572281881328204934638848292693E10L,
+ 2.027480766502742538762944923313331185696E13L,
+ 3.167750475899536301562019307293643530456E15L,
+ 2.502813268068711844040275540632320849671E17L
+};
+
+/*
+y0(x) = (x-Y0Z1)(x-Y0Z2)(x-Y0Z3)(x-Y0Z4)P(x)/Q(x)
+4.5 <= x <= 9
+Absolute error
+n=9, d=9
+Peak error =  2.35e-20
+Relative error spread =  7.8e-13
+*/
+static long double y059n[] = {
+ 2.368715538373384869795740108286354080729E-2L,
+-1.472923738545276751401835498475289789724E0L,
+ 2.525993724177105060507377634547936257100E1L,
+ 7.727403527387097461580463446897153155336E1L,
+-4.578271827238477598563372907206784098428E3L,
+ 7.051411242092171161986020461608228436219E3L,
+ 1.951120419910720443330833105263077652526E5L,
+ 6.515211089266670755621513548872432595610E5L,
+-1.164760792144532266854968981115405821194E5L,
+-5.566567444353735925323263816754034956079E5L
+};
+static long double y059d[] = {
+/* 1.000000000000000000000000000000000000000E0 */
+-6.235501989189125881723091161802419916592E1L,
+ 2.224790285641017194158141027000555212083E3L,
+-5.103881883748705381186322587373400863945E4L,
+ 8.772616606054526158656710844751021655708E5L,
+-1.096162986826467060920523203989531893118E7L,
+ 1.083335477747278958468238227109848215017E8L,
+-7.045635226159434678832858770683824287226E8L,
+ 3.518324187204647941098046647734000055759E9L,
+ 1.173085288957116938494111248664763079367E9L
+ };
+
+#define TWOOPI 6.36619772367581343075535E-1L
+#define Y0Z1 3.9576784193148578683756771869174012814186038E0L
+#define Y0Z2 7.0860510603017726976236245968203524689715104E0L
+#define Y0Z3 1.0222345043496417018992042276342187125994060E1L
+#define Y0Z4 1.3361097473872763478267694585713786426579135E1L
+#define MAXNUML 1.189731495357231765021263853E4932L
+
+long double y0l(long double x)
+{
+long double xx, y, z, modulus, phase;
+
+if( x < 0.0 )
+  {
+    return (-MAXNUML);
+  }
+xx = x * x;
+if( xx < 81.0L )
+  {
+    if( xx < 20.25L )
+      {
+	y = TWOOPI * logl(x) * j0l(x);
+	y += __polevll( xx, y0n, 7 ) / __p1evll( xx, y0d, 7 );
+      }
+    else
+      {
+	y = (x - Y0Z1)*(x - Y0Z2)*(x - Y0Z3)*(x - Y0Z4);
+	y *= __polevll( x, y059n, 9 ) / __p1evll( x, y059d, 9 );
+      }
+    return y;
+  }
+
+y = fabsl(x);
+xx = 1.0/xx;
+phase = __polevll( xx, phasen, 5 ) / __p1evll( xx, phased, 6 );
+
+z = 1.0/y;
+modulus = __polevll( z, modulusn, 7 ) / __p1evll( z, modulusd, 7 );
+
+y = modulus * sinl( y -  PIO4L + z*phase) / sqrtl(y);
+return y;
+}

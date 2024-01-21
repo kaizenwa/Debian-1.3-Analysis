@@ -1,0 +1,157 @@
+.TH ROUTE 8 "14 Jun 1994" "" ""
+.SH NAME
+route \- show / manipulate the IP routing table
+.SH SYNOPSIS
+.B "route [ -vn ]"
+.TP
+.B "route [ -v ] add [ -net | -host ] XXXX [gw GGGG] [metric MMMM] [netmask NNNN] [mss NNNN] [window NNNN] [dev DDDD]"
+.LP
+.B "route [ -v ] del XXXX"
+.SH DESCRIPTION
+.B Route
+manipulates the kernel's IP routing table.  Its primary use is to set
+up static routes to specific hosts or networks via an interface after
+it has been configured with the
+.B ifconfig(8)
+program. This version of
+.B route
+is intended solely for use with kernel versions 0.99pl14n and newer
+kernels. 
+.SH OPTIONS
+.TP
+.B (none)
+prints out the kernel routing table, listing destination address,
+gateway, netmask for route ("Genmask"), flags (U = Up, H = Host,
+G = Gateway, D = dynamic, M = Modified), Metric (currently not
+supported), Ref, Use and Iface (i.e. which device the route maps
+to). 
+.TP
+.B -n
+same as previous, but shows numerical addresses instead of trying to
+determine symbolic host names. This is useful if you are trying to determine
+why the route to your nameserver has vanished.
+.TP
+.B -v
+is a flag for 
+.BR verbose
+(not actually used). 
+.TP
+.B del XXXX
+deletes the route associated with the destination address XXXX. 
+.TP 
+.B add [ -net | -host ] XXXX [gw GGGG] [metric MMMM] [netmask NNNN] [window WWWW] [dev DDDD]
+adds a route to the IP address XXXX. The route is a network route if
+(a) the 
+.B -net
+modifier is used or (b) XXXX is found in
+.B /etc/networks
+by the 
+.B getnetbyname() 
+library function and no 
+.B -host
+modifier is used. 
+
+The 
+.B gw GGGG
+argument means that any IP packets sent to this address will be routed
+through the specified gateway. 
+.B NOTE:
+The specified gateway must be reachable first. This usually means that
+you have to set up a static route to the gateway beforehand.
+
+The 
+.B metric MMMM
+modifier is not yet implemented (and with the 
+.B -v
+option will actually print a warning).
+
+The 
+.B netmask NNNN
+modifier specifies the netmask of the route to be added. This only
+makes sense for a network route, and when the address XXXX actually
+makes sense with the specified netmask. If no netmask is given, 
+.B route
+guesses it instead, so for most normal setups you won't need to specify a
+netmask. 
+
+The 
+.B mss NNNN
+modifier specifies the TCP mss for the route to be added. This is normally
+used only for fine optimisation of routing setups.
+
+The 
+.B window NNNN
+modifier specifies the TCP window for the route to be added. This is
+typically only used on AX.25 networks and with drivers unable to handle
+back to back frames.
+
+The 
+.B dev DDDD
+modifier forces the route to be associated with the specified
+device, as the kernel will otherwise try to determine the device on
+its own (by checking already existing routes and device
+specifications, and where the route is added to). In most normal
+networks you won't need this. 
+
+If 
+.B dev DDDD
+is the last option on the command line, the word 
+.B dev
+may be omitted, as it's the default. Otherwise the order of the route
+modifiers (metric - netmask - gw - dev) doesn't matter.
+
+.SH EXAMPLES
+.TP
+.B route add -net 127.0.0.0
+adds the normal loopback entry, using netmask 255.0.0.0 (Class A net,
+determined from the destination address) and associated with the 
+.B lo
+device (assuming this device was prviously set up correctly with
+.B ifconfig(8)
+). 
+.TP 
+.B route add -net 192.56.76.0 netmask 255.255.255.0 dev eth0
+adds a route to the network 192.56.76.x via 
+.B eth0.
+The Class C netmask modifier is not really necessary here because
+192.* is a Class C IP address. The word
+.B dev
+can be omitted here. 
+.TP
+.B route add default gw mango-gw
+adds a default route (which will be used if no other route matches).
+All packets using this route will be gatewayed through "mango-gw". The
+device which will actually be used for that route depends on how we
+can reach "mango-gw" - the static route to "mango-gw" will have to be
+set up before. 
+.TP
+.B route add ipx4 sl0
+.TP 
+.B route add -net 192.57.66.0 netmask 255.255.255.0 gw ipx4
+This command sequence adds the route to the "ipx4" host via the SLIP
+interface (assuming that "ipx4" is the SLIP host), and then adds the
+net 192.57.66.0 to be gatewayed through that host.
+.TP
+.B route add 224.0.0.0 netmask 240.0.0.0 dev eth0
+This is an obscure one documented so people know how to do it. This sets
+all of the class D (multicast) IP routes to go via eth0. This is the
+correct normal configuration line with a multicasting kernel. 
+.LP
+.SH FILES
+.I /proc/net/route
+.br
+.I /etc/networks
+.br
+.I /etc/hosts
+.SH SEE ALSO
+.I ifconfig(8)
+.SH HISTORY
+.B Route
+for Linux was originally written by Fred N.  van Kempen,
+<waltje@uwalt.nl.mugnet.org> and then modified by Johannes Stille and
+Linus Torvalds for pl15. Alan Cox added the mss and window options for
+Linux 1.1.22.
+.SH BUGS
+Alan needs to add the 'irtt' option for an initial round trip time for slow
+(AX.25/NetROM) links. Unfortunately he has to get around to adding it to the
+kernel first.

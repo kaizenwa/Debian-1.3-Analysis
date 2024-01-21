@@ -1,0 +1,442 @@
+;;File: mwmrc.gwm
+;;Author: Frederic CHARTON -- Bull Research FRANCE
+;;Author: Glen WHITNEY -- UCLA Mathematics Dept.
+;;Revision: 1.0 -- Sep 12 1989
+;;Revision: 1.1 -- Jun 28 1992
+;;State: Exp
+;;GWM Version: 1.7l
+;;Modified by LCE 02/90
+
+; This file consults the X resources on the server and sets up characteristics
+; for the MWM emulation. It also supplies the defaults for unspecified
+; options. So to change one of the options, change your X resources
+; via xrdb, rather than changing this file.
+
+;; Since we are not using the GWM resource database to hold per-window
+;; information, (we are going to decorate and place *every*
+;; window and icon as an "mwm window"), we'll load the X defaults information
+;; into our resource database.
+
+(defun load-resources (string)
+  ; Performs almost exactly the same function as XrmGetStringDatabase
+  ; into the GWM database, from its single STRING argument
+  (with (matchData () currentLine ()
+         stripOneLineRegexp "\\([^\n]*\\)\n\\(.*\\)$"
+	 parseLineRegexp "[ \t]*\\([^ \t]*\\)[ \t]*:[ \t]*\\(.*\\)$")
+     (while (not (= string ""))
+       (: matchData (match stripOneLineRegexp string 1 2))
+       (if (= matchData "")
+	   (progn
+	     (: currentLine string)
+	     (: string ""))
+	 (progn
+	   (: currentLine (# 0 matchData))
+	   (: string (# 1 matchData))))
+       (: matchData (match parseLineRegexp currentLine 1 2))
+       (if (not (= matchData ""))
+	   (resource-put (# 0 matchData) 
+			 (strip-trailing-whitespace (# 1 matchData)))))))
+
+(defun strip-trailing-whitespace (str)
+  ; Returns STRING less any trailing whitespace.
+  (with (ws (match "\\([ \n\t]*\\)$" str 1))
+     (match (+ "\\(.*\\)" ws "$") str 1)))
+
+(load-resources (with (wob root-window) (get-x-property "RESOURCE_MANAGER")))
+(load-resources (getenv "XENVIRONMENT"))
+
+(: true-strings '("1" "on" "t" "true" "On" "ON" "T" "True" "TRUE" "yes"
+		  "Yes" "YES"))
+(defun atoB (string)
+  ; returns a truth value from STRING,
+  ; For now, implemented by a global list true-strings of
+  ; everything that will return t.
+  (member string true-strings))
+
+(defun listify-string (str)
+  ; Takes a string of whitespace-separated alphanumeric names and returns the
+  ; list of atoms with those names
+  (with (matchData () theList ())
+     (while (> (length str) 0)
+       (: matchData (match "^[ \t\n]*\\([a-zA-Z0-9]*\\)[ \t\n]*\\(.*\\)"
+			   str 1 2))
+       (if (> (length (# 0 matchData)) 0)
+	   (: theList (+ theList (list (atom (# 0 matchData))))))
+       (: str (# 1 matchData)))
+     theList))
+
+;; Next, set some things the user gets no say in:
+
+(: move-grid-style 5)
+(: resize-grid-style 5)
+(: resize-style 1)
+(: move-opaque.cutoff-area 350000)
+
+(load 'cursor-names)
+(: cursor-NW (cursor-make XC_top_left_corner))
+(: cursor-NE (cursor-make XC_top_right_corner))
+(: cursor-SW (cursor-make XC_bottom_left_corner))
+(: cursor-SE (cursor-make XC_bottom_right_corner))
+(: cursor-N  (cursor-make XC_top_side))
+(: cursor-S  (cursor-make XC_bottom_side))
+(: cursor-W  (cursor-make XC_left_side))
+(: cursor-E  (cursor-make XC_right_side))
+
+(: cross-cursor (cursor-make XC_fleur))
+
+; COMPONENT APPEARANCE RESOURCES :
+; ------------------------------
+
+;; Consult defaults for the other cursors (these are not in Mwm spec.)
+
+(: menu-cursor 
+   (cursor-make (eval (atom (+ "XC_" (or (resource-get "mwm.menu.cursor"
+						       "Mwm.Menu.Cursor")
+					 "left_ptr"))))))
+(: frame-cursor 
+   (cursor-make (eval (atom (+ "XC_" (or (resource-get "mwm.client.cursor"
+						       "Mwm.Client.Cursor")
+					 "left_ptr"))))))
+(: place-cursor 
+   (cursor-make (eval (atom (+ "XC_" (or (resource-get "mwm.feedback.cursor"
+						       "Mwm.Feedback.Cursor")
+					 "ul_angle"))))))
+(: root-cursor 
+   (cursor-make 
+    (eval (atom (+ "XC_" (or (resource-get "mwm.cursor" "Mwm.Cursor") 
+			     "tcross"))))))
+
+
+(: feedbackFontList 
+   (font-make (or (resource-get "mwm.feedback.fontList" "Mwm.Feedback.FontList")
+		  "fixed")))
+(: menuFontList 
+   (font-make (or (resource-get "mwm.menu.fontList" "Mwm.Menu.FontList")
+		  "fixed")))
+(: iconFontList 
+   (font-make (or (resource-get "mwm.icon.fontList" "Mwm.Icon.FontList")
+		  "fixed")))
+(: clientFontList 
+   (font-make (or (resource-get "mwm.client.fontList" "Mwm.Client.FontList")
+		  "fixed")))
+
+; Internal results of these settings.
+(: menuFontHeight (with (font menuFontList) (height "A")))
+(: iconFontHeight (with (font iconFontList) (height "A")))
+(: clientFontHeight (with (font clientFontList) (height "A")))
+(: title-bar.height (+ 4 clientFontHeight))
+(: clientFontList.height (with (font clientFontList) (height "A")))
+(: menuFontList.height (with (font menuFontList) (height "A")))
+(: iconFontList.height (with (font iconFontList) (height "A")))
+(: feedbackFontList.height (with (font feedbackFontList) (height "A")))
+
+; On to color settings:
+(if (= screen-type 'mono)
+    (progn
+      (: screen-tile (with (foreground black background white)
+			   (pixmap-make "grainy") ) )
+      (: shadeDisabled ())
+      (: menuShadeColor "white")
+      (: defaultBackground "white")
+      (: defaultBottomShadowColor "black")
+      (: defaultForeground "black")
+      (: defaultTopShadowColor "black")
+      (: defaultActiveBackground "black")
+      (: defaultActiveBottomShadowColor "white")
+      (: defaultActiveForeground "white")
+      (: defaultActiveTopShadowColor "white"))
+  (= screen-type 'gray)
+  (progn
+    (: screen-tile (with (foreground black background white)
+			 (pixmap-make "grainy") ) )
+    (: shadeDisabled t)
+    (: menuShadeColor "grey")
+    (: defaultBackground "grey")
+    (: defaultBottomShadowColor "black")
+    (: defaultForeground "black")
+    (: defaultTopShadowColor "white")
+    (: defaultActiveBackground "darkgrey")
+    (: defaultActiveBottomShadowColor "black")
+    (: defaultActiveForeground "white")
+    (: defaultActiveTopShadowColor "grey"))
+  (progn ;color
+    (: screen-tile (with (foreground (color-make "#888050")
+			  background (color-make "#fed"))
+		      (pixmap-make "grainy")))
+    (: shadeDisabled t)
+    (: menuShadeColor "#9BC")
+    (: defaultBackground "#387")
+    (: defaultBottomShadowColor "#243")
+    (: defaultForeground "black")
+    (: defaultTopShadowColor "#3ca")
+    (: defaultActiveBackground "#379")
+    (: defaultActiveBottomShadowColor "#235")
+    (: defaultActiveForeground "white")
+    (: defaultActiveTopShadowColor "#3bc"))
+  )
+
+(: menuBackground 
+   (color-make (or (resource-get "mwm.menu.background" "Mwm.Menu.Background")
+		   defaultBackground)))
+(: iconBackgroundString (or (resource-get "mwm.icon.background" 
+					  "Mwm.Icon.Background")
+			    defaultBackground))
+(: iconBackground (color-make iconBackgroundString))
+(: clientBackground 
+   (color-make (or (resource-get "mwm.client.background"
+				 "Mwm.Client.Background") defaultBackground)))
+(: feedbackBackground 
+   (color-make (or (resource-get "mwm.feedback.background" 
+				 "Mwm.Feedback.Background") defaultBackground)))
+
+(: menuBottomShadowColor 
+   (color-make 
+    (or (resource-get "mwm.menu.bottomShadowColor" "Mwm.Menu.Foreground") 
+	defaultBottomShadowColor)))
+				   
+(: iconBottomShadowColorString 
+   (or (resource-get "mwm.icon.bottomShadowColor" "Mwm.Icon.Foreground") 
+	defaultBottomShadowColor))
+(: iconBottomShadowColor (color-make iconBottomShadowColorString))
+(: clientBottomShadowColor 
+   (color-make 
+    (or (resource-get "mwm.client.bottomShadowColor" "Mwm.Client.Foreground")
+	defaultBottomShadowColor)))
+  ; This is where we'd do feedbackBottomShadowColor if it's ever implemented
+
+(: menuForeground 
+   (color-make (or (resource-get "mwm.menu.foreground" "Mwm.Menu.Foreground")
+		   defaultForeground)))
+(: iconForegroundString (or (resource-get "mwm.icon.foreground" 
+					  "Mwm.Icon.Foreground")
+			    defaultForeground))
+(: iconForeground (color-make iconForegroundString))
+(: clientForeground 
+   (color-make (or (resource-get "mwm.client.foreground"
+				 "Mwm.Client.Foreground") defaultForeground)))
+(: feedbackForeground 
+   (color-make (or (resource-get "mwm.feedback.foreground" 
+				 "Mwm.Feedback.Foreground") defaultForeground)))
+
+(: menuTopShadowColor 
+   (color-make 
+    (or (resource-get "mwm.menu.topShadowColor" "Mwm.Menu.Background") 
+	defaultTopShadowColor)))
+				   
+(: iconTopShadowColorString 
+   (or (resource-get "mwm.icon.topShadowColor" "Mwm.Icon.Background") 
+	defaultTopShadowColor))
+(: iconTopShadowColor (color-make iconTopShadowColorString))
+(: clientTopShadowColor 
+   (color-make 
+    (or (resource-get "mwm.client.topShadowColor" "Mwm.Client.Background")
+	defaultTopShadowColor)))
+  ; This is where we'd do feedbackTopShadowColor if it's ever implemented
+
+
+(: iconActiveBackground 
+   (color-make 
+    (or (resource-get "mwm.icon.activeBackground" "Mwm.Icon.Background")
+	defaultActiveBackground)))
+(: clientActiveBackground 
+   (color-make 
+    (or (resource-get "mwm.client.activeBackground" "Mwm.Client.Background")
+	defaultActiveBackground)))
+
+(: iconActiveForeground 
+   (color-make 
+    (or (resource-get "mwm.icon.activeForeground" "Mwm.Icon.Foreground")
+	defaultActiveForeground)))
+(: clientActiveForeground 
+   (color-make 
+    (or (resource-get "mwm.client.activeForeground" "Mwm.Client.Foreground")
+	defaultActiveForeground)))
+
+(: iconActiveBottomShadowColor 
+   (color-make 
+    (or (resource-get "mwm.icon.activeBottomShadowColor" "Mwm.Icon.Foreground")
+	defaultActiveBottomShadowColor)))
+(: clientActiveBottomShadowColor 
+   (color-make 
+    (or (resource-get "mwm.client.activeBottomShadowColor" 
+		      "Mwm.Client.Foreground") 
+	defaultActiveBottomShadowColor)))
+
+(: iconActiveTopShadowColor
+   (color-make 
+    (or (resource-get "mwm.icon.activeTopShadowColor" "Mwm.Icon.Background")
+	defaultActiveTopShadowColor)))
+(: clientActiveTopShadowColor 
+   (color-make 
+    (or (resource-get "mwm.client.activeTopShadowColor" "Mwm.Client.Background")
+	defaultActiveTopShadowColor)))
+
+; SPECIFIC APPEARENCE AND BEHAVIOR RESOURCES :
+; ------------------------------------------
+
+(: autoKeyFocus (atoB (or (resource-get "mwm.autoKeyFocus" "Mwm.AutoKeyFocus")
+			  "1")))
+(: autoRaiseDelay (atoi (or (resource-get "mwm.autoRaiseDelay" 
+					  "Mwm.AutoRaiseDelay") "500")))
+;bitmapDirectory is not implemented
+(: buttonBindings (atom (or (resource-get "mwm.buttonBindings" 
+					  "Mwm.ButtonBindings")
+			    "DefaultButtonBindings")))
+;cleanText is not implemented
+(: clientAutoPlace (atoB (or (resource-get "mwm.clientAutoPlace"
+					   "Mwm.ClientAutoPlace") "1")))
+;colormapFocusPolicy not implemented
+;configFile not implemented
+(: deiconifyKeyFocus (atoB (or (resource-get "mwm.deiconifyKeyFocus"
+					     "Mwm.DeiconifyKeyFocus") "1")))
+(: doubleClickTime (atoi (or (resource-get "mwm.doubleClickTime"
+					   "Mwm.DoubleClickTime") "300")))
+(: double-click-delay doubleClickTime)
+
+;enableWarp not implemented
+(: enforceKeyFocus (atoB (or (resource-get "mwm.enforceKeyFocus"
+					   "Mwm.EnforceKeyFocus") "1")))
+(if enforceKeyFocus (: check-input-focus-flag 1) (: check-input-focus-flag 0))
+
+;fadeNormalIcon not implemented
+(: frameBorderwidth (atoi (or (resource-get "mwm.frameBorderWidth"
+					    "Mwm.FrameBorderWidth") "5")))
+(: iconAutoPlace (atoB (or (resource-get "mwm.iconAutoPlace"
+					 "Mwm.IconAutoPlace") "1")))
+; All iconBox resources not implemented
+(: iconClick (atoB (or (resource-get "mwm.iconClick" "Mwm.IconClick") "1")))
+
+; iconDecoration is only partially implemented:
+(: iconDecoration (or (resource-get "mwm.iconDecoration" "Mwm.IconDecoration")
+		      "activelabel label image"))
+(: completeIconNameOnFocusIn (member "activelabel" iconDecoration))
+; Thus, "label" and "image" are always assumed.
+
+(: iconImageMaximum (or (resource-get "mwm.iconImageMaximum"
+				      "Mwm.IconImageMaximum") "50x50"))
+(: iconImageMaximum (mapfor dim (match "\\([0-9]*\\)x\\([0-9]*\\)"
+				       iconImageMaximum 1 2)
+			    (atoi dim)))
+
+;iconImageMinimum not implemented
+(: iconPlacement (or (resource-get "mwm.iconPlacement" "Mwm.IconPlacement")
+		     "left bottom"))
+(: iconPlacement (listify-string iconPlacement))
+
+(: iconPlacementMargin (atoi (or (resource-get "mwm.iconPlacementMargin"
+					       "Mwm.IconPlacementMargin") "5")))
+(: interactivePlacement (atoB (resource-get "mwm.interactivePlacement"
+					    "Mwm.InteractivePlacement")))
+(: keyBindings (atom (or (resource-get "mwm.keyBindings" "Mwm.KeyBindings")
+			 "DefaultKeyBindings")))
+(: keyboardFocusPolicy 
+   (atom (or (resource-get "mwm.keyboardFocusPolicy" "Mwm.KeyboardFocusPolicy")
+	     "explicit")))
+;limitResize not implemented
+(: lowerOnIconify (atoB (or (resource-get "mwm.lowerOnIconify"
+					  "Mwm.LowerOnIconify") "1")))
+;maximumMaximumSize not implemented
+(: moveThreshold (atoi (or (resource-get "mwm.moveThreshold" 
+					 "Mwm.MoveThreshold") "4")))
+;multiScreen not implemented
+;passButtons not implemented
+(: passSelectButton (atoB (or (resource-get "mwm.passSelectButton"
+					    "Mwm.PassSelectButton") "1")))
+(: positionIsFrame (atoB (or (resource-get "mwm.positionIsFrame"
+					   "Mwm.PositionIsFrame") "1")))
+(: positionOnScreen (atoB (or (resource-get "mwm.positionOnScreen"
+					    "Mwm.PositionOnScreen") "1")))
+;quitTimeout not implemented
+;raiseKeyFocus not implemented
+(: resizeBorderWidth (atoi (or (resource-get "mwm.resizeBorderWidth"
+					     "Mwm.ResizeBorderWidth") "10")))
+(: mwm-resize-style-corner-size (+ title-bar.height resizeBorderWidth))
+
+(: resizeCursors (atoB (or (resource-get "mwm.resizeCursors"
+					 "Mwm.ResizeCursors") "1")))
+;screens not implemented
+;showFeedback only partially implemented:
+(: showFeedback (or (resource-get "mwm.showFeedback" "Mwm.ShowFeedback") "all"))
+(if (= showFeedback "all") (: showFeedback '(move placement resize))
+                                 ; These are all that are implemented
+    (= showFeedback "none") (: showFeedback nil)
+    (: showFeedback (listify-string showFeedback)))
+
+(if (member 'move showFeedback) (: move-meter 1) (: move-meter 0))
+(if (member 'resize showFeedback) (: resize-meter 1) (: resize-meter 0))
+
+(meter 'font feedbackFontList 'foreground feedbackForeground 
+       'background feedbackBackground)
+
+(: startUpKeyFocus (atoB (or (resource-get "mwm.startupKeyFocus"
+					   "mwm.StartupKeyFocus") "1")))
+(: transientDecoration 
+   (or (resource-get "mwm.transientDecoration" "Mwm.TransientDecoration") 
+       "menu title"))
+(if (= transientDecoration "all") 
+      (: transientDecoration '(border maximize minimize resizeh menu title))
+    (= transientDecoration "none") (: transientDecoration nil)
+    (: transientDecoration (listify-string transientDecoration)))
+
+; transientFunctions not implemented
+; useIconBox not implemented
+(: wMenuButtonClick (atoB (or (resource-get "mwm.wMenuButtonClick"
+					    "Mwm.wMenuButtonClick") "1")))
+(: wMenuButtonClick2 (atoB (or (resource-get "mwm.wMenuButtonClick2"
+					    "Mwm.wMenuButtonClick2") "1")))
+
+;; The extras:
+
+; Amount to move a window right when autoplacing, if it obscures another window
+(: clientAutoXOffset (atoi (or (resource-get "mwm.clientAutoXOffset" 
+					     "Mwm.ClientAutoXOffset") "25")))
+; Amount to move a window down when autoplacing, if it obscures another window
+(: clientAutoYOffset (atoi (or (resource-get "mwm.clientAutoYOffset" 
+					     "Mwm.ClientAutoYOffset") "20")))
+; Euclidean distance that is too close for the upper right corners of windows:
+(: tooClose (atoi (or (resource-get "mwm.tooClose" "Mwm.TooClose") "9")))
+(if shadeDisabled
+    (: menuShadeColor 
+       (color-make (or (resource-get "mwm.menuShadeColor" "Mwm.MenuShadeColor")
+		       menuShadeColor))))
+
+
+; CLIENT SPECIFIC RESOURCES :
+; -------------------------
+
+(: clientDecorationNames
+ '(all border maximize minimize none resizeh menu title)
+)
+
+
+(: clientFunctionsNames
+ '(all none resize move minimize maximize close)
+)
+
+;; internal defaults if nothing at all is specified out there:
+(: internal_clientDecoration "all")
+(: internal_clientFunctions "all")
+(: internal_focusAutoRaise "1")
+(: internal_iconImage "")
+(: internal_iconImageBackground iconBackgroundString)
+(: internal_iconImageForeground iconForegroundString)
+(: internal_iconImageBottomShadowColor iconBottomShadowColorString)
+; iconImageBottomShadowPixmap not implemented
+(: internal_iconImageTopShadowColor iconTopShadowColorString)
+; iconImageTopShadowPixmap not implemented
+; the matte is not implemented
+; maximumClientSize is not implemented
+; useClientIcon is not implemented
+(: internal_windowMenu "DefaultWindowMenu")
+
+(de get-res-value (theValue)
+    (with (effective-name (if (= window-client-name "name") "defaults"
+			    window-client-name)
+	   effective-class (if (= window-client-class "client") "Defaults"
+			     window-client-class))
+      (or (resource-get (+ "mwm." effective-name "." theValue)
+			(+ "Mwm." effective-class "." theValue))
+	  (eval (atom (+ "internal_" theValue))))))
+
+(de get-res-truth-value (theValue)
+    (atoB (get-res-value theValue)))

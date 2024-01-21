@@ -1,0 +1,367 @@
+PLEASE READ THE FILE "README.security" for important information!
+
+------------------------------------------------------------------------
+			   Term. version 1.11
+
+	      Copyright (c) 1992,1993,1994 Michael O'Reilly
+		  All Rights Reserved
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 1, or (at your option)
+    any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+-------------------------------------------------------------------------------
+
+--> Read the 'CHANGES' file as this will be more up to date than this
+readme.
+
+--> Please read this entire file if you have any problems.
+
+*********************************************************************
+--> Please don't send me e-mail telling me you liked it! My mailbox
+overfloweth! Postcards on the other hand are most welcome. 
+
+	Michael O'Reilly
+	192 Nicholson Rd
+	Subiaco 6008
+	Perth, Western Australia
+	Australia
+	
+I guess this makes this postcardware.....
+*********************************************************************
+
+---> For a sample ~/.term/termrc file see TERMRC
+
+Term is a program to implement a slip-like connection between 2 *NIX
+machines. It isn't sl/ip. It runs entirely in user mode. It requires no
+kernel support on either end, and no root access on either end. It is
+built to run over a modem to connect a non-internet machine with an
+internet machine. If this is your situation, and you don't have
+slip/ppp then term is for you.  If you do have slip/ppp, then you
+should probably use it instead.
+
+Term is run at both ends, and does multiplexing, error correction, and
+compression across the serial link between them. Designed to be as
+efficient as possible, and have good response time, even over slow
+modems. (I run it over a 2400 baud modem). [ Well, I used to. Roll on
+14.4! M - 7/1/94]
+
+Note that it behaves the same from both ends. A user on either machine
+can connect to the other.
+
+The term program runs as a server. A UNIX-domain socket is opened and
+bound to support communication between client processes and the
+server.
+
+See 'old/PROTOCOL.unix' for the protocol used by clients.  
+See 'old/PROTOCOL.serial' for the protocol used across the serial link.  ( Be
+warned that they are out of date. If in doubt, read the source :)
+
+These six clients are the most useful:
+
+    trsh
+	Runs a shell on the remote end. Like a normal login.  (Similar
+        to "rsh" without the need to specify a hostname.)
+    tupload <local file> -as <remote file>
+	Uploads a file. takes the name of the local file and the optional
+	arg is the name of the remote file.  This is a bit more robust than
+        "rcp", but at the price of not allowing you to specify a different
+        host or username.
+    txconn
+	Hangs around in the background waiting for X connections. re-directs
+	them to the local X server. Intended to be run on the remote machine.
+    tredir
+	Lets you alias a port on one system to another. I.e. 'tredir 4000 23'
+	run on host 'a' means that anyone telneting to port 4000 on 'a',
+	will get a login prompt of machine 'b'.
+    tshutdown
+	Terminates term.
+
+
+[More up to date information is available in HOWTO.term]
+
+By default the program assumes that your modem can transmit data at the
+same speed as your computer's serial port connection to the modem.  To
+set the proper rate run term as:
+	'term -s9600'
+for a 9600 baud modem.  Alternatively try :
+	'setenv BAUDRATE 9600'
+or specifying:
+	baudrate 9600
+in your termrc. The baudrate determines how fast term will try
+to send data to the modem. I.e. if BAUDRATE is 9600, it will only
+attempt to send 9600 bits per second to the modem.  However, the best
+way to specify transmission rates is to write a termrc file.
+
+Term reads the ~/.term/termrc file if it exists, so you can
+permanently set this stuff.  A system default termrc file may be
+named /etc/termrc.
+
+Look in the file TERMRC.
+
+To terminate a term session use the command "tshutdown".  If that
+doesn't work, either end will exit if it gets five zeros.  (i.e.
+"00000")  This means that if "tshutdown" fails you can kill the
+local end, and then type '000000' into your comm program or
+'echo 0000000 > /dev/modem'.
+	
+----------------------------------------------------------
+How to use txconn: (and term for that matter)
+
+Login to your remote machine.
+run
+	"term -r"
+
+Break back to your Linux prompt. I.e if you are running xcomm or
+something similar then type control-A, x (to break back to xcomm
+prompt). Then run term with stdin/stdout connected to the modem. 
+
+In xcomm I type
+	"$ term"
+Alternatively you could exit your comms program altogether and run
+	"term < /dev/ttys1 > /dev/ttys1" from the shell prompt.
+		(assuming that /dev/ttys1 is your modem port).
+		Makes certain your comms program ISN'T running if you
+		try the above, as it will fight with term if it is.
+		
+Then run 'trsh' from a shell prompt. (I generally run xcomm and term
+on tty8, and then switch to tty7 to run trsh. You may find it handy to
+have a entry in /etc/passwd looking like...
+	remote::0:0::/root:/usr/local/bin/trsh 
+as this then enables you to login to your remote machine by logging in
+as 'remote').
+
+This should give you (in about 2 seconds) a shell on your remote
+machine. At this point the error correction/compression is on. You can
+go to another tty to run another trsh giving you multiple shells etc.
+
+
+None of the above needs X-windows to run.
+------------------------------------------ 
+
+To run txconn:
+  Make sure you are running X-windows. txconn will
+assume you have x-windows running.
+
+After running 'trsh', type
+if you are running tcsh, or csh:
+	"setenv DISPLAY `hostname`:0 ; setenv DISPLAY `txconn`" for csh/tcsh 
+otherwise, if you are running 'sh' , or 'ksh':
+	"export DISPLAY=`hostname`:0 ; export DISPLAY=`txconn`"
+on the trsh. (i.e. run txconn on your remote machine).
+It should exit immediately. (This is because it starts a process in the 
+background).
+
+Here, `hostname` returns the hostname of your REMOTE machine. (i.e. the
+machine you ran txconn on. To make that very clear. The local machine
+is the machine you are typing on, the remote is the one at the other
+end of the modem link. Run txconn on the remote machine. hostname is
+set to be the name of your remote machine. DON'T use the hostname of
+your local machine).
+
+Then you can run any x-windows program on your remote machine, and it
+should appear on your screen.
+
+
+Things that can go wrong compiling..
+[See INSTALL for more up to date information.]
+
+1) configure complains about your OS not being define.  You'll have
+   to either edit the configure script, or find an OS that is "close
+   enough".
+
+2) config.h gives a message about the OS being undefined. 
+	config.h sets up a list of #define's based on what OS you are
+	compiling on. Please (if you can) write support for your OS, and
+	mail me the patches so I can support it. If you can't mail me
+	with details of you machine, and I will see what I can do.
+
+If things go wrong, make sure you run the local end with the '-n on' flag.
+This won't help, but it can give you some clues as to what's going
+wrong. 
+
+Things that can go wrong:
+1) term giving message like
+	": timed out at 60 trans 4"
+    This should be read as "A packet got no acknowledgment even though it
+	has been waiting for 60/20th's of a second, so it is being 
+	re-transmitted for the 4th time."
+
+     These errors are normal. Line noise etc will cause packets to be
+	lost and retransmitting is the way they are recovered.
+
+     Times when it isn't normal:
+	a) Constantly re-transmitting i.e the last number just keeps
+	going up. This indicated one of 
+	    i) The remote term has died. Shouldn't happen.
+	   ii) The line is not an 8 bit line.
+		You can check this by running the linecheck program.
+	
+		Look up 'sevenbit' in TERMRC or term(1) if you have a
+		sevenbit line. 
+	  iii) Line noise has sent a XOFF character and your terminal
+		server has treated it is a quench signal. You
+		shouldn't be using software flow control with term.
+		turn if off if you can. Look up the -f option in OPTIONS
+		or 'flowcontrol' in TERMRC or term(1).
+	b) Any retransmissions on an error correcting modem.
+	    Any of the above, and
+	   iv) The BAUDRATE is set too high. Too much data is being
+		buffered by the operating system.
+        c) Term tells you to an old packet has been received and to raise
+           your timeout.
+            v) If this happens rarely, just ignore it.  If it happens a lot,
+               then you should follow this advice and raise your timeout to
+               a higher #.  
+        d) Lots of errors when you run multiple tasks at once.
+	   vi) Try "collisions on" in your termrc files, to tell term to lower
+               its transmission rate when receiving data.
+		
+2) Term not doing anything. Everything hangs.
+	i) The clients can't talk to the term socket.  Look at client.c.
+	ii) I have stuffed up and left a bug in a released version.
+	iii) The line is really dirty and it is eating one of the characters
+	term is using. See linecheck below.
+	iv) Mail me with LOTS of details.
+3) Term constantly giving you the prompt from your remote machine.
+	You have run the remote term in the background. Don't do this.
+4) Trsh hangs after you have typed a few keystrokes.
+	You have a dirty line. A terminal server or something like
+	that is eating some characters. Run linecheck. See
+	term_setup.1 for more information. See TERMRC for more information. See
+	below for more information.
+5) Term works fine, but if you have tredir's running, and you
+	login from the other end, all the tredirs exit.
+
+	This is because you are missing the 'remote' keyword. You need
+	"remote" on ONE end only. This keyword should go in your
+	~/.term/termrc file. Alternatively run ONE term with the '-r' flag,
+	as was shown in the example above.
+
+------------
+USAGE OF linecheck.c
+
+[ this is probably out of date. Check the start of the linecheck.c
+file. M - 7/1/94]
+
+ initially written by Michael O'Reilly
+ *seriously* bashed about by by quarters
+ hell, I wonder if diff would find more than 5 matching lines anymore...
+ jefftep@cs.utexas.edu
+ jeff grills
+
+
+Without term running do the following. (i.e. on a bare serial line.
+Nothing but your comms program is running.)
+if you use a csh type shell (csh, or tcsh), then run /bin/sh before
+you do the following
+ run remotely like:      linecheck 2> remote.output
+             locally:    linecheck < /dev/modem > /dev/modem 2> local.output 
+	
+
+ if it says something needs escaped, that means it didn't get through okay
+ this time. if you get an invalid packet printed, it means the packet wasn't
+ sent by the linecheck on the other side, and may either be line static,
+ or some very braindead terminal response to a (possibly series) of characters
+ to what was printed over the line.  in this case, it's your responsibility
+ to determine which, and escape the previously sent char if needed.  There is
+ no way this program can identity a braindead terminal server from line static,
+ so this is the way it has to be.
+
+ if, for some reason, you get stuck out in lala land, and can't kill
+ the program, try typing "^jexit^j".  That should kill it, and restore
+ your terminal.   
+
+ It'll print "### sending char" and "### received valid".  Don't worry if these
+ two number are out of sync.  That's fine.  Just worry, on either side, if you
+ get some "Invalid packet: " lines.  Look at them closely, and see if it's line
+ static, or a real problem.
+
+ At the end, it'll print out a summary of what it thinks you should escape.
+ This just means these chars didn't get received correctly this time.  Again,
+ if line static munched something, some of these may be valid. 
+
+ To actually escape them, you have to put them into your termrc file.
+ So if it said to escape 0-31, then on the OTHER end from the one that
+ printed it, you add the line 'escape 0-31' to your ~/.term/termrc file.
+ Please note that the local.output file contains the characters that
+ should be escaped on the REMOTE end, and vice versa. See TERMRC and
+ term(1) for more on escaping characters.
+
+ *** IF *** your terminal server generates extra responses for odd chars,
+ then you may not be told to escape something, but need to anyway.  This will
+ be evident from a "Invalid packet: " on the local side, after attempting to
+ send a character.  Again, it may be line static. You have to make the call.
+
+ if you're running it locally in a xterm, I suggest you turn on logging.
+
+ if you have problems with this program, and want me to look at it, mail me
+ *both* the local and remote output, and label them appropriately.
+
+programmers notes:
+
+ hopefully, soon, I'll add the ability to skip chars to this program,
+ so you can test out the escapes you want.
+
+ maybe do a fork() and process the two sides independently, so it never hangs.
+ would cause minor quitting problems, but may be worth it.
+
+Any problems, feel free to mail me. Any patches, bug fixes, etc are
+VERY welcome.
+
+Michael (oreillym@tartarus.uwa.edu.au);
+
+P.S.
+Bill Riemers (bcr@physics.purdue.edu) is temporarily maintaining this code,
+originally written by Michael O'Reilly (oreillym@tartarus.uwa.edu.au).
+
+----------
+
+From michael@iinet.com.au  Tue Jul 19 22:33:54 1994
+From: michael@iinet.com.au (Michael O'Reilly)
+Subject: I saw...
+
+term 202 go past today. Looks just beautiful. :)
+
+Given the awesome mods you've made, it's probably a good idea to
+change the docs to mention, term, original written by me, now
+fixed, beautified, made useful, and supported by you.
+
+Michael
+
+-----------
+
+Hmm, really most of the credit should go to the people listed in CREDITS.
+Some of these people have probably done a lot more with term development
+than I have.  :-)
+
+Originally I started using term because it was the only option for multi-
+tasking over a modem without remote root support.  At this point I think
+it is quite competitive with SLIP and PPP. 
+
+Pro's:
+        - Often times term is faster.
+        - Term gives you true firewall security.  Users can only access 
+          network commands you explicitly allow with a SUID or SGID command.
+          And you will never be sprayed, or have to worry about network
+          users ports you have redirected!
+        - No root support required.
+
+Con's:  
+        - Programs have to be compiled with term support to work.
+	- Not everything works.  Programs like "ping" which normally
+          must be SUID root never will work.  Although "rsh" type commands
+	  are already an exception to this rule.
+        - "fet" term's equivalent of "dip" isn't nearly as smart as "dip".
+        - It is doubtful NFS mounts over term will ever be supported.
+

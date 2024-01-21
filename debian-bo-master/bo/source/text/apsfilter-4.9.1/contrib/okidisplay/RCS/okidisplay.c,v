@@ -1,0 +1,135 @@
+head	1.1;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.1
+date	95.03.23.19.55.58;	author martin;	state Exp;
+branches;
+next	;
+
+
+desc
+@This program is supposed to insert a "PROGRAM LC DISPLAY" escape sequenc
+into an already HPLJ converted byte stream. The byte stream is passed through
+and at the appropriate place the ESC sequence to write into the LCDisplay
+is inserted (that is, after the initial ESC E reset sequence(s)).
+                    Martin Kraemer, March 1995
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+/* $Header$ */
+/* This program is supposed to insert a "PROGRAM LC DISPLAY" escape sequence   */
+/* into an already HPLJ convert byte stream. The byte stream is passed through */
+/* and at the appropriate place the ESC sequence to write into the LCDisplay   */
+/* is inserted (that is, after the initial ESC E reset sequence(s)).           */
+/*                      Martin Kraemer, March 1995                             */
+
+
+typedef struct
+{
+    unsigned char   MSB, LSB;
+} WORD;
+
+static struct  HEADER
+{
+    WORD            Header;         /* == 10, 0 */
+    unsigned char   Format;         /* == 0 */
+    unsigned char   Continue;       /* == 0 */
+    unsigned char   When;           /* 0:Vor Druck;  1:Nach Druck; 2:Nach Komplettdruck */
+    unsigned char   GoOffline;      /* 1:Go Offline;  2:Stay Online */
+    unsigned char   WaitForRecover; /* 0:No Waiting;  1:Wait for [RECOVER] Keypress */
+    unsigned char   Resv;           /* == 0 */
+    WORD            StrLen;         /* Anzahl Bytes in Text */
+} OkiHeader = {
+    { 0, 10 },
+    0,
+    0,
+    0,          /* Vor Seitendruck */
+    2,          /* bleibt OnLine */
+    0,          /* kein Warten auf [RECOVER] Taste */
+    0,          /* fest==0 */
+    { 0, 0 }   /* Laenge wird eingefuellt. */
+};
+
+static inline void
+SetWord (WORD *Dest, unsigned Value)
+{
+    Dest->MSB = (Value >> 8) & 0xFF;
+    Dest->LSB = Value & 0xFF;
+}
+
+#define ESC '\033'
+
+void
+main(int argc, char *argv[])
+{
+    char *buf=NULL;
+    int first[2], count=0;
+    int i;
+
+    while (count == 0 && (first[0] = getchar()) != EOF)
+    {
+	++count;
+	if (first[0] == ESC)
+	    if ((first[1] = getchar()) != EOF)
+	    {
+		++count;
+		if (first[1] == 'E')
+		{
+		    /* RESET Sequence wird _vor_ dem Rest ausgegeben. */
+		    putchar (first[0]);
+		    putchar (first[1]);
+		    count=0;    /* Alles gedruckt: nichts mehr gepuffert. */
+		}
+	    }
+    }
+
+    /* Concatenate all strings, separated by spaces */
+    for (i=1; i<argc; ++i)
+    {
+	if (buf == NULL)
+	    buf = strdup(argv[i]);
+	else
+	{
+	    buf = realloc (buf, strlen(buf)+strlen(argv[i])+sizeof(" "));
+	    if (buf != NULL && strlen(argv[i]) > 0)
+		strcat(strcat(buf," "), argv[i]);
+	}
+    }
+
+    /* Print buffer prefixed by the defined HEADER structure: */
+    if (buf == NULL)
+    {
+	fprintf (stderr, "Usage: %s some strings... <inputfile >/dev/lp\n", argv[0]);
+	fprintf (stderr, "       $Id$\n");
+	exit(1);
+    }
+    else
+    {
+	SetWord (&OkiHeader.StrLen, strlen(buf));
+	fprintf (stdout, "\033/d%dW", sizeof(OkiHeader)+strlen(buf));
+	fwrite ((void *) &OkiHeader, sizeof(OkiHeader), 1, stdout);
+	fwrite ((void *) buf, strlen(buf), 1, stdout);
+    }
+
+    /* print any remaining buffered characters: */
+    for (i=0; i<count; ++i)
+	putchar (first[i]);
+
+    while ((i = getchar()) != EOF)
+	putchar(i);
+
+    exit(0);
+}
+@

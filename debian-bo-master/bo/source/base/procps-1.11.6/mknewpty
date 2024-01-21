@@ -1,0 +1,51 @@
+#!/bin/bash
+if [ `echo $0|cut -c1-2` = './' ]; then
+  progname=`echo $0|cut -c3-`
+else
+  progname=$0
+fi
+
+makedev () {	# usage: makedev name [bcu] major minor owner:group mode
+	rm -f $1
+	mknod $1 $2 $3 $4 &&
+	chown $5 $1 &&
+	chmod $6 $1
+}
+
+usage () { 
+   echo
+   echo "Usage : $progname <pty major>"
+   echo
+   echo "eg: (please refer to your include/linux/major.h)"
+   echo
+   echo " $progname 2	#make ptyXX for pty_master major=2"
+   echo " $progname 49	#make ptyXX for pty_master major=49"
+   echo
+   exit 0
+}
+
+if [ -z "$1" ]  ; then
+   usage
+fi
+
+if [ $[$1+0] != "$1" ] ; then
+	usage
+    else
+	major=$1
+fi
+
+echo Creating ptyp0 / ttyp0  to  ptyEf / ttyEf
+minor=0 
+major_slave=`expr $major + 1`
+while [ $minor -le 255 ] ; do 
+	p1=`expr $minor / 16 + 1`
+	p2=`expr $minor % 16 + 1`
+	newname=`echo pqrstuvwxyzABCDE | cut -c$p1``echo 0123456789abcdef | cut -c$p2`
+	echo -n mknod pty$newname / tty$newname
+	makedev /dev/pty$newname c $major $minor root:root 666
+	makedev /dev/tty$newname c $major_slave $minor root:root 666
+	minor=`expr $minor + 1`
+	echo
+done
+echo "done."
+exit 0

@@ -1,0 +1,70 @@
+#!/usr/bin/make -f
+
+package=lout
+version=3.08
+debian=1
+
+a=$(shell dpkg --print-architecture)
+d=debian-tmp/usr/doc/lout
+l=debian-tmp/usr/lib/lout
+
+build:
+	$(checkdir)
+	$(MAKE) lout c2lout
+	sh ./debian.formatdocs
+	touch build
+
+clean:
+	$(checkdir)
+	-rm -f build
+	-$(MAKE) -i clean
+	-rm -rf debian-tmp debian-doctmp *~ *.orig #*# *.rej
+
+binary:		checkroot build
+	-rm -rf debian-tmp
+	mkdir debian-tmp debian-tmp/DEBIAN
+	install -m 755 -d debian-tmp/usr/doc/copyright
+	install -m 755 -d debian-tmp/usr/{bin,man/man1,lib}
+	sed -e '2s/=/$(version)-$(debian)/; 3s/=/$(a)/' \
+		debian.control > debian-tmp/DEBIAN/control
+	$(MAKE) prefix=debian-tmp/usr install installman installdoc
+	chmod 644 $d/README
+	mv $d/README $d/README.jeffreykingston
+	cp debian.docreadme $d/README.debian
+	cp debian-doctmp/*.ps $d/.
+	find $d -name outfile.ps -exec rm -- '{}' ';'
+	cp -r software $d/software
+	cp debian.README debian-tmp/usr/doc/copyright/lout
+	cp whatsnew blurb notes.dsc maillist $d/.
+	perl -i~ -pe 's/debian-tmp//g' debian-tmp/usr/man/man1/*
+	rm debian-tmp/usr/man/man1/*~
+	strip debian-tmp/usr/bin/{lout,c2lout}
+	chown -R root.root debian-tmp
+	chmod -R g-ws,u+w debian-tmp
+	dpkg --build debian-tmp
+	mv debian-tmp.deb ../lout-$(version)-$(debian).$(a).deb
+
+changes:
+	perl debian.mkchanges "$(version)-$(debian)" <debian.changestemplate \
+	 | pgp-auto -fast >../lout-$(version)-$(debian).$(a).changes
+	echo
+
+define checkdir
+	test -f c2lout.c
+endef
+
+source:		clean
+	chmod +x debian.rules
+	cd .. && \
+	tar cf $(package)-$(version)-$(debian).tar $(package)-$(version) && \
+	gzip -9vf $(package)-$(version)-$(debian).tar
+ 
+diff:		clean
+	cd .. && \
+	(diff -ruN $(package)-$(version).orig $(package)-$(version) \
+	 >$(package)-$(version)-$(debian).diff; [ $$? = 1 ]) && \
+	gzip -9vf $(package)-$(version)-$(debian).diff
+
+checkroot:
+	$(checkdir)
+	test root = "`whoami`"

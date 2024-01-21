@@ -1,0 +1,195 @@
+# Makefile.in for ps2pkm
+# Set up to provide links to kpathsea so that ps2pk can
+# be used conveniently with MakeTeXPK
+
+version = 1.4
+SHELL = /bin/sh
+srcdir = .
+VPATH = $(srcdir)
+
+prefix = /usr/local
+exec_prefix = $(prefix)
+bindir = $(exec_prefix)/bin
+# Include ALL the boilerplate!
+sbindir = $(exec_prefix)/sbin
+libexecdir = $(exec_prefix)/libexec 
+
+datadir = $(prefix)/share
+sysconfdir = $(prefix)/etc
+infodir = $(prefix)/info
+libdir = $(prefix)/lib
+includedir = $(prefix)/include
+manext = 1
+mandir = $(prefix)/man/man$manext)
+
+# Built-in path, not used with kpathsea can be set as environment
+T1INPUTS = .
+
+
+.SUFFIXES:
+.SUFFIXES: .c .o
+# Compilation options.
+DEFS = $(XDEFS)
+
+# CFLAGS is used for both compilation and linking.
+CFLAGS = -g $(XCFLAGS)
+
+# Do not override CPPFLAGS; change CFLAGS or DEFS instead.
+CPPFLAGS = $(XCPPFLAGS) -I. -I$(srcdir) -I$(kpathsea_parent) \
+           $(x_include_flags) $(DEFS) 
+.c.o:
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $<
+
+# Linking.
+LDFLAGS = $(CFLAGS) $(XLDFLAGS)
+LOADLIBES = $(kpathsea) $(x_libs) $(LIBS) -lm $(x_extra_libs)
+
+CC = @CC@
+
+LEX = @LEX@
+LEXLIB = @LEXLIB@
+YACC = @YACC@
+
+# Command to link an executable.
+CCLD = $(CC)
+RANLIB = @RANLIB@
+LN = @LN_S@
+
+# End of general setup
+
+# This is so kpathsea will get remade automatically if you change
+# something in it and recompile from the package directory.
+kpathsea_parent = ../..
+kpathsea_dir = $(kpathsea_parent)/kpathsea
+kpathsea_srcdir_parent = $(srcdir)/../..
+kpathsea_srcdir = $(kpathsea_srcdir_parent)/kpathsea
+kpathsea = $(kpathsea_dir)/kpathsea.a
+KPSEHDR = -I$(kpathsea_dir)
+
+# This is so libtype1 will get remade automatically if you change
+# something in it and recompile from the package directory.
+type1_parent = ..
+type1_dir = $(type1_parent)/type1
+type1_srcdir_parent = $(srcdir)/..
+type1_srcdir = $(type1_srcdir_parent)/type1
+type1 = $(type1_dir)/libtype1.a
+T1LIBDIR = $(type1_dir)
+T1LIB = $(type1)
+T1HDR = -I$(type1_dir)
+
+#
+# Object macros
+#
+common_objects = pkout.o filenames.o
+
+ps2pkobjs = ps2pk.o encoding.o $(common_objects)
+
+pk2bmobjs = pk2bm.o pkin.o
+
+pfb2pfaobjs = pfb2pfa.o filenames.o
+
+# pktestobjs = pktest.o $(common_objects)
+
+magobjs = mag.o
+#
+# Compilation target macros
+#
+ps2pk = ps2pk
+pfb2pfa = pfb2pfa
+mag = mag
+pk2bm = pk2bm
+
+programs = $(ps2pk) $(pfb2pfa) $(mag)
+testprograms = $(programs) $(pk2bm) # pktest (Not revised)
+
+default: $(programs)
+all: $(testprograms)
+OLIBS = $(kpathsea) -lm
+
+$(kpathsea_srcdir)/c-auto.h:
+	( cd $(kpathsea_srcdir) ; configure )
+
+$(kpathsea):
+	( cd $(kpathsea_dir) ; $(MAKE) )
+
+ps2pk: $(ps2pkobjs)  $(kpathsea)
+	$(CC) $(LDFLAGS) -o $@ $(ps2pkobjs) $(T1LIB) $(OLIBS)
+
+ps2pk.o:
+	$(CC) -DKPSE -DT1INPUTS=\"$(T1INPUTS)\" $(CPPFLAGS) $(CFLAGS) $(KPSEHDR) $(T1HDR) -c ps2pk.c
+
+pfb2pfa: $(pfb2pfaobjs) $(kpathsea)
+	$(CC) $(KPSEHDR) $(LDFLAGS) -o $@ $(pfb2pfaobjs) $(OLIBS)
+
+pktest: $(pktestobjs) $(kpathsea)
+	$(CC) $(LDFLAGS) -o $@ $(pktestobjs) $(OLIBS)
+
+pk2bm: $(pk2bmobjs) $(kpathsea)
+	$(CC) $(LDFLAGS) -o $@ $(pk2bmobjs) $(CLIBS)
+
+mag: $(magobjs) 
+	$(CC) $(LDFLAGS) -o $@ $(magobjs) $(OLIBS)
+
+install: install-exec
+uninstall: uninstall-exec
+install-data:
+
+install-exec:
+	$(SHELL) $(srcdir)/../../mkdirchain $(bindir)
+	test ! -f $(ps2pk) \
+	  || $(INSTALL_PROGRAM) $(ps2pk) $(bindir)/$(ps2pk)
+	test ! -f $(pfb2pfa) \
+	  || $(INSTALL_PROGRAM) $(pfb2pfa) $(bindir)/$(pfb2pfa)
+	test ! -f $(mag) \
+	  || $(INSTALL_PROGRAM) $(mag) $(bindir)/$(mag)
+	test ! -f $(mag) \
+	  || $(INSTALL_PROGRAM) $(pk2bm) $(bindir)/$(pk2bm)
+
+uninstall-exec:
+	cd $(bindir); rm -f $(testprograms)
+
+
+distname = ps2pkm
+program_files = .man 
+
+pre-dist-$(distname):
+post-dist-$(distname):
+
+info dvi check:
+
+
+clean mostlyclean::
+	rm -f $(testprograms) *.o
+
+realclean distclean: clean
+	rm -f Makefile config.status config.log config.cache
+
+extraclean: clean
+	rm -f *~ *\#* patch* *.orig *.rej core a.out *.i *.s
+	rm -f *log *gf *pk *.tfm *.pl *.dvi
+
+configclean:
+	rm -f configure c-auto.h.in c-auto.h
+
+ps2pk.o: ps2pk.c $(kpathsea_srcdir)/c-auto.h $(kpathsea_srcdir)/config.h $(kpathsea_srcdir)/c-std.h \
+  $(kpathsea_srcdir)/tex-make.h $(kpathsea_srcdir)/tex-file.h \
+  $(kpathsea_srcdir)/c-unistd.h $(kpathsea_srcdir)/systypes.h \
+  $(kpathsea_srcdir)/c-limits.h \
+  $(kpathsea_srcdir)/c-proto.h \
+  $(kpathsea_srcdir)/lib.h $(kpathsea_srcdir)/types.h $(kpathsea_srcdir)/debug.h \
+  $(kpathsea_srcdir)/proginit.h $(kpathsea_srcdir)/progname.h \
+  $(type1_srcdir)/ffilest.h $(kpathsea_srcdir)/config.h filenames.h pkout.h
+
+pfb2pfa.o: pfb2pfa.c $(kpathsea_srcdir)/config.h $(kpathsea_srcdir)/c-auto.h $(kpathsea_srcdir)/c-std.h \
+  $(kpathsea_srcdir)/c-unistd.h $(kpathsea_srcdir)/systypes.h \
+  $(kpathsea_srcdir)/c-limits.h \
+  $(kpathsea_srcdir)/c-proto.h \
+  $(kpathsea_srcdir)/lib.h $(kpathsea_srcdir)/types.h $(kpathsea_srcdir)/debug.h \
+  $(kpathsea_srcdir)/proginit.h $(kpathsea_srcdir)/progname.h \
+  $(kpathsea_srcdir)/tex-make.h $(kpathsea_srcdir)/tex-file.h filenames.h 
+
+pk2bm.o: pk2bm.c pkin.h
+
+pktest.o: pktest.c pkout.h
+
+mag.o: mag.c

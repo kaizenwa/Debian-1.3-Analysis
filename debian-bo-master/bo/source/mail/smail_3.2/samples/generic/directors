@@ -1,0 +1,127 @@
+# @(#) directors,v 1.6 1992/09/06 04:41:29 tron Exp
+
+# This file defines the configuration of the director subsystem as
+# compiled into the smail binary.  By modifying the source file config.h
+# the actual internal configuration can be changed.  Thus, this should
+# be matched up against config.h and default.c before assuming this is
+# completely correct.
+
+# aliasinclude - expand ":include:filename" addresses produced by alias files
+aliasinclude:
+	driver=aliasinclude,		# use this special-case driver
+	nobody;				# associate nobody user with addresses
+					#  when mild permission violations
+					#  are encountered
+
+	copysecure,			# get permissions from alias director
+	copyowners,			# get owners from alias director
+
+# forwardinclude - expand ":include:filename" addrs produced by forward files
+forwardinclude:
+	driver=forwardinclude,		# use this special-case driver
+	nobody;
+
+	checkpath,			# check path accessibility
+	copysecure,			# get perms from forwarding director
+	copyowners,			# get owners from forwarding director
+
+# aliases - search for alias expansions stored in a database
+aliases:
+	driver=aliasfile,		# general-purpose aliasing director
+	-nobody,			# all addresses are associated
+					# with nobody by default, so setting
+					# this is not useful.
+	sender_okay,			# don't remove sender from expansions
+#	-sender_okay,			# do remove sender, sendmail compatible
+	owner=owner-$user;		# problems go to an owner address
+
+	file=/usr/lib/aliases,		# default: sendmail compatible
+#	file=mail.aliases,		# use this for YP
+	modemask=002,			# should not be globally writable
+	optional,			# ignore if file does not exist
+	proto=lsearch,			# unsorted ASCII file
+#	proto=bsearch,			# sorted file
+#	proto=aliasyp,			# use this for YP
+#	proto=dbm,			# use this to be sendmail compatible
+
+# dotforward - expand .forward files in user home directories
+dotforward:
+	driver=forwardfile,		# general-purpose forwarding director
+	owner=real-$user,		# problems go to the user's mailbox
+	nobody,				# use nobody user, if unsecure
+	sender_okay;			# sender never removed from expansion
+
+	file=~/.forward,		# .forward file in home directories
+	checkowner,			# the user can own this file
+	owners=root,			# or root can own the file
+	modemask=002,			# it should not be globally writable
+	caution=0-10:uucp:daemon,	# don't run things as root or daemons
+	# be extra carefull of remotely accessible home directories
+	unsecure="~ftp:~uucp:~nuucp:/tmp:/usr/tmp",
+
+# forwardto - expand a "Forward to " in user mailbox files
+#
+# This emulates the V6/V7/System-V forwarding mechanism which uses a
+# line of forward addresses stored at the beginning of user mailbox files
+# prefixed with the string "Forward to "
+forwardto:
+	driver=forwardfile,
+	owner=Postmaster,		# errors can't go to the user's mailbox
+	nobody,				# use nobody user, if unsecure
+	sender_okay;			# sender never removed from expansion
+
+	file=/usr/spool/mail/${lc:user}, # point at user mailbox files
+#	file=/usr/mail/${lc:user},	# the mailbox file for System V
+	forwardto,			# enable "Forward to " function
+	checkowner,			# the user can own this file
+	owners=root,			# or root can own the file
+	modemask=0022,			# only owner should be able to write
+#	modemask=0002,			# under System V, group mail can write
+	caution=0-10:uucp:daemon,	# don't run things as root or daemons
+
+# user - match users on the local host with delivery to their mailboxes
+user:	driver=user;			# driver to match usernames
+
+	transport=local,		# local transport goes to mailboxes
+
+# real_user - match usernames when prefixed with the string "real-"
+#
+# This is useful for allowing an address which explicitly delivers to a
+# user's mailbox file.  For example, errors in a .forward file expansion
+# can be delivered here, or forwarding loops between multiple machines
+# can be resolved by using a real-username address.
+real_user:
+	driver=user;
+
+	transport=local,
+	prefix="real-",			# for example, match real-root
+
+# lists - expand mailing lists stored in a list directory
+#
+# mailing lists can be created simply by creating a file in the
+# /usr/lib/smail/lists directory.
+lists:	driver=forwardfile,
+	caution,			# flag all addresses with caution
+	nobody,				# and then associate the nobody user
+	-sender_okay,			# do remove sender from list expansions
+#	sender_okay,			# do NOT remove the sender
+	owner=owner-$user;		# system V sites may wish to use
+					# o-$user, as owner-$user may be
+					# too long for a 14-char filename.
+
+	# map the name of the mailing list to lower case
+	file=lists/${lc:user},
+
+# smart_user - a partially specified smartuser director
+#
+# If the config file attribute smart_user is defined as a string such as
+# "$user@domain-gateway" then users not matched otherwise will be sent
+# off to the host "domain-gateway".
+#
+# If the smart_user attribute is not defined, this director is ignored.
+smart_user:
+	driver=smartuser;		# special-case driver
+
+	# do not match addresses which cannot be made into valid
+	# RFC822 local addresses without the use of double quotes.
+	well_formed_only,

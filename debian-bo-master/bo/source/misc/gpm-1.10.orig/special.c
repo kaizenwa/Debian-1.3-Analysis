@@ -1,0 +1,162 @@
+/*
+ * special commands support for gpm
+ *
+ * Copyright 1996 rubini@ipvvis.unipv.it (Alessandro Rubini)
+ *
+ * Based on an idea by KARSTEN@piobelix.physik.uni-karlsruhe.de
+ * (Karsten Ballueder)
+ *
+ *   This program is free software; you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation; either version 2 of the License, or
+ *   (at your option) any later version.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU General Public License for more details.
+ *
+ *   You should have received a copy of the GNU General Public License
+ *   along with this program; if not, write to the Free Software
+ *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ ********/
+
+/* This file is compiled conditionally, see the Makefile */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <time.h>
+#include <sys/param.h>
+
+#include "gpmInt.h"
+
+/*
+ * This function is only called at button press, to avoid unnecessary
+ * overhead due to function call at every mouse event
+ */
+
+static int special_status = 0; /* turns on when active */
+static int did_parse = 0;
+
+  /*
+   * The actions are described by these strings. The default is:
+   *   left: kill -2 init
+   *   middle: shutdown -h now
+   *   right: shutdown -r now
+   *
+   * such a default can be overridden by the argument of the "-S" command.
+   * This arg is a colon-separated list of commands. An empty command
+   * is used to make gpm kill init
+   */
+
+static char *commandL=NULL; /* kill init */
+static char *commandM="shutdown -h now";
+static char *commandR="shutdown -r now";
+
+/*
+ * The return value is 0 if the event has been eaten,
+ * 1 if the event is passed on
+ */
+int processSpecial(Gpm_Event *event)
+{
+  char *command=NULL; int i;
+  FILE *consolef;
+
+  if ((event->type & GPM_TRIPLE)
+      && (event->buttons == (GPM_B_LEFT|GPM_B_RIGHT))) /* trigger */
+    special_status=time(NULL);
+
+  if (!special_status) /* not triggered: return */
+    return 1;
+
+  consolef=fopen("/dev/tty0","w");
+  if (!consolef) consolef=stderr;
+  if (event->type & GPM_TRIPLE) /* just triggered: make noise and return */
+    {
+    if (!did_parse)
+      {
+      did_parse++;
+      if (opt_special && opt_special[0]) /* not empty */
+	{
+	commandL = opt_special;
+	commandM = strchr(opt_special, ':');
+	if (commandM)
+	  {
+	  *commandM='\0'; commandM++;
+	  commandR = strchr(commandM, ':');
+	  if (commandR)
+	    { *commandR='\0'; commandR++; }
+	  }
+	}
+      }
+    fprintf(consolef,"\n%s: release all the mouse buttons and press "
+	    "one of them\n\twithin three seconds in order to invoke "
+	    "a special command\a\a\a\n", prgname);
+    PDEBUG((consolef,"gpm special: the commands are \"%s\", \"%s\", \"%s\"\n",
+	    commandL, commandM, commandR));
+    if (consolef!=stderr) fclose(consolef);
+    return 0; /* eaten */
+    }
+
+  if (time(NULL) > special_status+3)
+    {
+    fprintf(consolef,"\n%s: timeout: no special command taken\n", prgname);
+    if (consolef!=stderr) fclose(consolef);
+    special_status=0;
+    return 0; /* eaten -- don't paste or such on this event */
+    }
+  special_status=0; /* run now, prevent running next time */
+  PDEBUG((consolef,"going to run: buttons is %i\n",event->buttons));
+
+  switch(event->buttons)
+    {
+    case GPM_B_LEFT:   command=commandL; break;
+    case GPM_B_MIDDLE: command=commandM; break;
+    case GPM_B_RIGHT:  command=commandR; break;
+    default:           
+        fprintf(consolef,"\n%s: more than one button: "
+		"special command discarded\n",prgname);
+        if (consolef!=stderr) fclose(consolef);
+        return 0; /* eaten */
+    }
+  fprintf(consolef,"\n%s: executing ", prgname);
+
+  if (!command || !command[0])
+    {
+    fprintf(consolef,"hard reboot (by signalling init)\n");
+    if (consolef!=stderr) fclose(consolef);
+    kill(1,2); /* kill init: shutdown now */
+    return 0;
+    }
+
+  fprintf(consolef,"\"%s\"\n",command);
+  if (consolef!=stderr) fclose(consolef);
+
+  switch(fork())
+    {
+    case -1: /* error */
+      fprintf(stderr,"%s: fork(): %s\n", prgname, strerror(errno));
+      return 0; /* Hmmm.... error */
+    
+    case 0: /* child */
+      close(0); close(1); close(2);
+      open("/dev/null",O_RDONLY); /* stdin  */
+      open("/dev/tty0",O_WRONLY); /* stdout */
+      dup(1);                     /* stderr */
+      for (i=3;i<OPEN_MAX; i++) close(i);
+      execl("/bin/sh","sh","-c",command,(char *)NULL);
+      exit(1); /* shouldn't happen */
+      
+    default: /* parent */
+      return 0;	
+    }
+}
+
+
+
+
+

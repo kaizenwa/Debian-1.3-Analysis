@@ -1,0 +1,436 @@
+#! /usr/bin/make -f
+############################ -*- Mode: Makefile -*- ###########################
+## debian.rules ---
+## Author	    : Manoj Srivastava ( srivasta@pilgrim.umass.edu )
+## Created On	    : Sat Apr 27 06:36:31 1996
+## Created On Node  : melkor.pilgrim.umass.edu
+## Last Modified By : Manoj Srivastava
+## Last Modified On : Thu Feb 13 14:44:44 1997
+## Last Machine Used: tiamat.datasync.com
+## Update Count	    : 156
+## Status	    : Unknown, Use with caution!
+## HISTORY	    :
+## Description	    :
+##
+###############################################################################
+
+# Please change the maintainer information, as well as the debian version
+# below, espescially if you are uploading an official package)
+
+# The maintainer information.
+#maintainer := Manoj Srivastava
+#email := srivasta@debian.org
+
+maintainer = Simon Shapiro
+email= Shimon@i-connect.net
+
+pgp=$(maintainer)
+
+# The Debian revision of the kernel packages (for example, `2').
+debian := 1.00
+
+# decide if image is meant to be in /boot rather than /
+image_in_boot :=
+
+# The version numbers for kernel-image, kernel-headers and
+# kernel-source are deduced from the Makefile (see below,
+# and footnote 1 for details)
+
+# The default architecture (all if architecture independent)
+architecture:=$(shell dpkg --print-architecture)
+
+# The kernel image type (i.e. zImage or bzImage)
+ifeq ($(strip $(architecture)),ppc)
+kimage := zImage
+else
+kimage := bzImage
+endif
+
+
+#  Package specific stuff
+# The following variable is used to simplify the process of making
+# diffs and orig targets, Please set it if AND ONLY IF no patches
+# have been applied to the upstream source, in other words, we have
+# just added debian* files.  If any patches were applied, please
+# leave it empty
+
+# NO_SRC_CHANGES =
+NO_SRC_CHANGES = yes
+
+VERSION:=$(shell grep ^VERSION Makefile 2>/dev/null | \
+                 sed -e 's/[^0-9]*\([0-9]*\)/\1/')
+PATCHLEVEL:=$(shell grep ^PATCHLEVEL Makefile 2>/dev/null | \
+                    sed -e 's/[^0-9]*\([0-9]*\)/\1/')
+SUBLEVEL:=$(shell grep ^SUBLEVEL Makefile 2>/dev/null | \
+                  sed -e 's/[^0-9]*\([0-9]*\)/\1/')
+
+version = $(VERSION).$(PATCHLEVEL).$(SUBLEVEL)
+
+# The name of the package (for example, `emacs').
+package = kernel-source-$(version)
+h_package = kernel-headers-$(version)
+i_package = kernel-image-$(version)
+
+FILES_TO_CLEAN = modules/modversions.h modules/ksyms.ver debian/files
+STAMPS_TO_CLEAN = stamp-build stamp-configure stamp-source stamp-image \
+                  stamp-headers stamp-src stamp-diff stamp-buildpackage
+DIRS_TO_CLEAN  = debian/tmp-source debian/tmp-headers debian/tmp-image
+
+CONFLOC:=/etc/kernel-pkg.conf
+LIBLOC:=/usr/lib/kernel-package
+MODULE_LOC := /usr/src/modules
+
+# The destination of all .deb files
+# (suggested by Rob Browning <osiris@cs.utexas.edu>)
+DEB_DEST := ..
+
+SRCTOP := $(shell if [ "$$PWD" != "" ]; then echo $$PWD; else pwd; fi)
+DEBDIR := $(LIBLOC)
+DEBDIR_NAME:= $(shell basename $(DEBDIR))
+
+
+# The file which has local configuration
+CONFIG_FILE := $(shell if test -e .config ; then \
+                           echo .config; \
+                       elif test -e $(DEBDIR)/config ; then \
+                           echo $(DEBDIR)/config; \
+                       else echo /dev/null ; \
+                       fi)
+
+# define MODULES_ENABLED if appropriate
+ifneq ($(strip $(shell egrep ^[^\#]*CONFIG_MODULES $(CONFIG_FILE))),)
+MODULES_ENABLED = yes
+endif
+
+install_file= install -m 644
+install_program= install -m 755
+make_directory= install -d -m 755
+deb_rule = $(MAKE) -f $(DEBDIR)/rules
+
+# Include any site specific overrides here.
+-include $(CONFLOC)
+
+# Over ride the config file from the environment/command line
+ifneq ($(strip $(KPKG_MAINTAINER)),)
+maintainer=$(KPKG_MAINTAINER)
+endif
+
+ifneq ($(strip $(KPKG_EMAIL)),)
+email=$(KPKG_EMAIL)
+endif
+
+ifneq ($(strip $(PGP_SIGNATURE)),)
+pgp=$(PGP_SIGNATURE)
+endif
+
+ifneq ($(strip $(DEBIAN_REVISION)),)
+debian := $(DEBIAN_REVISION)
+endif
+
+ifneq ($(strip $(IMAGE_IN_BOOT)),)
+image_in_boot := $(IMAGE_IN_BOOT)
+endif
+
+ifneq ($(strip $(IMAGE_TYPE)),)
+kimage = $(IMAGE_TYPE)
+endif
+
+# See if we are being run in the kernel directory
+IN_KERNEL_DIR := $(shell if test -d drivers -a -d kernel -a -d fs -a \
+                                 -d include/linux ; then \
+                            echo YES; \
+                         fi )
+
+ifeq ($(strip $(IN_KERNEL_DIR)),)
+# Hah! Not in kernel directory!!
+build configure clean binary kernel_source kernel-source kernel-headers\
+stamp-source kernel_headers stamp-headers kernel_image stamp-image \
+kernel-image buildpackage:
+	@echo "You should invoke this command from the top level directory of"
+	@echo "a linux kernel source directory tree, and as far as I can tell,"
+	@echo "the current directory:"
+	@echo "	$(SRCTOP)"
+	@echo "is not a top level linux kernel source directory. "
+	@echo ""
+	@echo "	(If I am wrong then kernel-packages and the linux kernel"
+	@echo "	 are so out sync that you'd better get the latest versions"
+	@echo "	 of the kernel-package package and the Linux sources)"
+	@echo ""
+	@echo "Please change directory to wherever linux kernel sources"
+	@echo "reside and try again."
+else
+all build: configure
+# Builds the binary package.
+# debian.config contains the current idea of what the image should
+# have.
+	-test ! -f stamp-configure || $(deb_rule) configure
+	make $(kimage)
+ifdef MODULES_ENABLED
+	make  modules
+endif
+	touch stamp-build
+
+buildpackage: stamp-buildpackage
+stamp-buildpackage:
+	test -f stamp-configure || $(deb_rule) configure
+	echo 'Building Package' > stamp-building
+	dpkg-buildpackage -m"$(maintainer) <$(email)>"
+	rm -f stamp-building
+	touch stamp-buildpackage
+
+configure: stamp-configure
+stamp-configure: .config
+	-@test -f $(DEBDIR)/rules || \
+            echo Error: Could not find $(DEBDIR)/rules
+	test -f $(DEBDIR)/rules
+	-test ! -f stamp-configure && test ! -f debian/official && \
+	      rm -rf debian && $(make_directory) debian
+	-test ! -f stamp-configure && \
+	   sed -e 's/=V/$(version)/g' -e 's/=D/$(debian)/g' \
+	    -e 's/=A/$(architecture)/g' -e 's/=M/$(maintainer) <$(email)>/g' \
+		$(DEBDIR)/Control > debian/control
+	-test ! -f stamp-configure && test ! -f debian/official && \
+	   sed -e 's/=V/$(version)/g' -e 's/=D/$(debian)/g' \
+	    -e 's/=A/$(architecture)/g' -e 's/=M/$(maintainer) <$(email)>/g' \
+		$(DEBDIR)/changelog > debian/changelog
+	-test ! -f stamp-configure && test ! -f debian/official && \
+	   $(install_program) $(DEBDIR)/rules debian/rules
+	-test ! -f stamp-configure && \
+	  (test -f .config || \
+                $(install_file) $(DEBDIR)/config .config) \
+	  && make oldconfig && make dep && make clean && \
+             touch stamp-configure
+
+.config:
+	test -f .config || $(install_file) $(DEBDIR)/config .config
+
+
+clean:
+	rm -f $(FILES_TO_CLEAN) $(STAMPS_TO_CLEAN)
+	cp -f .config config.precious
+	-test -f Makefile && make distclean
+	mv -f config.precious .config
+	rm -rf $(DIRS_TO_CLEAN)
+	test -f stamp-building || test -f debian/official || rm -rf debian
+
+binary:       binary-indep binary-arch
+binary-indep: kernel_source kernel_headers
+binary-arch:  kernel_image
+
+
+kernel-source kernel_source: stamp-source
+stamp-source:
+	@test root = "`whoami`" || (echo need root priviledges; exit 1)
+	test -f stamp-configure || $(deb_rule) configure
+	rm -rf debian/tmp-source
+	$(make_directory) debian/tmp-source/DEBIAN
+	$(make_directory) debian/tmp-source/usr/src/$(package)
+	$(make_directory) debian/tmp-source/usr/doc/$(package)
+	sed -e 's/=P/$(package)/g' \
+	    $(DEBDIR)/include.postinst > debian/tmp-source/DEBIAN/postinst
+	chmod 755 debian/tmp-source/DEBIAN/postinst
+	sed -e 's/=P/$(package)/g' \
+		$(DEBDIR)/include.postrm > debian/tmp-source/DEBIAN/postrm
+	chmod 755 debian/tmp-source/DEBIAN/postrm
+	$(install_file) $(DEBDIR)/copyright.source \
+		debian/tmp-source/usr/doc/$(package)/copyright
+	$(install_file) debian/changelog \
+	         debian/tmp-source/usr/doc/$(package)/changelog.debian
+	gzip -9f debian/tmp-source/usr/doc/$(package)/changelog.debian
+	$(install_file) $(DEBDIR)/LinkPolicy \
+	         debian/tmp-source/usr/doc/$(package)/LinkPolicy
+	gzip -9f debian/tmp-source/usr/doc/$(package)/LinkPolicy
+	$(install_file) $(DEBDIR)/README \
+	         debian/tmp-source/usr/doc/$(package)/debian.README
+	gzip -9f debian/tmp-source/usr/doc/$(package)/debian.README
+	$(install_file) README \
+	         debian/tmp-source/usr/doc/$(package)/README
+	gzip -9f debian/tmp-source/usr/doc/$(package)/README
+	$(install_file) $(DEBDIR)/Headers \
+	         debian/tmp-source/usr/doc/$(package)/Headers
+	gzip -9f debian/tmp-source/usr/doc/$(package)/Headers
+	(cd debian/tmp-source/usr/doc/$(package); \
+         ln -s ../../src/$(package)/Documentation Documentation;)
+	-tar cf - `echo * | sed -e 's/debian//g' -e 's/\.deb//g' ` \
+	| (cd debian/tmp-source/usr/src/$(package); umask 000; tar xsf -)
+	(cd debian/tmp-source/usr/src/$(package);make distclean)
+	(cd debian/tmp-source/usr/src/$(package); \
+                        rm -f stamp-building $(STAMPS_TO_CLEAN))
+	(cd debian/tmp-source/usr/src/$(package)/include; rm -f asm; \
+		ln -s asm-$(architecture) asm)
+	$(install_file) .config debian/tmp-source/usr/src/$(package)/.config
+	dpkg-gencontrol -pkernel-source-$(version) -Pdebian/tmp-source/
+	chown -R root.root debian/tmp-source
+	chmod -R og=rX debian/tmp-source
+	dpkg --build debian/tmp-source $(DEB_DEST)
+	rm -f -r debian/tmp-source
+	touch stamp-source
+
+kernel-headers kernel_headers: stamp-headers
+stamp-headers:
+	@test root = "`whoami`" || (echo need root priviledges; exit 1)
+	test -f stamp-configure || $(deb_rule) configure
+	rm -rf debian/tmp-headers
+	$(make_directory) debian/tmp-headers/DEBIAN
+	$(make_directory) debian/tmp-headers/usr/src/$(h_package)
+	$(make_directory) debian/tmp-headers/usr/doc/$(h_package)
+	sed -e 's/=P/$(h_package)/g' \
+		$(DEBDIR)/include.postinst > debian/tmp-headers/DEBIAN/postinst
+	chmod 755 debian/tmp-headers/DEBIAN/postinst
+	sed -e 's/=P/$(h_package)/g' \
+		$(DEBDIR)/include.postrm > debian/tmp-headers/DEBIAN/postrm
+	chmod 755 debian/tmp-headers/DEBIAN/postrm
+	$(install_file) $(DEBDIR)/copyright.headers \
+		debian/tmp-headers/usr/doc/$(h_package)/copyright
+	$(install_file) debian/changelog \
+	         debian/tmp-headers/usr/doc/$(h_package)/changelog.debian
+	gzip -9f debian/tmp-headers/usr/doc/$(h_package)/changelog.debian
+	$(install_file) $(DEBDIR)/LinkPolicy \
+	       debian/tmp-headers/usr/doc/$(h_package)/LinkPolicy
+	gzip -9f debian/tmp-headers/usr/doc/$(h_package)/LinkPolicy
+	$(install_file) $(DEBDIR)/README.headers \
+	         debian/tmp-headers/usr/doc/$(h_package)/debian.README
+	gzip -9f debian/tmp-headers/usr/doc/$(h_package)/debian.README
+	-tar cf - include | \
+            (cd debian/tmp-headers/usr/src/$(h_package); umask 000; tar xsf -)
+	(cd debian/tmp-headers/usr/src/$(h_package)/include; rm -f asm; \
+		ln -s asm-$(architecture) asm)
+	dpkg-gencontrol -pkernel-headers-$(version) -Pdebian/tmp-headers/
+	chown -R root.root debian/tmp-headers
+	chmod -R og=rX debian/tmp-headers
+	dpkg --build debian/tmp-headers $(DEB_DEST)
+	rm -rf debian/tmp-headers
+	touch stamp-headers
+
+kernel-image kernel_image: stamp-image
+stamp-image:
+	@test root = "`whoami`" || (echo need root priviledges; exit 1)
+	rm -f -r ./debian/tmp-image ./debian/tmp-image.deb
+	test -f stamp-configure || $(deb_rule) configure
+	test -f stamp-build || $(deb_rule) build
+	$(make_directory) debian/tmp-image/DEBIAN
+	$(make_directory) debian/tmp-image/boot
+ifdef MODULES_ENABLED
+	$(make_directory) debian/tmp-image/lib/modules/$(version)/cdrom
+	$(make_directory) debian/tmp-image/lib/modules/$(version)/fs
+	$(make_directory) debian/tmp-image/lib/modules/$(version)/ipv4
+	$(make_directory) debian/tmp-image/lib/modules/$(version)/ipv6
+	$(make_directory) debian/tmp-image/lib/modules/$(version)/misc
+	$(make_directory) debian/tmp-image/lib/modules/$(version)/net
+	$(make_directory) debian/tmp-image/lib/modules/$(version)/scsi
+	$(make_directory) debian/tmp-image/lib/modules/$(version)/block
+endif
+	$(make_directory) debian/tmp-image/usr/doc/$(i_package)
+	sed -e 's/=V/$(version)/g' -e 's/=B/$(image_in_boot)/g' \
+             $(DEBDIR)/image.postinst > debian/tmp-image/DEBIAN/postinst
+	chmod 755 debian/tmp-image/DEBIAN/postinst
+	sed -e 's/=V/$(version)/g' \
+	             $(DEBDIR)/image.prerm > debian/tmp-image/DEBIAN/prerm
+	chmod 755 debian/tmp-image/DEBIAN/prerm
+	$(install_file) $(DEBDIR)/copyright.image \
+		debian/tmp-image/usr/doc/$(i_package)/copyright
+	$(install_file) debian/changelog \
+	         debian/tmp-image/usr/doc/$(i_package)/changelog.debian
+	gzip -9f debian/tmp-image/usr/doc/$(i_package)/changelog.debian
+	$(install_file) $(DEBDIR)/LiloDefault \
+	         debian/tmp-image/usr/doc/$(i_package)/LiloDefault
+	gzip -9f debian/tmp-image/usr/doc/$(i_package)/LiloDefault
+	$(install_file) $(DEBDIR)/README.image \
+	         debian/tmp-image/usr/doc/$(i_package)/debian.README
+	gzip -9f debian/tmp-image/usr/doc/$(i_package)/debian.README
+ifdef MODULES_ENABLED
+	cp modules/* debian/tmp-image/lib/modules/$(version)/misc
+	chmod 644 debian/tmp-image/lib/modules/$(version)/misc/*
+	(if [ -f modules/BLOCK_MODULES ] ; then \
+              cd debian/tmp-image/lib/modules/$(version)/misc; \
+	      mv `cat ./BLOCK_MODULES` ../block; \
+              mv ./BLOCK_MODULES ../../../../usr/doc/$(i_package)/; fi)
+	(if [ -f modules/CDROM_MODULES ] ; then \
+              cd debian/tmp-image/lib/modules/$(version)/misc; \
+	      mv `cat ./CDROM_MODULES` ../cdrom; \
+              mv ./CDROM_MODULES ../../../../usr/doc/$(i_package)/; fi)
+	(if [ -f modules/FS_MODULES ]; then \
+              cd debian/tmp-image/lib/modules/$(version)/misc; \
+	      mv `cat ./FS_MODULES` ../fs; \
+              mv ./FS_MODULES ../../../../usr/doc/$(i_package)/; fi)
+	(if [ -f modules/NET_MODULES ]; then \
+              cd debian/tmp-image/lib/modules/$(version)/misc; \
+	      mv `cat ./NET_MODULES` ../net; \
+              mv ./NET_MODULES ../../../../usr/doc/$(i_package)/; fi)
+	(if [ -f modules/IPV4_MODULES ]; then \
+              cd debian/tmp-image/lib/modules/$(version)/misc; \
+	      mv `cat ./IPV4_MODULES` ../ipv4; \
+              mv ./IPV4_MODULES ../../../../usr/doc/$(i_package)/; fi)
+	(if [ -f modules/IPV6_MODULES ]; then \
+              cd debian/tmp-image/lib/modules/$(version)/misc; \
+	      mv `cat ./IPV6_MODULES` ../ipv6; \
+              mv ./IPV6_MODULES ../../../../usr/doc/$(i_package)/; fi)
+	(if [ -f modules/SCSI_MODULES ]; then \
+              cd debian/tmp-image/lib/modules/$(version)/misc; \
+	      mv `cat ./SCSI_MODULES` ../scsi; \
+              mv ./SCSI_MODULES ../../../../usr/doc/$(i_package)/; fi)
+	(if [ -f modules/NET_MISC_MODULES ]; then \
+	      cd debian/tmp-image/lib/modules/$(version)/misc; \
+	      mv ./NET_MISC_MODULES ../../../../usr/doc/$(i_package)/; fi)
+endif
+	cp arch/$(architecture)/boot/$(kimage) \
+                   debian/tmp-image/boot/vmlinuz-$(version)
+	cp vmlinux debian/tmp-image/boot/vmlinux-$(version)
+	cp System.map debian/tmp-image/boot/System.map-$(version)
+	chmod 644 debian/tmp-image/boot/vmlinuz-$(version) \
+                  debian/tmp-image/boot/vmlinux-$(version) \
+                  debian/tmp-image/boot/System.map-$(version)
+	dpkg-gencontrol -pkernel-image-$(version) -Pdebian/tmp-image/
+	chown -R root.root debian/tmp-image
+	chmod -R og=rX debian/tmp-image
+	dpkg --build debian/tmp-image $(DEB_DEST)
+	rm -f -r debian/tmp-image
+	make clean
+	rm -f stamp-build
+	touch stamp-image
+
+#This  endif is for IN_KERNEL_DIR
+endif
+
+
+# only generate module image packages
+modules-image modules_image: configure
+ifndef MODULES_ENABLED
+	@echo Modules not configured, so not making modules_image
+else
+	-for module in $(MODULE_LOC)/* ; do \
+	    (cd $$module; \
+              ./debian/rules KVERS="$(version)" KSRC="$(SRCTOP)" \
+                             KMAINT="$(pgp)" kdist_image; ); \
+        done
+endif
+
+# generate the modules packages and sign them with dchanges
+modules: configure
+ifndef MODULES_ENABLED
+	@echo Modules not configured, so not making modules
+else
+	-for module in $(MODULE_LOC)/* ; do \
+	    (cd $$module; \
+              ./debian/rules KVERS="$(version)" KSRC="$(SRCTOP)" \
+                             KMAINT="$(pgp)" kdist; ); \
+        done
+endif
+
+modules-config modules_config: configure
+ifndef MODULES_ENABLED
+	@echo Modules not configured, so not making modules_config
+else
+	-for module in $(MODULE_LOC)/* ; do \
+	    (cd $$module; \
+              ./debian/rules KVERS="$(version)" KSRC="$(SRCTOP)" \
+                             KMAINT="$(pgp)" kdist_configure; ); \
+        done
+endif
+
+
+source diff:
+	@echo >&2 'source and diff are obsolete - use dpkg-source -b'; false
+
+
+.PHONY: binary binary-arch binary-indep clean modules modules_image

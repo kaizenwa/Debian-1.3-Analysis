@@ -1,0 +1,1502 @@
+# Utilities Library
+# $Header: /u/ra/raines/cvs/tk/tkmail2/utils.tk,v 1.5 1995/12/14 00:49:47 raines Exp $
+global ut_glob
+
+# whether default is to show hidden files in fsbox
+if {![info exists ut_glob(hidden)]} {set ut_glob(hidden) 0}
+global ut_hidden; set ut_hidden $ut_glob(hidden)
+# whether to make dialogs transient
+if {![info exists ut_glob(transient)]} {set ut_glob(transient) 1}
+# possible prefix to Escape for cancels (needed by emacs users)
+if {![info exists ut_glob(cancel)]} {set ut_glob(cancel) ""}
+# procedure to call to get key seq for special bindings
+if {![info exists ut_glob(key-hook)]} {set ut_glob(key-hook) ut:key-hook}
+proc ut:key-hook {w k cmd} {bind $w <Meta-[string tolower $k]> $cmd}
+
+# will be set if quick exit is required
+set mfp(trap-exit) 0
+
+# have a blank bitmap for spacers
+if {[lsearch -exact [image names] blank] < 0} {
+  image create bitmap blank -data {
+  #define blank_width 15
+  #define blank_height 15
+  static char blank_bits[] = {
+     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+     0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+  }
+}
+
+###############################################
+# BEGINNING OF FILESELECTOR PACKAGES
+#   hacked from code by Mario J. Silva
+
+# Arguments:
+#   -prompt	 a text string to prompt with
+#   -cancelvalue value to return if Cancel pressed
+#   -default     value to set as default
+#   -grab	 whether to grab focus or not
+#   -callback    possible command to eval before event loop
+#		 which will be given the fileselector toplevel
+#		 as a first argument
+#   -cbargs	 arguments to callback in addition to toplevel
+#   -master	 name of toplevel to be transient to
+#   -title	 title for fileselector toplevel
+#   -dir	 startup directory
+#   -hidden	 whether to show hidden directories
+#   -quick       pair list of label and directory for quick change
+#
+proc ut:fsbox { args } {
+  global env ut_fs ut_hidden ut_glob
+  
+ j:parse_args { \
+   {prompt "File: "} \
+   {default ""} \
+   {cancelvalue ""} \
+   {grab 0} \
+   {callback ""} \
+   {cbargs ""} \
+   {master ""} \
+   {title "Select File"} \
+   {dir ""} \
+   {hidden -1} \
+   {quick {}} }
+  
+  set w .utfsbox
+  if {[winfo exists $w]} {return $cancelvalue }
+  set ut_fs(result) $cancelvalue
+  if {$hidden < 0} { 
+    set hidden $ut_hidden 
+  } else { set ut_hidden $hidden }
+
+  toplevel $w -class UTFSBox
+  wm protocol $w WM_DELETE_WINDOW "ut:fscancelcmd $w {$cancelvalue} $grab"
+  if {[string length $master]} { 
+    if $ut_glob(transient) {wm transient $w $master}
+    set xpos [expr [winfo rootx $master]+[winfo width $master]/3]
+    set ypos [expr [winfo rooty $master]+[winfo height $master]/3]
+    wm geometry $w +${xpos}+${ypos}
+  }
+  wm title $w $title
+  if {$grab != 0} {after 20 grab $w}
+
+  # widgets
+  frame $w.file -bd 10 
+  frame $w.bframe -bd 10
+ 
+  pack $w.file -side top -expand true -fill both
+  pack $w.bframe -side top
+
+  frame $w.file.eframe
+  frame $w.file.sframe
+  frame $w.file.bframe
+
+  if {[string length $dir] && [file isdirectory $dir]} {cd $dir}
+  set dir [pwd]
+  if {[string length $dir] > 32} {
+    set dir [join "... $dir" ""]
+    while {[string length $dir] > 32} {
+      set dir [string range $dir 4 end]
+      set dir [string range $dir [string first "/" $dir] end]
+      set dir [join "... $dir" ""]
+    }
+  }
+  label $w.file.dirlabel -width 32 -anchor w -text "Dir: $dir"
+
+  pack $w.file.dirlabel -side top -fill x
+  pack $w.file.eframe -side top -fill x
+  pack $w.file.sframe -side top -expand true -fill both
+  pack $w.file.bframe -side top -fill x
+
+  label $w.file.eframe.label -text "$prompt"
+  entry $w.file.eframe.entry -relief sunken \
+      -exportselection 0 
+  $w.file.eframe.entry insert 0 $default
+
+  pack $w.file.eframe.label -side left
+  pack $w.file.eframe.entry -side left -pady 10 \
+      -expand true -fill x -ipady 3
+
+
+  scrollbar $w.file.sframe.yscroll -relief sunken \
+      -command "$w.file.sframe.list yview"
+
+  set lb $w.file.sframe.list
+  listbox $lb -relief sunken \
+      -width 25 -height 10 \
+      -yscroll "$w.file.sframe.yscroll set" \
+      -exportselection 0
+
+  pack $w.file.sframe.yscroll -side left -fill y
+  pack $lb -expand true -fill both
+
+  # buttons
+
+  checkbutton $w.file.bframe.hide -text "hidden" -variable ut_hidden \
+      -relief raised -bd 2 -padx 8p -pady 4p -highlightthickness 2 \
+      -anchor c -command "ut:fsfill $lb \[pwd\]"
+
+  button $w.file.bframe.home -text Home -relief raised \
+      -command "global env; ut:fsgo \$env(HOME) $w $grab"
+
+  pack $w.file.bframe.hide -side left -expand true -fill x
+  pack $w.file.bframe.home -side left -expand true -fill x
+
+  set cnt 0
+  foreach quickref $quick {
+    button $w.file.bframe.quick$cnt -text [lindex $quickref 0] \
+	-command "ut:fsgo [lindex $quickref 1] $w $grab" \
+	-relief raised
+    if {[regexp {[A-Z]} [lindex $quickref 0] char]} {
+      $ut_glob(key-hook) $w.file.eframe.entry  [string tolower $char] \
+	  "$w.file.bframe.quick$cnt invoke"
+    }
+    pack $w.file.bframe.quick$cnt -side left -expand true -fill x
+    incr cnt
+  }
+
+  button $w.bframe.ok -text OK -relief raised  -width 10 \
+      -command "ut:fsokcmd $w $grab"
+
+  button $w.bframe.cancel -text Cancel -relief raised -width 10 \
+      -command "ut:fscancelcmd $w {$cancelvalue} $grab"
+
+  pack $w.bframe.ok -side left -padx 15
+  pack $w.bframe.cancel -side left -padx 15
+
+  # Set up bindings for the browser.
+  bind $w.file.eframe.entry <Return> "$w.bframe.ok invoke"
+  bind $w.file.eframe.entry <$ut_glob(cancel)Escape> "$w.bframe.cancel invoke"
+  $ut_glob(key-hook) $w.file.eframe.entry o "$w.bframe.ok invoke"
+  $ut_glob(key-hook) $w.file.eframe.entry c "$w.bframe.cancel invoke"
+  $ut_glob(key-hook) $w.file.eframe.entry h "$w.file.bframe.home invoke"
+  $ut_glob(key-hook) $w.file.eframe.entry period "$w.file.bframe.hide invoke"
+
+  bind $w.file.eframe.entry <Tab> {
+    set f [%W get]
+    %W delete 0 end
+    %W insert end [j:expand_filename $f]
+    break
+  }    
+  bind $w.file.eframe.entry <Control-Tab> { # }
+  bind $w.file.eframe.entry <Up> {
+    set lw [winfo toplevel %W].file.sframe.list
+    if {![string length [set ndx [$lw curselection]]]} {set ndx 0}
+    incr ndx -1
+    ut:fsselect $lw $ndx
+    set ymax [$lw nearest [winfo height $lw]]
+    set ymin [$lw nearest 0]
+    if {$ndx > $ymax} {
+      $lw yview [expr $ndx-$ymax+$ymin]
+    } elseif {$ndx < $ymin}  {
+      $lw yview $ndx
+    }
+  }
+  bind $w.file.eframe.entry <Down> {
+    set lw [winfo toplevel %W].file.sframe.list
+    if {![string length [set ndx [$lw curselection]]]} {set ndx 0}
+    incr ndx 1
+    ut:fsselect $lw $ndx
+    set ymax [$lw nearest [winfo height $lw]]
+    set ymin [$lw nearest 0]
+    if {$ndx > $ymax} {
+      $lw yview [expr $ndx-$ymax+$ymin]
+    } elseif {$ndx < $ymin}  {
+      $lw yview $ndx
+    }
+  }
+
+  bindtags $lb "Listbox $lb $w all"
+
+  bind $lb <Button-1> "ut:fsselect %W"
+
+  bind $lb <Key> "ut:fsselect %W"
+
+  bind $lb <B1-Motion> " "
+
+  bind $lb <Double-Button-1> "eval $w.bframe.ok invoke"
+
+  bind $lb <Return> \
+      "ut:fsselect %W; eval $w.bframe.ok invoke"
+
+  ut:fsfill $lb [pwd]
+  if {[string length $callback]} {eval "$callback $w $cbargs"}
+
+  set savefocus [focus]
+  focus $w.file.eframe.entry
+  tkwait window $w
+  focus $savefocus
+  if {$ut_fs(result) == $cancelvalue} {return $cancelvalue}
+  if {[file isdirectory [set dir [file dirname $ut_fs(result)]]]} {
+    cd $dir
+    return [pwd]/[file tail $ut_fs(result)]
+  } else {
+    return [pwd]/$ut_fs(result)
+  }
+}
+
+proc ut:fsgo {dir w grab} {
+  $w.file.eframe.entry delete 0 end
+  $w.file.eframe.entry insert 0 "$dir/"
+  eval "ut:fsokcmd $w $grab"
+}
+
+proc ut:fsselect {W {ndx {}}} {
+  set B_entry [winfo toplevel $W].file.eframe.entry
+  if [string length $ndx] {
+    $W selection clear 0 end
+    $W selection anchor $ndx
+    $W selection set $ndx
+  }
+  set ndx [lindex [$W curselection] 0]
+  $B_entry delete 0 end
+  $B_entry insert 0 [$W get $ndx]
+}
+
+proc ut:fsokcmd {w grab} {
+  global ut_fs env
+
+  set selected [$w.file.eframe.entry get]
+  set ndx [expr [string length $selected]-1]
+  if {[string index $selected $ndx] == "/"} {
+    set selected [string range $selected 0 [expr $ndx-1]]
+  }
+  $w.file.eframe.entry delete 0 end
+  if {![string length $selected]} {return}
+  
+  if {![catch {set res [glob $selected]}]} {
+    set selected [lindex $res 0]
+  }
+
+  if {[file isdirectory $selected] != 0} {
+    cd $selected
+    set dir [pwd]
+    if {[string length $dir] > 32} {
+      set dir [join "... $dir" ""]
+      while {[string length $dir] > 32} {
+	set dir [string range $dir 4 end]
+	set dir [string range $dir [string first "/" $dir] end]
+	set dir [join "... $dir" ""]
+      }
+    }
+    $w.file.dirlabel configure -text "Dir: $dir"
+    ut:fsfill $w.file.sframe.list [pwd]
+    return
+  }
+  if {$grab != 0} {grab release $w}
+  set ut_fs(result) $selected
+  destroy $w
+}
+
+proc ut:fscancelcmd {w cancelvalue grab} {
+  global ut_fs
+
+  if {$grab != 0} {grab release $w}
+  set ut_fs(result) $cancelvalue
+  destroy $w
+}
+
+proc ut:fsfill {fslist dir} {
+  global ut_hidden
+
+  if {$ut_hidden} { 
+    set opt "-a"
+    set dirlist ""
+  } else { 
+    set opt "" 
+    set dirlist ".."
+  }
+  $fslist delete 0 end
+  foreach i [split [eval "exec ls $opt $dir"] \n] {
+    if {[string compare $i "."] != 0} {
+      if {[file isdirectory $i]} {
+	set dirlist [linsert $dirlist 0 $i]
+      } else {
+	$fslist insert end $i
+      }
+    }
+  }
+  foreach i $dirlist {
+    $fslist insert 0 "$i/"
+  }
+}
+
+###############################################
+# BEGINNING OF color-select PACKAGE
+
+set ut_color(database) /usr/lib/X11/rgb.txt
+proc ut:color-select {args} {
+  global ut_color ut_glob
+
+  j:parse_args { \
+    {prompt "Select a Color"} \
+    {title "Color Selector"} \
+    {grab 0} \
+    {database /usr/lib/X11/rgb.txt} \
+    {cancelvalue {}} \
+    {master ""} }
+
+  if {![file exists $database]} {set database $ut_color(database)}
+  if {![file exists $database]} {
+    if {![ut:getok -prompt "Can't find X servers color database file $database. Do you wish to specify it yourself?" \
+	      -master $master -grab $grab]} {return $cancelvalue}
+    set database [ut:fsbox -prompt "Color database file:" \
+		      -grab $grab -master $master]
+    if {![string length $database]} {return {}}
+    set ut_color(database) $database
+  }
+  if {[catch {open $database r} fid]} {
+    error "Can't open $database to get colors"
+  }
+  
+  set w .ut_color
+  toplevel $w -class UTColor
+  wm minsize $w 160 100
+  wm protocol $w WM_DELETE_WINDOW ".ut_color.bb.quit invoke"
+  if {[string length $master]} { 
+    if $ut_glob(transient) {wm transient $w $master}
+    set xpos [expr [winfo rootx $master]+[winfo width $master]/3]
+    set ypos [expr [winfo rooty $master]+[winfo height $master]/3]
+    wm geometry $w +${xpos}+${ypos}
+  }
+  wm title $w $title
+
+  frame $w.f -borderwidth 5
+  label $w.f.lbl -text "Select Color" -height 5 -relief groove
+  pack $w.f.lbl -side top -fill x
+
+  frame $w.cl -borderwidth 5
+  scrollbar $w.cl.scroll -command "$w.cl.list yview" -relief raised
+  listbox $w.cl.list -yscrollcommand "$w.cl.scroll set" \
+      -relief raised -exportselection 0
+  bindtags $w.cl.list "Listbox $w.cl.list $w all"
+  bind $w.cl.list <1> "ut:color-set"
+  bind $w.cl.list <Double-Button-1> "ut:color-set; destroy $w"
+  bind $w.cl.list <Up> "ut:color_set"
+  bind $w.cl.list <Down> "ut:color_set"
+  bind $w.cl.list <$ut_glob(cancel)Escape> "$w.bb.quit invoke"
+  bind $w.cl.list <Return> "$w.bb.sel invoke"
+  $ut_glob(key-hook) $w.cl.list c "$w.bb.quit invoke"
+  $ut_glob(key-hook) $w.cl.list s "$w.bb.sel invoke"
+
+  frame $w.bb -borderwidth 5
+  button $w.bb.sel -text "Select" -command "destroy $w"
+  button $w.bb.quit -text "Cancel" \
+      -command "global ut_color; set ut_color(color) $cancelvalue; destroy $w"
+  pack $w.bb.sel $w.bb.quit -side left -expand true -fill x \
+      -padx 5 -pady 5 -ipady 2 -ipadx 2
+
+  pack $w.cl.scroll -side left -fill y 
+  pack $w.cl.list -expand true -fill both
+
+  pack $w.f -side top -fill x
+  pack $w.bb -side bottom -fill x
+  pack $w.cl -side top -expand true -fill both
+  
+  set cdb {}
+  foreach line [split [read $fid] "\n"] {
+    lappend cdb [lrange $line 3 end]
+  }
+  foreach clr [lsort $cdb] {
+    if {[string length $clr]} {
+      $w.cl.list insert end $clr
+    }
+  }
+  after 100 "$w.cl.list selection set 0; ut:color-set"
+
+  if {$grab != 0} {after 20 grab $w}
+  set savefocus [focus]
+  focus $w.cl.list
+  tkwait window $w
+  grab release $w
+  focus $savefocus
+  return $ut_color(color)
+}
+
+proc ut:color-set { } {
+  global ut_color
+
+  set w .ut_color
+  set curs [$w.cl.list curselection]
+  if {[llength $curs]} {
+    set clr [$w.cl.list get $curs]
+    $w.f.lbl configure -bg $clr -text $clr
+    set ut_color(color) $clr
+  }
+}
+
+
+###############################################
+# BEGINNING OF font-select PACKAGE
+
+proc ut:font-select {args} {
+  global ut_fnt ut_glob
+
+ j:parse_args { \
+   {prompt "Select a Font:"} \
+   {title "Font Selector"} \
+   {grab 0} \
+   {fullname 0} \
+   {cancelvalue {}} \
+   {master ""} }
+
+  set w .ut_fnt
+  toplevel $w -class UTFont
+  wm minsize $w 360 100
+  wm protocol $w WM_DELETE_WINDOW ".ut_fnt.bb.quit invoke"
+  if {[string length $master]} { 
+    if $ut_glob(transient) {wm transient $w $master}
+    set xpos [expr [winfo rootx $master]+[winfo width $master]/3]
+    set ypos [expr [winfo rooty $master]+[winfo height $master]/3]
+    wm geometry $w +${xpos}+${ypos}
+  }
+
+  wm title $w $title
+
+  if {![info exists ut_fnt(list)]} {
+    ut:font-init
+    set ut_fnt(list) [lsort -command ut:font-compare $ut_fnt(list)]
+  }
+  set ut_fnt(bold) 0
+  set ut_fnt(italic) 0
+
+  label $w.lbl -text $prompt -anchor w
+
+  frame $w.frame1 -borderwidth 5
+
+  scrollbar $w.frame1.yscroll \
+      -command "$w.frame1.list yview" \
+      -relief raised
+
+  scrollbar $w.frame1.xscroll \
+      -command "$w.frame1.list xview" \
+      -relief raised \
+      -orient horizontal
+
+  listbox $w.frame1.list \
+      -yscrollcommand "$w.frame1.yscroll set" \
+      -xscrollcommand "$w.frame1.xscroll set" \
+      -exportselection 0 \
+      -relief sunken
+
+  bindtags $w.frame1.list "Listbox $w.frame1.list $w all"
+  set cmd "ut:font-set-family $w.frame2.list $w.frame3.demo \[%W curselection\]"
+  bind $w.frame1.list <ButtonRelease-1> $cmd
+  bind $w.frame1.list <Up> $cmd
+  bind $w.frame1.list <Down> $cmd
+  bind $w.frame1.list <Return> "$w.bb.sel invoke"
+  bind $w.frame1.list <$ut_glob(cancel)Escape> "$w.bb.quit invoke"
+  $ut_glob(key-hook) $w.frame1.list s "$w.bb.sel invoke"
+  $ut_glob(key-hook) $w.frame1.list c "$w.bb.quit invoke"
+  $ut_glob(key-hook) $w.frame1.list b "$w.cb.bold invoke"
+  $ut_glob(key-hook) $w.frame1.list i "$w.cb.italic invoke"
+
+  pack $w.frame1.yscroll -side left -fill y
+  pack $w.frame1.xscroll -side bottom -fill x
+  pack $w.frame1.list -fill both -expand true
+
+  frame $w.frame2 -borderwidth 5
+
+  scrollbar $w.frame2.yscroll \
+      -command "$w.frame2.list yview" \
+      -relief raised
+
+  listbox $w.frame2.list \
+      -yscrollcommand "$w.frame2.yscroll set" \
+      -width 4 -height 8 \
+      -relief sunken -exportselection 0
+
+  bindtags $w.frame2.list "Listbox $w.frame2.list $w all"
+  set cmd "ut:font-show $w.frame3.demo \[%W get \[%W curselection\]\]"
+  bind $w.frame2.list <ButtonRelease-1> $cmd
+  bind $w.frame2.list <Up> $cmd
+  bind $w.frame2.list <Down> $cmd
+  bind $w.frame2.list <Return> "$w.bb.sel invoke"
+  bind $w.frame2.list <$ut_glob(cancel)Escape> "$w.bb.quit invoke"
+
+  $ut_glob(key-hook) $w.frame2.list s "$w.bb.sel invoke"
+  $ut_glob(key-hook) $w.frame2.list c "$w.bb.quit invoke"
+  $ut_glob(key-hook) $w.frame2.list b "$w.cb.bold invoke"
+  $ut_glob(key-hook) $w.frame2.list i "$w.cb.italic invoke"
+
+  pack $w.frame2.yscroll -side left -fill y
+  pack $w.frame2.list -fill both -expand true
+
+  frame $w.frame3 -borderwidth 5
+  text $w.frame3.demo -height 8 -width 28 \
+      -borderwidth 3 -relief groove -wrap none
+
+  pack $w.frame3.demo -side top -expand true -fill x
+
+  frame $w.bb -borderwidth 5
+  button $w.bb.sel -text Select -command "destroy .ut_fnt"
+  button $w.bb.quit -text Cancel -command "
+    global ut_fnt
+    set ut_fnt(okay) 0
+    destroy $w"
+
+  pack $w.bb.sel $w.bb.quit -side left -expand true -fill x \
+      -padx 20 -pady 5 -ipady 2
+
+  frame $w.cb -borderwidth 5
+  checkbutton $w.cb.bold -text Bold \
+      -variable ut_fnt(bold) -relief flat \
+      -command "global ut_fnt; ut:font-show $w.frame3.demo \$ut_fnt(cursize)"
+  checkbutton $w.cb.italic -text Italic \
+      -variable ut_fnt(italic) -relief flat \
+      -command "global ut_fnt; ut:font-show $w.frame3.demo \$ut_fnt(cursize)"
+
+  if $fullname {
+    pack $w.cb.bold $w.cb.italic -side left -padx 20
+  }
+
+  pack $w.lbl -side top -fill x -anchor w
+  pack $w.bb -side bottom -fill x
+  frame $w.sep -bd 2 -height 4 -relief sunken
+  pack $w.sep -side bottom -fill x -expand true -pady 10
+  pack $w.cb -side bottom
+  pack $w.frame1 $w.frame2 $w.frame3 -side left -expand true -fill both
+
+  foreach spec $ut_fnt(list) {
+    set family [lindex $spec 0]
+    set foundry [lindex $spec 1]
+    $w.frame1.list insert end "$family ($foundry)"
+    set ut_fnt($family,$foundry,sizes) [lsort -integer $ut_fnt($family,$foundry,sizes)]
+  }
+  $w.frame1.list selection set 0
+  ut:font-set-family $w.frame2.list $w.frame3.demo 0
+
+  if {$grab != 0} {after 20 grab $w}
+  set savefocus [focus]
+  focus $w.frame1.list; $w.frame1 configure -relief groove
+  tkwait window $w
+  grab release $w
+  focus $savefocus
+  if {!$ut_fnt(okay)} {return $cancelvalue}
+  if {$fullname} {
+    return $ut_fnt(curfont)
+  } else {
+    return [list $ut_fnt(curfoundry) $ut_fnt(curfamily) $ut_fnt(cursize)]
+  }
+}
+
+proc ut:font-set-family { slist w ndx } {
+  global ut_fnt
+
+  set fontspec [lindex $ut_fnt(list) $ndx]
+  set ut_fnt(curfamily) [set family [lindex $fontspec 0]]
+  set ut_fnt(curfoundry) [set foundry [lindex $fontspec 1]]
+
+  $slist delete 0 end
+  set fntsize 14
+  if {[lindex $ut_fnt($family,$foundry,sizes) 0] == 0} {
+    for {set cnt 6} {$cnt < 37} {incr cnt 2} {
+      $slist insert end $cnt
+    }
+    set ndx 4
+  } else {
+    eval $slist insert end $ut_fnt($family,$foundry,sizes)
+    set ndx 0
+    set stop [expr [llength $ut_fnt($family,$foundry,sizes)]-1]
+    while {[lindex $ut_fnt($family,$foundry,sizes) $ndx] < 14 && 
+	   $ndx < $stop} {incr ndx}
+    set fntsize [lindex $ut_fnt($family,$foundry,sizes) $ndx]
+  }
+  $slist selection anchor $ndx
+  $slist selection set $ndx
+  if {$ndx > 1} {incr ndx -2}
+  $slist yview $ndx
+  ut:font-show $w $fntsize
+}
+
+proc ut:font-show { w fntsize } {
+  global ut_fnt
+  set ut_fnt(okay) 1
+  set foundry $ut_fnt(curfoundry)
+  set family $ut_fnt(curfamily)
+  if {!$ut_fnt(bold) && !$ut_fnt(italic)} {
+    set curfont "-$foundry-$family-medium-r-*-*-$fntsize-*-*-*-*-*-*-*"
+    if {[catch "$w configure -font \$curfont"]} {
+      set curfont "-$foundry-$family-regular-r-*-*-$fntsize-*-*-*-*-*-*-*"
+      if {[catch "$w configure -font $curfont"]} { set ut_fnt(okay) 0 }
+    }
+  } elseif {$ut_fnt(bold) && !$ut_fnt(italic)} {
+    set curfont "-$foundry-$family-bold-r-*-*-$fntsize-*-*-*-*-*-*-*"
+    if {[catch "$w configure -font \$curfont"]} {
+      set curfont "-$foundry-$family-demibold-r-*-*-$fntsize-*-*-*-*-*-*-*"
+      if {[catch "$w configure -font $curfont"]} { set ut_fnt(okay) 0 }
+    }
+  } elseif {!$ut_fnt(bold) && $ut_fnt(italic)} {
+    set curfont "-$foundry-$family-medium-i-*-*-$fntsize-*-*-*-*-*-*-*"
+    if {[catch "$w configure -font \$curfont"]} {
+      set curfont "-$foundry-$family-regular-i-*-*-$fntsize-*-*-*-*-*-*-*"
+      if {[catch "$w configure -font \$curfont"]} {
+	set curfont "-$foundry-$family-medium-o-*-*-$fntsize-*-*-*-*-*-*-*"
+	if {[catch "$w configure -font \$curfont"]} {
+	  set curfont "-$foundry-$family-regular-o-*-*-$fntsize-*-*-*-*-*-*-*"
+	  if {[catch "$w configure -font $curfont"]} { set ut_fnt(okay) 0 }
+	}
+      }
+    }
+  } elseif {$ut_fnt(bold) && $ut_fnt(italic)} {
+    set curfont "-$foundry-$family-bold-i-*-*-$fntsize-*-*-*-*-*-*-*"
+    if {[catch "$w configure -font \$curfont"]} {
+      set curfont "-$foundry-$family-demibold-i-*-*-$fntsize-*-*-*-*-*-*-*"
+      if {[catch "$w configure -font \$curfont"]} {
+	set curfont "-$foundry-$family-bold-o-*-*-$fntsize-*-*-*-*-*-*-*"
+	if {[catch "$w configure -font \$curfont"]} {
+	  set curfont "-$foundry-$family-demibold-o-*-*-$fntsize-*-*-*-*-*-*-*"
+	  if {[catch "$w configure -font $curfont"]} { set ut_fnt(okay) 0 }
+	}
+      }
+    }
+  }
+
+  $w delete 1.0 end
+  if {!$ut_fnt(okay)} {
+    catch "$w configure -font fixed"
+    $w insert 1.0 "Invalid Font"
+  } else {
+    $w insert 1.0 "~!@#\$%^&*()_+-=|:\"<>?[]\\;',./`\n"
+    $w insert 2.0 "1234567890\n"
+    $w insert 3.0 "abcdefghijklmnopqrstuvwxyz\n"
+    $w insert 4.0 "ABCDEFGHIJKLMNOPQRSTUVWXYZ\n"
+  }
+
+  set ut_fnt(cursize) $fntsize
+  set ut_fnt(curfont) $curfont
+}
+
+proc ut:font-init { } {
+  global ut_fnt
+
+  set ut_fnt(list) {}
+  catch { exec xlsfonts | grep bold-\[io\]-.*-iso8859-1} fonts
+  set fonts [split $fonts \n]
+  foreach font $fonts {
+    set tmp [split $font -]
+    set foundry [lindex $tmp 1]
+    set family [lindex $tmp 2]
+    set fntsize [lindex $tmp 7]
+    if {$fntsize == 0} {
+      if {[lindex $tmp 8] != 0} continue
+    }
+    if {[info exists ut_fnt($family,$foundry,sizes)]} {
+      if {[lsearch $ut_fnt($family,$foundry,sizes) $fntsize] > -1} continue
+    } else {
+      lappend ut_fnt(list) [list $family $foundry]
+    }
+    lappend ut_fnt($family,$foundry,sizes) $fntsize
+  }
+}
+
+proc ut:font-compare {spec1 spec2} {
+  set f1 [lindex $spec1 0]
+  set f2 [lindex $spec2 0]
+  if {$f1 < $f2} { 
+    return -1
+  } elseif {$f1 > $f2} {
+    return 1
+  } else { return 0 }
+}
+
+###############################################
+# BEGINNING OF TKGETOKAY PACKAGE
+#   hacked from code by Jay Sekora
+#
+# Arguments:
+#  -prompt	text of message to display for confirmation
+#  -master	name of toplevel to be transient to
+#  -oklabel	label for ok button
+#  -nolabel	label for cancel button
+#  -showno	whether to show the Cancel button
+proc ut:getok { args } {
+  global ut_getok ut_glob
+  set ut_getok(res) 0
+
+  j:parse_args { \
+    {master ""} \
+    {oklabel "OK"} \
+    {nolabel "Cancel"} \
+    {prompt "Confirm?"} \
+    {bitmap {}} \
+    {showno 1} \
+  }
+
+  set cnt 0
+  while {[winfo exists .ut_getok$cnt]} {incr cnt}
+  
+  set w .ut_getok$cnt
+  toplevel $w -class UTGetOkay
+  wm protocol $w WM_DELETE_WINDOW "ut:getokdone [expr 1-$showno] $w"
+  wm title $w "Attention!"
+  if {[string length $master]} { 
+    if $ut_glob(transient) {wm transient $w $master}
+    set xpos [expr [winfo rootx $master]+[winfo width $master]/3]
+    set ypos [expr [winfo rooty $master]+[winfo height $master]/3]
+    wm geometry $w +${xpos}+${ypos}
+  }
+
+  frame $w.t
+  frame $w.t.bmp -bd 2 -relief groove
+  label $w.t.bmp.lbl
+  pack $w.t.bmp.lbl
+  pack $w.t.bmp -side left -padx 5 -pady 5
+
+  if {![string length $bitmap] || \
+        [catch {$w.t.bmp.lbl configure -bitmap $bitmap}]} {
+    if {$showno} {
+      $w.t.bmp.lbl configure -bitmap question
+    } else { 
+      $w.t.bmp.lbl configure -bitmap error
+    }
+  }
+
+  message $w.t.prompt -width 300 -anchor w -text $prompt
+  pack $w.t.prompt -side left -fill both -expand true -padx 10 -pady 10
+
+  frame $w.b
+  button $w.b.ok -text $oklabel \
+      -command "ut:getokdone 1 $w"
+  if {[string length $oklabel] < 8} {$w.b.ok configure -width 8}
+  bind $w <Return> "$w.b.ok invoke"
+  if {[regexp {[A-Z]} $oklabel char]} {
+    $ut_glob(key-hook) $w [string tolower $char] "$w.b.ok invoke"
+  }
+  pack $w.b.ok -side left -padx 20 -pady 5 -ipady 2 -ipadx 10
+  if {$showno} {
+    button $w.b.cancel -text $nolabel \
+	-command "ut:getokdone 0 $w"
+    if {[string length $nolabel] < 8} {$w.b.cancel configure -width 8}
+    bind $w <$ut_glob(cancel)Escape> "$w.b.cancel invoke"
+    if {[regexp {[A-Z]} $nolabel char]} {
+      $ut_glob(key-hook) $w [string tolower $char] "$w.b.cancel invoke"
+    }
+    pack $w.b.cancel -side left -padx 20 -pady 5 -ipady 2 -ipadx 10
+  }
+
+  pack $w.t -side top -fill x
+  pack $w.b -side bottom
+  frame $w.sep -bd 2 -height 4 -relief sunken
+  pack $w.sep -side bottom -fill x -expand true -pady 10
+
+  set savefocus [focus]
+  focus $w.b.ok
+  after 200 grab $w
+  tkwait window $w
+  focus $savefocus
+  return $ut_getok(res)
+}
+
+proc ut:getokdone { val w} {
+
+  global ut_getok
+  set ut_getok(res) $val
+  grab release $w
+  destroy $w
+}    
+
+###############################################
+# BEGINNING OF ut:getstr PACKAGE
+#   hacked from code by Jay Sekora
+#
+# Arguments:
+#   -prompt	text to prompt user with
+#   -default	default string to place in entry
+#   -callback   possible command to eval before event loop
+#		which will be given the created toplevel
+#		as a first argument
+#   -cbargs	arguments to callback in addition to toplevel
+#   -master	name of toplevel to be transient to
+#   -fc		whether to do file completion
+#   -oklabel	label for ok button
+#   -nolabel	label for cancel button
+proc ut:getstr { args } {
+  global ut_getstr ut_glob
+  set ut_getstr(res) ""
+
+  j:parse_args { \
+    {master ""} \
+    {prompt "Confirm?"} \
+    {default ""} \
+    {callback ""} \
+    {cbargs ""} \
+    {fc 0} \
+    {oklabel "OK"} \
+    {nolabel "Cancel"} \
+  }
+
+  set cnt 0
+  while {[winfo exists .ut_getstr$cnt]} {incr cnt}
+  
+  set w .ut_getstr$cnt
+  toplevel $w -class UTGetStr
+  wm protocol $w WM_DELETE_WINDOW "ut:getstrdone 0 $w"
+  wm title $w " "
+  if {[string length $master]} { 
+    if $ut_glob(transient) {wm transient $w $master}
+    set xpos [expr [winfo rootx $master]+[winfo width $master]/3]
+    set ypos [expr [winfo rooty $master]+[winfo height $master]/3]
+    wm geometry $w +${xpos}+${ypos}
+  }
+
+  message $w.prompt -width 300 -anchor w -text $prompt
+  entry $w.ent -relief sunken
+  $w.ent delete 0 end
+  $w.ent insert 0 $default
+
+  if {$fc} {
+    bind $w.ent <Tab> {
+      set f [%W get]
+      %W delete 0 end
+      %W insert end [j:expand_filename $f]
+      break
+    }
+    bind $w.ent <Control-Tab> { # }
+  } 
+
+  frame $w.b 
+  button $w.b.ok -text $oklabel \
+      -command "ut:getstrdone 1 $w"
+  if {[string length $oklabel] < 8} {$w.b.ok configure -width 8}
+  button $w.b.clear -text "Clear" -width 8 \
+      -command "$w.ent delete 0 end"
+  button $w.b.cancel -text $nolabel \
+      -command "ut:getstrdone 0 $w"
+  if {[string length $nolabel] < 8} {$w.b.cancel configure -width 8}
+  pack $w.b.ok $w.b.clear $w.b.cancel -side left -padx 10 -pady 10 \
+      -ipady 2 -ipadx 5
+
+  pack $w.prompt -side top -fill both -expand true -padx 10 -pady 10
+  pack $w.ent -side top -fill x -expand true -padx 10 -ipady 3
+  frame $w.sep -bd 2 -height 4 -relief sunken
+  pack $w.sep -side top -fill x -expand true -pady 10
+  pack $w.b -side bottom
+
+  bind $w.ent <Return> "$w.b.ok invoke"
+  if {[regexp {[A-Z]} $oklabel char]} {
+    $ut_glob(key-hook) $w.ent [string tolower $char] "$w.b.ok invoke"
+  }
+  bind $w.ent <$ut_glob(cancel)Escape> "$w.b.cancel invoke"
+  if {[regexp {[A-Z]} $nolabel char]} {
+    $ut_glob(key-hook) $w.ent [string tolower $char] "$w.b.cancel invoke"
+  }
+
+  if {[string length $callback]} {eval "$callback $w $cbargs"}
+
+  set savefocus [focus]
+  focus $w.ent
+  after 200 grab $w
+  tkwait window $w
+  focus $savefocus
+  return $ut_getstr(res)
+}
+
+proc ut:getstrdone { val w} {
+
+  global ut_getstr
+  if {$val} {set ut_getstr(res) [$w.ent get]}
+  grab release $w
+  destroy $w
+}    
+
+###############################################
+# BEGINNING OF ut:combo-create PACKAGE
+#
+# Arguments:
+#   -frame	name of frame window to pack combo elements in
+#   -label      label to put to left of entry widget
+#   -default	text to put in entry widget
+#   -deflist	default list to place in popdown list
+#   -labelwidth width of label widget
+#   -entrywidth	width of entry widget
+#   -listheight	height of popdown list
+#   -editable	whether user can type in entry
+#   -command	command to eval after entry's value has changed
+#		The sequence %W will be replace with frame name
+#		The sequence %E will be replace with entry's value
+#
+proc ut:combo-create { args } {
+  global ut_combo ut_glob
+
+  j:parse_args { \
+    {frame {}} \
+    {label ""} \
+    {labelwidth 0} \
+    {default ""} \
+    {deflist {}} \
+    {width 20} \
+    {entrywidth 20} \
+    {listheight 6} \
+    {editable 1} \
+    {command {}} \
+  }
+  if {![winfo exists $frame]} {
+    error "The frame $frame doesn't exist to place combobox in"
+  }
+
+  set w $frame
+  set ut_combo($w,entrywidth) $entrywidth
+  set ut_combo($w,listheight) $listheight
+  set ut_combo($w,grabbed) 0
+  set ut_combo($w,command) $command
+  set ut_combo($w,last) $default
+  set ut_combo($w,save) {}
+  if {$editable} {
+    set ut_combo($w,state) normal
+  } else {
+    set ut_combo($w,state) disabled
+  }
+
+  if {[string length $label]} {
+    label $w.lbl -text $label -anchor e
+    if {$labelwidth} { $w.lbl configure -width $labelwidth }
+    pack $w.lbl -side left -padx 2
+  }
+
+  entry $w.ent -width $ut_combo($w,entrywidth) \
+      -relief sunken 
+  button $w.btn -text "<<" -command "ut:combo-btn $w"
+  pack $w.ent -side left -ipady 2
+  pack $w.btn -side left -padx 5 -ipadx 2
+
+  $w.ent insert 0 $default
+  $w.ent configure -state $ut_combo($w,state)
+
+  set shell [toplevel $w.drop -border 2 -relief raised \
+		 -cursor arrow]
+  wm withdraw $shell
+  wm overrideredirect $shell 1
+
+  scrollbar $shell.scr -command "$shell.list yview" \
+      -relief sunken
+  listbox $shell.list -yscroll "$shell.scr set" \
+      -relief sunken
+  bindtags $shell.list "Listbox $shell.list $shell all"
+
+  pack $shell.scr -side left -fill y
+  pack $shell.list -fill both -expand true
+
+  foreach item $deflist {
+    $shell.list insert end $item
+  }
+
+  bind $w.ent <Return> "ut:combo-command $w"
+  bind $w.ent <FocusOut> "ut:combo-command $w"
+
+  bind $shell.list <$ut_glob(cancel)Escape> "ut:combo-cancel $w"
+  bind $shell.list <1> "ut:combo-select $w %y"
+  bind $shell.list <Double-ButtonPress-1> "ut:combo-popdown $w"
+
+  bind $w <1> "ut:combo-btn $w"
+  bind $w <Destroy> "ut:combo-destroy $w"
+  return $frame
+}
+
+proc ut:combo-reset { w def deflist {doit 1}} {
+  global ut_combo
+
+  $w.drop.list delete 0 end
+  foreach item $deflist {
+    $w.drop.list insert end $item
+  }
+
+  $w.ent configure -state normal
+  $w.ent delete 0 end
+  $w.ent insert 0 $def
+  if {$doit} {
+    ut:combo-command $w
+  } else {
+    set ut_combo($w,last) $def
+  }
+  if {$ut_combo($w,grabbed)} {
+    $w.ent configure -state disabled
+  } else {
+    $w.ent configure -state $ut_combo($w,state)
+  }
+}
+
+proc ut:combo-get { w } {
+  global ut_combo
+
+  return [$w.ent get]
+}
+
+proc ut:combo-command { w } {
+  global ut_combo
+
+  if {[$w.ent get] == $ut_combo($w,last)} return
+
+  if {[string length [set cmd $ut_combo($w,command)]]} {
+    $w.ent configure -state normal
+    if {$ut_combo($w,grabbed)} {
+      catch "grab release $w"    
+    }
+    regsub -all {%W} $cmd "$w" cmd
+    regsub -all {%E} $cmd "{[$w.ent get]}" cmd
+    if {[catch "eval $cmd" res]} {
+      ut:getok -prompt "Error evaluating \"$cmd\"\nResult: $res" \
+	  -showno 0 -master $w
+    }
+    set ut_combo($w,last) [$w.ent get]
+    if {$ut_combo($w,grabbed)} {
+      catch "grab -global $w"    
+      $w.ent configure -state disabled
+    } else {
+      $w.ent configure -state $ut_combo($w,state)
+    }
+  }
+}
+
+proc ut:combo-btn { w } {
+  global ut_combo
+
+  if {$ut_combo($w,grabbed)} {
+    ut:combo-popdown $w
+  } else {
+    ut:combo-popup $w
+  }
+}
+
+proc ut:combo-cancel { w } {
+  global ut_combo
+
+  if {$ut_combo($w,grabbed)} {
+    ut:combo-popdown $w
+    ut:combo-restore $w
+  }
+}
+
+proc ut:combo-restore { w } {
+  global ut_combo
+
+  $w.ent configure -state normal
+  $w.ent delete 0 end
+  $w.ent insert 0 $ut_combo($w,save)
+  ut:combo-command $w
+
+  if {$ut_combo($w,grabbed)} {
+    $w.ent configure -state disabled
+  } else {
+    $w.ent configure -state $ut_combo($w,state)
+  }
+}
+
+proc ut:combo-select { w y } {
+  global ut_combo
+
+  set list $w.drop.list
+
+  $list selection clear 0 end
+  $list selection anchor [$list nearest $y]
+  $list selection set anchor
+
+  if {[string length [set ndx [$list curselection]]]} {
+    $w.ent configure -state normal
+    $w.ent delete 0 end
+    $w.ent insert 0 [$list get $ndx]
+    $w.ent configure -state disabled
+    ut:combo-command $w
+  }
+}
+
+proc ut:combo-popup { w } {
+  global ut_combo
+
+  set shell $w.drop
+
+  # pop up the shell
+  set y [expr [winfo rooty $w.ent]+[winfo height $w.ent]+3]
+  $shell.list configure \
+      -width $ut_combo($w,entrywidth) -height $ut_combo($w,listheight)
+  set height [expr "[winfo reqheight $shell.list]+4"]
+
+  set x1 [winfo rootx $w.ent]
+  set x2 [expr "[winfo rootx $w.btn] + [winfo width $w.btn]"]
+  set width  [expr "$x2 - $x1"]
+
+  # If the listbox is below bottom of screen, put it upwards
+  set scrheight [winfo screenheight .]
+  set bottom [expr $y+$height]
+  if {$bottom > $scrheight} {
+      set y [expr $y-$height-[winfo height $w.ent]-5]
+  }
+
+  wm geometry $shell ${width}x$height+$x1+$y
+  wm deiconify $shell
+  raise $shell
+
+  if {[$shell.list curselection] == ""} {
+      $shell.list selection anchor 0
+      $shell.list selection set 0
+  }
+  $w.ent configure -state disabled
+  $w.ent configure -cursor right_ptr
+  $w configure -cursor right_ptr
+
+  set ut_combo($w,grabbed) 1
+  set ut_combo($w,save) [$w.ent get]
+  catch "grab -global $w"
+  focus $shell.list
+}
+
+proc ut:combo-popdown { w } {
+  global ut_combo
+
+  wm withdraw $w.drop
+  $w configure -cursor {}
+  $w.ent configure -cursor {}
+  $w.ent configure -state $ut_combo($w,state)
+  focus $w.ent
+  catch "grab release $w"
+  set ut_combo($w,grabbed) 0
+}
+
+proc ut:combo-destroy { w } {
+  global ut_combo
+
+  unset ut_combo($w,grabbed)
+  unset ut_combo($w,save)
+  unset ut_combo($w,entrywidth)
+  unset ut_combo($w,listheight)
+  unset ut_combo($w,state)
+  unset ut_combo($w,command)
+  unset ut_combo($w,last)
+}
+
+###############################################
+# BEGINNING OF ut:simpletext PACKAGE
+#
+# Arguments:
+#   -name	name of window to use for toplevel
+#   -title	text to put in window title
+#   -class	class to give toplevel
+#   -default	default string to place in text widget
+#   -master	name of toplevel to be transient to
+#   -focus	name of widget to return keyboard focus to
+#   -keep	whether to withdraw or destroy window (see buttons)
+#   -grab	whether to grab the focus while mapped
+#   -callback   possible command to eval before event loop
+#		which will be given the created toplevel
+#		as a first argument
+#   -cbargs	arguments to callback in addition to toplevel
+#   -leftscroll whether scroll bar should be on left or right
+#   -buttons    a list of button definitions where the definitions
+#		have the form of a variable length list. The mapping
+#		of this list by slot is:
+#		   1) Label string for button
+#		   2) a command (no arguments) to run when button
+#		      is pressed (default none). It must return
+#		      a 0 to keep the window from being 
+#		      withdrawn/destroyed
+#		   3+) all arguments from the third on are taken
+#		       as additional arguments to the command
+#		       specified in the second slot
+#		Only the label string is required.
+#		Example: { {Apply apply_it $env(HOME) $file} \
+#			   {Cancel} } 
+#	        If no buttons are specified, { {Close} } is assumed.
+#
+# The callback, cbargs, leftscroll, and buttons arguments can
+# only be specified the first time ut:simpletext is called for 
+# a named window.  Calling ut:simpletext for a particular name window
+# after the first call will remap the window.  The caller must 
+# explicity destroy the window itself if desired.
+#
+
+proc ut:simpletext { args } {
+
+  global ut_stext ut_glob
+
+  j:parse_args { \
+    {name {}} \
+    {title {}} \
+    {class UTSimpleText} \
+    {master {}} \
+    {text {}} \
+    {callback {}} \
+    {cbargs {}} \
+    {grab 0} \
+    {leftscroll 1} \
+    {focus {}} \
+    {buttons {}} \
+    {keep 0} \
+  }
+
+  if {![string length $name]} {
+    set cnt 0
+    while {[winfo exists .ut_stext$cnt]} {incr cnt}
+    set w .ut_stext$cnt
+  } else {
+    set w $name
+  }
+
+  set ut_stext($w,focus) $focus
+  set ut_stext($w,grab) $grab
+  set ut_stext($w,keep) $keep
+
+  if {![winfo exists $w]} {
+
+    toplevel $w -class $class
+    wm minsize $w 100 100 
+    wm protocol $w WM_DELETE_WINDOW "ut:stextcmd $w"
+    if {[string length $master]} {
+      set xpos [expr [winfo rootx $master]+10]
+      set ypos [expr [winfo rooty $master]+[winfo height $master]/3]
+      wm geometry $w +${xpos}+${ypos}
+    }
+
+    frame $w.hbar
+    scrollbar $w.scr -command "$w.txt yview" -relief raised
+    scrollbar $w.hbar.scr -command "$w.txt xview" \
+	-relief raised -orient horizontal
+    button $w.hbar.spacer -width [$w.scr cget -width] \
+	-image blank -relief flat -borderwidth 0 -state disabled
+
+    text $w.txt -cursor left_ptr -relief sunken -wrap word \
+	-yscroll "$w.scr set" -xscroll "$w.hbar.scr set"
+    $w.txt insert 1.0 $text
+
+    frame $w.bb
+    set bcnt 0
+    if {![string length $buttons]} {set buttons {{Close}} }
+    foreach bdef $buttons {
+      if {[llength $bdef] < 1} continue
+      set bargs [lrange $bdef 1 end]
+      button $w.bb.btn$bcnt -text [lindex $bdef 0] -command "ut:stextcmd $w $bargs"
+      if {[regexp {[A-Z]} [lindex $bdef 0] char]} {
+	$ut_glob(key-hook) $w.txt [string tolower $char] "$w.bb.btn$bcnt invoke"
+      }
+      pack $w.bb.btn$bcnt -side left -expand true -fill x
+      incr bcnt
+    }
+    if {$bcnt < 1} {error "Invalid buttons specification to ut:simpletext"}
+
+    if {$leftscroll} { set sside left } { set sside right}
+    pack $w.bb -side bottom -fill x
+    pack $w.hbar.spacer -side $sside
+    pack $w.hbar.scr -side $sside -expand true -fill x
+    pack $w.hbar -side bottom -fill x
+    pack $w.scr -side $sside -fill y
+    pack $w.txt -side left -expand true -fill both
+
+    if {[string length $callback]} {eval "$callback $w $cbargs"}
+
+  } else {
+    if {[string length $master]} {
+      if $ut_glob(transient) {wm transient $w $master}
+      set xpos [expr [winfo rootx $master]+10]
+      set ypos [expr [winfo rooty $master]+[winfo height $master]/3]
+      wm geometry $w +${xpos}+${ypos}
+    }
+    if {[string length $text]} {
+      $w.txt delete 1.0 end
+      $w.txt insert 1.0 $text
+    }
+    if {[string length $buttons] || [string length $callback]} {
+      error "Window $w already exists. Cannot change buttons or run callback"
+    }
+    wm deiconify $w; raise $w
+  }
+  if {[string length $title]} {wm title $w $title}
+  if {$grab != 0} {after 20 grab $w}
+  focus $w.txt
+  return $w
+}
+
+
+proc ut:stextcmd {w args} {
+  global ut_stext mfp
+
+  if $mfp(trap-exit) return
+
+  if {$ut_stext($w,grab) != 0} {grab release $w}
+  if {[string length $args]} {
+    regsub -all {%W} $args $w args
+    set res [eval $args]
+  } else {
+    set res 1
+  }
+  if {$res == 0} {
+    if {$ut_stext($w,grab) != 0} {grab $w}
+  } else {
+    if {$ut_stext($w,keep)} {
+      catch "wm withdraw $w"
+    } else { catch "destroy $w" }
+    if {[winfo exists $ut_stext($w,focus)]} {focus $ut_stext($w,focus)}
+  }
+}
+
+
+###################################################################
+#  Create an empty file if filename does not exist and create any
+#  directories needed with user confirmation
+
+proc ut:askcreate { filename args} {
+
+  j:parse_args { \
+    {master ""} \
+    {askf 1} \
+    {askd 1} \
+    {askovrw 0} \
+    {errproc ut:deferror} \
+  }
+
+  if {[file exists $filename]} {
+    if {![file writable $filename]} {
+      $errproc "ut:askcreate: File $filename not writable" $master
+      return 0
+    }
+    if {$askovrw && ![ut:getok -master $master \
+			  -prompt "Append to existing file ($filename)?"]} {
+      return 0
+    }
+    return 1
+  }
+
+  set dlist ""
+  set fname [file tail $filename]
+  set cdir [file dirname $filename]
+  while {$cdir != "." && $cdir != "/" && ![file exists $cdir]} {
+    set dlist [linsert $dlist 0 [file tail $cdir]]
+    set cdir [file dirname $cdir]
+  }
+
+  if {[string length $cdir]} {set cdir $cdir/}
+  foreach dname $dlist {
+    if {$askd && ![ut:getok -prompt "Create new directory ${cdir}$dname?" \
+		       -master $master]} {return 0}
+    if {[catch {exec mkdir ${cdir}$dname} res]} {
+      $errproc "ut:askcreate: cannot create ${cdir}$dname" $master
+    }
+    set cdir ${cdir}${dname}/
+  }
+
+  if {$askf} {
+    if {![ut:getok -prompt "Create new file ${cdir}$fname?" \
+	      -master $master]} {return 0}
+    if {[catch {exec touch ${cdir}$fname} res]} {
+      $errproc "ut:askcreate: cannot create ${cdir}$fname" $master
+    }
+  }
+
+  return 1
+}
+
+# default error routine
+proc ut:deferror { str master } {
+
+  ut:getok -prompt "ERROR: $str" -master $master -showno 0
+
+}
+
+############################################################################
+# Following procedures ripped off shamelessly from Jay Sekora's jlibrary.tcl
+#
+# Copyright 1992-1994 by Jay Sekora.  All rights reserved, except 
+# that this file may be freely redistributed in whole or in part 
+# for non­profit, noncommercial use.
+
+######################################################################
+# j:parse_args arglist - parse arglist in parent procedure
+#   arglist is a list of option names (without leading "-");
+# this proc puts their values (if any) into variables (named after
+#   the option name) in d parent procedure
+# any element of arglist can also be a list consisting of an option
+#   name and a default value.
+######################################################################
+proc j:parse_args {arglist} {
+  upvar args args
+
+  foreach pair $arglist {
+    set option [lindex $pair 0]
+    set default [lindex $pair 1]		;# will be null if not supplied
+    set index [lsearch -exact $args "-$option"]
+    if {$index != -1} {
+      set index1 [expr {$index + 1}]
+      set value [lindex $args $index1]
+      uplevel 1 [list set $option $value]	;# caller's variable "$option"
+      set args [lreplace $args $index $index1]
+    } else {
+      uplevel 1 [list set $option $default]	;# caller's variable "$option"
+    }
+  }
+}
+
+######################################################################
+# j:longest_match l - longest common initial string in list l
+#   used by tab-expansion in filename dialogue box
+######################################################################
+# this needs commenting desperately
+
+proc j:longest_match { l } {
+  case [llength $l] in {
+    {0} { return {} }
+    {1} { return [lindex $l 0] }
+  }
+  set first [lindex $l 0]
+  set matchto [expr {[string length $first] - 1}]
+  for {set i 1} {$i < [llength $l]} {incr i} {
+    set current [lindex $l $i]
+    # if they don't match up to matchto, find new matchto
+    if { [string compare \
+           [string range $first 0 $matchto] \
+           [string range $current 0 $matchto]] } {
+      # loop, decreasing matchto until the strings match that far
+      for {} \
+          {[string compare \
+              [string range $first 0 $matchto] \
+              [string range $current 0 $matchto]] } \
+          {incr matchto -1 } \
+          {}			;# don't need to do anything in body
+    } ;# end if they didn't already match up to matchto
+  } ;# end for each element in list
+  if {$matchto < 0} then {
+    return {}
+  } else {
+    return [string range $first 0 $matchto]
+  }
+}
+
+######################################################################
+# j:expand_filename f - expand filename prefix as much as possible
+#       (for use in file dialogue boxes)
+######################################################################
+# note: if the filename has *, ?, or [...] in it, they will be used
+#       as part of the globbing pattern.  i declare this a feature.
+
+proc j:expand_filename { f } {
+  set expansion [j:longest_match [glob -nocomplain "${f}*"]]
+  if {$expansion == ""} {return $f}
+  # make sure it doesn't already end in "/"
+  set expansion [string trimright $expansion "/"]
+  if {[llength [glob -nocomplain "${expansion}*"]] < 2} {
+    if [file isdirectory $expansion] {append expansion "/"}
+  }
+  return $expansion
+}
+
+#################################################################
+
+proc ut:string-expand-specials { instring codes } {
+
+  set express {([^%]|^)%([}
+  foreach code $codes {
+    append express [lindex $code 0]
+  }
+  append express {])}
+  puts "Expression is: $express"
+
+  if {[regsub -all $express $instring "\\1\004\\2\004" outstring]} {
+    regsub -all {%%} $outstring {%} outstring
+    foreach code $codes {
+      foreach letter [split [lindex $code 0] {}] {
+	regsub -all "\004$letter\004" $outstring [lrange $code 1 end] outstring
+      }
+    }
+  } else {
+    regsub -all {%%} $instring {%} outstring
+  }
+  return $outstring
+}

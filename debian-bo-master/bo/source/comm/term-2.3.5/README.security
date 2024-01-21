@@ -1,0 +1,189 @@
+WHAT IS THIS?
+~~~~~~~~~~~~~
+Shared term allows other users to use the same term connection you are using.
+By environment variables you can disable/enable shared features.
+
+You only need to install shared term on the end that you have users
+who want a shared term connection.  However for new commands to work,
+both ends should be running the same term version #.
+
+OK, the following instructions allow you to share your term connection without
+allowing other users direct access to either the account on which term
+was started, or the remote *NIX account.  ("chroot", and "denyrsh" just don't
+cut it if users are clever with tupload, or willing to compile their
+own clients.  If you don't believe me, let me on your machine.)
+
+If you don't want to use the shared term features, skip the following
+section of this file.  Just type follow the instructions in INSTALL.
+
+
+TERM MODES
+~~~~~~~~~~
+
+There are two basic ways you can install term for sharing.  The safest, most
+secure method is as root create a "term" group which contains no members.  Then
+as root, install "term" as a SGID program.  If this option is not possible, 
+then you can install term as a SUID program by installing as an ordinary user.
+
+Here is a table that lists the differences:
+
+Chmod	$TERMMODE	$TERMDIR -or-	Default		Connection
+Type			$TERMSHARE			Owner	Users
+-------	---------------	---------------	---------------	------- ----------------
+u+s	2 (Shared)	neither		$HOME/term	You	Anyone
+u+s	0 (Private)	$TERMDIR	$HOME		Anyone	Connection Owner
+g+s	1 (Shared)	$TERMSHARE	/usr/local/lib/term	Anyone	Anyone
+g+s	0 (Private)	$TERMDIR	$HOME		Anyone	Connection Owner
+-	0 (Private)	$TERMDIR	$HOME		Anyone	Anyone
+
+
+To install shared term, do the following:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+1) (IF YOU ARE ROOT!)  Create a "term" group with no members
+   by adding the following line in /etc/group:
+
+   term::16:root
+
+   If 16 is already used by something else, choose an unused GID.
+
+
+2) Follow the instructions in INSTALL for making and installing your binaries.
+
+3) To start "term" SHARED mode use:
+
+   IF term was installed by ROOT:
+     With csh or tcsh:
+       setenv TERMMODE 1
+     With bash use:
+       export TERMMODE=1
+   otherwise
+     With csh or tcsh:
+       setenv TERMMODE 2
+     With bash use:
+       export TERMMODE=2
+
+   NOTE!!!  All users who want to take advantage of the shared term 
+   connection should set the above environment variable.
+
+
+4) To start clients compiled with term117 or earlier in shared mode.
+
+   With TERMMODE=1:
+     With csh or tcsh:
+        setenv TERMDIR /usr/local/lib/term
+     With bash use:
+        export TERMDIR=/usr/local/lib/term
+   With TERMMODE=2:
+     With csh or tcsh
+	setenv TERMDIR $HOME/term
+     With bash use:
+        export TERMDIR=$HOME/term
+
+   NOTE!!!  All users who want to take advantage of the shared term 
+   connection should set the above variables.
+
+5) To run in PRIVATE MODE: 
+
+   With csh/tcsh:
+       setenv TERMMODE 0
+   With bash:
+       export TERMMODE=0
+
+6) If you have multiple modems, then you can have more than one connection
+   at a time.  To specify which connection to use you must start term
+   with a server name.  i.e.
+
+       nohup term -v /dev/modem1 -l /tmp/logfile1 Connection1 &
+       nohup term -v /dev/modem2 -l /tmp/logfile2 Connection2 &
+
+   then users should set the variable TERMSERVER to the connection name
+   they want to use.  i.e.
+
+       setenv TERMSERVER Connection1
+
+   for csh, tcsh, and etc.,  or
+
+       export TERMSERVER=Connection1
+
+   for bash, sh, ksh, and etc.
+
+
+PRIVILEGED COMMANDS:
+~~~~~~~~~~~~~~~~~~~~
+
+The primary differences between the sharable and the unsharable commands are:
+  - Sharable commands are SGID (set group id) programs if installed by root
+    or SUID (set user id) programs if installed by an ordinary user.
+  - The shared "term" directory is controlled by $TERMSHARE instead of
+    $TERMDIR
+
+Some programs, even though they may be SUID or SGID, will still only be usable
+by the owner of the term-connection and root.  These are known as privileged
+commands.  The following clients are privileged.
+
+  tupload, trsh, tshutdown
+
+The other term clients:
+
+  tmon, txconn, tredir
+
+are available by anyone who can execute the binaries.
+
+If you port program using termnet.h, anything that uses rcmd() will also
+be privileged.  Here is a listing of some of these programs:
+
+  rlogin, rsh, rcp
+
+Here are some non-privileged programs:
+
+  finger, whois, talk, telnet, xarchie, xgopher, ytalk
+
+Basically, if it allows the user to access an account without a password it
+will be privileged.
+
+
+HOW TO MAKE A COMMAND SHARED
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you want to make a term command such as termftp or termtelnet shared,
+then do the following, which sets shared group permissions:
+
+  IF YOU ARE ROOT:
+	chgrp term binary-file
+	chmod g+s binary-file
+  IF YOU ARE AN ORDINARY USER:
+        chmod u+s binary-file
+
+
+SECURITY TEST
+~~~~~~~~~~~~~
+
+If you are the first to port a program, it would probably pay to double
+check its security when in shared mode.
+
+To test the command try to fork a shell with the command "id".  If "id"
+reports:
+   '... egid=16(term) ...' 
+then you have a security hole.
+
+Also try to overwrite other peoples' files, or create files where you
+don't have write permission.
+
+Here is an example of how I tested "ftp":
+
+% ftp localhost
+Connected to localhost.
+220 k9 FTP server (Linux k9 1.0.9 #5 Tue Jun 7 12:52:00 EST 1994 i486) ready.
+Name (localhost:bcr): bcr
+Password (localhost:bcr): 
+331 Password required for bcr.
+230 User bcr logged in.
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp> !id
+uid=501(bcr) gid=100(users) groups=100(users)
+
+In this case, this is my user id and group id, so "ftp" passes the test and
+this command is safe.
+

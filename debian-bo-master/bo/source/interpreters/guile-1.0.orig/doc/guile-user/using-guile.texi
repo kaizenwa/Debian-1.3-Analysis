@@ -1,0 +1,434 @@
+@node Using Guile
+@chapter Using Guile
+
+@c @strong{[NOTE: this entire chapter applies to the old Cygnus Guile
+@c release.  It is not yet clear how many of these features will be
+@c implemented in Guile.  This chapter will almost certainly have to be
+@c revised.]}
+
+@menu
+* Using Guile to write Guile programs::  
+@end menu
+
+@node Using Guile to write Guile programs
+@section Using Guile to write Guile programs
+@cindex Scheme programming tutorial
+@cindex tutorial on Scheme programming
+
+In this section I give a tutorial introduction to programming in Scheme,
+with a slant toward the interesting things that can be done in Guile.
+
+@c Applets are so @emph{chic} that they get their own section, but this
+This section will try to touch on many of the interesting and cool
+aspects of Guile, showing you how new types of problems can be solved
+with Guile.  Note that using Guile as a library with @code{libguile.a}
+is described in its own chapter (@pxref{Guile in a library - using
+libguile.a}).  Also note that some small examples are given in @ref{How
+to start up Guile - a quick tour}.
+
+To get started you need to know how to program in @dfn{Scheme} (a
+dialect of LISP).  Fortunately Scheme is a small, clean language and is
+not hard to learn.  It is also used in many undergraduate courses to
+introduce computer programming.
+@cindex lisp dialects
+
+I will not try to teach you Scheme here (although you might end up
+learning by example), since there are many good books on the subject,
+listed in @ref{Where to find more Guile/Scheme resources}. @footnote{To
+get started, look at the books @cite{Simply Scheme} and @cite{The Little
+Schemer} from that list.}
+
+
+@subsection Hello World
+@cindex hello world
+
+Our first program is the typical Scheme "hello world" program.  Put the
+following code in a file called @code{hello.scm} (this can be find in
+@file{examples/scheme/hello.scm}).
+
+@smalllisp
+#!/usr/local/bin/guile -s
+!#
+
+(display "hello world")
+(newline)
+@end smalllisp
+
+Then run guile on it.  One way to do so is to start up guile and load
+this file:
+
+@smallexample
+<shell-prompt> guile
+guile> (load "hello")
+@end smallexample
+
+Another way is to make the file executable and execute it directly.
+Notice how Guile regognizes a @code{-s} option which tells it to run a
+script and then exit.  Guile also has a new type of block comment
+enclosed by @code{#!} and @code{!#}, so that you can make executable
+Scheme escripts with the standard UNIX @code{#!} mechanism.
+
+In the given example, the first line is used to invoke the Guile
+interpreter (make sure you correct the path if you installed Guile in
+something other than /usr/local/bin).  Once Guile is invoked on this
+file, it will understand that the first line is a comment.  The comment
+is then terminated with @code{!#} on the second line so as to not
+interfere with the execution mechanism.
+
+
+@subsection A bunch of operations in Scheme
+
+Here is some code you can type at the @code{guile>} prompt to see some
+of the Scheme data types at work (mostly lists and vectors).  I have
+inserted brief comments @emph{before} each line of code explaining what
+happens.
+
+@smalllisp
+;; @r{makes a list and binds it to the symbol @code{ls}}
+guile> (define ls (list 1 2 3 4 5 6 7))
+       @result{}
+;; @r{shows you the list}
+guile> ls
+       @result{(1 2 3 4 5 6 7)}
+;; @r{ask if @code{ls} is a vector; @code{#f} means it is not}
+guile> (vector? ls)
+       @result{#f}
+;; @r{ask if @code{ls} is a list; @code{#t} means it is}
+guile> (list? ls)
+       @result{#t}
+;; @r{ask for the length of @code{ls}}
+guile> (length ls)
+       @result{7}
+;; @r{pick out the first element of the list}
+guile> (car ls)
+       @result{1}
+;; @r{pick the rest of the list without the first element}
+guile> (cdr ls)
+       @result{(2 3 4 5 6 7}
+;; @r{this should pick out the 3rd element of the list}
+guile> (car (cdr (cdr ls)))
+       @result{3}
+;; @r{a shorthand for doing the same thing}
+guile> (caddr ls)
+       @result{3}
+;; @r{append the given list onto @code{ls}, print the result}
+;; @r{@strong{NOTE:} the original list @code{ls} is @emph{not} modified}
+guile> (append ls (list 8 9 10))
+       @result{(1 2 3 4 5 6 7 8 9 10)}
+guile> (reverse ls)
+       @result{(10 9 8 7 6 5 4 3 2 1)}
+;; @r{asks if 12 is in the list --- it obviously is not}
+guile> (memq 12 ls)
+       @result{#f}
+;; @r{asks if 4 is in the list --- returns the list from 4 on.}
+;; @r{Notice that the result will behave as true in conditionals}
+guile> (memq 4 ls)
+       @result{(4 5 6 7)}
+;; @r{an @code{if} statement using the aforementioned result}
+guile> (if (memq 4 ls)
+           (display "hey, it's true!\n")
+           (display "dude, it's false\n"))
+       @print{hey, it's true!}
+       @result{}
+guile> (if (memq 12 ls)
+           (display "hey, it's true!\n")
+           (display "dude, it's false\n"))
+       @print{dude, it's false}
+       @result{}
+guile> (memq 4 (reverse ls))
+       @result{(4 3 2 1)}
+;; @r{make a smaller list @code{ls2} to work with}
+guile> (define ls2 (list 2 3 4))
+;; @r{make a list in which the function @code{sin} has been}
+;; @r{applied to all elements of @code{ls2}}
+guile> (map sin ls2)
+       @result{(0.909297426825682 0.141120008059867 -0.756802495307928)}
+;; @r{make a list in which the squaring function has been}
+;; @r{applied to all elements of @code{ls}}
+guile> (map (lambda (n) (expt n n)) ls)
+       @result{(1 4 27 256 3125 46656 823543)}
+@end smalllisp
+
+@smalllisp
+;; @r{makes a vector and binds it to the symbol @code{v}}
+guile> (define v #(1 2 3 4 5 6 7))
+guile> v
+       @result{#(1 2 3 4 5 6 7)}
+guile> (vector? v)
+       @result{#t}
+guile> (list? v)
+       @result{#f}
+guile> (vector-length v)
+       @result{7}
+;; @r{vector-ref allows you to pick out elements by index}
+guile> (vector-ref v 2)
+       @result{3}
+;; @r{play around with the vector: make it into a list, reverse}
+;; @r{the list, go back to a vector and take the second element}
+guile> (vector-ref (list->vector (reverse (vector->list v))) 2)
+       @result{5}
+;; @r{this demonstrates that the entries in a vector do not have}
+;; @r{to be of uniform type}
+guile> (vector-set! v 4 "hi there")
+       @result{"hi there"}
+guile> v
+       @result{#(1 2 3 4 "hi there" 6 7)}
+@end smalllisp
+
+
+@subsection Using recursion to process lists
+@cindex recursion
+@cindex list processing
+
+Here are some typical examples of using recursion to process a list.
+
+@smalllisp
+;; @r{this is a rather trivial way of reversing a list}
+(define (my-reverse l)
+  (if (null? l)
+      l
+      (append (my-reverse (cdr l)) (list (car l)))))
+(my-reverse '(27 32 33 40))
+@result{(40 33 32 27)}
+@end smalllisp
+
+
+@subsection Processing matrices
+
+Suppose you have a matrix represented as a list of lists:
+
+@smalllisp
+(define m
+  (list
+   (list 7 2 1 3 2 8 5 3 6)
+   (list 4 1 1 1 3 8 9 8 1)
+   (list 5 5 4 8 1 8 2 2 4)))
+@end smalllisp
+
+Then you could apply a certain function to each element of the matrix in
+the following manner:
+@smalllisp
+;; @r{applies the function func to the matrix m element-by-element;}
+;; @r{returns a matrix with the result.}
+(define (process-matrix m func)
+  (map (lambda (l)
+         (map func l))
+       m))
+@end smalllisp
+Notice that I have used the Scheme @code{map} procedure because I am
+interested in the matrix that results from the application of
+@code{func}, rather than in the side effects associated with applying
+@code{func}.
+
+This could be invoked with @code{(process-matrix m sin)} or
+@code{(process-matrix m (lambda (x) (* x x)))}; for example:
+
+@smalllisp
+(process-matrix m (lambda (x) (* x x)))
+@result{((49 4 1 9 4 64 25 9 36) (16 1 1 1 9 64 81 64 1) (25 25 16 64 1 64 4 4 16))}
+@end smalllisp
+
+To print a representation of the matrix, we could define a generalized
+routine:
+@smalllisp
+;; @r{proc is a procedure to represent the single element,}
+;; @r{row-proc is a procedure that is invoked after each row.}
+;; @r{Example: proc could be (lambda (x) (begin (display x) (display " ")))}
+;; @r{and row-proc could be (lambda (l) (display "\n"))}
+(define (represent-matrix m proc row-proc)
+  (for-each (lambda (l)
+              (begin
+                (for-each proc l)
+                (row-proc l)))
+            m))
+@end smalllisp
+@findex represent-matrix
+
+And then invoke it with
+@smalllisp
+(represent-matrix m
+                  (lambda (x) (begin (display x) (display " ")))
+                  (lambda (l) (begin (display "\n"))))
+@print{7 2 1 3 2 8 5 3 6}
+@print{4 1 1 1 3 8 9 8 1}
+@print{5 5 4 8 1 8 2 2 4}
+@end smalllisp
+
+@cindex objects
+
+Now we write a helper routine that uses Scheme @dfn{closures} to make
+objects with state that then receive messages to draw little squares.
+@cindex closures
+@cindex syntactic closures
+
+But let us take it one step at a time.  I will start by showing you a
+simple example of object in Scheme.  The object I make here represents a
+cell, which could be a cell in a matrix.  The cell responds to commands
+to draw itself, to return the next cell, and so forth.  @emph{Guile does
+not currently have a Tk interface, so I will leave the hooks for
+graphical rendering, and future releases of Guile will add graphical
+rendering messages to the cell object.}
+
+@smallexample
+;; @r{cell-object.scm: routines for creating and manipulating cell objects}
+
+;; @r{(the-x, the-y) is the initial position of the cell.}
+;; @r{the-color is a string representing a color; must be something Tk can grok.}
+;; @r{square-size is the size of the square that gets drawn.}
+;; @r{(sizex, sizey) is the size of the matrix.}
+(define (MAKE-CELL the-x the-y the-color square-size sizex sizey)
+  (define (get-x) the-x)
+  (define (get-y) the-y)
+
+  (define (set-x! new-x)
+    (set! the-x new-x)
+    the-x)
+  (define (set-y! new-y)
+    (set! the-y new-y)
+    the-y)
+  (define (get-color) the-color)
+  (define (set-color! new-color)
+    (set! the-color new-color)
+    the-color)
+  (define (next!)
+    (set! the-x (+ the-x 1))
+    (if (>= the-x sizex)
+	(begin
+	  (set! the-x 0)
+	  (set! the-y (+ the-y 1))))
+	(if (>= the-y sizey)
+	    (begin
+	      (display "CELL next!: value of y is too big; not changing it\n")
+	      (set! the-y (- the-y 1))))
+	(cons the-x the-y))
+  (define (draw)
+    (let* ((x0 (* the-x square-size))
+	   (y0 (* the-y square-size))
+	   (x1 (+ x0 square-size))
+	   (y1 (+ y0 square-size)))
+      (display "I should draw a ")
+      (display the-color)
+      (display " rectangle with corners at ")
+      (display x0) (display y0) (display x1) (display y1)
+      ))
+
+  ;; self is the dispatch procedure
+  (define (self message)
+    (case message
+      ((x)            get-x)
+      ((y)            get-y)
+      ((set-x!)       set-x!)
+      ((set-y!)       set-y!)
+      ((color)        get-color)
+      ((set-color!)   set-color!)
+      ((next!)        next!)
+      ((draw)         draw)
+      (else (error "CELL: Unknown message -> " message))))
+  ;; and now return the dispatch procedure
+  self
+  )
+@end smallexample
+@cindex cell-object
+@findex MAKE-CELL
+
+What is this procedure doing?  It returns another procedure
+(@code{self}) which receives a message (x, y, set-x!, set-y!, @dots{})
+and takes an action to return or modify its state.  The state consists
+of the values of variables @code{the-x}, @code{the-y}, @code{the-color}
+and so forth.
+
+Here are some examples of how to use MAKE-CELL and the cell object it
+creates:
+@smallexample
+(define c (MAKE-CELL 0 0 "red" 10 7 9))
+
+;; @r{retrieve the x and y coordinates}
+((c 'x))
+@result{0}
+((c 'y))
+@result{0}
+;; @r{change the x coordinate}
+((c 'set-x!) 5)
+@result{5}
+((c 'x))
+@result{5}
+;; @r{change the color}
+((c 'color))
+@result{"red"}
+((c 'set-color!) "green")
+@result{"green"}
+((c 'color))
+@result{"green"}
+;; @r{now use the next! message to move to the next cell}
+((c 'next!))
+@result{(6 . 0)}
+((c 'x))
+@result{6}
+((c 'y))
+@result{0}
+;; @r{now make things wrap around}
+((c 'next!))
+@result{(0 . 1)}
+((c 'next!))
+@result{(1 . 1)}
+((c 'next!))
+@result{(2 . 1)}
+((c 'x))
+@result{2}
+((c 'y))
+@result{1}
+@end smallexample
+
+You will notice that expressions like @code{(c 'next)} return procedures
+that do the job, so we have to use extra parentheses to make the job
+happen.  This syntax is rather awkward; one way around it is to define a
+@code{send} procedure:
+
+@smallexample
+;; @r{send makes object syntax a bit easier; instead of saying}
+;; @r{    ((my-cell 'set-x!) 4)}
+;; @r{you can say}
+;; @r{    (send my-cell 'set-x! 4)}
+(define (send obj . args)
+  (let ((first-eval (apply obj (list (car args)))))
+    (if (null? (cdr args))
+	(first-eval)
+	(apply first-eval (cdr args)))))
+@end smallexample
+@findex send
+
+You can see that @code{send} passes the message to the object, making
+sure that things are evaluated the proper number of times.  You can now
+type:
+
+@smallexample
+(define c2 (MAKE-CELL 0 0 "red" 10 7 9))
+(send c2 'x)
+@result{0}
+(send c2 'set-x! 5)
+@result{5}
+(send c2 'color)
+@result{"red"}
+(send c2 'set-color! "green")
+@result{"green"}
+(send c2 'next!)
+@result{(1 . 0)}
+(send c2 'x)
+@result{1}
+(send c2 'y)
+@result{0}
+@end smallexample
+
+@cindex object based programming
+@cindex object oriented programming
+
+This is the simplest way of introducing objects in Scheme, and it does
+not really allow for full @emph{object oriented programming} (for
+example, there is no inheritance).  But it is useful for @emph{object
+based programming}.
+
+Guile comes with a couple of more complete object oriented extension to
+Scheme: these are part of slib (@pxref{Object, , , slib, SLIB: the
+portable Scheme library} and @pxref{Yasos, , , slib, SLIB: the portable
+Scheme library}).
+

@@ -1,0 +1,57 @@
+#!/usr/bin/make -f
+
+#
+# Last updated: Sat Apr 20 23:55:53 BST 1996 by and1000.
+#
+# To make the binary distribution package, the ``Debianized'' source package
+# and the context diff to the original package, type `./debian.rules dist'.
+# Make sure that `debian.rules' is executable before the final distribution
+# is made.
+#
+# Invoke each target with `./debian.rules <target>'.  All targets should be
+# invoked with the package root as the current directory.
+#
+# The `binary' target must be run as root, as it needs to install files with
+# specific ownerships.  The `diff' target assumes that you have the original
+# source package available, unpacked, in ../$(p)-$(v).orig, or that you have
+# the previous revision of the ``Debianized'' source package and context diff
+# in the parent directory.
+
+package=bsdutils
+
+build:
+	make
+	touch build
+
+clean:
+	make clean
+	rm -f build
+	rm -rf debian/tmp
+
+binary-indep:   checkroot build
+
+binary-arch:    checkroot build
+	install -d debian/tmp debian/tmp/DEBIAN
+	install -d debian/tmp/usr/doc/$(package)
+	make install \
+          bindir=debian/tmp/bin \
+          sbindir=debian/tmp/sbin \
+          usrbindir=debian/tmp/usr/bin \
+          usrsbindir=debian/tmp/usr/sbin \
+          libdir=debian/tmp/usr/lib \
+          mandir=debian/tmp/usr/man
+	chmod -R g-w debian/tmp
+	install -g root -m 755 -o root debian/copyright debian/tmp/usr/doc/$(package)/copyright
+	
+	dpkg-shlibdeps kill logger renice script wall
+	dpkg-gencontrol
+	chown -R root.root debian/tmp
+	chmod -R g-ws debian/tmp
+	dpkg --build debian/tmp ..
+
+
+binary:         binary-indep binary-arch
+checkroot:
+	test root = "`whoami`"
+
+.PHONY: binary binary-arch binary-indep clean checkroot

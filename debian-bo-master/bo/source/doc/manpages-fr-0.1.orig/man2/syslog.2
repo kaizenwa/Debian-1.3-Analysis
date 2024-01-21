@@ -1,0 +1,166 @@
+.\" Copyright 1995 Andries Brouwer (aeb@cwi.nl)
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\"
+.\" Written 11 June 1995 by Andries Brouwer (aeb@cwi.nl)
+.\" 
+.\" Traduction 15/10/1996 par Christophe Blaess (ccb@club-internet.fr)
+.\"
+.TH SYSLOG 2 "15 Octobre 1996" Linux "Manuel du programmeur Linux"
+.SH NOM
+syslog \- Lire et/ou effacer les buffers circulaires de messages
+du noyau \- Positionner console_loglevel.
+.SH SYNOPSIS
+.nf
+.B #include <unistd.h>
+.sp
+.B #include <linux/unistd.h>
+.sp
+.B _syscall3(int, syslog, int, type, char *, bufp, int, len);
+.sp
+.BI "int syslog(int " type ", char *" bufp ", int " len );
+.fi
+.SH DESCRIPTION
+Cette fonction n'est probablement pas celle qui vous interesse,
+regardez plutot
+.BR syslog (3)
+pour l'interface avec la bibliotheque C. Cette page ne documente
+que l'interface directe de l'appel systeme avec le noyau.
+
+L'argument \fItype\fP determine l'action effectuee par
+.BR syslog .
+
+Extrait de
+.IR kernel/printk.c :
+.nf
+/*
+ * Commandes de sys_syslog:
+ *
+ *   0 -- Fermer le journal (actuellement NOP)
+ *   1 -- ouvrir le journal (actuellement NOP)
+ *   2 -- Lire depuis le journal
+ *   3 -- Lire jusqu'a 4Ko des derniers messages du buffer circulaire.
+ *   4 -- Lire et effacer les 4Ko derniers messages du buffer circulaire.
+ *   5 -- Vider le buffer circulaire
+ *   6 -- Desactiver printk sur la console
+ *   7 -- Activer printk sur la console
+ *   8 -- Indiquer le niveau des messages a afficher sur la console.
+ */
+.fi
+
+Seule la fonction 3 est autorisee pour les processus non Super\-User.
+
+.B Le buffer de journalisation du noyau.
+.br
+Le noyau dispose d'un buffer circulaire d'une longueur LOG_BUF_LEN (4096) 
+dans laquelle il stocke les messages recus par la fonction \fIprintk\fP().
+Ce buffer est le journal du systeme.
+
+L'appel
+.B syslog
+.RI (2, buf , len )
+attend que ce journal soit non vide, puis lit au plus \fIlen\fP 
+octets qu'il place dans le buffer \fIbuf\fP. Il renvoie le
+nombre d'octets lus. Les octets lus sont extraits du journal :
+les informations ne peuvent etre lues qu'une seule fois.
+C'est la fonction executee par le noyau quand un programme
+utilisateur lit /proc/kmsg.
+
+l'appel
+.B syslog
+.RI (3, buf , len )
+lit les  \fIlen\fP octets depuis le journal (de maniere non destructive).
+Il renvoie le nombre d'octets lus.
+
+l'appel
+.B syslog
+.RI (4, buf , len )
+effectue la meme chose puis vide le buffer.
+
+l'appel
+.B syslog
+.RI (5, dummy , idummy )
+vide uniquement le buffer.
+
+.B le niveau de journalisation (loglevel)
+.br
+La routine du noyau \fIprintk\fP() n'ecrira un message sur la console
+que si celui-ci a un niveau de journalisation inferieur a la valeur
+de la variable
+.I console_loglevel
+(initialement DEFAULT_CONSOLE_LOGLEVEL (7), mais augmente a 10
+si la ligne de commande du noyau contient le mot `debug', et a 
+15 si une faute du noyau se produit \- en realite les valeurs
+10 et 15 sont idiotes et n'apportent rien de plus que 8).
+Cette variable est positionnee (dans l'intervalle 1-8) par l'appel
+.B syslog
+.RI (8, dummy , value ).
+L'appel
+.B syslog
+.RI ( type , dummy , idummy )
+avec \fItype\fP 
+egal a 6 ou 7 la positionne a 1 (seulement les messages kernel panics)
+ou 7 (tout sauf les messages de debugging), respectivement.
+
+Chaque ligne de texte dans un message a son propre niveau de journalisation.
+Ce niveau est DEFAULT_MESSAGE_LOGLEVEL \- 1 (6) 
+a moins que la ligne ne commence par <d>
+ou \fId\fP est un chiffre dans l'intervalle 1\-7.
+La signification conventionnelle des niveaux de journalisation est
+definie dans
+.I <linux/kernel.h>
+comme suit :
+
+.nf
+#define KERN_EMERG    "<0>"  /* systeme inutilisable             */
+#define KERN_ALERT    "<1>"  /* action a effectuer immediatement */
+#define KERN_CRIT     "<2>"  /* conditions critiques             */
+#define KERN_ERR      "<3>"  /* conditions d'erreurs             */
+#define KERN_WARNING  "<4>"  /* message d'avertissement          */
+#define KERN_NOTICE   "<5>"  /* normal mais significatif         */
+#define KERN_INFO     "<6>"  /* informations                     */
+#define KERN_DEBUG    "<7>"  /* messages de debugging            */
+.fi
+
+.SH "VALEUR RENVOYEE"
+En cas d'erreur \-1 est renvoye et \fIerrno\fP contient le
+code d'erreur.
+En cas de reussite
+\fBsyslog\fP() renvoie le nombre d'octets lus
+pour \fItype\fP valant 2, 3 ou 4, 
+et 0 sinon.
+.SH "ERREURS"
+.TP
+.B EPERM
+une tentative de changer console_loglevel ou d'effacer le
+buffer circulaire du noyau par un processus sans les privileges
+Super\-User.
+.TP
+.B EINVAL
+Mauvais parametres
+.TP
+.B ERESTARTSYS
+L'appel systeme a ete interrompu par un signal \- rien n'a ete lu.
+.SH "CONFORME A"
+Cet appel systeme est specifique Linux.
+.SH "VOIR AUSSI"
+.BR syslog (3)
+

@@ -1,0 +1,268 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                     REPORTING BUGS AND SUBMITTING FIXES
+                     ===================================
+                              November 21, 1996
+
+
+Table of Contents
+-----------------
+
+  1. Introduction
+  2. What you'll need to find bugs
+  3. Recommended reading
+  4. Isolating bugs
+  5. X Protocol Errors
+  6. Submitting bug reports
+  7. Submitting patches
+
+
+
+1. Introduction
+---------------
+
+    Bug hunting in LessTif isn't really all that different from bug hunting
+  in X application code, with a few notable exceptions.  We encourage users to
+  help us make LessTif a better product by doing some preliminary ground-work
+  for the developers when you find a bug in the library.  Of course, what
+  we really want is a patch that fixes the bug, but we'll settle for some
+  help.
+
+
+
+2. What you'll need
+-------------------
+
+  Let's see:
+
+   o - a computer (Ta-dah!)
+   o - the X Window System, at release level R5 or above
+   o - a compiler/assembler/linker
+   o - a debugger
+   o - some test code
+
+  Of course, if you don't have that, you probably don't need to read this,
+  do you?
+
+
+
+3. Recommended Reading
+----------------------
+
+    The following list of books are nice to have, especially the Intrinsics
+  and the Motif books, but you can probably get away without them if you
+  have a full set of man pages.  One thing, though: if you want to understand
+  what widget methods do, and how a widget works, they are an absolute
+  necessity.
+
+  The O'Reilly books "The Definitive Guide to the X Window System".  Of these,
+  you'll want:
+	Volume 1: Xlib Programming Manual
+	Volume 2: Xlib Reference Manual
+	Volume 4: X Toolkit Intrinsics Programming Manual
+	Volume 5: X Toolkit Intrinsics Reference Manual
+	Volume 6A: Motif Programming Manual
+	Volumn 6B: Motif Reference Manual
+    If you have R6 (Linux, *BSD, others), you'll want:
+	Programmer's Supplement for Release 6
+
+  From the OSF, you'll want
+	OSF/Motif Programmer's Reference (for 1.2)
+	OSF/Motif Programmer's Guide (for 1.2)
+  The style guide is nice, but not required.
+
+
+
+4. Isolating bugs
+-----------------
+
+    Ok, your favorite Motif program is barfing on lesstif, and you're so
+  inclined to help us fix the problem.  Problems generally fall into four
+  broad categories:
+
+    o - behavior
+    o - visual
+    o - X Protocol Error
+    o - core dump
+
+    Of these, the first two are more trivial, and (as of now, anyway) are
+  allocated somewhat lower priority, while we work on implementing *missing*
+  behaviors.  X Errors and core dumps have a higher priority.
+
+    One thing to keep in mind is that the location that the problem occurs in
+  not necessarily the same as the location that caused the problem; this is
+  due to the (normally) asynchronous nature of X applications.  When your
+  application has a problem, the first thing to do is run the application
+  synchronously, to see if the location of the error changes (you'll be
+  surprised how often it will).  Here's how to do it with gdb:
+
+root@zeek:/var/root/lesstif/testXm/filesb# gdb ./test1
+GDB is free software and you are welcome to distribute copies of it
+ under certain conditions; type "show copying" to see the conditions.
+There is absolutely no warranty for GDB; type "show warranty" for details.
+GDB 4.14 (i586-unknown-linux), Copyright 1995 Free Software Foundation, Inc...
+(no debugging symbols found)...
+(gdb) run -sync
+Starting program: /var/root/lesstif/testXm/filesb/./test1 -sync
+
+-----
+    It'll probably spit out a bunch of debug messages (especially if you set
+  the DEBUGSOURCES environment variable).  Note that the commands passed to
+  the run command are actually command line arguments to the program.
+
+  On some systems, you may find that you can't set breakpoints at the start
+  if you use shared libraries.  That's because the symbols won't be resolved
+  until a process image exists.  To work around this, set a breakpoint at
+  main(), and run.  Once the breakpoint at main is reached, you'll find that
+  you can set the other breakpoints.
+
+    Once you've had your program dump core:), just say "where".  Again from
+  gdb:
+----------
+
+Program received signal SIGSEGV, Segmentation fault.
+0x40076918 in __XmStringGetNextComponent (context=0x8081de0) at XmString.c:68
+68          if (context->current_segment < context->string->number_of_segments)
+(gdb) where
+#0  0x40076918 in __XmStringGetNextComponent (context=0x8081de0)
+    at XmString.c:68
+#1  0x40077ea7 in XmStringGetLtoR (string=0x30, 
+    tag=0x804dc68 "FONTLIST_DEFAULT_TAG_STRING", text=0xbffffa00)
+    at XmString.c:869
+#2  0x8049793 in cb (w=0x8062c00, a=0x0, b=0xbffffa64) at test1.c:32
+#3  0x400aa718 in XtCallCallbackList ()
+#4  0x4005e7f0 in _XmSbButton (w=0x806cb00, client=0x0, call=0xbffffac0)
+    at SelectionBox.c:467
+#5  0x400aa743 in XtCallCallbackList ()
+#6  0x4004e5a0 in Activate (w=0x806cb00, event=0xbffffce4, params=0x0, 
+    num_params=0x0) at PushBG.c:1014
+#7  0x4004f10b in input_dispatch (gadget=0x806cb00, event=0xbffffce4, 
+    event_mask=64) at PushBG.c:1360
+#8  0x40035ad6 in _XmDispatchGadgetInput (w=0x806cb00, event=0xbffffce4, 
+    mask=64) at GadgetUtil.c:205
+#9  0x40045492 in _XmGadgetActivate (w=0x8062c00, event=0xbffffce4, 
+    params=0x0, num_params=0x8059668) at Manager.c:795
+#10 0x400d2ceb in HandleActions ()
+#11 0x400d35ae in HandleComplexState ()
+#12 0x400d365b in _XtTranslateEvent ()
+#13 0x400b412f in XtDispatchEventToWidget ()
+#14 0x400b4aa9 in _XtDefaultDispatcher ()
+---Type <return> to continue, or q <return> to quit---
+#15 0x400b4ce3 in XtDispatchEvent ()
+#16 0x400b4fd9 in XtAppMainLoop ()
+#17 0x80498f1 in main (argc=1, argv=0xbffffd78) at test1.c:69
+#18 0x80495a4 in ___crt_dummy__ ()
+
+    Note the line numbers.  Please do NOT send a trace without having compiled
+  with debug (the -g option).
+
+
+
+5. About X Protocol Errors
+--------------------------
+
+  Sometimes the program will fail with something like:
+
+X Error: Bad Drawable
+  (other stuff)
+
+  or something similar.  This is a problem with something that got sent to the
+  X server.
+
+    This isn't hard to track down if you've run in synchronous mode.  Just set
+  a breakpoint at the exit() function, run with the -sync option, and you'll
+  get a trace from the point where the error occurred, plus some other
+  information.  These are crucial to proper LessTif functionality -- these
+  must be stamped out.
+
+
+
+6. Submitting bug reports
+-------------------------
+
+    When (not if) you find a problem with Lesstif, we really want to know.
+  Ideally, a patch is what we'd prefer.  Failing that, we need sample code,
+  and a stack trace of the problem (even if it was an X Error).  If it was
+  a behavioral or visual problem, just a description will do, although some
+  code that exhibits the behavior would be nice.  Try to be complete if you
+  send just a description -- meaning if you send something like:
+
+  "Well, I ran an app, and the thingie at the bottom of the wossname didn't
+   look right"
+
+  Your are in all likelihood going to be ignored.
+
+    We also need the version number of the file that had the problem.  If you
+  prefer, and you are using lesstif-current, you can tell us the date you
+  noticed the problem.  Please do not tell us the problem two months after
+  you saw it, the code base changes too rapidly for us to be able to make
+  anything meaningful out of a bug report that old.
+
+    If you do send a bug report against a scheduled release, please include
+  the release number.
+
+
+
+7. Submitting patches
+---------------------
+
+    Patches are the preferred form of bug report, as it lessens our efforts
+  to track down where the bugs are.  If you do submit a patch, please try to
+  keep a few rules in mind:
+
+    o when writing your fix, please try to follow the coding style of the file
+      you are fixing.  We are currently debating coding standards, so expect to
+      see one soon.
+
+    o try not to submit a fix that creates dead code.  Using "#if 0" or
+      commented code is discouraged.  We can do that (because, after all, we
+      are the elitist core team;), but you are discouraged from that, because
+      it makes the patches hard to read.
+
+    o do not be discouraged if your patch is not accepted verbatim.  Often
+      people submit patches that one or more of the core team will recognize
+      as identifying a problem, but the core member will recognize that your
+      fix will break some other piece of functionality.  We'll try to tell
+      you, but we're human, so we may forget.
+
+    o Remember that relay mailers are free to alter the content of text
+      messages, and often do so.  Lines should always be less than 80
+      characters in length; if you are working on OS/2, remember that mailers
+      will usually convert <carriage-return><line-feed> into just <line-feed>.
+      This has in the past caused patches to be rejected by the patch program,
+      and thus by us.
+
+    o We prefer patches in the "unified diff" format (with GNU diff, this is
+      "diff -u").  If you have to, you can send a "context diff".  Please
+      use one of those two formats.
+
+    o If you have a large patch, or a patch that alters a large number of
+      files, please use the "deltas" script included in the distribution to
+      create your patch.  This may not be possible if you are working on a
+      somewhat esoteric platform, but do try to follow at least the spirit
+      of the script, in that your patch includes the entire source tree
+      (which enables us to apply it easily, and to quickly identify the
+      altered objects).  The "deltas" script includes documentation both on
+      it's usage, and it's purpose.
+
+
+Thanks, and remember: all help is appreciated.

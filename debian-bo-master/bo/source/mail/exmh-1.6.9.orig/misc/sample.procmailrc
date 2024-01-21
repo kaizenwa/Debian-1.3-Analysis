@@ -1,0 +1,140 @@
+
+###################################################################
+# .procmailrc
+# Richard Coleman  <coleman@math.gatech.edu>
+# Created 1/18/95
+#
+# $Revision: 1.4 $
+# $Date: 1995/02/23 22:19:24 $
+#
+###################################################################
+# To use procmail, put the next line in .forward
+# "|IFS=' ' && exec /usr/local/bin/procmail -f- || exit 75 #coleman"
+# The double quotes should not be removed.
+# Your .forward needs to be world-readable, but not world-writable.
+###################################################################
+# This .procmailrc is written for use with mh/xmh/exmh
+###################################################################
+
+
+###########
+# VARIABLES
+###########
+VERBOSE=off
+PATH=/bin:/usr/bin:/usr/local/bin:/usr/local/mh/bin:/usr/local/mh/lib
+MAILDIR=$HOME/Mail
+LOGFILE=$MAILDIR/procmail.log
+MYADDR="coleman@math.gatech.edu"
+WHOAMI="Richard Coleman <$MYADDR>"
+FROMSIG="Richard Coleman's tiny PGP key server <$MYADDR>"
+
+
+##########################
+# MAIL FOR ROOT/POSTMASTER
+##########################
+:0 w: root/$LOCKEXT
+* ^TO(root|postmaster|MAILER-DAEMON)
+| rcvstore +root
+
+
+###############
+# MAILING LISTS
+###############
+:0 w: amanda/$LOCKEXT
+* ^TOamanda-hackers
+| rcvstore +amanda
+
+:0 w: auto-net/$LOCKEXT
+* ^TOauto-net
+| rcvstore +auto-net
+
+:0 w: backup/$LOCKEXT
+* ^TObackup
+| rcvstore +backup
+
+:0 w: cert-tools/$LOCKEXT
+* ^TOcert-tools
+| rcvstore +cert-tools
+
+:0 w: csr/$LOCKEXT
+* ^TOcsr
+| rcvstore +csr
+
+:0 w: exmh/$LOCKEXT
+* ^TOexmh-users|exmh-announce
+| rcvstore +exmh
+
+:0 w: mathsys/$LOCKEXT
+* ^TOmathsys
+| rcvstore +mathsys
+
+:0 w: msql/$LOCKEXT
+* ^TOmsql-list
+| rcvstore +msql
+
+:0 w: procmail/$LOCKEXT
+* ^TOprocmail
+| rcvstore +procmail
+
+:0 w: tex-k/$LOCKEXT
+* ^TOtex-k
+| rcvstore +tex-k
+
+:0 w: smartlist/$LOCKEXT
+* ^TOsmartlist
+| rcvstore +smartlist
+
+:0 w: xsh/$LOCKEXT
+* ^TOxsh-workers
+| rcvstore +xsh
+
+:0 w: zsh/$LOCKEXT
+* ^TOzsh-list|zsh-announce
+| rcvstore +zsh
+
+
+######################################################
+# tiny PGP KEY SERVER
+#
+# If e-mail message has subject of "get pgp key" or
+# "send pgp key", then this will reply with my pgp key
+# and log the request in $MAILDIR/pgpkey-request.log
+######################################################
+:0 c
+* ^Subject:.*(send|get) *pgp *key
+* !^X-Loop: $MYADDR
+{
+	FROM=`formail -rt -xTo:`
+	SUBJECT=`formail -xSubject:`
+
+	:0 ch: pgp$LOCKEXT
+	| (formail -rI"From: $FROMSIG" \
+		-I"Reply-To: $MYADDR" \
+		-I"Subject: PGP public key" \
+		-I"Mime-Version: 1.0" \
+		-I"Content-Type: application/pgp; format=keys-only" \
+		-I"Content-Description: PGP key of $WHOAMI" \
+		-I"Content-Transfer-Encoding: 7bit" \
+		-I"X-Loop: $MYADDR" ;\
+		sh -c "pgp -kxaf $MYADDR 2>/dev/null") \
+	| $SENDMAIL -oi -t
+
+	:0 w: pgpkey-requests$LOCKEXT
+	| echo "`date` : $FROM : $SUBJECT" >> $MAILDIR/pgpkey-requests.log
+}
+
+
+###########################################
+#  This catches mail to zsh@math.gatech.edu
+###########################################
+:0 w: zsh/$LOCKEXT
+* ^TOzsh
+| rcvstore +zsh
+
+
+################
+# DEFAULT ACTION
+################
+:0 w: inbox/$LOCKEXT
+| rcvstore +inbox
+

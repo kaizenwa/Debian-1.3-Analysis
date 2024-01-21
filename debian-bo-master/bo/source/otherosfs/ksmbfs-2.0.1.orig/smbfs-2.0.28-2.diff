@@ -1,0 +1,80 @@
+diff -urN 2.0.28/fs/smbfs/inode.c linux/fs/smbfs/inode.c
+--- 2.0.28/fs/smbfs/inode.c	Thu Dec  5 16:48:16 1996
++++ linux/fs/smbfs/inode.c	Sun Feb  2 12:06:02 1997
+@@ -102,7 +102,13 @@
+ 	}
+ 	if (finfo->opened != 0)
+ 	{
+-		if (smb_proc_close(server, finfo->fileid, inode->i_mtime))
++		__u32 mtime = inode->i_mtime;
++
++		if (finfo->access == O_RDONLY)
++		{
++			mtime = 0xffffffff;
++		}
++		if (smb_proc_close(server, finfo->fileid, mtime))
+ 		{
+ 			/* We can't do anything but complain. */
+ 			DPRINTK("smb_put_inode: could not close\n");
+@@ -362,7 +368,7 @@
+ 		return -EPERM;
+ 
+ 	if (((attr->ia_valid & ATTR_GID) &&
+-	     (attr->ia_uid != SMB_SERVER(inode)->m.gid)))
++	     (attr->ia_gid != SMB_SERVER(inode)->m.gid)))
+ 		return -EPERM;
+ 
+ 	if (((attr->ia_valid & ATTR_MODE) &&
+diff -urN 2.0.28/fs/smbfs/proc.c linux/fs/smbfs/proc.c
+--- 2.0.28/fs/smbfs/proc.c	Tue Jan 14 18:25:44 1997
++++ linux/fs/smbfs/proc.c	Sun Feb  2 12:06:02 1997
+@@ -644,11 +644,17 @@
+ 	       __u16 fileid, __u32 mtime)
+ {
+ 	char *buf;
++	__u32 send_mtime = mtime;
+ 
++	if ((mtime != 0) && (mtime != 0xffffffff))
++	{
++		/* 0 and 0xffffffff mean: do not set mtime */
++		send_mtime = utc2local(mtime);
++	}
+ 	smb_setup_header_exclusive(server, SMBclose, 3, 0);
+ 	buf = server->packet;
+ 	WSET(buf, smb_vwv0, fileid);
+-	DSET(buf, smb_vwv1, utc2local(mtime));
++	DSET(buf, smb_vwv1, send_mtime);
+ 
+ 	return smb_request_ok_unlock(server, SMBclose, 0, 0);
+ }
+diff -urN 2.0.28/fs/smbfs/sock.c linux/fs/smbfs/sock.c
+--- 2.0.28/fs/smbfs/sock.c	Tue Jan 14 18:25:44 1997
++++ linux/fs/smbfs/sock.c	Sun Feb  2 12:06:03 1997
+@@ -373,7 +373,6 @@
+ 	int total_data = 0;
+ 	int total_param = 0;
+ 	int result;
+-	unsigned char *inbuf = server->packet;
+ 	unsigned char *rcv_buf;
+ 	int buf_len;
+ 	int data_len = 0;
+@@ -389,8 +388,8 @@
+ 		*ldata = *lparam = 0;
+ 		return 0;
+ 	}
+-	total_data = WVAL(inbuf, smb_tdrcnt);
+-	total_param = WVAL(inbuf, smb_tprcnt);
++	total_data = WVAL(server->packet, smb_tdrcnt);
++	total_param = WVAL(server->packet, smb_tprcnt);
+ 
+ 	DDPRINTK("smb_receive_trans2: td=%d,tp=%d\n", total_data, total_param);
+ 
+@@ -415,6 +414,8 @@
+ 
+ 	while (1)
+ 	{
++		unsigned char *inbuf = server->packet;
++
+ 		if (WVAL(inbuf, smb_prdisp) + WVAL(inbuf, smb_prcnt)
+ 		    > total_param)
+ 		{

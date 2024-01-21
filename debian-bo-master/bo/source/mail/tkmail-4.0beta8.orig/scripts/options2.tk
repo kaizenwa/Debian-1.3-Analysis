@@ -1,0 +1,1089 @@
+proc mfv:opt-send-display { f } {
+  global mf mfp mfopt
+
+  set mfopt(list) [list compose-addr-postfix \
+      compose-from-field compose-require-subject \
+      compose-save-send]
+  set mfopt(text) [list compose-alternates $f.alt.txt 1]
+
+  foreach opt $mfopt(list) {
+    set mfopt($opt) $mf($opt)
+  }
+
+  if {![winfo exists $f]} {
+    frame $f
+
+    label $f.lbl -text "Send Options"
+    pack $f.lbl -side top -pady 10
+
+    mfv:opt-simple-entry $f.post compose-addr-postfix \
+	"Address Postfix: " 15
+    mfv:opt-simple-entry $f.from compose-from-field \
+	"From field: " 15
+
+    frame $f.bool
+    checkbutton $f.bool.subj -text "Require Subject" \
+	-variable mfopt(compose-require-subject) -relief flat
+    checkbutton $f.bool.save -text "Retain Send" \
+	-variable mfopt(compose-save-send) -relief flat
+    pack $f.bool.subj -side left
+    pack $f.bool.save -side left -padx 10
+
+    mfv:opt-help-bind $f.bool.subj compose-require-subject
+    mfv:opt-help-bind $f.bool.save compose-save-send
+
+    label $f.altlbl -anchor w \
+	-text "Alternate addresses to strip from To:, Cc:, Bcc:"
+    frame $f.alt
+    scrollbar $f.alt.scr -command "$f.alt.txt yview" \
+	  -relief raised
+    text $f.alt.txt -yscroll "$f.alt.scr set" \
+	  -relief sunken -bd 2 -width 60 -height 6
+    if {$mf(disp-left-scroll)} {
+      pack $f.alt.scr -side left -fill y
+    } else {
+      pack $f.alt.scr -side right -fill y
+    }
+    pack $f.alt.txt -side left -expand true -fill both
+    mfv:opt-help-bind $f.alt compose-alternates
+
+    pack $f.post $f.from $f.bool $f.altlbl $f.alt \
+	-side top -padx 10 -pady 5 -fill x
+  }
+  $f.alt.txt delete 1.0 end
+  $f.alt.txt insert 1.0 [join $mf(compose-alternates) \n]
+  set mf(compose-alternates) [split [string trim [$f.alt.txt get 1.0 end]] \n]
+
+  focus $f.post.ent
+}
+
+proc mfv:opt-send-apply { f } {
+  mfv:opt-universal-apply $f
+}
+
+proc mfv:opt-aliases-display { f } {
+  global mf mfp mfopt
+
+  set mfopt(list) [list mail-alias-file mail-alias-type mail-alias-case]
+  set mfopt(text) {}
+
+  foreach opt $mfopt(list) {
+    set mfopt($opt) $mf($opt)
+  }
+
+  if {![winfo exists $f]} {
+    frame $f
+
+    label $f.lbl -text "Alias Options"
+    pack $f.lbl -side top -pady 10
+
+    mfv:opt-simple-entry $f.file mail-alias-file \
+	"Alias File: "
+
+    frame $f.bool
+    frame $f.bool.type
+    label $f.bool.type.lbl -text "Type: "
+    radiobutton $f.bool.type.bsd -text "BSD" -relief flat \
+	-variable mfopt(mail-alias-type) -value bsd
+    radiobutton $f.bool.type.elm -text "Elm" -relief flat \
+	-variable mfopt(mail-alias-type) -value elm
+    pack $f.bool.type.lbl -side left
+    pack $f.bool.type.bsd $f.bool.type.elm \
+	-side left -padx 5
+
+    checkbutton $f.bool.case -text "Case Sensitive" \
+	-variable mfopt(mail-alias-case) -relief flat
+
+    pack $f.bool.type -side left
+    pack $f.bool.case -side left -padx 10 \
+	-expand true -fill x
+
+    pack $f.file $f.bool -side top -fill x -padx 10 -pady 5
+
+    mfv:opt-help-bind $f.bool.type mail-alias-type
+    mfv:opt-help-bind $f.bool.case mail-alias-case
+
+    mfv:bind-file-complete $f.file.ent
+  }
+  focus $f.file.ent
+}
+
+proc mfv:opt-aliases-apply { f } {
+  if {![mfv:opt-universal-apply $f]} {
+    mfv:parse-alias-file
+  }
+}
+
+proc mfv:opt-viewer-display { f } {
+  global mf mfp mfopt
+
+  set mfopt(list) [list viewer-geom viewer-state mail-read-ask \
+		      disp-default-fixed viewer-start-locked mail-read-max]
+  set mfopt(text) {}
+
+  foreach opt $mfopt(list) {
+    set mfopt($opt) $mf($opt)
+  }
+
+  if {![winfo exists $f]} {
+    frame $f
+
+    label $f.lbl -text "Viewer Options"
+    pack $f.lbl -side top -pady 10
+
+    mfv:opt-simple-entry $f.geom viewer-geom \
+	"Viewer Geometry: "
+    button $f.geom.btn -text "<<Current" -padx 5 \
+	-command "$f.geom.ent delete 0 end
+		  $f.geom.ent insert 0 \[winfo geometry $mfp(curview) \]" 
+    pack $f.geom.btn -side left -padx 5
+
+    frame $f.state
+    label $f.state.lbl -text "Message Text is Editable? "
+    radiobutton $f.state.norm -text "Yes" -relief flat \
+	-variable mfopt(viewer-state) -value normal
+    radiobutton $f.state.dis -text "No" -relief flat \
+	-variable mfopt(viewer-state) -value disabled
+    pack $f.state.lbl -side left
+    pack $f.state.norm $f.state.dis \
+	-side left -padx 5
+    mfv:opt-help-bind $f.state viewer-state
+
+    frame $f.fixed
+    label $f.fixed.lbl -text "Use Fixed Font as Default? "
+    radiobutton $f.fixed.yes -text "Yes" -relief flat \
+	-variable mfopt(disp-default-fixed) -value 1
+    radiobutton $f.fixed.no -text "No" -relief flat \
+	-variable mfopt(disp-default-fixed) -value 0
+    pack $f.fixed.lbl -side left
+    pack $f.fixed.yes $f.fixed.no \
+	-side left -padx 5
+    mfv:opt-help-bind $f.fixed disp-default-fixed
+
+    frame $f.locked
+    label $f.locked.lbl -text "Viewers Locked by Default? "
+    radiobutton $f.locked.yes -text "Yes" -relief flat \
+	-variable mfopt(viewer-start-locked) -value 1
+    radiobutton $f.locked.no -text "No" -relief flat \
+	-variable mfopt(viewer-start-locked) -value 0
+    pack $f.locked.lbl -side left
+    pack $f.locked.yes $f.locked.no \
+	-side left -padx 5
+    mfv:opt-help-bind $f.locked viewer-start-locked
+
+    checkbutton $f.ask -text "Ask before loading long messages" \
+	-variable mfopt(mail-read-ask) -relief flat
+    mfv:opt-help-bind $f.ask mail-read-ask
+
+    mfv:opt-simple-entry $f.max mail-read-max \
+	"     Long message has greater than "
+
+    pack $f.geom $f.state $f.fixed $f.locked \
+	-side top -fill x -padx 10 -pady 5
+    # pack $f.geom $f.fixed -side top -fill x -padx 10 -pady 5
+    pack $f.ask $f.max -side top -padx 10 -pady 5 -anchor w
+  }
+  focus $f.geom.ent
+}
+
+proc mfv:opt-viewer-apply { f } {
+  global mf mfp
+
+  if {![mfv:opt-universal-apply $f]} {
+    foreach viewer $mfp(viewlist) {
+      $viewer.$mfp(mesg) configure -state $mf(viewer-state)
+    }
+  }
+}
+
+proc mfv:opt-compose-display { f } {
+  global mf mfp mfopt
+
+  set mfopt(list) [list compose-alt-editor compose-alt-auto \
+		       compose-geom compose-show-cc compose-fcc-folder \
+		       compose-fcc-forward compose-fcc-swap]
+  set mfopt(text) {}
+
+  foreach opt $mfopt(list) {
+    set mfopt($opt) $mf($opt)
+  }
+
+  if {![winfo exists $f]} {
+    frame $f
+
+    label $f.lbl -text "Compose Options"
+    pack $f.lbl -side top -pady 10
+
+    mfv:opt-simple-entry $f.edit compose-alt-editor \
+	"Alternate Editor: "
+    checkbutton $f.edit.auto -text "Auto" \
+	-variable mfopt(compose-alt-auto) -relief flat
+    pack $f.edit.auto -side left
+    mfv:opt-help-bind $f.edit.auto compose-alt-auto
+
+    mfv:opt-simple-entry $f.geom compose-geom \
+	"Compose Window Geometry: "
+    checkbutton $f.geom.cc -text "Always show CC & BCC" \
+	-variable mfopt(compose-show-cc) -relief flat
+    pack $f.geom.cc -side left
+    mfv:opt-help-bind $f.geom.cc compose-show-cc
+
+    mfv:opt-simple-entry $f.fcc compose-fcc-folder \
+	"Default FCC: "
+
+    frame $f.bool
+    checkbutton $f.bool.forw -text "FCC Forwards" \
+	-variable mfopt(compose-fcc-forward) -relief flat
+    checkbutton $f.bool.swap -text "Swap To/From Fields" \
+	-variable mfopt(compose-fcc-swap) -relief flat
+    pack $f.bool.forw $f.bool.swap -side left -padx 10 -expand true
+
+    mfv:opt-help-bind $f.bool.forw compose-fcc-forward
+    mfv:opt-help-bind $f.bool.swap compose-fcc-swap
+
+    pack $f.edit $f.geom $f.fcc $f.bool \
+	-side top -padx 10 -pady 5 -fill x
+
+    mfv:bind-file-complete $f.edit.ent
+    mfv:bind-file-complete $f.fcc.ent
+  }
+
+  focus $f.edit.ent
+}
+
+proc mfv:opt-compose-apply { f } {
+  mfv:opt-universal-apply $f
+}
+
+proc mfv:opt-headers-display { f } {
+  global mf mfp mfopt
+
+  set mfopt(list) [list header-config header-retain header-strip]
+  set mfopt(text) {}
+
+  foreach opt $mfopt(list) {
+    set mfopt($opt) $mf($opt)
+  }
+
+  foreach opt {underline relief background foreground font} {
+    set mfopt(tagopt,$opt) [$mfp(curview).$mfp(mesg) tag cget headers -$opt]
+    if {[string length $mfopt(tagopt,$opt)] == 0} {
+      if {$opt == "underline"} { 
+	set mfopt(tagopt,$opt) 0 
+      } else {
+	set mfopt(tagopt,$opt) [$mfp(curview).$mfp(mesg) cget -$opt]
+      }
+    }
+    set mfopt(tagorig,$opt) $mfopt(tagopt,$opt)
+  }
+
+  if {![winfo exists $f]} {
+    frame $f
+
+    label $f.lbl -text "Headers Options"
+    pack $f.lbl -side top -pady 10
+
+    frame $f.fore
+    label $f.fore.lbl -text Foreground: -width 13 -anchor w
+    entry $f.fore.ent -relief sunken \
+	-textvariable mfopt(tagopt,foreground)
+    pack $f.fore.lbl -side left
+    pack $f.fore.ent -side left -expand true -fill x \
+	-padx 10 -ipady 2
+    button $f.fore.btn -bitmap @$mfp(tkmaillib)/list.xbm -padx 5 \
+	-command "set val \[$f.fore.ent get\]
+		  $f.fore.ent delete 0 end
+		  $f.fore.ent insert 0 \[ut:color-select -master $f -cancelvalue \$val \]" 
+    pack $f.fore.btn -side left
+
+    frame $f.back
+    label $f.back.lbl -text Background: -width 13 -anchor w
+    entry $f.back.ent -relief sunken \
+	-textvariable mfopt(tagopt,background)
+    pack $f.back.lbl -side left
+    pack $f.back.ent -side left -expand true -fill x \
+	-padx 10 -ipady 2
+    button $f.back.btn -bitmap @$mfp(tkmaillib)/list.xbm -padx 5 \
+	-command "set val \[$f.back.ent get\]
+		  $f.back.ent delete 0 end
+		  $f.back.ent insert 0 \[ut:color-select -master $f -cancelvalue \$val \]" 
+    pack $f.back.btn -side left
+
+    frame $f.font
+    label $f.font.lbl -text Font: -width 13 -anchor w
+    entry $f.font.ent -relief sunken -textvariable mfopt(tagopt,font)
+    pack $f.font.lbl -side left
+    pack $f.font.ent -side left -expand true -fill x \
+	-padx 10 -ipady 2
+    button $f.font.btn -bitmap @$mfp(tkmaillib)/list.xbm -padx 5 \
+	-command "set val \[$f.font.ent get\]
+		  $f.font.ent delete 0 end
+		  $f.font.ent insert 0 \[ut:font-select -fullname 1 -master $f -cancelvalue \$val \]" 
+    pack $f.font.btn -side left
+
+    frame $f.relief
+    label $f.relief.lbl -text "Relief: "
+    radiobutton $f.relief.raised -text "raised" -relief flat \
+	-variable mfopt(tagopt,relief) -value raised
+    radiobutton $f.relief.sunken -text "sunken" -relief flat \
+	-variable mfopt(tagopt,relief) -value sunken
+    radiobutton $f.relief.flat -text "flat" -relief flat \
+	-variable mfopt(tagopt,relief) -value flat
+    radiobutton $f.relief.ridge -text "ridge" -relief flat \
+	-variable mfopt(tagopt,relief) -value ridge
+    radiobutton $f.relief.groove -text "groove" -relief flat \
+	-variable mfopt(tagopt,relief) -value groove
+    checkbutton $f.relief.under -text "Underlined"  \
+	-variable mfopt(tagopt,underline) -relief flat
+    pack $f.relief.lbl -side left
+    pack $f.relief.raised $f.relief.sunken $f.relief.flat \
+	$f.relief.ridge $f.relief.groove -side left -padx 3
+    pack $f.relief.under -side left -padx 10
+
+    mfv:opt-simple-entry $f.strip header-strip \
+	"Headers to Strip: " 16
+    mfv:opt-simple-entry $f.retain header-retain \
+	"Headers to Retain: " 16
+
+    pack $f.font $f.fore $f.back $f.relief \
+	-side top -padx 10 -pady 5 -fill x
+    frame $f.sep -bd 2 -height 4 -relief sunken
+    pack $f.sep -side top -fill x -expand true -padx 10
+    pack $f.strip $f.retain -side top -padx 10 -pady 5 -fill x
+
+    foreach w [list $f.font $f.fore $f.back $f.relief] {
+      mfv:opt-help-bind $w header-config
+    }
+  }
+  focus $f.font.ent
+}
+
+proc mfv:opt-headers-apply { f } {
+  global mf mfp mfopt
+
+  if {![mfv:opt-universal-apply $f]} {
+    set line {}
+    foreach opt {underline relief background foreground font} {
+      set mfopt(tagorig,$opt) $mfopt(tagopt,$opt)
+      if {[string length $mfopt(tagopt,$opt)]} {
+	append line "-$opt {$mfopt(tagopt,$opt)} "
+      }
+    }
+    set mf(header-config) $line
+    foreach viewer $mfp(viewlist) {
+      eval "$viewer.$mfp(mesg) tag configure headers $mf(header-config)"
+    }
+  }
+}
+
+proc mfv:opt-summary-display { f } {
+  global mf mfp mfopt
+
+  set mfopt(list) [list headlist-sort headlist-reverse headlist-height \
+		       headlist-format headlist-deleted-hide]
+  set mfopt(text) {}
+
+  foreach opt $mfopt(list) {
+    set mfopt($opt) $mf($opt)
+  }
+
+  if {![winfo exists $f]} {
+    frame $f
+
+    label $f.lbl -text "Summary Options"
+    pack $f.lbl -side top -pady 10
+
+    mfv:opt-simple-entry $f.form headlist-format \
+	"Summary Format: " 17
+    mfv:opt-simple-entry $f.sort headlist-sort \
+	"Sort on Field: " 17
+
+    mfv:opt-simple-entry $f.height headlist-height \
+	"Listbox height: " 17
+    button $f.height.btn -text "<<Current" -padx 5 \
+	-command "$f.height.ent delete 0 end
+		  set h \[$mfp(curtop).$mfp(head) cget -height\]
+		  $f.height.ent insert 0 \$h" 
+    pack $f.height.btn -side left -padx 5
+
+    mfv:opt-simple-yesno $f.reverse headlist-reverse \
+	"Show messages in reverse? "
+    mfv:opt-simple-yesno $f.hidedel headlist-deleted-hide \
+	"Show deleted messages? "
+
+    pack $f.form $f.sort $f.height $f.reverse \
+	-side top -fill x -padx 10 -pady 5
+  }
+  focus $f.form.ent
+}
+
+proc mfv:opt-summary-apply { f } {
+  if {![mfv:opt-universal-apply $f]} {
+    mfv:reset-headlist
+  }
+}
+
+proc mfv:opt-insert-display { f } {
+  global mf mfp mfopt
+
+  set mfopt(list) [list insert-cite-format insert-forward-format insert-strip \
+		       insert-prefix]
+
+  set mfopt(text) [list insert-headers $f.head.txt 0]
+
+  foreach opt $mfopt(list) {
+    set mfopt($opt) $mf($opt)
+  }
+
+  if {![winfo exists $f]} {
+    frame $f
+
+    label $f.lbl -text "Insert Options"
+    pack $f.lbl -side top -pady 10
+
+    mfv:opt-simple-entry $f.cite insert-cite-format \
+	"Cite Format: " 14
+    mfv:opt-simple-entry $f.forw insert-forward-format \
+	"Forward Format: " 14
+    mfv:opt-simple-entry $f.pref insert-prefix \
+	"Insert Prefix: " 14
+    mfv:opt-simple-yesno $f.strip insert-strip \
+	"Strip headers from inserted messages ? "
+
+    label $f.headlbl -anchor w \
+	-text "Header text to insert on all compostions:"
+    frame $f.head
+    scrollbar $f.head.scr -command "$f.head.txt yview" \
+	  -relief raised
+    text $f.head.txt -yscroll "$f.head.scr set" \
+	  -relief sunken -bd 2 -width 60 -height 6
+    if {$mf(disp-left-scroll)} {
+      pack $f.head.scr -side left -fill y
+    } else {
+      pack $f.head.scr -side right -fill y
+    }
+    pack $f.head.txt -side left -expand true -fill both
+    mfv:opt-help-bind $f.head insert-headers
+
+    pack $f.cite $f.forw $f.pref $f.strip \
+	$f.headlbl $f.head -side top -fill x -padx 10 -pady 5
+  }
+  $f.head.txt delete 1.0 end
+  $f.head.txt insert 1.0 $mf(insert-headers)
+
+  focus $f.cite.ent
+}
+
+proc mfv:opt-insert-apply { f } {
+  mfv:opt-universal-apply $f
+}
+
+proc mfv:opt-signature-display { f } {
+  global mf mfp mfopt
+
+  set mfopt(list) [list insert-signature insert-auto-sign insert-always-sign]
+  set mfopt(text) [list insert-prefix-sig $f.prefix.txt 0]
+
+  foreach opt $mfopt(list) {
+    set mfopt($opt) $mf($opt)
+  }
+
+  if {![winfo exists $f]} {
+    frame $f
+
+    label $f.lbl -text "Signature Options"
+    pack $f.lbl -side top -pady 10
+
+    mfv:opt-simple-entry $f.file insert-signature \
+	"Signature File: "
+    mfv:opt-simple-yesno $f.auto insert-auto-sign \
+	"Insert signature at compose startup? "
+    mfv:opt-simple-yesno $f.always insert-always-sign \
+	"Always insert signature before sending? "
+
+    label $f.prefixlbl -anchor w \
+	-text "Text to insert in front of signature: "
+    frame $f.prefix
+    scrollbar $f.prefix.scr -command "$f.prefix.txt yview" \
+	  -relief raised
+    text $f.prefix.txt -yscroll "$f.prefix.scr set" \
+	  -relief sunken -bd 2 -width 60 -height 6
+    if {$mf(disp-left-scroll)} {
+      pack $f.prefix.scr -side left -fill y
+    } else {
+      pack $f.prefix.scr -side right -fill y
+    }
+    pack $f.prefix.txt -side left -expand true -fill both
+    mfv:opt-help-bind $f.prefix insert-prefix-sig
+
+    pack $f.file $f.auto $f.always $f.prefixlbl $f.prefix \
+	-side top -fill x -padx 10 -pady 5
+
+    mfv:bind-file-complete $f.file.ent
+  }
+  focus $f.file.ent
+
+  $f.prefix.txt delete 1.0 end
+  $f.prefix.txt insert 1.0 $mf(insert-prefix-sig)
+}
+
+proc mfv:opt-signature-apply { f } {
+  mfv:opt-universal-apply $f
+}
+
+proc mfv:opt-menu-display { f } {
+  global mf mfp mfopt
+
+  set mfopt(list) [list menu-folders-max menu-depth-max menu-recent-max \
+		       menu-recent-exclusive menu-folders-ignore \
+		       menu-quick-send]
+  set mfopt(text) {}
+
+  foreach opt $mfopt(list) {
+    set mfopt($opt) $mf($opt)
+  }
+
+  if {![winfo exists $f]} {
+    frame $f
+
+    label $f.lbl -text "Menu Options"
+    pack $f.lbl -side top -pady 10
+
+    mfv:opt-simple-entry $f.maxf menu-folders-max \
+	"Maximum folders in File/Copy/Move menus: " 40
+    mfv:opt-simple-entry $f.maxd menu-depth-max \
+	"Maximum depth to descend mail directory: " 40
+    mfv:opt-simple-entry $f.maxr menu-recent-max \
+	"Maximum folders in recent menu: " 40
+    mfv:opt-simple-yesno $f.exclr menu-recent-exclusive \
+	"Exclude folders in mail directory from recent menus? "
+    mfv:opt-simple-entry $f.ignr menu-folders-ignore \
+	"Folders to ignore: " 20
+    mfv:opt-simple-entry $f.quick menu-quick-send \
+	"Quick Send addresses: " 20
+
+    pack $f.maxf $f.maxd $f.maxr $f.exclr $f.ignr $f.quick \
+	-side top -padx 10 -pady 5 -fill x
+  }
+  focus $f.maxf.ent
+}
+
+proc mfv:opt-menu-apply { f } {
+  if {![mfv:opt-universal-apply $f]} {
+    mfv:build-folder-menus
+  }
+}
+
+proc mfv:opt-archive-display { f } {
+  global mf mfp mfopt
+
+  set mfopt(list) {mail-directory mail-archive-folder}
+  set mfopt(text) {}
+
+  foreach opt $mfopt(list) {
+    set mfopt($opt) $mf($opt)
+  }
+
+  if {![winfo exists $f]} {
+    frame $f
+
+    label $f.lbl -text "Archive Options"
+    pack $f.lbl -side top -pady 10
+
+    mfv:opt-simple-entry $f.mdir mail-directory \
+	"Archive directory: " 18
+    mfv:opt-simple-entry $f.archive mail-archive-folder \
+	"Default archive: " 18
+
+
+    pack $f.mdir $f.archive -side top -padx 10 -pady 5 -fill x
+
+    foreach w {mdir archive} {
+      mfv:bind-file-complete $f.$w.ent
+    }
+  }
+
+  focus $f.mdir.ent
+}
+
+proc mfv:opt-archive-apply { f } {
+  global mfp
+
+  if {![mfv:opt-universal-apply $f]} {
+    foreach viewer $mfp(viewlist) {
+      mfv:mesg-set-sender $viewer
+    }
+  }
+}
+
+proc mfv:opt-utilities-display { f } {
+  global mf mfp mfopt
+
+  set mfopt(list) [list insert-compress insert-compress-suffix insert-encoder]
+  set mfopt(text) {}
+
+  foreach opt $mfopt(list) {
+    set mfopt($opt) $mf($opt)
+  }
+
+  if {![winfo exists $f]} {
+    frame $f
+
+    label $f.lbl -text "Unix Utilities"
+    pack $f.lbl -side top -pady 10
+
+    frame $f.comp
+    frame $f.comp.prog
+    label $f.comp.prog.lbl -text "Compress Program: " -width 18 -anchor w
+    entry $f.comp.prog.ent -relief sunken \
+	-textvariable mfopt(insert-compress)
+    pack $f.comp.prog.lbl -side left
+    pack $f.comp.prog.ent -side left -fill x -expand true -ipady 2
+
+    frame $f.comp.suff
+    label $f.comp.suff.lbl -text "Suffix: "
+    entry $f.comp.suff.ent -relief sunken \
+	-textvariable mfopt(insert-compress-suffix) -width 5
+    pack $f.comp.suff.lbl -side left
+    pack $f.comp.suff.ent -side left -ipady 2 -padx 5
+
+    pack $f.comp.prog -side left -fill x -expand true
+    pack $f.comp.suff -side left
+    mfv:opt-help-bind $f.comp.prog insert-compress
+    mfv:opt-help-bind $f.comp.suff insert-compress-suffix
+
+    mfv:opt-simple-entry $f.enc insert-encoder \
+	"Encoding Program: " 18
+
+    pack $f.comp $f.enc -side top -fill x -padx 10 -pady 5
+
+    mfv:bind-file-complete $f.comp.prog.ent
+    mfv:bind-file-complete $f.enc.ent
+  }
+  focus $f.comp.prog.ent
+}
+
+proc mfv:opt-utilities-apply { f } {
+  mfv:opt-universal-apply $f
+}
+
+proc mfv:opt-mime-display { f } {
+  global mf mfp mfopt
+
+  set mfopt(list) [list mime-parse mime-compose mime-external-default \
+		        mime-font-default mime-font-fixed]
+  set mfopt(text) [list mime-external-viewers $f.list.txt 1]
+
+  foreach opt $mfopt(list) {
+    set mfopt($opt) $mf($opt)
+  }
+
+  if {![winfo exists $f]} {
+    frame $f
+
+    label $f.lbl -text "MIME Options"
+    pack $f.lbl -side top -pady 10
+
+    mfv:opt-simple-yesno $f.parse mime-parse "Do MIME Parsing? "
+    mfv:opt-simple-yesno $f.compose mime-compose "Use MIME composition mode? "
+
+    frame $f.font
+    label $f.font.lbl -text "Default Font: " -width 24 -anchor w
+    entry $f.font.ent -relief sunken -textvariable mfopt(mime-font-default)
+    pack $f.font.lbl -side left
+    pack $f.font.ent -side left -expand true -fill x -ipady 2
+    button $f.font.btn -text ">>" \
+	-command "set val \[$f.font.ent get\]
+		  $f.font.ent delete 0 end
+		  $f.font.ent insert 0 \[ut:font-select -fullname 0 -master $f -cancelvalue \$val \]" 
+    pack $f.font.btn -side left -padx 10
+    mfv:opt-help-bind $f.font mime-font-default
+
+    frame $f.fixed
+    label $f.fixed.lbl -text "Fixed Font:  " -width 24 -anchor w
+    entry $f.fixed.ent -relief sunken -textvariable mfopt(mime-font-fixed)
+    pack $f.fixed.lbl -side left
+    pack $f.fixed.ent -side left -expand true -fill x -ipady 2
+    button $f.fixed.btn -text ">>" \
+	-command "set val \[$f.fixed.ent get\]
+		  $f.fixed.ent delete 0 end
+		  $f.fixed.ent insert 0 \[ut:font-select -fullname 0 -master $f -cancelvalue \$val \]" 
+    pack $f.fixed.btn -side left -padx 10
+    mfv:opt-help-bind $f.fixed mime-font-fixed
+
+    mfv:opt-simple-entry $f.dflt mime-external-default \
+	"Default external viewer: " 24
+
+    label $f.listlbl -anchor w \
+	-text "Map of contents types to external viewers: "
+    frame $f.list
+    scrollbar $f.list.scr -command "$f.list.txt yview" \
+	  -relief raised
+    text $f.list.txt -yscroll "$f.list.scr set" \
+	  -relief sunken -bd 2 -width 60 -height 6
+    if {$mf(disp-left-scroll)} {
+      pack $f.list.scr -side left -fill y
+    } else {
+      pack $f.list.scr -side right -fill y
+    }
+    pack $f.list.txt -side left -expand true -fill both
+    mfv:opt-help-bind $f.list mime-external-viewers
+
+    pack $f.parse $f.compose $f.font $f.fixed $f.dflt $f.listlbl $f.list \
+	-side top -padx 10 -pady 5 -fill x
+  }
+  $f.list.txt delete 1.0 end
+  $f.list.txt insert 1.0 [join $mf(mime-external-viewers) \n]
+  set mf(mime-external-viewers) [split [string trim [$f.list.txt get 1.0 end]] \n]
+
+  focus $f.font.ent
+}
+
+proc mfv:opt-mime-apply { f } {
+  global mf mfp mfopt
+
+  if {![mfv:opt-universal-apply $f]} {
+    # redisplay mime messages?
+  }
+}
+
+proc mfv:opt-fonts-display { f } {
+  global mf mfp mfopt
+
+  set mfopt(list) [list disp-font-default disp-font-fixed]
+  set mfopt(text) {}
+
+  foreach opt $mfopt(list) {
+    set mfopt($opt) $mf($opt)
+  }
+
+  if {![winfo exists $f]} {
+    frame $f
+
+    label $f.lbl -text "Font Options"
+    pack $f.lbl -side top -pady 10
+
+    frame $f.font
+    label $f.font.lbl -text "Default Font: " -width 24 -anchor w
+    entry $f.font.ent -relief sunken -textvariable mfopt(disp-font-default)
+    pack $f.font.lbl -side left
+    pack $f.font.ent -side left -expand true -fill x -ipady 2
+    button $f.font.btn -bitmap @$mfp(tkmaillib)/list.xbm \
+	-command "set val \[$f.font.ent get\]
+		  $f.font.ent delete 0 end
+		  $f.font.ent insert 0 \[ut:font-select -fullname 1 -master $f -cancelvalue \$val \]" 
+    pack $f.font.btn -side left -padx 10
+    mfv:opt-help-bind $f.font disp-font-default
+
+    frame $f.fixed
+    label $f.fixed.lbl -text "Fixed Font:  " -width 24 -anchor w
+    entry $f.fixed.ent -relief sunken -textvariable mfopt(disp-font-fixed)
+    pack $f.fixed.lbl -side left
+    pack $f.fixed.ent -side left -expand true -fill x -ipady 2
+    button $f.fixed.btn -bitmap @$mfp(tkmaillib)/list.xbm \
+	-command "set val \[$f.fixed.ent get\]
+		  $f.fixed.ent delete 0 end
+		  $f.fixed.ent insert 0 \[ut:font-select -fullname 1 -master $f -cancelvalue \$val \]" 
+    pack $f.fixed.btn -side left -padx 10
+    mfv:opt-help-bind $f.fixed disp-font-fixed
+
+
+    pack $f.font $f.fixed -side top -padx 10 -pady 5 -fill x
+  }
+
+  focus $f.font.ent
+}
+
+proc mfv:opt-fonts-apply { f } {
+  global mf mfp mfopt
+
+  if {![mfv:opt-universal-apply $f]} {
+    foreach viewer $mfp(viewlist) {
+      mfv:toggle-fixed-font $viewer $viewer.$mfp(mesg)
+    }
+    set cnt 0
+    while {[winfo exists .mfc${cnt}]} {
+      mfv:toggle-fixed-font .mfc${cnt} .mfc${cnt}.comp.txt
+      incr cnt
+    }
+  }
+}
+
+proc mfv:opt-set-bitmap { w {ask 0} } {
+  global mf mfopt
+
+  set val [$w.ent get]
+  if $ask {
+    set savedir [pwd]
+    set dir [file dirname $val]
+    if [file isdirectory $dir] {cd $dir}
+    $w.ent delete 0 end
+    set val [mfv:get-filename -master $w -cancelvalue $val]
+    $w.ent insert 0 $val
+    cd $savedir
+  }
+
+  if [catch {$w.btn configure -bitmap @$val} res] {
+    if $ask {mfv:error-mesg "Invalid bitmap: $res" $w}
+    $w.btn configure -bitmap error
+  }
+}
+
+proc mfv:opt-bitmaps-display { f } {
+  global mf mfp mfopt
+
+  set mfopt(list) [list viewer-bitmap-nomail viewer-bitmap-mail \
+		       compose-icon-bitmap]
+  set mfopt(text) {}
+
+  foreach opt $mfopt(list) {
+    set mfopt($opt) $mf($opt)
+  }
+
+  if {![winfo exists $f]} {
+    frame $f
+
+    label $f.lbl -text "Bitmap Options"
+    pack $f.lbl -side top -pady 10
+
+    mfv:opt-simple-entry $f.nomail viewer-bitmap-nomail \
+	"No new mail:" 14
+    button $f.nomail.btn -command "mfv:opt-set-bitmap $f.nomail 1"
+    pack $f.nomail.btn -side left -padx 10
+
+    mfv:opt-simple-entry $f.mail viewer-bitmap-mail \
+	"New mail:" 14
+    button $f.mail.btn -command "mfv:opt-set-bitmap $f.mail 1"
+    pack $f.mail.btn -side left -padx 10
+
+    mfv:opt-simple-entry $f.compose compose-icon-bitmap \
+	"Compose Icon:" 14
+    button $f.compose.btn -command "mfv:opt-set-bitmap $f.compose 1"
+    pack $f.compose.btn -side left -padx 10
+
+    pack $f.nomail $f.mail $f.compose -side top -fill x -padx 10 -pady 5
+
+    foreach w {nomail mail compose} {
+      mfv:bind-file-complete $f.$w.ent
+    }
+
+  }
+  mfv:opt-set-bitmap $f.nomail
+  mfv:opt-set-bitmap $f.mail
+  mfv:opt-set-bitmap $f.compose
+
+  focus $f.nomail.ent
+}
+
+proc mfv:opt-bitmaps-apply { f } {
+  global mf mfp
+
+  if {![mfv:opt-universal-apply $f]} {
+    if {[file exists $mf(compose-icon-bitmap)]} {
+      set cnt 0 ;# TODO: this is wrong
+      while {[winfo exists .mfc${cnt}]} {
+	wm iconbitmap .mfc${cnt} "@$mf(compose-icon-bitmap)"
+	incr cnt
+      }
+    }
+    if {[file exists $mf(viewer-bitmap-mail)] && 
+      [file exists $mf(viewer-bitmap-nomail)]} {
+      foreach viewer $mfp(viewlist) {
+	if {$mfp($viewer,newmail)} {
+	  wm iconbitmap $viewer "@$mf(viewer-bitmap-mail)"
+	} else {
+	  wm iconbitmap $viewer "@$mf(viewer-bitmap-nomail)"
+	}
+      }    
+    }
+  }
+}
+
+proc mfv:opt-sounds-display { f } {
+  global mf mfp mfopt
+
+  set mfopt(list) [list viewer-beep-new viewer-beep-empty viewer-beep-error]
+  set mfopt(text) {}
+
+  foreach opt $mfopt(list) {
+    set mfopt($opt) $mf($opt)
+  }
+
+  if {![winfo exists $f]} {
+    frame $f
+
+    label $f.lbl -text "Sound Options"
+    pack $f.lbl -side top -pady 10
+
+    mfv:opt-simple-entry $f.empty viewer-beep-empty \
+	"No new mail:" 14
+    button $f.empty.btn -bitmap @$mfp(tkmaillib)/note.xbm \
+	-command "eval \[$f.empty.ent get\]"
+    pack $f.empty.btn -side left -padx 10
+
+    mfv:opt-simple-entry $f.new viewer-beep-new \
+	"New mail:" 14
+    button $f.new.btn -bitmap @$mfp(tkmaillib)/note.xbm \
+	-command "eval \[$f.new.ent get\]"
+    pack $f.new.btn -side left -padx 10
+
+    mfv:opt-simple-entry $f.error viewer-beep-error \
+	"Error:" 14
+    button $f.error.btn -bitmap @$mfp(tkmaillib)/note.xbm \
+	-command "eval \[$f.error.ent get\]"
+    pack $f.error.btn -side left -padx 10
+
+
+    pack $f.empty $f.new $f.error -side top -fill x -padx 10 -pady 5
+  }
+  focus $f.empty.ent
+}
+
+proc mfv:opt-sounds-apply { f } {
+  mfv:opt-universal-apply $f
+}
+
+proc mfv:opt-ispell-display { f } {
+  global mf mfp mfopt
+
+  set mfopt(list) [list ispell-present ispell-binary ispell-main-dictionary \
+		      ispell-personal-dictionary ispell-addopts]
+  set mfopt(text) {}
+
+  foreach opt $mfopt(list) {
+    set mfopt($opt) $mf($opt)
+  }
+
+  if {![winfo exists $f]} {
+    frame $f
+
+    label $f.lbl -text "Ispell Options"
+    pack $f.lbl -side top -pady 10
+
+    mfv:opt-simple-yesno $f.present ispell-present "Is ispell present? "
+
+    mfv:opt-simple-entry $f.binary ispell-binary \
+	"Ispell program: " 20
+    mfv:opt-simple-entry $f.main ispell-main-dictionary \
+	"Main dictionary: " 20
+    mfv:opt-simple-entry $f.pers ispell-personal-dictionary \
+	"Personal dictionary: " 20
+    mfv:opt-simple-entry $f.opts ispell-addopts \
+	"Additional options: " 20
+
+    pack $f.present $f.binary $f.main $f.pers $f.opts \
+	-side top -padx 10 -pady 5 -fill x
+
+    foreach w {binary main pers} {
+      mfv:bind-file-complete $f.$w.ent
+    }
+  }
+
+  focus $f.binary.ent
+}
+
+proc mfv:opt-ispell-apply { f } {
+  mfv:opt-universal-apply $f
+}
+
+proc mfv:opt-notify-display { f } {
+  global mf mfp mfopt
+
+  set mfopt(list) [list notify-popup notify-format]
+  set mfopt(text) {}
+
+  foreach opt $mfopt(list) {
+    set mfopt($opt) $mf($opt)
+  }
+
+  if {![winfo exists $f]} {
+    frame $f
+
+    label $f.lbl -text "Notify Popup Options"
+    pack $f.lbl -side top -pady 10
+
+    mfv:opt-simple-yesno $f.popup notify-popup \
+	"Popup a summary list when new mail arrives? "
+
+    mfv:opt-simple-entry $f.format notify-format \
+	"Notify summary format: "
+
+    mfv:opt-simple-entry $f.geom notify-geom \
+	"Notify popup geometry: "
+
+    pack $f.popup $f.format $f.geom \
+	-side top -padx 10 -pady 5 -fill x
+  }
+
+  focus $f.format.ent
+}
+
+proc mfv:opt-notify-apply { f } {
+  mfv:opt-universal-apply $f
+}
+
+proc mfv:opt-user-display { f } {
+  global mf mfp mfopt mfuser
+
+  set mfopt(list) {}
+  set mfopt(text) {}
+
+  if {![winfo exists $f]} {
+    frame $f
+
+    scrollbar $f.scr -command "$f.txt yview" \
+	  -relief raised
+    text $f.txt -yscroll "$f.scr set" \
+	  -relief sunken -bd 2 -width 60
+    if {$mf(disp-left-scroll)} {
+      pack $f.scr -side left -fill y
+    } else {
+      pack $f.scr -side right -fill y
+    }
+    pack $f.txt -side left -expand true -fill both
+
+    bind $f.txt <Enter> {
+      eval [bind Text <Any-Enter>]
+      set top [winfo toplevel %W]
+      $top.work.help configure -state normal
+      $top.work.help delete 1.0 end
+      $top.work.help insert end {Edit the text as a Tcl script and use\
+Apply to source it. Only mfuser() settings will be saved on a Save. }
+      $top.work.help configure -state disabled
+    }
+  }
+
+  $f.txt delete 1.0 end
+  if {![catch "array names mfuser" names]} {
+    foreach name [lsort $names] {
+      set val [eval "set mfuser($name)"]
+      $f.txt insert insert "set mfuser($name) {$val}\n"
+    }
+  }
+
+  tkTextUndoSetup $f.txt
+  focus $f.txt
+}
+
+proc mfv:opt-user-apply { f } {
+  global mf mfp mfopt mfuser
+
+  set w [winfo toplevel $f]
+  if {![mfv:opt-change-q $w]} {
+    mfv:opt-message $w {NO CHANGES TO APPLY}
+    return 0
+  }
+
+  if [catch "eval \[$f.txt get 1.0 end\]" res] {
+    mfv:error-mesg "ERROR: a error occured while trying to evaluate your mfuser()
+settings. It is not safe to save your options at this point. Please
+correct the error before doing so. The error message encountered was:\n\n$res" $w
+    return 0
+  }
+
+  tkTextUndoSetup $f.txt
+  set mfopt(modified) 1
+  mfv:opt-message $w {SETTINGS APPLIED}
+  return 0
+}
+

@@ -1,0 +1,74 @@
+#!/bin/sh
+# makempx -- make an MPX file from a MetaPost source file.
+# Based on John Hobby's original (though there's not much of it left by now).
+
+: ${MPTOTEX="mpto -tex"}
+: ${MPTOTR="mpto -troff"}
+: ${DVITOMP=dvitomp}
+: ${DMP=dmp}
+: ${NEWER=newer}
+: ${TEX=tex}
+: ${TROFF='eqn -d\$\$ | troff -Tpost'}
+
+# These names are documented in the MetaPost manual, so it's
+# unwise to change them.
+ERRLOG=mpxerr.log		# file for an error log if necessary
+TEXERR=mpxerr.tex		# file for erroneous TeX if any
+DVIERR=mpxerr.dvi		# troublesome dvi file if any
+TROFF_IN_ERR=mpxerr		# file for erroneous troff input, if any
+TROFF_OUT_ERR=mpxerr.t		# file for troublesome troff output, if any
+
+
+usage="Usage: $0 MPFILE MPXFILE.
+If MPXFILE is older than MPFILE, update it by running
+\`$MPTOTR', \`$TROFF', and \`$DMP'.
+The current directory is used for writing temporary files.
+Errors are left in mpxerr.*"
+
+#####################################################
+# Everything below here should seldom need changing #
+#####################################################
+MPFILE=$1			# input file
+MPXFILE=$2			# output file
+NL='
+'
+
+trap "rm -f mpx$$.* $ERRLOG; exit 4" 1 2 15
+
+
+if $NEWER $MPFILE $MPXFILE
+then
+    $MPTOTR $MPFILE >mpx$$.i 2>$ERRLOG
+    case $? in
+    0)	;;
+    *)	echo "$NL"'Command failed: ' $MPTOTR $MPFILE
+	cat $ERRLOG
+	rm -f mpx$$.i
+	exit 1
+	;;
+    esac
+
+    cat mpx$$.i | eval $TROFF >mpx$$.t
+    case $? in
+    0)	;;
+    *)	mv -f mpx$$.i $TROFF_IN_ERR
+	echo "$NL"'Command failed:' cat $TROFF_IN_ERR '|' $TROFF
+	rm -f mpx$$.t
+	exit 2
+	;;
+    esac
+
+    $DMP mpx$$.t $MPXFILE 2>$ERRLOG
+    case $? in
+    0)	;;
+    *)  mv -f mpx$$.t $TROFF_OUT_ERR
+	mv -f mpx$$.i $TROFF_IN_ERR
+	echo "$NL"'Command failed:' $DMP $TROFF_OUT_ERR $MPXFILE
+	cat $ERRLOG
+	rm -f mpx$$.*
+	exit 3
+	;;
+    esac
+
+    rm -f $ERRLOG mpx$$.*
+fi

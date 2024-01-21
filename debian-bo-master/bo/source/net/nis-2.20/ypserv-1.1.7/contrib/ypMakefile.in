@@ -1,0 +1,182 @@
+# Makefile
+
+AWK = @@AWKPRG@
+RM  = @@RMPRG@ -f
+
+BINDIR  = @YPBINDIR@
+DIR     = /etc
+
+PWDIR   = $(DIR)
+
+DBLOAD  = $(BINDIR)/dbload -i
+MKNETID = $(BINDIR)/mknetid
+
+ETHERS    = $(DIR)/ethers
+HOSTS     = $(DIR)/hosts
+NETWORKS  = $(DIR)/networks
+PROTOCOLS = $(DIR)/protocols
+RPC 	  = $(DIR)/rpc
+SERVICES  = $(DIR)/services
+PASSWD    = $(PWDIR)/passwd
+GROUP     = $(DIR)/group
+SHADOW    = $(DIR)/shadow
+GSHADOW   = $(DIR)/gshadow
+
+target:
+	@if [ ! -d `domainname` ]; then mkdir `domainname`; fi; cd `domainname` ; make -f ../Makefile all
+
+
+all: hosts networks protocols rpc services passwd group netid
+# ethers
+# shadow gshadow 
+
+ethers:	   ethers.byname ethers.byaddr
+hosts:	   hosts.byname hosts.byaddr
+networks:  networks.byaddr networks.byname
+protocols: protocols.bynumber protocols.byname
+rpc:	   rpc.byname rpc.bynumber
+services:  services.byname
+passwd:    passwd.byname passwd.byuid
+group:     group.byname group.bygid
+netid:	   netid.byname
+shadow:    shadow.byname
+gshadow:   gshadow.byname 
+
+
+
+
+ethers.byname: $(ETHERS)
+	@echo "Updating $@..."
+	$(RM) $@
+	$(AWK) '{ if ($$1 != "" && $$1 != "#") print $$2"\t"$$0 }' $^ \
+		| $(DBLOAD) -f- $@
+
+ethers.byaddr: $(ETHERS)
+	@echo "Updating $@..."
+	$(RM) $@
+	$(AWK) '{ if ($$1 != "" && $$1 != "#") print $$1"\t"$$0 }' $^ \
+		| $(DBLOAD) -f- $@
+
+
+hosts.byname: $(HOSTS)
+	@echo "Updating $@..."
+	$(RM) $@
+	$(AWK) '/^[0-9]/ { for (n=2; n<=NF && $$n !~ "#"; n++) \
+		print $$n"\t"$$0 }' $^ | $(DBLOAD) -f- $@
+
+hosts.byaddr: $(HOSTS)
+	@echo "Updating $@..."
+	$(RM) $@
+	$(AWK) '$$1 !~ "#" { print $$1"\t"$$0 }' $^ \
+		| $(DBLOAD) -f- $@
+
+
+networks.byname: $(NETWORKS)
+	@echo "Updating $@..."
+	$(RM) $@
+	$(AWK) \
+	   '$$1 !~ "#"  { print $$1"\t"$$0; \
+			  for (n=3; n<=NF && $$n !~ "#"; n++) \
+			      print $$n"\t"$$0 \
+			}' $^ | $(DBLOAD) -f- $@
+
+networks.byaddr: $(NETWORKS)
+	@echo "Updating $@..."
+	$(RM) $@
+	$(AWK) '$$1 !~ "#" { print $$2"\t"$$0 }' $^ \
+		| $(DBLOAD) -f- $@
+
+
+protocols.byname: $(PROTOCOLS)
+	@echo "Updating $@..."
+	$(RM) $@
+	$(AWK) \
+	   '$$1 !~ "#"	{ print $$1"\t"$$0; \
+			  for (n=3; n<=NF && $$n !~ "#"; n++) \
+			      print $$n"\t"$$0 \
+			}' $^ | $(DBLOAD) -f- $@
+
+protocols.bynumber: $(PROTOCOLS)
+	@echo "Updating $@..."
+	$(RM) $@
+	$(AWK) '$$1 !~ "#" { print $$2"\t"$$0 }' $^ \
+		| $(DBLOAD) -f- $@
+
+
+
+rpc.byname: $(RPC)
+	@echo "Updating $@..."
+	$(RM) $@
+	$(AWK) \
+	   '$$1 !~ "#"  { print $$1"\t"$$0; \
+			  for (n=3; n<=NF && $$n !~ "#"; n++) \
+			      print $$n"\t"$$0 \
+			}' $^ | $(DBLOAD) -f- $@
+
+rpc.bynumber: $(RPC)
+	@echo "Updating $@..."
+	$(RM) $@
+	$(AWK) '$$1 !~ "#" { print $$2"\t"$$0 }' $^ \
+		| $(DBLOAD) -f- $@
+
+
+
+services.byname: $(SERVICES)
+	@echo "Updating $@..."
+	$(RM) $@
+	$(AWK) \
+	   '$$1 !~ "#"  { print $$1"\t"$$0; \
+			  for (n=3; n<=NF && $$n !~ "#"; n++) \
+			      print $$n"\t"$$0 \
+			}' $^ | $(DBLOAD) -f- $@
+
+
+passwd.byname: $(PASSWD)
+	@echo "Updating $@..."
+	$(RM) $@
+	$(AWK) -F: '{ if ($$1 != "+") print $$1"\t"$$0 }' $^ \
+		| $(DBLOAD) -f- $@
+
+passwd.byuid: $(PASSWD)
+	@echo "Updating $@..."
+	$(RM) $@
+	$(AWK) -F: '{ if ($$1 != "+") print $$3"\t"$$0 }' $^ \
+		| $(DBLOAD) -f- $@
+
+
+group.byname: $(GROUP)
+	@echo "Updating $@..."
+	$(RM) $@
+	$(AWK) -F: '{ if ($$1 != "+") print $$1"\t"$$0 }' $^ \
+		| $(DBLOAD) -f- $@
+
+group.bygid: $(GROUP)
+	@echo "Updating $@..."
+	$(RM) $@
+	$(AWK) -F: '{ if ($$1 != "+") print $$3"\t"$$0 }' $^ \
+		| $(DBLOAD) -f- $@
+
+netid.byname: $(GROUP) $(PASSWD)
+	@echo "Updating $@..."
+	$(RM) $@
+	@$(MKNETID) $(PASSWD) $(GROUP) `basename \`pwd\`` \
+		| $(DBLOAD) -f- $@
+
+#
+# Shadow and Gshadow maps... They shouldn't really be available via
+# YP, kind of defeats their purpose...
+#
+shadow.byname: $(SHADOW)
+	@echo "Updating $@..."
+	$(RM) $@
+	$(AWK) -F: '{ if ($$1 != "+") print $$1"\t"$$0 }' $^ \
+		| $(DBLOAD) -f- $@
+
+
+gshadow.byname: $(GSHADOW)
+	@echo "Updating $@..."
+	$(RM) $@
+	$(AWK) -F: '{ if ($$1 != "+") print $$1"\t"$$0 }' $^ \
+		| $(DBLOAD) -f- $@
+
+

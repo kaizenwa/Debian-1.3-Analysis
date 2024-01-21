@@ -1,0 +1,193 @@
+.\" Copyright (c) 1993 Luigi P. Bai (lpb@softint.com) July 28, 1993
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\"
+.\" Modified Wed Jul 28 11:03:24 1993, Rik Faith (faith@cs.unc.edu)
+.\" Modified Sun Nov 28 16:43:30 1993, Rik Faith (faith@cs.unc.edu)
+.\"          with material from Giorgio Ciucci (giorgio@crcc.it)
+.\" Portions Copyright 1993 Giorgio Ciucci (giorgio@crcc.it)
+.\"
+.\" Traduction 16/10/1996 par Christophe Blaess (ccb@club-internet.fr)
+.\"
+.TH SHMCTL 2 "16 Octobre 1996" Linux "Manuel du programmeur Linux"
+.SH NOM
+shmctl \- Controle de la memoire partagee.
+.SH SYNOPSIS
+.ad l
+.B #include <sys/ipc.h>
+.sp
+.B #include <sys/shm.h>
+.sp
+.BI "int shmctl(int " shmid ", int " cmd ", struct shmid_ds *" buf );
+.ad b
+.SH DESCRIPTION
+\fBshmctl()\fP
+permet a l'utilisateur d'obtenir des informations concernant un
+segment de memoire partagee, ainsi que de fixer le proprietaire
+le groupe et les permissions d'acces a ce segment. 
+Cette fonction permet egalement de detruire un segment.
+
+Les informations concernant le segment identifie par
+\fIshmid\fP sont renvoyees dans une structure \fIshmid_ds\fP :
+.PP
+.in +0.5i
+.nf
+struct shmid_ds {
+  struct          ipc_perm shm_perm; /* Permissions d'acces       */
+  int             shm_segsz;         /* Taille segment en octets  */
+  time_t          shm_atime;         /* Heure dernier attachement */
+  time_t          shm_dtime;         /* Heure dernier detachement */
+  time_t          shm_ctime;         /* Heure dernier changement  */
+  unsigned short  shm_cpid;          /* PID du createur           */
+  unsigned short  shm_lpid;          /* PID du dernier operateur  */
+  short           shm_nattch;        /* Nombre d'attachements     */
+  /* ------------- Les champs suivants sont prives -------------- */
+  unsigned short  shm_npages;        /* Taille segment en pages   */
+  unsigned long   *shm_pages;        /* Taille d'une page (?)     */
+  struct shm_desc *attaches;         /* Descript. attachements    */
+};
+.fi
+.in -0.5i
+.PP
+Le champ \fIshm_perm\fP a la forme suivante :
+.PP
+.in +0.5i
+.nf
+struct ipc_perm
+{
+  key_t  key;
+  ushort uid;   /* UID et GID effectifs du proprietaire    */
+  ushort gid;
+  ushort cuid;  /* UID et GID effectif du createur         */
+  ushort cgid;
+  ushort mode;  /* Mode d'acces sur 9 bits de poids faible */
+  ushort seq;   /* numero de sequence                      */
+};
+.fi
+.PP
+Les commandes \fIcmd\fP suivantes sont disponibles :
+.br
+.TP 12
+.B IPC_STAT
+permet de recuperer dans le buffer \fIbuf\fP les informations
+concernant le segment de memoire partagee.
+L'apellant doit avoir la permission d'acces en lecture sur
+le segment.
+.TP
+.B IPC_SET
+sert a appliquer les changements que l'utilisateur a apportes dans
+les champs \fIuid\fP, \fIgid\fP,ou \fImode\fP 
+de la structure \fIshm_perms\fP.  Seuls les 9 bits de poids
+faibles sont utilises dans \fImode\fP. Le membre
+.I shm_ctime
+est aussi mis a jour.
+L'appelant doit etre le createur du segment, son proprietaire, ou
+le Super\-User.
+.TP
+.B IPC_RMID
+permet de considerer un segment comme detruit. Il sera detruit
+effectivement apres le dernier detachement (quand le membre
+.I shm_nattch
+de la structure
+.I shmid_ds
+associee vaudra zero.)  
+L'appelant doit etre le createur du segment, son proprietaire, ou
+le Super\-User.
+.PP
+Attention, meme apres le dernier detachement, le contenu du segment
+n'est pas efface par le systeme. Un processus realisant a nouveau
+un attachement recuperera son contenu. Il est a la charge du processus
+l'utilisateur d'ecraser le contenu du segment s'il ne veut pas qu'il
+persiste.
+.PP
+De plus  le \fBSuper\-User\fP peut autoriser ou interdire le
+swapping d'un segment avec les commandes suivantes 
+(specifique Linux) :
+.br
+.TP 12
+.B SHM_LOCK
+empeche le swapping d'un segment de memoire partagee. L'appelant
+doit consulter chaque page concernee apres avoir effectue le
+verrouillage pour s'assurer qu'elle soit bien presente en memoire.
+.TP
+.B SHM_UNLOCK
+reautorise le swapping d'un segment. 
+.PP
+Les appels systemes
+.BR IPC_INFO ,
+.BR IPC_STAT
+et
+.B IPC_RMID
+sont utilises par le programme
+.BR ipcs (1)
+afin d'obtenir des informations sur les ressources allouees.
+.PP
+.SH "AUTRES APPELS SYSTEMES"
+.TP
+.B fork()
+Apres un
+.B fork()
+le fils herite des segments de memoire partagee.
+.TP
+.B exec()
+Apres un
+.B exec()
+tous les segments de memoire partagee sont detaches (pas detruits).
+.TP
+.B exit()
+Lors d'un
+.B exit()
+tous les segments de memoire partagee sont detaches (pas detruits).
+.PP
+.SH "VALEUR RENVOYEE"
+.B shmctl
+renvoie 0 s'il reussit et \-1 s'il echoue, auquel cas
+.I errno
+contient le code d'erreur.
+.SH ERREURS
+.TP 12
+.B EACCESS
+on demande \fBIPC_STAT\fP mais
+\fIshm_perm.modes\fP ne permet pas la lecture du segment
+.IR shmid .
+.TP
+.B EFAULT
+.I cmd
+a la valeur
+.B IPC_SET
+ou
+.B IPC_STAT
+mais
+.I buf
+pointe en\-dehors de l'espace d'adressage accessible.
+.TP
+.B EINVAL
+\fIshmid\fP n'est pas un identificateur de segment valide,
+ou \fIcmd\fP n'est pas une commande reconnue.
+.TP
+.B EIDRM
+\fIshmid\fP pointe sur un segment detruit.
+.TP
+.B EPERM
+On reclame \fBIPC_SET\fP ou \fBIPC_RMID\fP mais l'appelant n'est
+ni le proprietaire du segment, ni son createur, ni le Super\-User.
+.SH "VOIR AUSSI"
+.BR shmget "(2), " shmop (2)

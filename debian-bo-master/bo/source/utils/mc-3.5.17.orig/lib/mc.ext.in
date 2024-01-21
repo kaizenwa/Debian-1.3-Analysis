@@ -1,0 +1,369 @@
+# Midnight Commander 3.0 extension file
+# Warning: Structure of this file has changed completely with version 3.0
+#
+# All lines starting with # or empty lines are thrown away.
+# Lines starting in the first column should have following format:
+#
+# keyword/descNL, i.e. everything after keyword/ until new line is desc
+#
+# keyword can be: 
+#
+#    shell (desc is, when starting with a dot, any extension (no wildcars), 
+#          i.e. matches all the files *desc . Example: .tar matches *.tar;
+#          if it doesn't start with a dot, it matches only a file of that name)
+#    regex (desc is a regular expression)
+#          Please note that we are using the GNU regex library and thus
+#          \| matches the literal | and | has special meaning (or) and
+#          () have special meaning and \( \) are standing for literal ( ).
+#    type  (file matches this if `file %f` matches regular expression desc
+#          (the filename: part from `file %f` is removed))
+#    directory (matches any directory matching regular expression desc)
+#    default (matches any file no matter what desc is)
+#
+# Other lines should start with a space or tab and should be of the format:
+#
+# keyword=commandNL (with no spaces around =), where keyword should be: 
+#
+#    Open (if the user presses Enter or doubleclicks it), 
+#
+#    View (F3), Edit (F4), Drop (user drops some files on it) or any other
+#
+#    user defined name (those will be listed in the extension dependent pop-up
+#    menu). 
+#
+#    Icon name is name of the corresponding icon (XPM). If it has no path,
+#    the default path for mc icons @prefix@/lib/mc/icons is assumed.
+#
+#    Title is the default icon title for objects. %p is expanded into the
+#    name of that file and %d/%p to a name with full path. Default title
+#    (if none is specified) is %p
+#
+# command is any one-line shell command, with the following substitutions:
+#
+# %% -> % character
+# %p -> name of the current file (without path, but pwd is its path)
+# %f -> name of the current file. Unlike %p, if file is located on a 
+#	non-local virtual filesystem, i.e. either tarfs, mcfs or ftpfs,
+#	then the file will be temporarily copied into a local directory
+#	and %f will be the full path to this local temporal file.
+#	If you don't want to get a local copy and want to get the
+#	virtual fs path (like ftp://ftp.cvut.cz/pub/hungry/xword), then
+#	use %d/%p instead of %f.
+# %d -> name of the current directory (pwd, without trailing slash)
+# %s -> "selected files", i.e. space separated list of tagged files if any
+#       or name of the current file
+# %t -> list of tagged files
+# %u -> list of tagged files (they'll be untaged after the command)
+#
+# (If these 6 letters are in uppercase, they refer to the other panel.
+# But you shouldn't have to use it in this file.)
+#
+#
+# %cd -> the rest is not command, but a path which will mc cd internally
+#       into (cd wouldn't work, since it is a child process, and %cd handles 
+#       even the vfs names (e.g. tar:archive.tar/path or
+#       ftp://tsx-11.mit.edu/
+#
+# %view -> the command you type will be piped into mc's internal file viewer
+#	if you type only the %view and no command, viewer will load %f file
+#	instead (i.e. no piping, so it is different to %view cat %f)
+#	%view may be directly followed by {} with a list of any of
+#	ascii (Ascii mode), hex (Hex mode), nroff (c\bc color highlighting)
+#	and unformatted (not highlighting nroff sequences) separated by
+#	spaces.
+#
+# %var -> You use it like this: %var{ENV-VAR:default}.  This macro will expand
+#       to the value of the ENV-VAR variable in the environement if it is set
+#       otherwise the value in default will be used.  This is similar to
+#       the Bourne shell ${VAR-def} construct.  We use it so that the extension
+#       file could be used unchanged under some shells that may use different
+#       methods of doing this
+#
+# %q -> will be replaced with a list of files user dropped on it
+#	with full pathnames (only applicable in the Drop command).
+#
+# Target are evaluted from top to bottom (order is thus important).
+# If some actions are missing, search continues as if this target didn't
+# match (i.e. if a file matches the first and second entry and View action
+# is missing in the first one, then on pressing F3 the View action from
+# the second entry will be used. default should catch all the actions.
+#
+# Any handy entries you develop for you are always welcome, if it has
+# wider usage than on one system. You can send your modifications to
+# via email to mc-devel@roxanne.nuclecu.unam.mx
+
+# .tgz, .tpz, .tar.gz, .tar.z, .tar.Z
+
+regex/\.t([gp]?z|ar\.g?[zZ])$
+	Open=%cd tar:%d/%p/
+	View=%view{ascii} gzip -dc %f 2>/dev/null | tar tvvf -
+	Extract=gzip -dc %f 2>/dev/null | tar xf -
+	Icon=compressed.xpm
+
+# .tar
+shell/.tar
+	Open=%cd tar:%d/%p/
+	View=%view{ascii} tar tvvf %f
+	Extract=tar xf %f
+	Icon=tar.xpm
+
+# Programs
+shell/rm
+	Open=if test ! -d ~/.trash; then mkdir ~/.trash; fi; I=%{Enter file to be safely deleted}; if test -n "$I"; then mv -f -b -V numbered %q ~/.trash; fi
+	Icon=rubbish.xpm
+	Drop=if test ! -d ~/.trash; then mkdir ~/.trash; fi; mv -f -b -V numbered %q ~/.trash
+	Flush=rm -rf ~/.trash
+	Title=Safe delete
+
+shell/lpr
+	Open=lpr %{Enter file(s) to print}
+	Icon=printer.xpm
+	Drop=lpr %q
+	Print=lpr %{Enter file(s) to print}
+
+shell/gzip
+	Open=gzip %{Enter file to gzip}
+	Icon=compressed.xpm
+	Drop=gzip %q
+
+shell/gunzip
+	Open=gunzip %{Enter file to gunzip}
+	Icon=compressed.xpm
+	Drop=gunzip %q
+
+shell/gdb
+	Open=gdb
+	Icon=bug.xpm
+	Drop=gdb %q
+
+# a directory
+directory/^..$
+	Icon=parent_dir.xpm
+directory/^News$
+	Icon=news_dir.xpm
+directory/^Mail$
+	Icon=mail_dir.xpm
+directory/^\..*$
+	Icon=hidden_dir.xpm
+directory/^.*$
+	View=%view{ascii,nroff} echo "_D_i_r_e_c_t_o_r_y"; echo %d/%p
+	Icon=plain_dir.xpm
+
+# ls-lR
+regex/^ls-?lR$
+	Open=%cd lslR:%d/%p/
+	View=%view{ascii}
+	Icon=plain_dir.xpm
+regex/^ls-?lR\.(g?z|Z)$
+	Open=%cd lslR:%d/%p/
+	View=%view{ascii} gunzip -c %f
+	Icon=plain_dir.xpm
+
+# rpm
+regex/\.rpm$
+	Open=%cd rpm:%d/%p/
+
+# zip
+regex/\.(zip|ZIP)$
+	Open=%cd zip:%d/%p/
+	View=%view{ascii} unzip -v %f
+	Icon=zip.xpm
+	Unzip=unzip %f '*'
+
+# zoo
+shell/.zoo
+	Open=%cd zoo:%d/%p/
+	View=%view{ascii} zoo l %f
+	Icon=zoo.xpm
+	Extract=zoo x %f '*'
+
+# lha
+regex/\.l(ha|zh)$
+	Open=lharc l %f | %var{PAGER:more}
+	View=%view{ascii} lharc l %f
+	Icon=lharc.xpm
+	Extract=lharc x %f '*'
+
+# arj
+regex/\.a(rj|[0-9][0-9])$
+	Open=unarj l %f | %var{PAGER:more}
+	View=%view{ascii} unarj l %f
+	Icon=zip.xpm
+	Unarj=unarj x %f '*'
+
+# C
+shell/.c
+	Open=%var{PAGER:more} %f
+	View=%view{ascii}
+	Compile=%var{CC:cc} -O -c %f
+	Link=%var{CC:cc} -O -o %d/`basename %f .c` %f
+	Icon=c.xpm
+
+shell/.h
+	Open=%var{EDITOR:vi} %f
+	Icon=h.xpm
+
+shell/.o
+	Open=%var{PAGER:more} %f
+	Link=%var{CC:cc} -O %f
+	Icon=o.xpm
+
+shell/.s
+	Open=%var{PAGER:more} %f
+	Assemble=%var{CC:cc} -O -c %f
+	Link=%var{CC:cc} -O -o %d/`basename %f .s` %f
+	Icon=s.xpm
+
+shell/.dvi
+	Open=xdvi %f
+	Icon=binary.xpm
+
+shell/.tex
+	Open=%var{PAGER:more} %f
+	TeX=tex %f
+	Icon=tex.xpm
+
+regex/\.(te?xi)|(texinfo)$
+	Icon=tex.xpm
+
+# C++
+regex/\.(C|cc)$
+	Open=%var{PAGER:more} %f
+	View=%view{ascii}
+	Compile=c++ -O -c %f
+	Link=c++ -O -o %d/`basename %f .c` %f
+	Icon=cc.xpm
+
+# ar library
+regex/\.s?a$
+	Open=%view{ascii} ar tv %f
+	View=%view{ascii} nm %f
+	Icon=a.xpm
+
+# .so libraries are not manual pages
+regex/\.so\.[0-9\.]*$
+	View=%view{hex}
+	Icon=so.xpm
+
+# Manual page
+regex/(([^0-9]|^[^\.]*)\.([1-9][a-z]?|n)|\.man)$
+	Open=nroff @TROFFASCII@ @MANDOC@ %f | %var{PAGER:more}
+	View=%view{ascii,nroff} nroff @TROFFASCII@ @MANDOC@ %f
+	Icon=man.xpm
+
+# Troff with me macros.
+shell/.me
+	Open=nroff @TROFFASCII@ -me %f | %var{PAGER:more}
+	View=%view{ascii,nroff} nroff @TROFFASCII@ -me %f
+	Icon=man.xpm
+
+# Troff with ms macros.
+shell/.ms
+	Open=nroff @TROFFASCII@ -ms %f | %var{PAGER:more}
+	View=%view{ascii,nroff} nroff @TROFFASCII@ -ms %f
+	Icon=man.xpm
+
+# Manual page - compressed
+regex/([^0-9]|^[^\.]*)\.([1-9][a-z]?|n)\.g?[Zz]$
+	Open=gunzip -dc %f | nroff @TROFFASCII@ @MANDOC@ | %var{PAGER:more}
+	View=%view{ascii,nroff} gunzip -dc %f | nroff @TROFFASCII@ @MANDOC@
+	Icon=man.xpm
+
+regex/(read\.?me$)|(README)
+	Icon=info.xpm
+
+shell/core
+	Icon=core.xpm
+
+type/PostScript\ text
+	Open=ghostview %f
+	Icon=postscript.xpm
+
+type/GIF\ picture
+	Open=xv %f
+	Icon=gif.xpm
+	
+type/JPEG\ picture
+	Open=xv %f
+	Icon=jpeg.xpm
+	
+type/TIFF\ file
+	Open=xv %f
+	Icon=tiff.xpm
+	
+type/PBM
+	Open=xv %f
+	Icon=pbm.xpm
+	
+type/PGM
+	Open=xv %f
+	Icon=pgm.xpm
+	
+type/PPM
+	Open=xv %f
+	Icon=ppm.xpm
+	
+shell/.xbm
+	Open=bitmap %f
+	Icon=xbm.xpm
+
+shell/.xpm
+	Open=xv %f
+	View=sxpm %f
+	Icon=xpm.xpm
+
+# Sound files
+shell/.mod
+       Open=tracker %f
+       Icon=sound.xpm
+regex/\.(wav)|(snd)|(voc)|(au)$
+       Open=play %f
+       Icon=sound.xpm
+
+type/FrameMaker
+	Open=fmclient -f %f
+	Icon=framemaker.xpm
+
+type/mail
+	Open=elm -f %f
+	Icon=mail.xpm
+
+# gzipped
+type/gzip
+	Open=gzip -dc %f | %var{PAGER:more}
+	View=%view{ascii} gzip -dc %f 2>/dev/null
+	Edit=I=`date +%%s`; export I; gzip -cd %f >/tmp/gzed.$I && %var{EDITOR:vi} /tmp/gzed.$I && gzip -c /tmp/gzed.$I > %f; rm -f /tmp/gzed.$I
+	Icon=compressed.xpm
+
+# Makefile
+regex/[Mm]akefile
+	Open=make -f %f %{Enter parameters}
+	Icon=makefile.xpm
+
+shell/Imakefile
+	Open=xmkmf -a
+	Icon=makefile.xpm
+
+# Executables
+type/executable
+	Open=./%f
+	View=%view
+	Drop=./%f %q
+	Libraries=%view{ascii} ldd %f
+	Icon=application.xpm
+
+# HTML
+regex/\.html?$
+#	Open=if echo "%d/%p" | grep ^ftp; then $viewer %d/%p; else $viewer file:%p; fi
+	Open=if [ x$DISPLAY = x ]; then lynx %p; else (@X11_WWW@ %p &); fi
+	View=%view{ascii} if echo "%d/%p" | grep ^ftp; then lynx -dump %d/%p; else lynx -dump %p; fi
+	Icon=html.xpm
+
+# Default target for anything not described above
+default/*
+	Open=
+	View=%view{ascii}
+	Edit=%var{EDITOR:vi} %f
+	Drop=
+	Icon=plain.xpm
+	Title=%p

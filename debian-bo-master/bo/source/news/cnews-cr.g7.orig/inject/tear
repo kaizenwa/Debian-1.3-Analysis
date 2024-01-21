@@ -1,0 +1,42 @@
+#! /bin/sh
+# tear prefix [file...] - tear RFC822 header and body apart
+#	output files are $1hdr and $1body
+PATH=/bin:/usr/bin; export PATH
+
+case $# in
+0)
+	echo "usage: tear prefix [file...]" >&2
+	exit 1
+	;;
+esac
+
+hdr="$1hdr"
+body="$1body"
+shift
+
+>>$hdr					# create files just in case
+>>$body
+case $# in
+0)	args="-" ;;	# awk needs a filename due to cmd. line assignments
+*)	args="$@" ;;
+esac
+# thanks to Charles Lindsey for the slightly better checking here
+exec awk 'BEGIN {
+	inbody = 0
+	status = 0
+	hdr = "'"$hdr"'"
+	body = "'"$body"'"
+}
+/^$/ { inbody = 1 }
+inbody == 0 && ($0 ~ /^[^ \t]*:/ || ($0 ~ /^[ \t]/ && NR > 1)) {
+	print >hdr
+	next
+}
+inbody == 0 {
+	print "tear: invalid header \"" $0 "\"" | "cat >&2"
+	status = 1
+}
+inbody == 1 {
+	print >body
+}
+END { exit status }' $args

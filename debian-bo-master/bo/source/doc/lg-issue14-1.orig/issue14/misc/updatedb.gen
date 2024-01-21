@@ -1,0 +1,142 @@
+#!/bin/sh
+# updatedb.gen -- build a general locate database from parameters
+# cloned from /usr/bin/updatedb, Keith Owens.
+# parameter required, the name of the master list file.
+# Copyright (C) 1994 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+# csh original by James Woods; sh conversion by David MacKenzie.
+
+x=${1:?"suffix for file.codes is required"}
+x=${2:?"name of input file list is required"}
+select=$3
+
+# Use cat or zcat
+case `file $2` in
+	*compress*)
+		CAT=zcat
+		;;
+	*)
+		CAT=cat
+		;;
+esac
+
+# The database file to build.
+: ${LOCATE_DB=/var/spool/locate/locatedb.$1}
+
+# These you probably won't need to override:
+
+# Directory to hold intermediate files.
+if test -d /var/tmp; then
+  : ${TMPDIR=/var/tmp}
+else
+  : ${TMPDIR=/usr/tmp}
+fi
+
+# The directory containing the subprograms.
+: ${LIBEXECDIR=/usr/libexec}
+
+# The names of the utilities to run to build the database.
+: ${find=find}
+: ${frcode=frcode}
+: ${bigram=bigram}
+: ${code=code}
+
+PATH=$LIBEXECDIR:$BINDIR:/usr/ucb:/bin:/usr/bin:$PATH export PATH
+
+# Make a file list.  Alphabetize `/' before any other char with `tr'.
+
+$CAT $2 | \
+awk ' \
+#	decide if we process the first line or not
+FNR == 1	{
+	if ($1 == "total") {
+		ls = 1
+		dir = "./"
+	}
+	else if (/:/ && NF == 1) {
+		ls = 1
+		dir = $1
+	}
+	else if (/^\+\+==/) {
+		# slakware MANIFEST
+		ls = 6
+		dir = ""
+	}
+	else
+		ls = 0
+}
+
+#	determine which format we are looking at
+FNR == (ls + 1)	{
+	if ($1 == "total") {
+		++ls
+		next
+	}
+	select = select + 0
+	if (NF == 1)
+		select = 1
+	else {
+		for (i = 1; i <= NF; ++i) {
+			if ($i ~ /^[12][0-9][0-9][0-9]$/ || $i ~ /^[0-2][0-9]:[0-5][0-9]$/)
+				select = i + 1
+		}
+	}
+	if (select == 0) {
+		print "cannot decide which field to select" > "/dev/stderr"
+		exit 1
+	}
+	else
+		print "selecting field " select > "/dev/stderr"
+}
+
+/:/ && ls && NF == 1	{
+	dir = $1
+	sub(/:/, "/", dir)
+}
+
+/^\|\| *Package/ && ls	{
+	# slakware MANIFEST
+	dir = "slakware" substr($NF, 2) "/"
+}
+
+NF < select	{ next }
+
+{
+	if (ls)
+		printf("%s", dir)
+	for (i = select; i <= NF; ++i) {
+		printf("%s", $i)
+		if (i < NF)
+			printf(" ")
+		else
+			printf("\n")
+	}
+}
+
+' select=$select | \
+sort -f | $frcode > $LOCATE_DB.n
+
+# To avoid breaking locate while this script is running, put the
+# results in a temp file, then rename it atomically.
+if test -s $LOCATE_DB.n; then
+  rm -f $LOCATE_DB
+  mv $LOCATE_DB.n $LOCATE_DB
+  chmod 644 $LOCATE_DB
+else
+  echo "updatedb: new database would be empty" >&2
+  rm -f $LOCATE_DB.n
+fi

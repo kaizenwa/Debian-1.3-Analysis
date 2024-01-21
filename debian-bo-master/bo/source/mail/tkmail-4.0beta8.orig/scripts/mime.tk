@@ -1,0 +1,770 @@
+# mime.tk - support file for TkMail 
+#	    commands for MIME operations
+#
+# $Header: /u/ra/raines/cvs/tk/tkmail2/mime.tk,v 1.3 1995/09/07 16:24:31 raines Exp $
+
+proc mfv:mime-show-part {top tw fid msg mplist} {
+
+  set part [lindex $mplist 0]
+  set type [lindex $mplist 1]
+  set subtype [lindex $mplist 2]
+  set fulltype "$type/$subtype"
+
+  if {$type == "multipart" || $fulltype == "message/rfc822"} {
+    if {$subtype == "alternative"} {
+      # TODO: for now take last subpart
+      mfv:mime-show-part $top $tw $fid $msg [lindex [lindex $mplist 3] end]
+    } else {
+      foreach subpart [lindex $mplist 3] {
+	mfv:mime-show-part $top $tw $fid $msg $subpart
+      }
+    }
+    return
+  }
+
+  set enc [$fid message mimepart $msg encoding $part]
+
+  if {$fulltype == "text/plain" || $fulltype == "message/delivery-status"} {
+    if [catch {$tw insert insert [$fid message mimepart $msg body $part $enc]} res] {
+      $tw insert insert "\n\nMIME-ERROR: $res\n\n"
+    }
+  } elseif {$fulltype == "text/enriched" || $fulltype == "text/richtext"} {
+    set charset [$fid message mimepart $msg param $part charset]
+    if ![string length $charset] { set charset us-ascii }
+    mfv:parse-enriched $tw $fid $msg $part $charset {} [expr {$subtype == "richtext"}]
+  } elseif {$type == "message"} {
+    $tw insert insert "\nSORRY.  $type/$subtype not handled yet\n\n"
+  } else {
+    if {$type == "image"} {
+      if ![catch {$fid message mimepart $msg write $part {} $enc} res] {
+	set tmpfile $res
+	switch -regexp -- $subtype {
+	  {^(xbm|x-xbm|bitmap)$} {set fmt bitmap}
+	  {^(xpm|x-xpm|pixmap)$} {set fmt pixmap}
+	  default {set fmt photo}
+	}
+	if ![catch "image create $fmt image$part -file $tmpfile" res] {
+	  set frame $top.mimelbl[join [split $part .] _]
+	  if [winfo exists $frame] { destroy $frame }
+	  label $frame -image image$part
+	  $tw insert insert \n
+	  $tw window create insert -window $frame
+	  $tw insert insert \n
+	  return
+	}
+      }
+    }
+    $tw insert insert "\nATTACHMENT: $type/$subtype  "
+    set btn $top.mimebtn[join [split $part .] _]
+    if ![winfo exists $btn] { button $btn -text View }
+    $btn configure -command "mfv:mime-external-view $tw $fid $msg $part 0"
+    bind $btn <ButtonRelease-3> "mfv:mime-external-view $tw $fid $msg $part 1"
+    $tw window create insert -window $btn
+    set desc [$fid message mimepart $msg description $part]
+    if {[string length $desc]} {
+      $tw insert insert "\n\t$desc\n"
+    } else {
+      $tw insert insert "\n"
+    }
+  }
+}
+
+proc mfv:mime-external-view { tw fid msg part {prompt 0}} {
+  global mf mfp mfdb
+
+  set top [winfo toplevel $tw]
+  mfv:wait-on
+
+  set type [$fid message mimepart $msg type $part]
+  set subtype [$fid message mimepart $msg subtype $part]
+  set ftype "$type/$subtype"
+
+  # TODO: parse /etc/mailcap?
+  set cmd $mf(mime-external-default)
+  foreach rule $mf(mime-external-viewers) {
+    if {[regexp -nocase "^${ftype}$" [lindex $rule 0]]} {
+      set cmd [lindex $rule 1]
+      break
+    }
+    if {[regexp -nocase "^${type}$" [lindex $rule 0]]} {
+      set cmd [lindex $rule 1]
+    }
+  }
+
+  # default to prompting user for file to write contents to
+  if {![string length [string trim $cmd]] || 
+      [regexp -nocase "@prompt" $cmd] || $prompt} {
+    set res [mfv:mime-to-file $tw $fid $msg $part]
+    mfv:wait-off
+    return $res
+  }
+
+  set enc [$fid message mimepart $msg encoding $part]
+  if [catch {$fid message mimepart $msg write $part {} $enc} file] {
+    mfv:error-mesg $file
+    mfv:wait-off; return 1
+  }
+
+  # run desired command in background
+  set cmd "exec $cmd"
+  if {[regsub -all {([^%]|^)%([FTtAS])} $cmd "\\1\004\\2\004" cmd]} {
+    regsub -all {%%} $cmd {%} cmd
+    if {![regsub -all "\004F\004" $cmd $file cmd]} {
+      append cmd " $file" 
+    }
+    #TODO: regsub -all "\004T\004" $cmd "{$ftype; $param}" cmd
+    regsub -all "\004t\004" $cmd $ftype cmd
+    set whofrom [$fid message field $msg from]
+    regsub -all "\004A\004" $cmd "{$whofrom}" cmd
+    set subject [$fid message field $msg subject]
+    regsub -all "\004S\004" $cmd "{$subject}" cmd
+
+  } else {
+    regsub -all {%%} $cmd {%} cmd
+    append cmd " $file" 
+  }
+
+  set cmd [string trim $cmd]
+  if {[string index $cmd [expr [string length $cmd]-1]] != "&"} {append cmd " &"}
+  puts stderr $cmd
+  if ![catch $cmd res] {
+    mfv:log-mesg $top "Ran $cmd in background"
+  } else {
+    mfv:error-mesg $res
+    mfv:wait-off; return 1
+  }
+  mfv:wait-off; return 0
+}
+
+proc mfv:mime-to-file { tw fid msg part } {
+  set top [winfo toplevel $tw]
+
+  set default [$fid message mimepart $msg param $part name]
+  set dispos [$fid message mimepart $msg disposition $part]
+  if [regexp -nocase {filename=\"*([^;\"]+)} $dispos trash name] {
+    set default $name
+  } elseif [string length $dispos] {
+    puts stderr "Strange Dispos: $dispos"
+  }
+
+  set encfile [ut:getstr -prompt "Enter filename to save attachment in:" \
+		  -master $top -fc 1 -default $default]
+  if {![string length $encfile]} {
+    return 0
+  }
+  set putdir [file dirname $encfile]
+  set encfile [file tail $encfile]
+  if {![file isdirectory $putdir]} {
+    mfv:error-mesg "$putdir is not a directory" $top
+    return 255
+  }
+  if {[file exists $putdir/$encfile]} {
+    if {![ut:getok -master $top -prompt "Overwrite existing file $encfile?"]} {
+      return 0
+    }
+  }
+
+  set enc [$fid message mimepart $msg encoding $part]
+  if [catch {$fid message mimepart $msg write $part $putdir/$encfile $enc} res] {
+    mfv:error-mesg $res
+    return 1
+  }
+
+  mfv:log-mesg $top "Message $msg/$part contents written to $putdir/$encfile"
+  return 0
+}
+
+proc mfv:get-font {tw base weight slant size charset} {
+
+  set charset [string tolower $charset]
+  if {$charset == "us-ascii"} { 
+    set charset *
+  } elseif {[regexp {iso-8859-([1-9])} $charset trash num]} {
+    set charset "iso8859-$num"
+  }
+
+  set font "-$base-$weight-$slant-normal-*-$size-*-*-*-*-*-$charset"
+  if {![catch "$tw tag configure test -font \$font" res]} {
+    return $font
+  }
+
+  if {$weight == "medium"} {
+    set font "-$base-regular-$slant-normal-*-$size-*-*-*-*-*-$charset"
+    if {![catch "$tw tag configure test -font \$font"]} {
+      return $font
+    }
+  }
+
+  if {$slant == "i"} {
+    set font "-$base-$weight-o-normal-*-$size-*-*-*-*-*-$charset"
+    if {![catch "$tw tag configure test -font \$font"]} {
+      return $font
+    }
+    if {$weight == "medium"} {
+      set font "-$base-regular-o-normal-*-$size-*-*-*-*-*-$charset"
+      if {![catch "$tw tag configure test -font \$font"]} {
+	return $font
+      }
+    }
+  }
+
+  if {$charset != "*"} {
+    return [mfv:get-font $tw $base $weight $slant $size *]
+  }
+  return fixed
+}
+
+proc mfv:set-tag-font {tw font under justify} {
+  if {[lsearch [$tw tag names] t$under-$font-$justify] > -1} return
+  $tw tag configure t$under-$font-$justify -font $font -underline $under -justify $justify
+}
+
+proc mfv:parse-enriched {tw fid msg part charset prefix {richtext 0}} {
+  global mf mfp mfdb
+
+  set tagslist {}
+  set tagstart [$tw index insert]
+  set weight medium
+  set slant r
+  set fntbase "[lindex $mf(mime-font-default) 0]-[lindex $mf(mime-font-default) 1]"
+  set fntsize [lindex $mf(mime-font-default) 2]
+  set curfont [mfv:get-font $tw $fntbase medium r $fntsize $charset]
+  set curtag t0-$curfont-left
+  mfv:set-tag-font $tw $curfont 0 left
+
+  set chars 0
+  set on 1
+  set charsetlist $charset
+
+  set nofill 0
+  set just {0 0 0}
+  set justify left
+  set bold 0
+  set italic 0
+  set fixed 0
+  set smaller 0
+  set bigger 0
+  set underline 0
+  set excerpt 0
+  set param 0
+
+  set indent 0
+  set indenttxt $prefix
+  set indentlen [string length $indenttxt]
+  set indentright 0
+  set max 72
+
+  set enc [$fid message mimepart $msg encoding $part]
+
+  set bodylist [split [$fid message mimepart $msg body $part $enc] \n]
+  set lastline [llength $bodylist]
+
+  for {set lineno 0} {$lineno < $lastline} {incr lineno} {
+    set line [lindex $bodylist $lineno]
+    if {$on && (([lempty $line] && !$richtext) || $nofill)} {
+      $tw insert insert \n
+      set chars 0
+      continue
+    }
+    append line " "
+    while {[set ndx [string first "<" $line]] > -1} {
+      set skipit 0
+      set str [string range $line 0 [expr $ndx-1]]
+      set line [string range $line [incr ndx] end]
+      if {[string first "<" $line] == 0} {
+	append str "<"
+	set line [string range $line 1 end]
+	set skipit 1
+      }
+      if {[set len [string length $str]] && $on} {
+	if {!$chars} {
+	  $tw insert insert $indenttxt
+	  set chars $indentlen
+	}
+	set lastchar [expr $max-$chars]
+	while {$len > $lastchar} {
+	  while {![string match {[ 	]} [string index $str $lastchar]] &&
+		 $lastchar > 0} {
+	    incr lastchar -1
+	  }
+	  if {$lastchar < 1} {
+	    set lastchar [expr $max-$chars]
+	    while {![string match {[ 	]} [string index $str $lastchar]] &&
+		   $lastchar < $len} {
+	      incr lastchar
+	    }
+	  }
+	  $tw insert insert [string range $str 0 $lastchar]
+	  incr lastchar
+	  set str [string trimleft [string range $str $lastchar end]]
+	  set len [string length $str]
+	  $tw insert insert "\n$indenttxt"
+	  set chars $indentlen
+	  set lastchar [expr $max-$chars]
+	}
+	$tw insert insert $str
+	incr chars $len
+      }
+      if {$skipit} continue
+      while {[set ndx [string first ">" $line]] < 0} {
+	incr lineno
+	if {$lineno >= $lastline} { 
+	  mfv:error-msg "Error parsing enriched text" [winfo toplevel $tw]
+	  return
+	}
+	append line [lindex $bodytext $lineno]
+      }
+      set format [string trim [string tolower [string range $line 0 [expr $ndx-1]]]]
+      set line [string range $line [incr ndx] end]
+      if {!$chars} {
+	set line [string trimleft $line]
+      }
+      set update 0
+      switch -regexp $format {
+	{^lt} {
+	  $tw insert insert {<}
+	}
+	{^nl} {
+	  $tw insert insert \n
+	  set chars 0
+	}
+	{^np} {
+	  $tw insert insert \n\n\n
+	  set chars 0
+	}
+	{/paragraph} {
+	  $tw insert insert \n\n
+	  set chars 0
+	}
+	{paragraph} {
+	  if [$tw compare "insert linestart" != insert] {
+	    $tw insert insert \n\n
+	  } elseif [$tw compare "insert -1 line linestart" != "insert -1 line end"] {
+	    $tw insert insert \n
+	  }
+	  set chars 0
+	}
+	{(/us-ascii|/iso-8859-.*)} {
+	  set charsetlist [lreplace $charsetlist 0 0]
+	  if [llength $charsetlist] {
+	    set charset [lindex $charsetlist 0]
+	    set update 1
+	  } else {
+	    set charsetlist $charset
+	  }
+	}
+	{(us-ascii|iso-8859-.*)} {
+	  set charsetlist [linsert $charsetlist 0 $format]
+	  set charset us-ascii
+	  set update 1
+	}
+	{/bold} {
+	  incr bold -1
+	  if {!$bold} {set weight medium; set update 1}
+	}
+	{bold} {
+	  if {!$bold} {set weight bold; set update 1}
+	  incr bold
+	}
+	{/italic} {
+	  incr italic -1
+	  if {!$italic} {set slant r; set update 1}
+	}
+	{italic} {
+	  if {!$italic} {set slant i; set update 1}
+	  incr italic
+	}
+	{/underline} {
+	  incr underline -1
+	  if {!$underline} {set update 1}
+	}
+	{underline} {
+	  if {!$underline} {set update 1}
+	  incr underline
+	}
+	{/fixed} {
+	  incr fixed -1
+	  if {!$fixed} {
+	    set fntbase "[lindex $mf(mime-font-default) 0]-[lindex $mf(mime-font-default) 1]"
+	    set update 1
+	  }
+	}
+	{fixed} {
+	  if {!$fixed} {
+	    set fntbase "[lindex $mf(mime-font-fixed) 0]-[lindex $mf(mime-font-fixed) 1]"
+	    set update 1
+	  }
+	  incr fixed
+	}
+	{/smaller} {
+	  incr fntsize 2
+	  set update 1
+	  incr smaller -1
+	}
+	{smaller} {
+	  incr fntsize -2
+	  set update 1
+	  incr smaller
+	}
+	{/bigger} {
+	  incr fntsize -2
+	  set update 1
+	  incr smaller -1
+	}
+	{bigger} {
+	  incr fntsize 2
+	  set update 1
+	  incr smaller
+	}
+	{/nofill} {
+	  set just [lreplace $just 0 0]
+	  set nofill [lindex $just 0]
+	  if {$on} {
+	    $tw insert insert \n
+	    set chars 0
+	  }
+	}
+	{nofill} {
+	  set just [linsert $just 0 1]
+	  set nofill 1
+	  if {$on} {
+	    $tw insert insert \n
+	    set chars 0
+	  }
+	}
+	{/center} {
+	  set just [lreplace $just 0 0]
+	  set nofill [lindex $just 0]
+	  set justify [lreplace $justify 0 0]
+	  set update 1
+	  if {$on} {
+	    $tw insert insert \n
+	    set chars 0
+	  }
+	}
+	{center} {
+	  set just [linsert $just 0 0]
+	  set nofill 0
+	  set justify [linsert $justify 0 center]
+	  set update 1
+	  if {$on} {
+	    $tw insert insert \n
+	    set chars 0
+	  }
+	}
+	{/flush.*} {
+	  set just [lreplace $just 0 0]
+	  set nofill [lindex $just 0]
+	  set justify [lreplace $justify 0 0]
+	  set update 1
+	  if {$on} {
+	    $tw insert insert \n
+	    set chars 0
+	  }
+	}
+	{flush.*} {
+	  set just [linsert $just 0 0]
+	  set nofill 0
+	  set justify [linsert $justify 0 [string range $format 5 end]]
+	  set update 1
+	  if {$on} {
+	    $tw insert insert \n
+	    set chars 0
+	  }
+	}
+	{(/indentright|^outdentright)} {
+	  incr indentright -1
+	  incr max 4
+	}
+	{(indentright|/outdentright)} {
+	  incr indentright
+	  incr max -4
+	}
+	{(/indent|^outdent)} {
+	  incr indent -1
+	  if {$indent < 0} {
+	    set indent 0
+	  } else {
+	    set indenttxt [string range $indenttxt 0 [expr $indentlen-5]]
+	    set indentlen [string length $indenttxt]
+	  }
+	}
+	{(indent|/outdent)} {
+	  incr indent
+	  append indenttxt "    "
+	  set indentlen [string length $indenttxt]
+	  if {!$chars && $on} {
+	    $tw insert insert $indenttxt
+	    set chars $indentlen
+	  }
+	}
+	{(/excerpt|/signature)} {
+	  incr indent -1
+	  set indenttxt [string range $indenttxt 0 [expr $indentlen-5]]
+	  set indentlen [string length $indenttxt]
+	  incr indentright -1
+	  incr max 4
+	}
+	{(excerpt|signature)} {
+	  incr indent
+	  append indenttxt "    "
+	  set indentlen [string length $indenttxt]
+	  incr indentright
+	  incr max -4
+	}
+	{(/comment|/param|/heading|/footing)} {
+	  set on 1
+	}
+	{(comment|param|heading|footing)} {
+	  set on 0
+	}
+      }
+      if {$update} {
+	lappend tagslist [list $curtag $tagstart [$tw index insert]]
+	set tagstart [$tw index insert]
+	set curfont [mfv:get-font $tw $fntbase $weight $slant $fntsize $charset]
+	mfv:set-tag-font $tw $curfont $underline [lindex $justify 0]
+	set curtag t$underline-$curfont-[lindex $justify 0]
+      }
+    }
+    if {[set len [string length $line]] && $on} {
+      if {!$chars} {
+	$tw insert insert $indenttxt
+	set chars $indentlen
+      }
+      set lastchar [expr $max-$chars]
+      while {$len > $lastchar} {
+	while {![string match {[ 	]} [string index $line $lastchar]] &&
+	       $lastchar > 0} {
+	  incr lastchar -1
+	}
+	if {$lastchar < 1} {
+	  set lastchar [expr $max-$chars]
+	  while {![string match {[ 	]} [string index $line $lastchar]] &&
+		 $lastchar < $len} {
+	    incr lastchar
+	  }
+	}
+	$tw insert insert "[string range $line 0 $lastchar]\n$indenttxt"
+	incr lastchar
+	set line [string trimleft [string range $line $lastchar end]]
+	set len [string length $line]
+	set chars $indentlen
+	set lastchar [expr $max-$chars]
+      }
+      $tw insert insert $line
+      incr chars $len
+    }
+
+  }
+
+  lappend tagslist [list $curtag $tagstart [$tw index insert]]
+  foreach tagspec $tagslist {
+    $tw tag add [lindex $tagspec 0] [lindex $tagspec 1] [lindex $tagspec 2] 
+  }
+}
+
+proc mfv:mime-attach { mfc type subtype {params {}} {enc {}} {file {}} {desc {}}} {
+  global mf mfp
+
+  tkTextUndoSetup $mfc.comp.txt
+
+  if {!$mfp($mfc,mime)} {
+    set mfp($mfc,bound) [mfv_util boundary]
+    set bound "$mfp($mfc,bound)-0"
+    $mfc.comp.txt insert 1.0 "Content-Transfer-Encoding: 7bit\n"
+    $mfc.comp.txt insert 1.0 "Content-Type: multipart/mixed; boundary=\"$bound\"\n"
+    $mfc.comp.txt insert 1.0 "Mime-Version: 1.0\n"
+
+    $mfc.comp.txt mark set insert "headerend +1 line linestart"
+    $mfc.comp.txt insert insert "This is  a multimedia message in MIME  format.  If you are reading this\n"
+    $mfc.comp.txt insert insert "prefix, your mail reader does  not understand MIME or is not currently\n"
+    $mfc.comp.txt insert insert "configured to parse MIME messages.  You may wish to look into\n"
+    $mfc.comp.txt insert insert "upgrading to a mail reader that does.\n\n"
+    $mfc.comp.txt insert insert "--$bound\n"
+    $mfc.comp.txt insert insert "Content-Type: text/plain; charset=us-ascii\n\n"
+    
+    $mfc.comp.txt mark set insert end
+    $mfc.comp.txt insert insert "\n--$bound--\n"
+    $mfc.comp.txt mark set multiend "end -4c"
+    $mfc.comp.txt insert insert "\nDO NOT DELETE the above boundary line."
+    $mfc.comp.txt insert insert "\nAnything placed after this line will be ignored by MIME readers.\n"
+    set mfp($mfc,mime) 1
+
+  } else {
+    set bound "$mfp($mfc,bound)-0"
+  }
+  $mfc.comp.txt mark set insert "multiend linestart"
+  $mfc.comp.txt insert insert "--$bound\n"
+  $mfc.comp.txt insert insert "Content-Type: $type/$subtype"
+  if {[string length $params]} {
+    foreach param $params {
+      set start [$mfc.comp.txt index insert]
+      $mfc.comp.txt insert insert "; $param"
+      if {[lindex [split [$mfc.comp.txt index insert] .] 1] > 72} {
+	$mfc.comp.txt insert "$start +1 char" "\n\t"
+      }
+    }
+  } else { 
+    $mfc.comp.txt insert insert "\n"
+  }
+  if {[string length $enc]} {
+    $mfc.comp.txt insert insert "Content-Transfer-Encoding: $enc\n"
+  }
+  if {[string length $desc]} {
+    $mfc.comp.txt insert insert "Content-Description: $desc\n"
+  }
+  $mfc.comp.txt insert insert "\n\n\n\n"
+  $mfc.comp.txt mark set insert "insert -2 char"
+
+  if {[string length $file]} {
+    $mfc.comp.txt insert insert "  ATTACHED FILE ($enc): $file  \n"
+    $mfc.comp.txt tag configure attachedfile -borderwidth 2 -relief raised \
+      -background [lindex [$mfc.bb.cancel configure -background] 4] \
+      -font [lindex [$mfc.bb.cancel configure -font] 4]
+    $mfc.comp.txt mark set insert "insert -1 line"
+    $mfc.comp.txt tag add attachedfile insert "insert lineend"
+    $mfc.comp.txt mark set insert "insert +1 line"
+  }
+  $mfc.comp.txt yview -pickplace insert
+}
+
+proc mfv:mime-attach-select {mfc} {
+  global mf mfp
+
+
+  set w .mime_attach
+  toplevel $w -class MailMime
+  wm minsize $w 400 260
+  wm protocol $w WM_DELETE_WINDOW "$w.bb.cancel invoke"
+  set xpos [expr [winfo rootx $mfc]+[winfo width $mfc]/3]
+  set ypos [expr [winfo rooty $mfc]+[winfo height $mfc]/3]
+  wm geometry $w +${xpos}+${ypos}
+
+  wm title $w "Mime Attachment for $mfc"
+
+  frame $w.type -borderwidth 5
+  ut:combo-create -frame $w.type -default text -editable 1 \
+      -deflist {text message application image audio video} \
+      -command {mfv:mime-type-select %W %E} -label "Type:" \
+      -labelwidth 12
+
+  frame $w.subtype -borderwidth 5
+  ut:combo-create -frame $w.subtype -default plain -editable 1 \
+      -deflist {plain enriched} -label "Subtype:" \
+      -labelwidth 12
+
+  frame $w.enc -borderwidth 5
+  ut:combo-create -frame $w.enc -default 7bit -editable 1 \
+      -deflist {7bit quoted-printable base64} -label "Encoding:" \
+      -labelwidth 12
+
+  frame $w.param -borderwidth 5
+  label $w.param.lbl -text "Parameters:" -width 12 -anchor e
+  entry $w.param.ent -relief sunken
+  pack $w.param.lbl -side left
+  pack $w.param.ent -side left -fill x -expand true -ipady 2
+
+  frame $w.desc -borderwidth 5
+  label $w.desc.lbl -text "Description:" -width 12 -anchor e
+  entry $w.desc.ent -relief sunken
+  pack $w.desc.lbl -side left
+  pack $w.desc.ent -side left -fill x -expand true -ipady 2
+
+  frame $w.file -borderwidth 5
+  label $w.file.lbl -text "File:" -width 12 -anchor e
+  entry $w.file.ent -relief sunken
+  button $w.file.btn -text ">>" -width 2 \
+	  -command "set val \[$w.file.ent get\]
+		    $w.file.ent delete 0 end
+		    $w.file.ent insert 0 \[mfv:get-filename -master $w -cancelvalue \$val \]"
+  pack $w.file.lbl -side left
+  pack $w.file.ent -side left -fill x -expand true -ipady 2
+  pack $w.file.btn -side left -padx 5
+
+  frame $w.bb -borderwidth 5
+  button $w.bb.ok -text "Attach" -width 8 \
+      -command "mfv:mime-attach-done $w $mfc; grab release $w; destroy $w"
+  button $w.bb.cancel -text Cancel -width 8 \
+      -command "grab release $w; destroy $w"
+  pack $w.bb.ok $w.bb.cancel -side left -padx 10 -pady 5
+
+  pack $w.type $w.subtype $w.enc $w.param $w.desc \
+      $w.file -side top -fill x -expand true -padx 10
+  frame $w.sep -bd 2 -height 4 -relief sunken
+  pack $w.sep -side top -fill x -expand true -pady 5
+  pack $w.bb -side top
+
+  bind $w.file.ent <Key-Tab> {
+    set f [%W get]
+    %W delete 0 end
+    %W insert end [j:expand_filename $f]
+  }
+
+  after 20 grab $w
+  set savefocus [focus]
+  focus $w.type.ent
+  tkwait window $w
+  grab release $w
+  focus $savefocus
+}
+
+# {text message application image audio video}
+proc mfv:mime-type-select { w type } {
+
+  set def {}
+  set deflist {}
+  set enc 7bit
+
+  set type [string tolower $type]
+  switch -exact $type {
+
+    {text} {
+      set def plain
+      set deflist {plain enriched}
+      set enc 7bit
+    }
+    {message} {
+      set def external-body
+      set deflist {external-body rfc822}
+      set enc 7bit
+    }
+    {application} {
+      set def octet-stream
+      set deflist {octet-stream postscript}
+      set enc base64
+    }
+    {image} {
+      set def gif
+      set deflist {gif jpeg}
+      set enc base64
+    }
+    {audio} {
+      set def basic
+      set deflist basic
+      set enc base64
+    }
+    {video} {
+      set def mpeg
+      set deflist mpeg
+      set enc base64
+    }
+  }
+
+  ut:combo-reset [string trimright $w type]subtype $def $deflist 0
+  ut:combo-reset [string trimright $w type]enc $enc {7bit quoted-printable base64} 0
+
+}
+
+proc mfv:mime-attach-done { w mfc } {
+
+  set type [ut:combo-get $w.type]
+  set subtype [ut:combo-get $w.subtype]
+  set enc [ut:combo-get $w.enc]
+
+  set params [$w.param.ent get]
+  set desc [$w.desc.ent get]
+  set file [j:expand_filename [$w.file.ent get]]
+
+  mfv:mime-attach $mfc $type $subtype $params $enc $file $desc
+}

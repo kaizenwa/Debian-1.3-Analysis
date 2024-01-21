@@ -1,0 +1,170 @@
+
+Nov. 94		:	Work begins.
+
+Dec. 94 v0.01	:	First version, directly changing buffers' device
+			in getblk, bread and co. No swap. Added an entry
+			in /proc for debugging purpose. (NR)
+
+Jan. 95 v0.10	:	Reworked the whole thing, due to some FS problems
+			with buffers on the same virtual device not belonging
+			to the same real device. Gave up on buffers device
+			change, and now using request device, which is
+			obviously better. (NR)
+
+Jan. 15/95 v0.11:	FS is now working fine (using an ext2). Swap added
+			but not yet tested. (NR)
+
+Jan. 21/95 v0.12:	Fixed a king-size bug in swap, now working flawlessly.
+			Some cosmetic changes to /proc/mdstat. Also cleaned
+			up md tools and wrote man page. (NR)
+
+Feb. 14/95 v0.13:	Fixed a bug preventing from using any md_dev other
+			than md0 ! Some checking added in the kernel.
+			Real devices now look like mounted when added to a
+			md_dev (use an inode as a lock, so it works with
+			fs_may_mount). Updated md tools (now behaving a bit
+			like mount). Man page is more confusing. (R)
+
+Mar. 08/95 v0.14:	Introduced a per md_dev 'personality' that indicates
+			the way the device is managed. Two personalities are
+			currently implemented : linear, which is the old (and
+			rather reliable) one, and striped, which is a new one
+			(real devices are no more appended to each other, but
+			stacked so we have a chunk on first disk, then
+			another on second...). The striped personality should
+			show some speed improvement with SCSI disks. Updated
+			md tools accordingly. (R)
+
+Mar. 20/95 v0.15:	Cleaned up ll_rw_block.c a bit. Debug informations in
+			/proc/mdstat are now optional (default is off). Major
+			number is now 9 (registered number). (R)
+
+Mar. 27/95 v0.16: 	First attempt to handle errors in a RAID-(1 and up)
+			system. Using a hacked version of wait_on_buffer.
+			It should work fine, but it's not really nice
+			to the kernel layering. I think I'd better
+			find another idea for that damned thing. Can
+			now choose between linear and striped mode at
+			config time. This should save a few bytes on
+			low memory systems. (NR)
+
+Apr. 04/95 v0.17:	Ok, things are now much more modular (created
+			linear.c and raid0.c). This should make module
+			versions very easy to implement. (NR)
+
+Apr. 06/95 v0.18: 	Since some people around don't like the way I trap
+			requests in ll_rw_block.c, rewrote the whole
+			stuff as a REAL device driver. Now working
+			with minimal support in this file (maybe
+			somewhat less efficient, since requests are now
+			stuffed back to the physical device driver). (NR)
+
+Apr. 11/95 v0.19:	Arghh ! Fixed a fxcking bug that must have been
+			here since v0.14 ! Unfortunately, this changes
+			blocks repartition on physical devices. Had to
+			re-mkfs my md devices :(. Anyway, it works a lot
+			better now. Now using read ahead. Really nice
+			with my old 1542. The best would be to have a
+			per-md-dev read_ahead value, instead of a
+			per-major-number value. Adapted to 1.2.5. (R)
+
+Apr. 15/95 v0.20:	Fixed a stupid bug in linear mode (introduced
+			with v0.19, thanks to Jeff Uphoff for reporting
+			the bug as well as being my first ALPHA tester).
+			Released as 0.19b not to confuse people that are
+			downloading the patch. New syntax to mdadd and co,
+			but this will have to be rewritten soon. (R)
+
+May  01/95 v0.21:	Now using early requests removal, as used in scsi
+			and ide drivers. This saves some requests, and
+			improves throughput. Fixed a small bug introduced
+			by a change in a kernel patch somewhere around
+			1.2.4. Still playing with RAID-1 (giving me
+			headaches because of non-atomic writes). It is now
+			usable, but is awfully slow when writing, and
+			no errors trapping yet. (NR)
+
+May  05/95 v0.22:	Added modules support. Only having md.c compiled
+			into the kernel is mandatory. Personalities are
+			optional and can be loaded at run time. Didn't
+			use ksyms.c to register exported symbols, but
+			instead declared them in md.c . Hope this will
+			work nicely (it does... ;-) (NR)
+
+May  26/95 v0.23:	Added make_double_request to ll_rw_block.c .
+			This gives really better performances to RAID-1
+			devices, and solve somewhat the atomicity problem
+			that bothered the whole thing since weeks... Had to
+			change some things in the SCSI driver and to
+			buffers code to make things work. Some cleanups in
+			error handling, although it's fully untested.
+			New command 'mdop' to invalid and revalid
+			physical devices in a raid1 device.
+			Corrected a small bug in mdrun, and added maximum
+			fault field in mdtab. Added version number to mdadd
+			& co. Partially rewrote README, mdadd.8, and created
+			mdtab.5. (R)
+			
+May  28/95 v0.24:	Still problems with RAID-1 and SCSI. Trying to delay
+			sister requests queuing in scsi.c (shouldn't bother
+			normal activity, but will slow down RAID-1 even more).
+			The question is : does it all worth it ? It seems to
+			work, but writing is SLOW, and it eats more than 20k
+			of kernel space on my machine, because of the extended
+			buffer_head structure. Won't work with mixed IDE/SCSI
+			devices until sister_req and shared_count are handled
+			in non-SCSI disk drivers. (R)
+
+June 05/95 v0.25:	Some RAID-5 defines... keep smiling ! Corrected a small
+			bug that cause a kernel Oops when using a md device
+			that is not being run... This is a very frequent
+			mistake that should be included in a FAQ. Chunk size
+			can now be directly set by indicating the size in
+			kilobytes. mdrun -p0 -c1 /dev/md0 becomes
+			mdrun -p0 -c8k /dev/md0. Even works in /etc/mdtab !
+			Idea from phil@zeus.fasttax.com . (R)
+
+June 10/95 v0.26:	Corrected bug that appears with CONFIG_MODVERSIONS
+			enabled (report from pstrode@exec.com). Switched
+			linear and raid0 to BETA. (R)
+
+June 13/95 v0.26b:	Arghh ! One more silly bug that nobody reported !
+			Have to learn how to use cpp ! Will bother people
+			that use a device different from md0. (R)
+
+June 21/95 v0.27:	Started RAID-5 integration... Extended md_personality
+			structure, and first shot of the raid5 kernel daemon.
+			Some changes in error traping. Adapted to 1.3.4.
+			Some docs update by cdr@star.net. (R)
+
+July 04/95 v0.28:	Tried to reduce memory usage for people that do not
+			use RAID-1 nor RAID-5. Removed bb from README (sad,
+			sad, sad...). Some stats are now avaible for chunk
+			size determination. (R)
+
+July 15/95 v0.29:	Patch only. Bug report from Phil Packer (removed
+			md_cur_req and moved requests handling down to
+			personalities, now needs some cleanup). Still wonder
+			why it only happends his machine, and not mine...
+			Anyway, lotta thanks to Phil for his very nice work
+			identifying the problem. (R)
+
+July 20/95 v0.30:	Some cleanup after 0.29 changes. Still deadlock problem
+			with RAID-5. Added mdcreate command and some checksum
+			info to mdadd. (R)
+
+Oct. 06/95 v0.31:	First non-mil version ! Lot of work have been done to
+			speed things up, specially RAID-0 (less original Linux
+			code used, more custom code, and bigger kernel ;-).
+			Small bug fix in read_ahead calculation when removing
+			a device. Adapted to 1.3.31. (R)
+
+Nov. 26/95 v0.32:	Linear and RAID-0 only version tuned for kernel
+			integration. Happy Birthday to MD ! (R)
+
+Jan. 14/96 v0.33:	Added some locks here and there. (R)
+
+Feb. 25/96 v0.34:	Some bug fixes (1k buffers...). Sent to Linus. (R)
+
+Apr. 19/96 v0.35:	Switched back to the ol' good way (just filter,
+			don't requeue). It works, simply works (1.3.93).

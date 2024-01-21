@@ -1,0 +1,433 @@
+#!/bin/sh
+#
+#  mailgo 2.0     E-mail go game management program by Adrian Mariano
+#     3/24/93     I place it on the public domain.  Please send improvements
+#                 to me at adrian@bsdserver.ucsf.edu
+# 
+#  Syntax: mailgo [-r] filename
+#          mailgo --  
+#          mailgo -n [filename]
+#          mailgo -c 
+#          mailgo -e filename
+# 
+#  Filename should contain a mailgo go game
+#  
+#  -- reads game file from stdin
+#  -r resends the file to the opponent
+#  -n start a new game, using data in filename to get address
+#  -c removes temporary files left when abnormally terminated: MailGo*
+#  -e edits the mailgo header and/or the game record
+#
+#  Invokes the game processor in the environment variable MAILGO, or attempts
+#  to run mgt from the inherited path if MAILGO is not set.
+#
+#  System V Unix users should change the assignment to the MAILER variable
+#  from 'mail' to 'mailx' or 'elm' or some other compatible mailer.
+#
+
+MAILER=mail
+
+if [ $# -eq 0 ]
+then
+  echo ' '
+  echo 'Syntax: mailgo [-r] filename'
+  echo '        mailgo --'
+  echo '        mailgo -n [filename]'
+  echo '        mailgo -c '
+  echo '        mailgo -e filename'
+  echo ' '
+  echo 'Mailgo is a program to manage email go games.'
+  echo 'Filename should contain a mailgo go game'
+  echo '  '
+  echo '  -- reads game file from stdin'
+  echo '  -r resends the file to the opponent'
+  echo '  -n start a new game, using data in filename to get address'
+  echo '  -c removes temporary files left when abnormally terminated: MailGo*'
+  echo '  -e edits the mailgo header and/or the game record'
+  echo ' '
+  exit
+fi
+case $1 in
+  -c) if [ $# -ne 1 ]
+       then
+         echo Wrong number of parameters
+         exit
+       else
+         rm -f MailGo* MailFile* MailOut*
+         exit
+       fi;;
+  -r) if [ $# != 2 ]
+       then
+         echo Wrong number of parameters
+         exit
+       fi
+       if grep "\---GoGaMeEnD---" $2 >/dev/null 2>&1
+       then
+         name=`sed -n '2,5s/TO: //p' $2`
+         hisfile=`sed -n '2,5s/TOFILE: //p' $2`
+         echo Remailing response to $name, $hisfile
+         $MAILER -s "Remailed Go Game: $hisfile" $name < $2
+         exit
+       else
+         echo Invalid input file $2
+         exit
+       fi;;
+  -e) if [ $# -ne 2 ]
+       then
+         echo Wrong number of parameters
+         exit
+       fi
+       if [ ! -s $2 ]
+       then
+         echo File $2 not found.
+         exit
+       fi
+sed -n '/---GoGaMeStArT---/,/---GoGaMeEnD---/{s/---GoGaMe.*---//
+p
+}' $2 > MailGo$$
+       if [ ! -s MailGo$$ ]
+       then
+         echo Invalid input file $2
+         exit
+       fi
+       opponent=`sed -n '2,5s/TO: //p' MailGo$$`
+       echo To address: $opponent
+       echo -n "new address, <ret> for no change: "
+       read res
+       if [ $res ]
+       then
+         opponent=$res
+       fi
+       hisfile=`sed -n '2,5s/TOFILE: //p' MailGo$$`
+       echo To game file: $hisfile
+       echo -n "new file name, <ret> for no change: "
+       read res
+       if [ $res ]
+       then
+         hisfile=$res
+       fi
+       me=`sed -n '2,5s/FROM: //p' MailGo$$`
+       echo From address: $me
+       echo -n "new address, <ret> for no change: "
+       read res
+       if [ $res ]
+       then
+         me=$res
+       fi
+       myfile=`sed -n '2,5s/FROMFILE: //p' MailGo$$`
+       echo From game file: $myfile
+       echo -n "new file name, <ret> for no change: "
+       read res
+       if [ $res ]
+       then
+         myfile=$res
+       fi
+       if sed -n 6,7p MailGo$$ | grep FORMAT > /dev/null 2>&1
+       then
+         format=`sed -n '6,7s/FORMAT: //p' MailGo$$`
+         if [ ! \( $format = 'L' -o $format = 'E' \) ] 
+         then
+           format='S'
+         fi
+       else
+         format='L'
+       fi
+       echo Old game record format: $format
+       echo -n "New game record format (Long/Short/Extrashort): "
+       read res
+       case $res in
+         L | l) format='L' ;;
+         E | e) format='E' ;;
+         S | s) format='S' ;;
+         *)  ;;
+       esac
+       case $format in
+         L) sflag='';;
+         *) sflag=-s;;
+       esac
+       if ${MAILGO-mgt} $sflag -m MailOut$$ MailGo$$
+       then
+         if [ -s MailOut$$ ]
+         then
+	   echo >> MailOut$$
+           cat <<END_END > MailFile$$
+---GoGaMeStArT---
+TO: $opponent
+TOFILE: $hisfile
+FROM: $me
+FROMFILE: $myfile
+FORMAT: $format
+END_END
+           if [ $format = 'S' ]
+           then
+             sed 's/\(;[BC]\[\)/\
+\1/g' MailOut$$ >>MailFile$$
+           else
+             cat MailOut$$ >> MailFile$$
+           fi
+           echo >> MailFile$$
+           echo "---GoGaMeEnD---" >> MailFile$$
+         else
+           echo -n "---GoGaMeStArT---" > MailFile$$
+           sed "s/TO:.*/TO: $opponent/
+	        s/TOFILE:.*/TOFILE: $hisfile/
+                s/FROM:.*/FROM: $me/
+                s/FROMFILE:.*/FROMFILE: $myfile/
+    	        s/FORMAT:.*/FORMAT: $format/" MailGo$$ >> MailFile$$
+           echo "---GoGaMeEnD---" >> MailFile$$
+           echo -n "empty mgt file"
+           exit
+         fi
+       else
+           echo -n "---GoGaMeStArT---" > MailFile$$
+           sed "s/TO:.*/TO: $opponent/
+	        s/TOFILE:.*/TOFILE: $hisfile/
+                s/FROM:.*/FROM: $me/
+                s/FROMFILE:.*/FROMFILE: $myfile/
+    	        s/FORMAT:.*/FORMAT: $format/" MailGo$$ >> MailFile$$
+           echo "---GoGaMeEnD---" >> MailFile$$
+         echo "No move made, or mgt error"
+       fi
+       rm -f MailGo$$ MailOut$$
+       echo -n "Do you wish to keep updates (y/N)? "
+       read res
+       case $res in
+         Y | y) cat MailFile$$ > $2
+            echo  Updates saved to: $2
+            rm -f MailFile$$
+            exit;;
+         *) echo   NOT keeping updates.
+            rm -f MailFile$$
+            exit;;
+       esac
+  ;;
+  -n) if [ $# -gt 2 ]
+       then
+         echo Wrong number of parameters
+         exit
+       fi
+       if [ $# -eq 2 ]
+       then
+         if [ ! -s $2 ]
+         then
+           echo File $2 not found.
+           exit
+         fi
+         opponent=`sed -n '2,5s/TO: //p' $2`
+         echo Opponent address: $opponent
+         hisfile=`sed -n '2,5s/TOFILE: //p' $2`
+         echo His game file: $hisfile
+         me=`sed -n '2,5s/FROM: //p' $2`
+         echo Your address: $me
+         myfile=`sed -n '2,5s/FROMFILE: //p' $2`
+         echo Your game file: $myfile
+       else
+         echo -n "Opponent address: "
+         read opponent
+         echo -n "Opponent game filename: "
+         read hisfile
+         echo -n "Your address: "
+         read me
+         echo -n "Your game filename: "
+         read myfile
+       fi
+       echo -n "Black player name: "
+       read bpname
+       echo -n "             rank: "
+       read bprank
+       echo -n "White player name: "
+       read wpname
+       echo -n "             rank: "
+       read wprank
+       echo -n "Board size (return for 19): "
+       read bsize
+       if [ "$bsize" -lt 7 -o "$bsize" -gt 19 ]
+       then
+         bsize=19
+       fi
+       echo -n "Handicap: "
+       read handicap
+       echo -n "Komi: "
+       read komi
+       echo -n "Game record format (Long/Short/Extrashort): "
+       read format
+       case $format in
+         L | l) format='L' ;;
+         E | e) format='E' ;;
+         *)     format='S' ;;
+       esac
+       started=`date|awk '{print $3, $2, $6}'`
+       if grep "W\[\]" $myfile >/dev/null 2>&1  
+       then
+         echo -n "File $myfile contains game possibly in progress.  Clobber (y/N)? "
+         read res
+         case $res in
+           Y | y) ;;
+           *)  echo -n "Your game filename: "
+               read myfile;;
+         esac
+       fi
+       cat <<END_END >$myfile
+---GoGaMeStArT---
+FROM: $me
+FROMFILE: $myfile
+TO: $opponent
+TOFILE: $hisfile
+NEWGAME
+FORMAT: $format
+END_END
+       cat <<END_END > MailGo$$
+(
+;
+GaMe[1]
+VieW[]
+SiZe[$bsize]
+Comment[Black: $bpname, $bprank
+White: $wpname, $wprank
+`if [ "$handicap" ] ; then echo "Handicap: $handicap" ; fi`
+`if [ "$komi" ] ; then echo "Komi: $komi" ; fi`
+Started: $started]
+PB[$bpname]
+BR[$bprank]
+PW[$wpname]
+WR[$wprank]
+`if [ "$komi" ] ; then echo KoMi[$komi] ; fi`
+DT[$started]
+`      case $bsize.$handicap in
+         19.2) echo "PL[W]HA[2]AB[dp][pd]" ;;
+         19.3) echo "PL[W]HA[3]AB[dp][pd][pp]" ;;
+         19.4) echo "PL[W]HA[4]AB[dd][dp][pd][pp]" ;;
+         19.5) echo "PL[W]HA[5]AB[dd][dp][jj][pd][pp]" ;;
+         19.6) echo "PL[W]HA[6]AB[dd][dj][dp][pd][pj][pp]" ;;
+         19.7) echo "PL[W]HA[7]AB[dd][dj][dp][jj][pd][pj][pp]" ;;
+         19.8) echo "PL[W]HA[8]AB[dd][dj][dp][jd][jp][pd][pj][pp]" ;;
+         19.9) echo "PL[W]HA[9]AB[dd][dj][dp][jd][jj][jp][pd][pj][pp]" ;;
+         13.2) echo "PL[W]HA[2]AB[dj][jd]" ;;
+         13.3) echo "PL[W]HA[3]AB[dj][jd][jj]" ;;
+         13.4) echo "PL[W]HA[4]AB[dd][dj][jd][jj]" ;;
+         13.5) echo "PL[W]HA[5]AB[dd][dj][gg][jd][jj]" ;;
+         9.2) echo "PL[W]HA[2]AB[cg][gc]" ;;
+         9.3) echo "PL[W]HA[3]AB[cg][gc][gg]" ;;
+         9.4) echo "PL[W]HA[4]AB[cc][cg][gc][gg]" ;;
+       esac`
+)
+END_END
+       case $format in
+         L) sflag='';;
+         *) sflag=-s;;
+       esac
+       if ${MAILGO-mgt} $sflag -m MailOut$$ MailGo$$
+       then
+         if [ -s MailOut$$ ]
+         then
+           cat MailOut$$ >>$myfile
+         else
+           cat MailGo$$ >>$myfile
+         fi
+       else
+         echo -n "No move made, or mgt error. Send anyway (y/N)? "
+         read res
+         case $res in
+           Y | y) cat MailGo$$ >>$myfile;;
+           *) echo   NOT mailing new game.
+              rm -f MailGo$$ MailOut$$
+              exit;;
+         esac
+       fi
+       rm -f MailOut$$ MailGo$$
+       echo Mailing new game to $opponent, $hisfile
+       echo >> $myfile
+       echo "---GoGaMeEnD---" >> $myfile
+       $MAILER -s "New Go Game: $hisfile" $opponent <$myfile
+       exit
+       ;;
+esac
+if [ $# -ne 1 ]
+then
+  echo Wrong number of parameters
+  exit
+fi
+if [ $1 = -- ]
+then
+  cat >/tmp/mailgo$$
+  set /tmp/mailgo$$
+  exec </dev/tty
+elif [ ! -s $1 ]
+then
+  echo File $1 not found
+  exit
+fi
+sed -n '/---GoGaMeStArT---/,/---GoGaMeEnD---/{s/---GoGaMe.*---//
+p
+}' $1 > MailGo$$
+if [ ! -s MailGo$$ ]
+then
+  echo Invalid input file $1
+  exit
+fi
+eval `sed -n '/---GoGaMeStArT---/,/(/{
+  s/^TOFILE:  */fileout=/p
+  s/^FROMFILE:  */hisfile=/p
+  s/^FORMAT:  */format=/p
+  s/^TO:  */me=/p
+  s/^FROM:  */name=/p
+  s/^NEWGAME/newgame=1/p
+  }' $1`
+if [ -z "$format" ] 
+then
+  format=L
+elif [ "$format" != L -a "$format" != E ]
+then
+  format=S
+fi
+case $format in
+  L) sflag='';;
+  *) sflag='-s';;
+esac
+if ${MAILGO-mgt} $sflag -m MailOut$$ MailGo$$
+then
+  echo >> MailOut$$
+  if [ "$newgame" = 1 -a -s $fileout ]
+  then
+    echo -n "File $fileout exists.  Clobber (y/N)? "
+    read res
+    case $res in
+      Y | y) rm -f $fileout ;;
+      *) echo -n "Output filename: "
+         read fileout ;;
+    esac
+  fi
+  cat <<EOF > MailFile$$
+---GoGaMeStArT---
+TO: $name
+TOFILE: $hisfile
+FROM: $me
+FROMFILE: $fileout
+FORMAT: $format
+EOF
+  case $format in
+    S) sed 's/\(;[BC]\[\)/\
+\1/g' MailOut$$ >>MailFile$$;;
+    *) cat MailOut$$ >>MailFile$$;;
+  esac 
+  echo "---GoGaMeEnD---" >> MailFile$$
+  echo Mailing response to $name, $hisfile
+  $MAILER -s "Go Game: $hisfile" $name < MailFile$$ 
+  rm -f MailGo$$ MailOut$$ $1
+  if grep "\---GoGaMeEnD---" $fileout > /dev/null 2>&1 || [ ! -s $fileout ]
+  then
+    mv MailFile$$ $fileout
+  else
+    echo Save file $fileout doesn\'t look like a mailgo file.  
+    echo "Overwrite it anyway (y/N)?"
+    read res
+    case $res in
+      y | Y) mv -f MailFile$$ $fileout;;
+      *)     echo Game record left in MailFile$$;;
+    esac
+  fi
+else
+  echo No move made, or mgt error.  NOT mailing response.
+  rm -f MailGo$$ MailOut$$
+fi
+

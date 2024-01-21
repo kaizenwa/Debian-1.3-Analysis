@@ -1,0 +1,59 @@
+Q1: Why does Debian provide kernel headers with the libc5-dev package
+instead of using the standard Linux convention of having symlinks to
+the currently installed kernel?
+
+A1: Manoj Srivastava explains why:
+
+> From: Manoj Srivastava <srivasta@pilgrim.umass.edu>
+> 
+> 	The headers were included in libc5-dev after a rash of very
+>  buggy alpha kernel releases (1.3.7* or something like that) that
+>  proceeded to break compilations, etc.  Kernel versions are changed
+>  far more rapidly than libc is, and there are higer chances that
+>  people install a custom kernel than they install custom libc.
+> 
+> 	Add to that the fact that few programs really need the more
+>  volatile elements of the header files (that is, things that really
+>  change from kernel version to kernel version), [before you reject
+>  this, consider: programs compiled on one kernel version usually work
+>  on other kernels].
+> 
+> 	So, it makes sense that a set of headers be provided from a
+>  known good kernel version, and that is sufficient for compiling most
+>  programs, (it also makes the compile time environments for programs
+>  on debian machines a well known one, easing the process of dealing
+>  with problem reports), the few programs that really depend on cutting
+>  edge kernel data structures may just use -I/usr/src/linux/include
+>  (provided that kernel-headers or kernel-source exists on the system).
+> 
+> 	libc5-deb is uploaded frequently enough that it never lags too
+>  far behind the latest released kernel.
+> 
+> 	I hope I was clear enough to answer your question.
+> 
+> 	manoj
+
+Q2: Why do netscape and other programs break with libc 5.4.7.  They
+worked fine with libc 5.2.18.
+
+A2: Libc 5.4.7 uses a different version of malloc and related
+functions than was used in libc 5.2.18.  This new version is
+considerably faster than the old version in most cases.  It can also
+return memory immediately to the operating system when it is freed.
+The old version would not return the memory until a program exited.
+This can be a huge win for programs that run for long periods of time
+such as an X server.  Unfortunately, the new malloc is less forgiving
+than the old version of programs with memory allocation related bugs
+and will cause them to fail in various ways.
+
+Until these programs can be fixed, they need to be run with the old
+malloc.  This can be done by setting the LD_PRELOAD environment
+variable to libgnumalloc.so.5 when ever the failing program is run.
+This is best done using a wrapper script.  For example, netscape can
+be run by creating the following script:
+
+	#!/bin/sh
+	LD_PRELOAD=libgnumalloc.so.5
+	export LD_PRELOAD
+	exec <path-to-real-netscape>
+

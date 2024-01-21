@@ -1,0 +1,6828 @@
+/*
+** Automatically generated from `higher_order.m' by the
+** Mercury compiler, version 0.6.  Do not edit.
+*/
+/*
+INIT mercury__higher_order__init
+ENDINIT
+*/
+
+#include "imp.h"
+
+Declare_static(mercury____Index___higher_order_new_pred_0__ua10000_2_0);
+Declare_static(mercury____Index___higher_order_higher_order_arg_0__ua10000_2_0);
+Declare_static(mercury____Index___higher_order_request_0__ua10000_2_0);
+Declare_static(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0);
+Declare_label(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i7);
+Declare_label(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i13);
+Declare_label(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i12);
+Declare_label(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i14);
+Declare_label(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i8);
+Declare_label(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i1017);
+Declare_static(mercury__higher_order__LambdaGoal__2_2_0);
+Declare_label(mercury__higher_order__LambdaGoal__2_2_0_i2);
+Declare_label(mercury__higher_order__LambdaGoal__2_2_0_i1);
+Declare_label(mercury__higher_order__LambdaGoal__2_2_0_i1000);
+Declare_static(mercury__higher_order__LambdaGoal__1_2_0);
+Define_extern_entry(mercury__higher_order__specialize_higher_order_4_0);
+Declare_label(mercury__higher_order__specialize_higher_order_4_0_i2);
+Declare_label(mercury__higher_order__specialize_higher_order_4_0_i3);
+Declare_label(mercury__higher_order__specialize_higher_order_4_0_i4);
+Declare_label(mercury__higher_order__specialize_higher_order_4_0_i5);
+Declare_label(mercury__higher_order__specialize_higher_order_4_0_i6);
+Declare_label(mercury__higher_order__specialize_higher_order_4_0_i7);
+Declare_static(mercury__higher_order__process_requests_10_0);
+Declare_label(mercury__higher_order__process_requests_10_0_i2);
+Declare_label(mercury__higher_order__process_requests_10_0_i3);
+Declare_label(mercury__higher_order__process_requests_10_0_i4);
+Declare_label(mercury__higher_order__process_requests_10_0_i7);
+Declare_label(mercury__higher_order__process_requests_10_0_i8);
+Declare_label(mercury__higher_order__process_requests_10_0_i9);
+Declare_label(mercury__higher_order__process_requests_10_0_i10);
+Declare_label(mercury__higher_order__process_requests_10_0_i11);
+Declare_label(mercury__higher_order__process_requests_10_0_i12);
+Declare_label(mercury__higher_order__process_requests_10_0_i13);
+Declare_label(mercury__higher_order__process_requests_10_0_i14);
+Declare_label(mercury__higher_order__process_requests_10_0_i15);
+Declare_static(mercury__higher_order__get_specialization_requests_2_7_0);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i4);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i5);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i6);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i9);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i10);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i11);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i12);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i13);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i14);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i15);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i19);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i20);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i21);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i22);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i23);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i24);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i25);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i26);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i16);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i27);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i30);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i33);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i34);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i35);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i36);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i28);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i8);
+Declare_label(mercury__higher_order__get_specialization_requests_2_7_0_i1006);
+Declare_static(mercury__higher_order__traverse_other_procs_7_0);
+Declare_label(mercury__higher_order__traverse_other_procs_7_0_i4);
+Declare_label(mercury__higher_order__traverse_other_procs_7_0_i5);
+Declare_label(mercury__higher_order__traverse_other_procs_7_0_i6);
+Declare_label(mercury__higher_order__traverse_other_procs_7_0_i7);
+Declare_label(mercury__higher_order__traverse_other_procs_7_0_i8);
+Declare_label(mercury__higher_order__traverse_other_procs_7_0_i9);
+Declare_label(mercury__higher_order__traverse_other_procs_7_0_i10);
+Declare_label(mercury__higher_order__traverse_other_procs_7_0_i11);
+Declare_label(mercury__higher_order__traverse_other_procs_7_0_i12);
+Declare_label(mercury__higher_order__traverse_other_procs_7_0_i13);
+Declare_label(mercury__higher_order__traverse_other_procs_7_0_i14);
+Declare_label(mercury__higher_order__traverse_other_procs_7_0_i15);
+Declare_label(mercury__higher_order__traverse_other_procs_7_0_i16);
+Declare_label(mercury__higher_order__traverse_other_procs_7_0_i1003);
+Declare_static(mercury__higher_order__traverse_goal_7_0);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i1032);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i1031);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i1030);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i1029);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i1028);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i1027);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i5);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i6);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i7);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i8);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i9);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i10);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i11);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i12);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i13);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i14);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i15);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i16);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i17);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i18);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i19);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i20);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i21);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i1022);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i1026);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i24);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i23);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i26);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i25);
+Declare_label(mercury__higher_order__traverse_goal_7_0_i27);
+Declare_static(mercury__higher_order__traverse_conj_9_0);
+Declare_label(mercury__higher_order__traverse_conj_9_0_i4);
+Declare_label(mercury__higher_order__traverse_conj_9_0_i5);
+Declare_label(mercury__higher_order__traverse_conj_9_0_i6);
+Declare_label(mercury__higher_order__traverse_conj_9_0_i1002);
+Declare_static(mercury__higher_order__traverse_disj_7_0);
+Declare_label(mercury__higher_order__traverse_disj_7_0_i4);
+Declare_label(mercury__higher_order__traverse_disj_7_0_i5);
+Declare_label(mercury__higher_order__traverse_disj_7_0_i1002);
+Declare_static(mercury__higher_order__traverse_disj_2_10_0);
+Declare_label(mercury__higher_order__traverse_disj_2_10_0_i4);
+Declare_label(mercury__higher_order__traverse_disj_2_10_0_i5);
+Declare_label(mercury__higher_order__traverse_disj_2_10_0_i6);
+Declare_label(mercury__higher_order__traverse_disj_2_10_0_i7);
+Declare_label(mercury__higher_order__traverse_disj_2_10_0_i1002);
+Declare_static(mercury__higher_order__traverse_cases_7_0);
+Declare_label(mercury__higher_order__traverse_cases_7_0_i4);
+Declare_label(mercury__higher_order__traverse_cases_7_0_i5);
+Declare_label(mercury__higher_order__traverse_cases_7_0_i1003);
+Declare_static(mercury__higher_order__traverse_cases_2_10_0);
+Declare_label(mercury__higher_order__traverse_cases_2_10_0_i4);
+Declare_label(mercury__higher_order__traverse_cases_2_10_0_i5);
+Declare_label(mercury__higher_order__traverse_cases_2_10_0_i6);
+Declare_label(mercury__higher_order__traverse_cases_2_10_0_i7);
+Declare_label(mercury__higher_order__traverse_cases_2_10_0_i1003);
+Declare_static(mercury__higher_order__merge_higher_order_infos_3_0);
+Declare_label(mercury__higher_order__merge_higher_order_infos_3_0_i2);
+Declare_label(mercury__higher_order__merge_higher_order_infos_3_0_i3);
+Declare_label(mercury__higher_order__merge_higher_order_infos_3_0_i4);
+Declare_label(mercury__higher_order__merge_higher_order_infos_3_0_i5);
+Declare_label(mercury__higher_order__merge_higher_order_infos_3_0_i6);
+Declare_label(mercury__higher_order__merge_higher_order_infos_3_0_i7);
+Declare_label(mercury__higher_order__merge_higher_order_infos_3_0_i8);
+Declare_static(mercury__higher_order__merge_pred_var_lists_3_0);
+Declare_label(mercury__higher_order__merge_pred_var_lists_3_0_i4);
+Declare_label(mercury__higher_order__merge_pred_var_lists_3_0_i1002);
+Declare_static(mercury__higher_order__merge_pred_var_with_list_3_0);
+Declare_label(mercury__higher_order__merge_pred_var_with_list_3_0_i6);
+Declare_label(mercury__higher_order__merge_pred_var_with_list_3_0_i15);
+Declare_label(mercury__higher_order__merge_pred_var_with_list_3_0_i11);
+Declare_label(mercury__higher_order__merge_pred_var_with_list_3_0_i17);
+Declare_label(mercury__higher_order__merge_pred_var_with_list_3_0_i10);
+Declare_label(mercury__higher_order__merge_pred_var_with_list_3_0_i9);
+Declare_label(mercury__higher_order__merge_pred_var_with_list_3_0_i5);
+Declare_label(mercury__higher_order__merge_pred_var_with_list_3_0_i22);
+Declare_label(mercury__higher_order__merge_pred_var_with_list_3_0_i3);
+Declare_static(mercury__higher_order__check_unify_3_0);
+Declare_label(mercury__higher_order__check_unify_3_0_i1031);
+Declare_label(mercury__higher_order__check_unify_3_0_i6);
+Declare_label(mercury__higher_order__check_unify_3_0_i1030);
+Declare_label(mercury__higher_order__check_unify_3_0_i13);
+Declare_label(mercury__higher_order__check_unify_3_0_i17);
+Declare_label(mercury__higher_order__check_unify_3_0_i1022);
+Declare_label(mercury__higher_order__check_unify_3_0_i12);
+Declare_label(mercury__higher_order__check_unify_3_0_i1024);
+Declare_label(mercury__higher_order__check_unify_3_0_i7);
+Declare_label(mercury__higher_order__check_unify_3_0_i21);
+Declare_label(mercury__higher_order__check_unify_3_0_i24);
+Declare_label(mercury__higher_order__check_unify_3_0_i27);
+Declare_label(mercury__higher_order__check_unify_3_0_i1029);
+Declare_static(mercury__higher_order__maybe_specialize_higher_order_call_6_0);
+Declare_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i1016);
+Declare_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i5);
+Declare_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i6);
+Declare_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i9);
+Declare_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i12);
+Declare_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i13);
+Declare_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i14);
+Declare_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i15);
+Declare_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i16);
+Declare_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i17);
+Declare_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i1015);
+Declare_static(mercury__higher_order__maybe_specialize_call_6_0);
+Declare_label(mercury__higher_order__maybe_specialize_call_6_0_i1000);
+Declare_label(mercury__higher_order__maybe_specialize_call_6_0_i5);
+Declare_label(mercury__higher_order__maybe_specialize_call_6_0_i6);
+Declare_label(mercury__higher_order__maybe_specialize_call_6_0_i7);
+Declare_label(mercury__higher_order__maybe_specialize_call_6_0_i8);
+Declare_label(mercury__higher_order__maybe_specialize_call_6_0_i13);
+Declare_label(mercury__higher_order__maybe_specialize_call_6_0_i15);
+Declare_label(mercury__higher_order__maybe_specialize_call_6_0_i16);
+Declare_label(mercury__higher_order__maybe_specialize_call_6_0_i20);
+Declare_label(mercury__higher_order__maybe_specialize_call_6_0_i19);
+Declare_label(mercury__higher_order__maybe_specialize_call_6_0_i18);
+Declare_label(mercury__higher_order__maybe_specialize_call_6_0_i21);
+Declare_label(mercury__higher_order__maybe_specialize_call_6_0_i12);
+Declare_label(mercury__higher_order__maybe_specialize_call_6_0_i22);
+Declare_static(mercury__higher_order__find_higher_order_args_7_0);
+Declare_label(mercury__higher_order__find_higher_order_args_7_0_i6);
+Declare_label(mercury__higher_order__find_higher_order_args_7_0_i9);
+Declare_label(mercury__higher_order__find_higher_order_args_7_0_i10);
+Declare_label(mercury__higher_order__find_higher_order_args_7_0_i11);
+Declare_label(mercury__higher_order__find_higher_order_args_7_0_i12);
+Declare_label(mercury__higher_order__find_higher_order_args_7_0_i5);
+Declare_label(mercury__higher_order__find_higher_order_args_7_0_i1005);
+Declare_static(mercury__higher_order__update_changed_status_3_0);
+Declare_label(mercury__higher_order__update_changed_status_3_0_i3);
+Declare_label(mercury__higher_order__update_changed_status_3_0_i6);
+Declare_label(mercury__higher_order__update_changed_status_3_0_i7);
+Declare_label(mercury__higher_order__update_changed_status_3_0_i4);
+Declare_static(mercury__higher_order__create_new_preds_11_0);
+Declare_label(mercury__higher_order__create_new_preds_11_0_i4);
+Declare_label(mercury__higher_order__create_new_preds_11_0_i7);
+Declare_label(mercury__higher_order__create_new_preds_11_0_i16);
+Declare_label(mercury__higher_order__create_new_preds_11_0_i17);
+Declare_label(mercury__higher_order__create_new_preds_11_0_i15);
+Declare_label(mercury__higher_order__create_new_preds_11_0_i20);
+Declare_label(mercury__higher_order__create_new_preds_11_0_i21);
+Declare_label(mercury__higher_order__create_new_preds_11_0_i22);
+Declare_label(mercury__higher_order__create_new_preds_11_0_i9);
+Declare_label(mercury__higher_order__create_new_preds_11_0_i6);
+Declare_label(mercury__higher_order__create_new_preds_11_0_i24);
+Declare_label(mercury__higher_order__create_new_preds_11_0_i25);
+Declare_label(mercury__higher_order__create_new_preds_11_0_i26);
+Declare_label(mercury__higher_order__create_new_preds_11_0_i1016);
+Declare_static(mercury__higher_order__create_new_pred_8_0);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i2);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i3);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i4);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i5);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i6);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i7);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i8);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i9);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i10);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i11);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i12);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i16);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i17);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i18);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i13);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i19);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i20);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i21);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i23);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i24);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i25);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i26);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i27);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i28);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i29);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i32);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i31);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i34);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i1016);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i36);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i37);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i38);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i39);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i40);
+Declare_label(mercury__higher_order__create_new_pred_8_0_i41);
+Declare_static(mercury__higher_order__output_higher_order_args_5_0);
+Declare_label(mercury__higher_order__output_higher_order_args_5_0_i4);
+Declare_label(mercury__higher_order__output_higher_order_args_5_0_i5);
+Declare_label(mercury__higher_order__output_higher_order_args_5_0_i6);
+Declare_label(mercury__higher_order__output_higher_order_args_5_0_i7);
+Declare_label(mercury__higher_order__output_higher_order_args_5_0_i8);
+Declare_label(mercury__higher_order__output_higher_order_args_5_0_i9);
+Declare_label(mercury__higher_order__output_higher_order_args_5_0_i10);
+Declare_label(mercury__higher_order__output_higher_order_args_5_0_i11);
+Declare_label(mercury__higher_order__output_higher_order_args_5_0_i12);
+Declare_label(mercury__higher_order__output_higher_order_args_5_0_i13);
+Declare_label(mercury__higher_order__output_higher_order_args_5_0_i14);
+Declare_label(mercury__higher_order__output_higher_order_args_5_0_i15);
+Declare_label(mercury__higher_order__output_higher_order_args_5_0_i1002);
+Declare_static(mercury__higher_order__fixup_preds_4_0);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i4);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i5);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i6);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i7);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i8);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i9);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i10);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i11);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i12);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i13);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i14);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i15);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i16);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i17);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i18);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i19);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i20);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i21);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i22);
+Declare_label(mercury__higher_order__fixup_preds_4_0_i1002);
+Declare_static(mercury__higher_order__create_specialized_versions_8_0);
+Declare_label(mercury__higher_order__create_specialized_versions_8_0_i4);
+Declare_label(mercury__higher_order__create_specialized_versions_8_0_i5);
+Declare_label(mercury__higher_order__create_specialized_versions_8_0_i6);
+Declare_label(mercury__higher_order__create_specialized_versions_8_0_i7);
+Declare_label(mercury__higher_order__create_specialized_versions_8_0_i1002);
+Declare_static(mercury__higher_order__create_specialized_versions_2_9_0);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i4);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i5);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i6);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i7);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i8);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i9);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i10);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i11);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i12);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i16);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i13);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i17);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i18);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i19);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i20);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i21);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i22);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i23);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i24);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i25);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i26);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i27);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i28);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i29);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i30);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i31);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i32);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i33);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i34);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i35);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i36);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i37);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i38);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i39);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i40);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i41);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i42);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i43);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i44);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i45);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i46);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i47);
+Declare_label(mercury__higher_order__create_specialized_versions_2_9_0_i1009);
+Declare_static(mercury__higher_order__construct_higher_order_terms_13_0);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i4);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i5);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i6);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i7);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i10);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i9);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i12);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i13);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i14);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i15);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i16);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i17);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i18);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i19);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i20);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i21);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i24);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i23);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i26);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i27);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i30);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i34);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i36);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i33);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i29);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i38);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i39);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i40);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i41);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i42);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i43);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i44);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i45);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i46);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i47);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i48);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i1034);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i50);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i51);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i52);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i53);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i54);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i55);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i56);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i57);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i58);
+Declare_label(mercury__higher_order__construct_higher_order_terms_13_0_i1024);
+Declare_static(mercury____Unify___higher_order__request_0_0);
+Declare_label(mercury____Unify___higher_order__request_0_0_i2);
+Declare_label(mercury____Unify___higher_order__request_0_0_i4);
+Declare_label(mercury____Unify___higher_order__request_0_0_i1);
+Declare_static(mercury____Index___higher_order__request_0_0);
+Declare_static(mercury____Compare___higher_order__request_0_0);
+Declare_label(mercury____Compare___higher_order__request_0_0_i4);
+Declare_label(mercury____Compare___higher_order__request_0_0_i5);
+Declare_label(mercury____Compare___higher_order__request_0_0_i3);
+Declare_label(mercury____Compare___higher_order__request_0_0_i10);
+Declare_static(mercury____Unify___higher_order__higher_order_arg_0_0);
+Declare_label(mercury____Unify___higher_order__higher_order_arg_0_0_i1005);
+Declare_static(mercury____Index___higher_order__higher_order_arg_0_0);
+Declare_static(mercury____Compare___higher_order__higher_order_arg_0_0);
+Declare_label(mercury____Compare___higher_order__higher_order_arg_0_0_i4);
+Declare_label(mercury____Compare___higher_order__higher_order_arg_0_0_i5);
+Declare_label(mercury____Compare___higher_order__higher_order_arg_0_0_i3);
+Declare_label(mercury____Compare___higher_order__higher_order_arg_0_0_i10);
+Declare_label(mercury____Compare___higher_order__higher_order_arg_0_0_i16);
+Declare_label(mercury____Compare___higher_order__higher_order_arg_0_0_i22);
+Declare_static(mercury____Unify___higher_order__maybe_pred_and_args_0_0);
+Declare_label(mercury____Unify___higher_order__maybe_pred_and_args_0_0_i1010);
+Declare_label(mercury____Unify___higher_order__maybe_pred_and_args_0_0_i1007);
+Declare_label(mercury____Unify___higher_order__maybe_pred_and_args_0_0_i1);
+Declare_label(mercury____Unify___higher_order__maybe_pred_and_args_0_0_i1009);
+Declare_static(mercury____Index___higher_order__maybe_pred_and_args_0_0);
+Declare_label(mercury____Index___higher_order__maybe_pred_and_args_0_0_i3);
+Declare_static(mercury____Compare___higher_order__maybe_pred_and_args_0_0);
+Declare_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i2);
+Declare_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i3);
+Declare_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i4);
+Declare_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i6);
+Declare_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i11);
+Declare_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i16);
+Declare_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i17);
+Declare_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i15);
+Declare_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i22);
+Declare_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i9);
+Declare_static(mercury____Unify___higher_order__new_pred_0_0);
+Declare_label(mercury____Unify___higher_order__new_pred_0_0_i2);
+Declare_label(mercury____Unify___higher_order__new_pred_0_0_i1004);
+Declare_label(mercury____Unify___higher_order__new_pred_0_0_i1);
+Declare_static(mercury____Index___higher_order__new_pred_0_0);
+Declare_static(mercury____Compare___higher_order__new_pred_0_0);
+Declare_label(mercury____Compare___higher_order__new_pred_0_0_i4);
+Declare_label(mercury____Compare___higher_order__new_pred_0_0_i5);
+Declare_label(mercury____Compare___higher_order__new_pred_0_0_i3);
+Declare_label(mercury____Compare___higher_order__new_pred_0_0_i10);
+Declare_label(mercury____Compare___higher_order__new_pred_0_0_i16);
+
+Declare_entry(mercury__unused_0_0);
+extern Word * mercury_data_higher_order__base_type_layout_changed_0[];
+Word * mercury_data_higher_order__base_type_info_changed_0[] = {
+	(Word *) ((Integer) 0),
+	(Word *) (Integer) ENTRY(mercury__unused_0_0),
+	(Word *) (Integer) ENTRY(mercury__unused_0_0),
+	(Word *) (Integer) ENTRY(mercury__unused_0_0),
+	(Word *) (Integer) mercury_data_higher_order__base_type_layout_changed_0
+};
+
+extern Word * mercury_data_higher_order__base_type_layout_goal_sizes_0[];
+Word * mercury_data_higher_order__base_type_info_goal_sizes_0[] = {
+	(Word *) ((Integer) 0),
+	(Word *) (Integer) ENTRY(mercury__unused_0_0),
+	(Word *) (Integer) ENTRY(mercury__unused_0_0),
+	(Word *) (Integer) ENTRY(mercury__unused_0_0),
+	(Word *) (Integer) mercury_data_higher_order__base_type_layout_goal_sizes_0
+};
+
+extern Word * mercury_data_higher_order__base_type_layout_higher_order_arg_0[];
+Word * mercury_data_higher_order__base_type_info_higher_order_arg_0[] = {
+	(Word *) ((Integer) 0),
+	(Word *) (Integer) STATIC(mercury____Unify___higher_order__higher_order_arg_0_0),
+	(Word *) (Integer) STATIC(mercury____Index___higher_order__higher_order_arg_0_0),
+	(Word *) (Integer) STATIC(mercury____Compare___higher_order__higher_order_arg_0_0),
+	(Word *) (Integer) mercury_data_higher_order__base_type_layout_higher_order_arg_0
+};
+
+extern Word * mercury_data_higher_order__base_type_layout_higher_order_info_0[];
+Word * mercury_data_higher_order__base_type_info_higher_order_info_0[] = {
+	(Word *) ((Integer) 0),
+	(Word *) (Integer) ENTRY(mercury__unused_0_0),
+	(Word *) (Integer) ENTRY(mercury__unused_0_0),
+	(Word *) (Integer) ENTRY(mercury__unused_0_0),
+	(Word *) (Integer) mercury_data_higher_order__base_type_layout_higher_order_info_0
+};
+
+extern Word * mercury_data_higher_order__base_type_layout_maybe_pred_and_args_0[];
+Word * mercury_data_higher_order__base_type_info_maybe_pred_and_args_0[] = {
+	(Word *) ((Integer) 0),
+	(Word *) (Integer) STATIC(mercury____Unify___higher_order__maybe_pred_and_args_0_0),
+	(Word *) (Integer) STATIC(mercury____Index___higher_order__maybe_pred_and_args_0_0),
+	(Word *) (Integer) STATIC(mercury____Compare___higher_order__maybe_pred_and_args_0_0),
+	(Word *) (Integer) mercury_data_higher_order__base_type_layout_maybe_pred_and_args_0
+};
+
+extern Word * mercury_data_higher_order__base_type_layout_new_pred_0[];
+Word * mercury_data_higher_order__base_type_info_new_pred_0[] = {
+	(Word *) ((Integer) 0),
+	(Word *) (Integer) STATIC(mercury____Unify___higher_order__new_pred_0_0),
+	(Word *) (Integer) STATIC(mercury____Index___higher_order__new_pred_0_0),
+	(Word *) (Integer) STATIC(mercury____Compare___higher_order__new_pred_0_0),
+	(Word *) (Integer) mercury_data_higher_order__base_type_layout_new_pred_0
+};
+
+extern Word * mercury_data_higher_order__base_type_layout_new_preds_0[];
+Word * mercury_data_higher_order__base_type_info_new_preds_0[] = {
+	(Word *) ((Integer) 0),
+	(Word *) (Integer) ENTRY(mercury__unused_0_0),
+	(Word *) (Integer) ENTRY(mercury__unused_0_0),
+	(Word *) (Integer) ENTRY(mercury__unused_0_0),
+	(Word *) (Integer) mercury_data_higher_order__base_type_layout_new_preds_0
+};
+
+extern Word * mercury_data_higher_order__base_type_layout_pred_vars_0[];
+Word * mercury_data_higher_order__base_type_info_pred_vars_0[] = {
+	(Word *) ((Integer) 0),
+	(Word *) (Integer) ENTRY(mercury__unused_0_0),
+	(Word *) (Integer) ENTRY(mercury__unused_0_0),
+	(Word *) (Integer) ENTRY(mercury__unused_0_0),
+	(Word *) (Integer) mercury_data_higher_order__base_type_layout_pred_vars_0
+};
+
+extern Word * mercury_data_higher_order__base_type_layout_request_0[];
+Word * mercury_data_higher_order__base_type_info_request_0[] = {
+	(Word *) ((Integer) 0),
+	(Word *) (Integer) STATIC(mercury____Unify___higher_order__request_0_0),
+	(Word *) (Integer) STATIC(mercury____Index___higher_order__request_0_0),
+	(Word *) (Integer) STATIC(mercury____Compare___higher_order__request_0_0),
+	(Word *) (Integer) mercury_data_higher_order__base_type_layout_request_0
+};
+
+extern Word * mercury_data_higher_order__common_5[];
+Word * mercury_data_higher_order__base_type_layout_request_0[] = {
+	(Word *) (Integer) mkword(mktag(1), (Integer) mercury_data_higher_order__common_5),
+	(Word *) (Integer) mkword(mktag(0), mkbody(((Integer) 1))),
+	(Word *) (Integer) mkword(mktag(0), mkbody(((Integer) 1))),
+	(Word *) (Integer) mkword(mktag(0), mkbody(((Integer) 1)))
+};
+
+extern Word * mercury_data_higher_order__common_7[];
+Word * mercury_data_higher_order__base_type_layout_pred_vars_0[] = {
+	(Word *) (Integer) mkword(mktag(3), (Integer) mercury_data_higher_order__common_7),
+	(Word *) (Integer) mkword(mktag(3), (Integer) mercury_data_higher_order__common_7),
+	(Word *) (Integer) mkword(mktag(3), (Integer) mercury_data_higher_order__common_7),
+	(Word *) (Integer) mkword(mktag(3), (Integer) mercury_data_higher_order__common_7)
+};
+
+extern Word * mercury_data_higher_order__common_9[];
+Word * mercury_data_higher_order__base_type_layout_new_preds_0[] = {
+	(Word *) (Integer) mkword(mktag(3), (Integer) mercury_data_higher_order__common_9),
+	(Word *) (Integer) mkword(mktag(3), (Integer) mercury_data_higher_order__common_9),
+	(Word *) (Integer) mkword(mktag(3), (Integer) mercury_data_higher_order__common_9),
+	(Word *) (Integer) mkword(mktag(3), (Integer) mercury_data_higher_order__common_9)
+};
+
+extern Word * mercury_data_higher_order__common_12[];
+Word * mercury_data_higher_order__base_type_layout_new_pred_0[] = {
+	(Word *) (Integer) mkword(mktag(1), (Integer) mercury_data_higher_order__common_12),
+	(Word *) (Integer) mkword(mktag(0), mkbody(((Integer) 1))),
+	(Word *) (Integer) mkword(mktag(0), mkbody(((Integer) 1))),
+	(Word *) (Integer) mkword(mktag(0), mkbody(((Integer) 1)))
+};
+
+extern Word * mercury_data_higher_order__common_13[];
+extern Word * mercury_data_higher_order__common_15[];
+Word * mercury_data_higher_order__base_type_layout_maybe_pred_and_args_0[] = {
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_13),
+	(Word *) (Integer) mkword(mktag(1), (Integer) mercury_data_higher_order__common_15),
+	(Word *) (Integer) mkword(mktag(0), mkbody(((Integer) 1))),
+	(Word *) (Integer) mkword(mktag(0), mkbody(((Integer) 1)))
+};
+
+extern Word * mercury_data_higher_order__common_18[];
+Word * mercury_data_higher_order__base_type_layout_higher_order_info_0[] = {
+	(Word *) (Integer) mkword(mktag(1), (Integer) mercury_data_higher_order__common_18),
+	(Word *) (Integer) mkword(mktag(0), mkbody(((Integer) 1))),
+	(Word *) (Integer) mkword(mktag(0), mkbody(((Integer) 1))),
+	(Word *) (Integer) mkword(mktag(0), mkbody(((Integer) 1)))
+};
+
+extern Word * mercury_data_higher_order__common_19[];
+Word * mercury_data_higher_order__base_type_layout_higher_order_arg_0[] = {
+	(Word *) (Integer) mkword(mktag(1), (Integer) mercury_data_higher_order__common_19),
+	(Word *) (Integer) mkword(mktag(0), mkbody(((Integer) 1))),
+	(Word *) (Integer) mkword(mktag(0), mkbody(((Integer) 1))),
+	(Word *) (Integer) mkword(mktag(0), mkbody(((Integer) 1)))
+};
+
+extern Word * mercury_data_higher_order__common_21[];
+Word * mercury_data_higher_order__base_type_layout_goal_sizes_0[] = {
+	(Word *) (Integer) mkword(mktag(3), (Integer) mercury_data_higher_order__common_21),
+	(Word *) (Integer) mkword(mktag(3), (Integer) mercury_data_higher_order__common_21),
+	(Word *) (Integer) mkword(mktag(3), (Integer) mercury_data_higher_order__common_21),
+	(Word *) (Integer) mkword(mktag(3), (Integer) mercury_data_higher_order__common_21)
+};
+
+extern Word * mercury_data_higher_order__common_22[];
+Word * mercury_data_higher_order__base_type_layout_changed_0[] = {
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_22),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_22),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_22),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_22)
+};
+
+extern Word * mercury_data_set__base_type_info_set_1[];
+Word * mercury_data_higher_order__common_0[] = {
+	(Word *) (Integer) mercury_data_set__base_type_info_set_1,
+	(Word *) (Integer) mercury_data_higher_order__base_type_info_new_pred_0
+};
+
+Word * mercury_data_higher_order__common_1[] = {
+	(Word *) string_const(" with higher-order arguments:\n", 30),
+	(Word *) (Integer) mkword(mktag(0), mkbody(((Integer) 0)))
+};
+
+extern Word * mercury_data_std_util__base_type_info_pair_2[];
+extern Word * mercury_data_hlds_goal__base_type_info_hlds__goal_expr_0[];
+extern Word * mercury_data_hlds_goal__base_type_info_hlds__goal_info_0[];
+Word * mercury_data_higher_order__common_2[] = {
+	(Word *) (Integer) mercury_data_std_util__base_type_info_pair_2,
+	(Word *) (Integer) mercury_data_hlds_goal__base_type_info_hlds__goal_expr_0,
+	(Word *) (Integer) mercury_data_hlds_goal__base_type_info_hlds__goal_info_0
+};
+
+extern Word * mercury_data_hlds_pred__base_type_info_pred_proc_id_0[];
+Word * mercury_data_higher_order__common_3[] = {
+	(Word *) (Integer) mercury_data_hlds_pred__base_type_info_pred_proc_id_0
+};
+
+extern Word * mercury_data_mercury_builtin__base_type_info_list_1[];
+Word * mercury_data_higher_order__common_4[] = {
+	(Word *) (Integer) mercury_data_mercury_builtin__base_type_info_list_1,
+	(Word *) (Integer) mercury_data_higher_order__base_type_info_higher_order_arg_0
+};
+
+Word * mercury_data_higher_order__common_5[] = {
+	(Word *) ((Integer) 3),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_3),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_3),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_4),
+	(Word *) string_const("request", 7)
+};
+
+extern Word * mercury_data_tree234__base_type_info_tree234_2[];
+extern Word * mercury_data_mercury_builtin__base_type_info_var_0[];
+Word * mercury_data_higher_order__common_6[] = {
+	(Word *) (Integer) mercury_data_tree234__base_type_info_tree234_2,
+	(Word *) (Integer) mercury_data_mercury_builtin__base_type_info_var_0,
+	(Word *) (Integer) mercury_data_higher_order__base_type_info_maybe_pred_and_args_0
+};
+
+Word * mercury_data_higher_order__common_7[] = {
+	(Word *) ((Integer) 0),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_6)
+};
+
+Word * mercury_data_higher_order__common_8[] = {
+	(Word *) (Integer) mercury_data_tree234__base_type_info_tree234_2,
+	(Word *) (Integer) mercury_data_hlds_pred__base_type_info_pred_proc_id_0,
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_0)
+};
+
+Word * mercury_data_higher_order__common_9[] = {
+	(Word *) ((Integer) 0),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_8)
+};
+
+extern Word * mercury_data___base_type_info_int_0[];
+Word * mercury_data_higher_order__common_10[] = {
+	(Word *) (Integer) mercury_data___base_type_info_int_0
+};
+
+extern Word * mercury_data_prog_data__base_type_info_sym_name_0[];
+Word * mercury_data_higher_order__common_11[] = {
+	(Word *) (Integer) mercury_data_prog_data__base_type_info_sym_name_0
+};
+
+Word * mercury_data_higher_order__common_12[] = {
+	(Word *) ((Integer) 4),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_10),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_10),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_11),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_4),
+	(Word *) string_const("new_pred", 8)
+};
+
+Word * mercury_data_higher_order__common_13[] = {
+	(Word *) ((Integer) 0),
+	(Word *) ((Integer) 1),
+	(Word *) string_const("no", 2)
+};
+
+Word * mercury_data_higher_order__common_14[] = {
+	(Word *) (Integer) mercury_data_mercury_builtin__base_type_info_list_1,
+	(Word *) (Integer) mercury_data_mercury_builtin__base_type_info_var_0
+};
+
+Word * mercury_data_higher_order__common_15[] = {
+	(Word *) ((Integer) 3),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_10),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_10),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_14),
+	(Word *) string_const("yes", 3)
+};
+
+Word * mercury_data_higher_order__common_16[] = {
+	(Word *) (Integer) mercury_data_set__base_type_info_set_1,
+	(Word *) (Integer) mercury_data_higher_order__base_type_info_request_0
+};
+
+extern Word * mercury_data_hlds_module__base_type_info_module_info_0[];
+Word * mercury_data_higher_order__common_17[] = {
+	(Word *) (Integer) mercury_data_hlds_module__base_type_info_module_info_0
+};
+
+Word * mercury_data_higher_order__common_18[] = {
+	(Word *) ((Integer) 4),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_6),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_16),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_8),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_17),
+	(Word *) string_const("info", 4)
+};
+
+Word * mercury_data_higher_order__common_19[] = {
+	(Word *) ((Integer) 5),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_10),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_10),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_10),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_10),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_4),
+	(Word *) string_const("higher_order_arg", 16)
+};
+
+Word * mercury_data_higher_order__common_20[] = {
+	(Word *) (Integer) mercury_data_tree234__base_type_info_tree234_2,
+	(Word *) (Integer) mercury_data___base_type_info_int_0,
+	(Word *) (Integer) mercury_data___base_type_info_int_0
+};
+
+Word * mercury_data_higher_order__common_21[] = {
+	(Word *) ((Integer) 0),
+	(Word *) (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_20)
+};
+
+Word * mercury_data_higher_order__common_22[] = {
+	(Word *) ((Integer) 1),
+	(Word *) ((Integer) 3),
+	(Word *) string_const("changed", 7),
+	(Word *) string_const("request", 7),
+	(Word *) string_const("unchanged", 9)
+};
+
+BEGIN_MODULE(mercury__higher_order_module0)
+	init_entry(mercury____Index___higher_order_new_pred_0__ua10000_2_0);
+BEGIN_CODE
+
+/* code for predicate '__Index___higher_order_new_pred_0__ua10000'/2 in mode 0 */
+Define_static(mercury____Index___higher_order_new_pred_0__ua10000_2_0);
+	r1 = ((Integer) 0);
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module1)
+	init_entry(mercury____Index___higher_order_higher_order_arg_0__ua10000_2_0);
+BEGIN_CODE
+
+/* code for predicate '__Index___higher_order_higher_order_arg_0__ua10000'/2 in mode 0 */
+Define_static(mercury____Index___higher_order_higher_order_arg_0__ua10000_2_0);
+	r1 = ((Integer) 0);
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module2)
+	init_entry(mercury____Index___higher_order_request_0__ua10000_2_0);
+BEGIN_CODE
+
+/* code for predicate '__Index___higher_order_request_0__ua10000'/2 in mode 0 */
+Define_static(mercury____Index___higher_order_request_0__ua10000_2_0);
+	r1 = ((Integer) 0);
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module3)
+	init_entry(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0);
+	init_label(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i7);
+	init_label(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i13);
+	init_label(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i12);
+	init_label(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i14);
+	init_label(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i8);
+	init_label(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i1017);
+BEGIN_CODE
+
+/* code for predicate 'remove_listof_higher_order_args__ua10000'/4 in mode 0 */
+Define_static(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0);
+	if (((Integer) r3 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i1017);
+	if (((Integer) r1 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i1017);
+	incr_sp_push_msg(7, "remove_listof_higher_order_args__ua10000");
+	detstackvar(7) = (Integer) succip;
+	detstackvar(1) = (Integer) r2;
+	detstackvar(2) = (Integer) r3;
+	detstackvar(3) = (Integer) field(mktag(1), (Integer) r1, ((Integer) 0));
+	r1 = (Integer) field(mktag(1), (Integer) r1, ((Integer) 1));
+	r2 = ((Integer) r2 + ((Integer) 1));
+	localcall(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0,
+		LABEL(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i7),
+		STATIC(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0));
+Define_label(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i7);
+	update_prof_current_proc(LABEL(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0));
+	detstackvar(4) = (Integer) curfr;
+	detstackvar(5) = (Integer) maxfr;
+	detstackvar(6) = (Integer) bt_redoip((Integer) maxfr);
+	LVALUE_CAST(Word,bt_redoip((Integer) maxfr)) = (Integer) LABEL(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i12);
+	r2 = (Integer) detstackvar(2);
+	detstackvar(2) = (Integer) r1;
+	r1 = (Integer) mercury_data_higher_order__base_type_info_higher_order_arg_0;
+	{
+	Declare_entry(mercury__list__member_2_1);
+	call_localret(ENTRY(mercury__list__member_2_1),
+		mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i13,
+		STATIC(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0));
+	}
+Define_label(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i13);
+	update_prof_current_proc(LABEL(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0));
+	{
+	Declare_entry(do_redo);
+	if (((Integer) detstackvar(1) != (Integer) field(mktag(0), (Integer) r1, ((Integer) 2))))
+		GOTO(ENTRY(do_redo));
+	}
+	LVALUE_CAST(Word,maxfr) = (Integer) detstackvar(5);
+	LVALUE_CAST(Word,bt_redoip((Integer) maxfr)) = (Integer) detstackvar(6);
+	LVALUE_CAST(Word,curfr) = (Integer) detstackvar(4);
+	GOTO_LABEL(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i14);
+Define_label(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i12);
+	update_prof_current_proc(LABEL(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0));
+	LVALUE_CAST(Word,curfr) = (Integer) detstackvar(4);
+	r1 = (Integer) detstackvar(2);
+	LVALUE_CAST(Word,bt_redoip((Integer) maxfr)) = (Integer) detstackvar(6);
+	GOTO_LABEL(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i8);
+Define_label(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i14);
+	r1 = (Integer) detstackvar(2);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(7);
+	decr_sp_pop_msg(7);
+	proceed();
+Define_label(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i8);
+	r2 = (Integer) r1;
+	tag_incr_hp(r1, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r1, ((Integer) 0)) = (Integer) detstackvar(3);
+	field(mktag(1), (Integer) r1, ((Integer) 1)) = (Integer) r2;
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(7);
+	decr_sp_pop_msg(7);
+	proceed();
+Define_label(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0_i1017);
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module4)
+	init_entry(mercury__higher_order__LambdaGoal__2_2_0);
+	init_label(mercury__higher_order__LambdaGoal__2_2_0_i2);
+	init_label(mercury__higher_order__LambdaGoal__2_2_0_i1);
+	init_label(mercury__higher_order__LambdaGoal__2_2_0_i1000);
+BEGIN_CODE
+
+/* code for predicate 'higher_order__LambdaGoal__2'/2 in mode 0 */
+Define_static(mercury__higher_order__LambdaGoal__2_2_0);
+	r3 = (Integer) r1;
+	r4 = (Integer) field(mktag(0), (Integer) field(mktag(0), (Integer) r2, ((Integer) 1)), ((Integer) 0));
+	r1 = (Integer) mercury_data___base_type_info_int_0;
+	r2 = (Integer) mercury_data___base_type_info_int_0;
+	incr_sp_push_msg(1, "higher_order__LambdaGoal__2");
+	detstackvar(1) = (Integer) succip;
+	{
+	Declare_entry(mercury__map__search_3_1);
+	call_localret(ENTRY(mercury__map__search_3_1),
+		mercury__higher_order__LambdaGoal__2_2_0_i2,
+		STATIC(mercury__higher_order__LambdaGoal__2_2_0));
+	}
+Define_label(mercury__higher_order__LambdaGoal__2_2_0_i2);
+	update_prof_current_proc(LABEL(mercury__higher_order__LambdaGoal__2_2_0));
+	if (!((Integer) r1))
+		GOTO_LABEL(mercury__higher_order__LambdaGoal__2_2_0_i1);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(1);
+	decr_sp_pop_msg(1);
+	if (((Integer) r2 > ((Integer) 20)))
+		GOTO_LABEL(mercury__higher_order__LambdaGoal__2_2_0_i1000);
+	r1 = TRUE;
+	proceed();
+Define_label(mercury__higher_order__LambdaGoal__2_2_0_i1);
+	r1 = FALSE;
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(1);
+	decr_sp_pop_msg(1);
+	proceed();
+Define_label(mercury__higher_order__LambdaGoal__2_2_0_i1000);
+	r1 = FALSE;
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module5)
+	init_entry(mercury__higher_order__LambdaGoal__1_2_0);
+BEGIN_CODE
+
+/* code for predicate 'higher_order__LambdaGoal__1'/2 in mode 0 */
+Define_static(mercury__higher_order__LambdaGoal__1_2_0);
+	r3 = (Integer) field(mktag(0), (Integer) r2, ((Integer) 3));
+	r2 = (Integer) r1;
+	r1 = (Integer) mercury_data_higher_order__base_type_info_higher_order_arg_0;
+	{
+	Declare_entry(mercury____Unify___mercury_builtin__list_1_0);
+	tailcall(ENTRY(mercury____Unify___mercury_builtin__list_1_0),
+		STATIC(mercury__higher_order__LambdaGoal__1_2_0));
+	}
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module6)
+	init_entry(mercury__higher_order__specialize_higher_order_4_0);
+	init_label(mercury__higher_order__specialize_higher_order_4_0_i2);
+	init_label(mercury__higher_order__specialize_higher_order_4_0_i3);
+	init_label(mercury__higher_order__specialize_higher_order_4_0_i4);
+	init_label(mercury__higher_order__specialize_higher_order_4_0_i5);
+	init_label(mercury__higher_order__specialize_higher_order_4_0_i6);
+	init_label(mercury__higher_order__specialize_higher_order_4_0_i7);
+BEGIN_CODE
+
+/* code for predicate 'specialize_higher_order'/4 in mode 0 */
+Define_entry(mercury__higher_order__specialize_higher_order_4_0);
+	incr_sp_push_msg(5, "specialize_higher_order");
+	detstackvar(5) = (Integer) succip;
+	detstackvar(1) = (Integer) r1;
+	detstackvar(2) = (Integer) r2;
+	{
+	Declare_entry(mercury__hlds_module__module_info_predids_2_0);
+	call_localret(ENTRY(mercury__hlds_module__module_info_predids_2_0),
+		mercury__higher_order__specialize_higher_order_4_0_i2,
+		ENTRY(mercury__higher_order__specialize_higher_order_4_0));
+	}
+Define_label(mercury__higher_order__specialize_higher_order_4_0_i2);
+	update_prof_current_proc(LABEL(mercury__higher_order__specialize_higher_order_4_0));
+	detstackvar(3) = (Integer) r1;
+	r1 = (Integer) mercury_data___base_type_info_int_0;
+	r2 = (Integer) mercury_data___base_type_info_int_0;
+	{
+	Declare_entry(mercury__map__init_1_0);
+	call_localret(ENTRY(mercury__map__init_1_0),
+		mercury__higher_order__specialize_higher_order_4_0_i3,
+		ENTRY(mercury__higher_order__specialize_higher_order_4_0));
+	}
+Define_label(mercury__higher_order__specialize_higher_order_4_0_i3);
+	update_prof_current_proc(LABEL(mercury__higher_order__specialize_higher_order_4_0));
+	detstackvar(4) = (Integer) r1;
+	r1 = (Integer) mercury_data_higher_order__base_type_info_request_0;
+	{
+	Declare_entry(mercury__set__init_1_0);
+	call_localret(ENTRY(mercury__set__init_1_0),
+		mercury__higher_order__specialize_higher_order_4_0_i4,
+		ENTRY(mercury__higher_order__specialize_higher_order_4_0));
+	}
+Define_label(mercury__higher_order__specialize_higher_order_4_0_i4);
+	update_prof_current_proc(LABEL(mercury__higher_order__specialize_higher_order_4_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(3);
+	r3 = (Integer) detstackvar(4);
+	r4 = (Integer) detstackvar(1);
+	call_localret(STATIC(mercury__higher_order__get_specialization_requests_2_7_0),
+		mercury__higher_order__specialize_higher_order_4_0_i5,
+		ENTRY(mercury__higher_order__specialize_higher_order_4_0));
+Define_label(mercury__higher_order__specialize_higher_order_4_0_i5);
+	update_prof_current_proc(LABEL(mercury__higher_order__specialize_higher_order_4_0));
+	detstackvar(1) = (Integer) r1;
+	detstackvar(3) = (Integer) r2;
+	detstackvar(4) = (Integer) r3;
+	r1 = (Integer) mercury_data_hlds_pred__base_type_info_pred_proc_id_0;
+	r2 = (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_0);
+	{
+	Declare_entry(mercury__map__init_1_0);
+	call_localret(ENTRY(mercury__map__init_1_0),
+		mercury__higher_order__specialize_higher_order_4_0_i6,
+		ENTRY(mercury__higher_order__specialize_higher_order_4_0));
+	}
+Define_label(mercury__higher_order__specialize_higher_order_4_0_i6);
+	update_prof_current_proc(LABEL(mercury__higher_order__specialize_higher_order_4_0));
+	r4 = (Integer) r1;
+	r1 = (Integer) detstackvar(1);
+	r2 = (Integer) detstackvar(3);
+	r3 = ((Integer) 1);
+	r5 = (Integer) detstackvar(4);
+	r6 = (Integer) detstackvar(2);
+	call_localret(STATIC(mercury__higher_order__process_requests_10_0),
+		mercury__higher_order__specialize_higher_order_4_0_i7,
+		ENTRY(mercury__higher_order__specialize_higher_order_4_0));
+Define_label(mercury__higher_order__specialize_higher_order_4_0_i7);
+	update_prof_current_proc(LABEL(mercury__higher_order__specialize_higher_order_4_0));
+	r1 = (Integer) r3;
+	r2 = (Integer) r4;
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(5);
+	decr_sp_pop_msg(5);
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module7)
+	init_entry(mercury__higher_order__process_requests_10_0);
+	init_label(mercury__higher_order__process_requests_10_0_i2);
+	init_label(mercury__higher_order__process_requests_10_0_i3);
+	init_label(mercury__higher_order__process_requests_10_0_i4);
+	init_label(mercury__higher_order__process_requests_10_0_i7);
+	init_label(mercury__higher_order__process_requests_10_0_i8);
+	init_label(mercury__higher_order__process_requests_10_0_i9);
+	init_label(mercury__higher_order__process_requests_10_0_i10);
+	init_label(mercury__higher_order__process_requests_10_0_i11);
+	init_label(mercury__higher_order__process_requests_10_0_i12);
+	init_label(mercury__higher_order__process_requests_10_0_i13);
+	init_label(mercury__higher_order__process_requests_10_0_i14);
+	init_label(mercury__higher_order__process_requests_10_0_i15);
+BEGIN_CODE
+
+/* code for predicate 'process_requests'/10 in mode 0 */
+Define_static(mercury__higher_order__process_requests_10_0);
+	incr_sp_push_msg(8, "process_requests");
+	detstackvar(8) = (Integer) succip;
+	detstackvar(1) = (Integer) r2;
+	r2 = (Integer) r1;
+	r1 = (Integer) mercury_data_higher_order__base_type_info_request_0;
+	detstackvar(2) = (Integer) r3;
+	detstackvar(3) = (Integer) r4;
+	detstackvar(4) = (Integer) r5;
+	detstackvar(5) = (Integer) r6;
+	{
+	Declare_entry(mercury__set__to_sorted_list_2_0);
+	call_localret(ENTRY(mercury__set__to_sorted_list_2_0),
+		mercury__higher_order__process_requests_10_0_i2,
+		STATIC(mercury__higher_order__process_requests_10_0));
+	}
+Define_label(mercury__higher_order__process_requests_10_0_i2);
+	update_prof_current_proc(LABEL(mercury__higher_order__process_requests_10_0));
+	tag_incr_hp(r2, mktag(0), ((Integer) 3));
+	r3 = (Integer) r1;
+	r1 = (Integer) mercury_data_higher_order__base_type_info_request_0;
+	field(mktag(0), (Integer) r2, ((Integer) 2)) = (Integer) detstackvar(1);
+	field(mktag(0), (Integer) r2, ((Integer) 0)) = ((Integer) 1);
+	field(mktag(0), (Integer) r2, ((Integer) 1)) = (Integer) STATIC(mercury__higher_order__LambdaGoal__2_2_0);
+	{
+	Declare_entry(mercury__list__filter_3_0);
+	call_localret(ENTRY(mercury__list__filter_3_0),
+		mercury__higher_order__process_requests_10_0_i3,
+		STATIC(mercury__higher_order__process_requests_10_0));
+	}
+Define_label(mercury__higher_order__process_requests_10_0_i3);
+	update_prof_current_proc(LABEL(mercury__higher_order__process_requests_10_0));
+	if (((Integer) r1 != (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__process_requests_10_0_i4);
+	r1 = (Integer) detstackvar(2);
+	r2 = (Integer) detstackvar(3);
+	r3 = (Integer) detstackvar(4);
+	r4 = (Integer) detstackvar(5);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(8);
+	decr_sp_pop_msg(8);
+	proceed();
+Define_label(mercury__higher_order__process_requests_10_0_i4);
+	detstackvar(6) = (Integer) r1;
+	r1 = (Integer) mercury_data_hlds_pred__base_type_info_pred_proc_id_0;
+	{
+	Declare_entry(mercury__set__init_1_0);
+	call_localret(ENTRY(mercury__set__init_1_0),
+		mercury__higher_order__process_requests_10_0_i7,
+		STATIC(mercury__higher_order__process_requests_10_0));
+	}
+Define_label(mercury__higher_order__process_requests_10_0_i7);
+	update_prof_current_proc(LABEL(mercury__higher_order__process_requests_10_0));
+	detstackvar(7) = (Integer) r1;
+	r1 = (Integer) mercury_data_hlds_pred__base_type_info_pred_proc_id_0;
+	r2 = (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_0);
+	{
+	Declare_entry(mercury__map__init_1_0);
+	call_localret(ENTRY(mercury__map__init_1_0),
+		mercury__higher_order__process_requests_10_0_i8,
+		STATIC(mercury__higher_order__process_requests_10_0));
+	}
+Define_label(mercury__higher_order__process_requests_10_0_i8);
+	update_prof_current_proc(LABEL(mercury__higher_order__process_requests_10_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(6);
+	r3 = (Integer) detstackvar(7);
+	r4 = (Integer) detstackvar(2);
+	r5 = (Integer) detstackvar(4);
+	r6 = (Integer) detstackvar(5);
+	call_localret(STATIC(mercury__higher_order__create_new_preds_11_0),
+		mercury__higher_order__process_requests_10_0_i9,
+		STATIC(mercury__higher_order__process_requests_10_0));
+Define_label(mercury__higher_order__process_requests_10_0_i9);
+	update_prof_current_proc(LABEL(mercury__higher_order__process_requests_10_0));
+	detstackvar(5) = (Integer) r3;
+	r3 = (Integer) r1;
+	detstackvar(2) = (Integer) r1;
+	detstackvar(4) = (Integer) r2;
+	r1 = (Integer) mercury_data_hlds_pred__base_type_info_pred_proc_id_0;
+	r2 = (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_0);
+	detstackvar(6) = (Integer) r4;
+	detstackvar(7) = (Integer) r5;
+	{
+	Declare_entry(mercury__map__keys_2_0);
+	call_localret(ENTRY(mercury__map__keys_2_0),
+		mercury__higher_order__process_requests_10_0_i10,
+		STATIC(mercury__higher_order__process_requests_10_0));
+	}
+Define_label(mercury__higher_order__process_requests_10_0_i10);
+	update_prof_current_proc(LABEL(mercury__higher_order__process_requests_10_0));
+	r2 = (Integer) detstackvar(2);
+	detstackvar(2) = (Integer) r1;
+	r1 = (Integer) mercury_data_hlds_pred__base_type_info_pred_proc_id_0;
+	r4 = (Integer) r2;
+	r2 = (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_0);
+	r3 = (Integer) detstackvar(3);
+	{
+	Declare_entry(mercury__map__merge_3_0);
+	call_localret(ENTRY(mercury__map__merge_3_0),
+		mercury__higher_order__process_requests_10_0_i11,
+		STATIC(mercury__higher_order__process_requests_10_0));
+	}
+Define_label(mercury__higher_order__process_requests_10_0_i11);
+	update_prof_current_proc(LABEL(mercury__higher_order__process_requests_10_0));
+	detstackvar(3) = (Integer) r1;
+	r1 = (Integer) mercury_data_hlds_pred__base_type_info_pred_proc_id_0;
+	r2 = (Integer) detstackvar(4);
+	{
+	Declare_entry(mercury__set__to_sorted_list_2_0);
+	call_localret(ENTRY(mercury__set__to_sorted_list_2_0),
+		mercury__higher_order__process_requests_10_0_i12,
+		STATIC(mercury__higher_order__process_requests_10_0));
+	}
+Define_label(mercury__higher_order__process_requests_10_0_i12);
+	update_prof_current_proc(LABEL(mercury__higher_order__process_requests_10_0));
+	r2 = (Integer) detstackvar(3);
+	r3 = (Integer) detstackvar(6);
+	call_localret(STATIC(mercury__higher_order__fixup_preds_4_0),
+		mercury__higher_order__process_requests_10_0_i13,
+		STATIC(mercury__higher_order__process_requests_10_0));
+Define_label(mercury__higher_order__process_requests_10_0_i13);
+	update_prof_current_proc(LABEL(mercury__higher_order__process_requests_10_0));
+	detstackvar(4) = (Integer) r1;
+	r1 = (Integer) mercury_data_higher_order__base_type_info_request_0;
+	{
+	Declare_entry(mercury__set__init_1_0);
+	call_localret(ENTRY(mercury__set__init_1_0),
+		mercury__higher_order__process_requests_10_0_i14,
+		STATIC(mercury__higher_order__process_requests_10_0));
+	}
+Define_label(mercury__higher_order__process_requests_10_0_i14);
+	update_prof_current_proc(LABEL(mercury__higher_order__process_requests_10_0));
+	r3 = (Integer) r1;
+	r1 = (Integer) detstackvar(2);
+	r2 = (Integer) detstackvar(3);
+	r4 = (Integer) detstackvar(1);
+	r5 = (Integer) detstackvar(4);
+	call_localret(STATIC(mercury__higher_order__create_specialized_versions_8_0),
+		mercury__higher_order__process_requests_10_0_i15,
+		STATIC(mercury__higher_order__process_requests_10_0));
+Define_label(mercury__higher_order__process_requests_10_0_i15);
+	update_prof_current_proc(LABEL(mercury__higher_order__process_requests_10_0));
+	r5 = (Integer) r3;
+	r3 = (Integer) detstackvar(5);
+	r4 = (Integer) detstackvar(3);
+	r6 = (Integer) detstackvar(7);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(8);
+	decr_sp_pop_msg(8);
+	localtailcall(mercury__higher_order__process_requests_10_0,
+		STATIC(mercury__higher_order__process_requests_10_0));
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module8)
+	init_entry(mercury__higher_order__get_specialization_requests_2_7_0);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i4);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i5);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i6);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i9);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i10);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i11);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i12);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i13);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i14);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i15);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i19);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i20);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i21);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i22);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i23);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i24);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i25);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i26);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i16);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i27);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i30);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i33);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i34);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i35);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i36);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i28);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i8);
+	init_label(mercury__higher_order__get_specialization_requests_2_7_0_i1006);
+BEGIN_CODE
+
+/* code for predicate 'get_specialization_requests_2'/7 in mode 0 */
+Define_static(mercury__higher_order__get_specialization_requests_2_7_0);
+	if (((Integer) r1 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__get_specialization_requests_2_7_0_i1006);
+	incr_sp_push_msg(16, "get_specialization_requests_2");
+	detstackvar(16) = (Integer) succip;
+	detstackvar(1) = (Integer) r2;
+	detstackvar(2) = (Integer) r3;
+	detstackvar(3) = (Integer) r4;
+	detstackvar(4) = (Integer) field(mktag(1), (Integer) r1, ((Integer) 0));
+	detstackvar(5) = (Integer) field(mktag(1), (Integer) r1, ((Integer) 1));
+	r1 = (Integer) r4;
+	{
+	Declare_entry(mercury__hlds_module__module_info_preds_2_0);
+	call_localret(ENTRY(mercury__hlds_module__module_info_preds_2_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i4,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i4);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	r3 = (Integer) r1;
+	detstackvar(6) = (Integer) r1;
+	r1 = (Integer) mercury_data___base_type_info_int_0;
+	{
+	extern Word * mercury_data_hlds_pred__base_type_info_pred_info_0[];
+	r2 = (Integer) mercury_data_hlds_pred__base_type_info_pred_info_0;
+	}
+	r4 = (Integer) detstackvar(4);
+	{
+	Declare_entry(mercury__map__lookup_3_1);
+	call_localret(ENTRY(mercury__map__lookup_3_1),
+		mercury__higher_order__get_specialization_requests_2_7_0_i5,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i5);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	detstackvar(7) = (Integer) r1;
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_non_imported_procids_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_non_imported_procids_2_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i6,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i6);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	if (((Integer) r1 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__get_specialization_requests_2_7_0_i8);
+	detstackvar(8) = (Integer) field(mktag(1), (Integer) r1, ((Integer) 0));
+	detstackvar(9) = (Integer) field(mktag(1), (Integer) r1, ((Integer) 1));
+	r1 = (Integer) detstackvar(7);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_procedures_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_procedures_2_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i9,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i9);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	r3 = (Integer) r1;
+	detstackvar(10) = (Integer) r1;
+	r1 = (Integer) mercury_data___base_type_info_int_0;
+	{
+	extern Word * mercury_data_hlds_pred__base_type_info_proc_info_0[];
+	r2 = (Integer) mercury_data_hlds_pred__base_type_info_proc_info_0;
+	}
+	r4 = (Integer) detstackvar(8);
+	{
+	Declare_entry(mercury__map__lookup_3_1);
+	call_localret(ENTRY(mercury__map__lookup_3_1),
+		mercury__higher_order__get_specialization_requests_2_7_0_i10,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i10);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	detstackvar(11) = (Integer) r1;
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_goal_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_goal_2_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i11,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i11);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	detstackvar(12) = (Integer) r1;
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) mercury_data_higher_order__base_type_info_maybe_pred_and_args_0;
+	{
+	Declare_entry(mercury__map__init_1_0);
+	call_localret(ENTRY(mercury__map__init_1_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i12,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i12);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	detstackvar(13) = (Integer) r1;
+	r1 = (Integer) mercury_data_hlds_pred__base_type_info_pred_proc_id_0;
+	r2 = (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_0);
+	{
+	Declare_entry(mercury__map__init_1_0);
+	call_localret(ENTRY(mercury__map__init_1_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i13,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i13);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	r4 = (Integer) r1;
+	tag_incr_hp(r2, mktag(0), ((Integer) 2));
+	field(mktag(0), (Integer) r2, ((Integer) 1)) = (Integer) detstackvar(8);
+	field(mktag(0), (Integer) r2, ((Integer) 0)) = (Integer) detstackvar(4);
+	r1 = (Integer) detstackvar(12);
+	tag_incr_hp(r3, mktag(0), ((Integer) 4));
+	field(mktag(0), (Integer) r3, ((Integer) 0)) = (Integer) detstackvar(13);
+	field(mktag(0), (Integer) r3, ((Integer) 1)) = (Integer) detstackvar(1);
+	field(mktag(0), (Integer) r3, ((Integer) 2)) = (Integer) r4;
+	field(mktag(0), (Integer) r3, ((Integer) 3)) = (Integer) detstackvar(3);
+	call_localret(STATIC(mercury__higher_order__traverse_goal_7_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i14,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i14);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	r5 = (Integer) r3;
+	detstackvar(1) = (Integer) r1;
+	detstackvar(12) = (Integer) r2;
+	detstackvar(13) = (Integer) field(mktag(0), (Integer) r4, ((Integer) 1));
+	r1 = (Integer) mercury_data___base_type_info_int_0;
+	r2 = (Integer) mercury_data___base_type_info_int_0;
+	r3 = (Integer) detstackvar(2);
+	r4 = (Integer) detstackvar(4);
+	{
+	Declare_entry(mercury__map__set_4_1);
+	call_localret(ENTRY(mercury__map__set_4_1),
+		mercury__higher_order__get_specialization_requests_2_7_0_i15,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i15);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	if (((Integer) detstackvar(12) != ((Integer) 0)))
+		GOTO_LABEL(mercury__higher_order__get_specialization_requests_2_7_0_i16);
+	detstackvar(2) = (Integer) r1;
+	r1 = (Integer) detstackvar(11);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_vartypes_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_vartypes_2_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i19,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i19);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	detstackvar(14) = (Integer) r1;
+	r1 = (Integer) detstackvar(11);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_headvars_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_headvars_2_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i20,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i20);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	detstackvar(15) = (Integer) r1;
+	r1 = (Integer) detstackvar(11);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_variables_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_variables_2_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i21,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i21);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	r3 = (Integer) r1;
+	r1 = (Integer) detstackvar(15);
+	r2 = (Integer) detstackvar(1);
+	r4 = (Integer) detstackvar(14);
+	{
+	Declare_entry(mercury__quantification__implicitly_quantify_clause_body_8_0);
+	call_localret(ENTRY(mercury__quantification__implicitly_quantify_clause_body_8_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i22,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i22);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	detstackvar(1) = (Integer) r2;
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(11);
+	detstackvar(11) = (Integer) r3;
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_set_goal_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_set_goal_3_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i23,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i23);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	r2 = (Integer) detstackvar(1);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_set_variables_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_set_variables_3_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i24,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i24);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	r2 = (Integer) detstackvar(11);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_set_vartypes_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_set_vartypes_3_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i25,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i25);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	r5 = (Integer) r1;
+	r1 = (Integer) mercury_data___base_type_info_int_0;
+	{
+	extern Word * mercury_data_hlds_pred__base_type_info_proc_info_0[];
+	r2 = (Integer) mercury_data_hlds_pred__base_type_info_proc_info_0;
+	}
+	r3 = (Integer) detstackvar(10);
+	r4 = (Integer) detstackvar(8);
+	{
+	Declare_entry(mercury__map__det_update_4_0);
+	call_localret(ENTRY(mercury__map__det_update_4_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i26,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i26);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	r5 = (Integer) r1;
+	r1 = (Integer) detstackvar(4);
+	r2 = (Integer) detstackvar(9);
+	r3 = (Integer) detstackvar(3);
+	r4 = (Integer) detstackvar(13);
+	r6 = (Integer) detstackvar(5);
+	r7 = (Integer) detstackvar(6);
+	r8 = (Integer) detstackvar(7);
+	r9 = (Integer) detstackvar(2);
+	r10 = (Integer) detstackvar(12);
+	GOTO_LABEL(mercury__higher_order__get_specialization_requests_2_7_0_i27);
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i16);
+	r9 = (Integer) r1;
+	r1 = (Integer) detstackvar(4);
+	r2 = (Integer) detstackvar(9);
+	r3 = (Integer) detstackvar(3);
+	r4 = (Integer) detstackvar(13);
+	r5 = (Integer) detstackvar(10);
+	r6 = (Integer) detstackvar(5);
+	r7 = (Integer) detstackvar(6);
+	r8 = (Integer) detstackvar(7);
+	r10 = (Integer) detstackvar(12);
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i27);
+	if (((Integer) r10 == ((Integer) 0)))
+		GOTO_LABEL(mercury__higher_order__get_specialization_requests_2_7_0_i30);
+	if (((Integer) r10 != ((Integer) 1)))
+		GOTO_LABEL(mercury__higher_order__get_specialization_requests_2_7_0_i28);
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i30);
+	detstackvar(3) = (Integer) r3;
+	detstackvar(4) = (Integer) r1;
+	detstackvar(5) = (Integer) r6;
+	detstackvar(6) = (Integer) r7;
+	detstackvar(7) = (Integer) r8;
+	detstackvar(2) = (Integer) r9;
+	call_localret(STATIC(mercury__higher_order__traverse_other_procs_7_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i33,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i33);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	detstackvar(1) = (Integer) r1;
+	r1 = (Integer) detstackvar(7);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_set_procedures_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_set_procedures_3_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i34,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i34);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	r5 = (Integer) r1;
+	r1 = (Integer) mercury_data___base_type_info_int_0;
+	{
+	extern Word * mercury_data_hlds_pred__base_type_info_pred_info_0[];
+	r2 = (Integer) mercury_data_hlds_pred__base_type_info_pred_info_0;
+	}
+	r3 = (Integer) detstackvar(6);
+	r4 = (Integer) detstackvar(4);
+	{
+	Declare_entry(mercury__map__det_update_4_0);
+	call_localret(ENTRY(mercury__map__det_update_4_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i35,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i35);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(3);
+	{
+	Declare_entry(mercury__hlds_module__module_info_set_preds_3_0);
+	call_localret(ENTRY(mercury__hlds_module__module_info_set_preds_3_0),
+		mercury__higher_order__get_specialization_requests_2_7_0_i36,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+	}
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i36);
+	update_prof_current_proc(LABEL(mercury__higher_order__get_specialization_requests_2_7_0));
+	r4 = (Integer) r1;
+	r1 = (Integer) detstackvar(5);
+	r2 = (Integer) detstackvar(1);
+	r3 = (Integer) detstackvar(2);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(16);
+	decr_sp_pop_msg(16);
+	localtailcall(mercury__higher_order__get_specialization_requests_2_7_0,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i28);
+	r2 = (Integer) r4;
+	r4 = (Integer) r3;
+	r1 = (Integer) r6;
+	r3 = (Integer) r9;
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(16);
+	decr_sp_pop_msg(16);
+	localtailcall(mercury__higher_order__get_specialization_requests_2_7_0,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i8);
+	r1 = (Integer) detstackvar(5);
+	r2 = (Integer) detstackvar(1);
+	r3 = (Integer) detstackvar(2);
+	r4 = (Integer) detstackvar(3);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(16);
+	decr_sp_pop_msg(16);
+	localtailcall(mercury__higher_order__get_specialization_requests_2_7_0,
+		STATIC(mercury__higher_order__get_specialization_requests_2_7_0));
+Define_label(mercury__higher_order__get_specialization_requests_2_7_0_i1006);
+	r1 = (Integer) r2;
+	r2 = (Integer) r3;
+	r3 = (Integer) r4;
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module9)
+	init_entry(mercury__higher_order__traverse_other_procs_7_0);
+	init_label(mercury__higher_order__traverse_other_procs_7_0_i4);
+	init_label(mercury__higher_order__traverse_other_procs_7_0_i5);
+	init_label(mercury__higher_order__traverse_other_procs_7_0_i6);
+	init_label(mercury__higher_order__traverse_other_procs_7_0_i7);
+	init_label(mercury__higher_order__traverse_other_procs_7_0_i8);
+	init_label(mercury__higher_order__traverse_other_procs_7_0_i9);
+	init_label(mercury__higher_order__traverse_other_procs_7_0_i10);
+	init_label(mercury__higher_order__traverse_other_procs_7_0_i11);
+	init_label(mercury__higher_order__traverse_other_procs_7_0_i12);
+	init_label(mercury__higher_order__traverse_other_procs_7_0_i13);
+	init_label(mercury__higher_order__traverse_other_procs_7_0_i14);
+	init_label(mercury__higher_order__traverse_other_procs_7_0_i15);
+	init_label(mercury__higher_order__traverse_other_procs_7_0_i16);
+	init_label(mercury__higher_order__traverse_other_procs_7_0_i1003);
+BEGIN_CODE
+
+/* code for predicate 'traverse_other_procs'/7 in mode 0 */
+Define_static(mercury__higher_order__traverse_other_procs_7_0);
+	if (((Integer) r2 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__traverse_other_procs_7_0_i1003);
+	incr_sp_push_msg(11, "traverse_other_procs");
+	detstackvar(11) = (Integer) succip;
+	detstackvar(1) = (Integer) r1;
+	detstackvar(2) = (Integer) r3;
+	detstackvar(3) = (Integer) r4;
+	detstackvar(4) = (Integer) r5;
+	detstackvar(5) = (Integer) field(mktag(1), (Integer) r2, ((Integer) 0));
+	detstackvar(6) = (Integer) field(mktag(1), (Integer) r2, ((Integer) 1));
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) mercury_data_higher_order__base_type_info_maybe_pred_and_args_0;
+	{
+	Declare_entry(mercury__map__init_1_0);
+	call_localret(ENTRY(mercury__map__init_1_0),
+		mercury__higher_order__traverse_other_procs_7_0_i4,
+		STATIC(mercury__higher_order__traverse_other_procs_7_0));
+	}
+Define_label(mercury__higher_order__traverse_other_procs_7_0_i4);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_other_procs_7_0));
+	detstackvar(7) = (Integer) r1;
+	r1 = (Integer) mercury_data_hlds_pred__base_type_info_pred_proc_id_0;
+	r2 = (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_0);
+	{
+	Declare_entry(mercury__map__init_1_0);
+	call_localret(ENTRY(mercury__map__init_1_0),
+		mercury__higher_order__traverse_other_procs_7_0_i5,
+		STATIC(mercury__higher_order__traverse_other_procs_7_0));
+	}
+Define_label(mercury__higher_order__traverse_other_procs_7_0_i5);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_other_procs_7_0));
+	detstackvar(8) = (Integer) r1;
+	r1 = (Integer) mercury_data___base_type_info_int_0;
+	{
+	extern Word * mercury_data_hlds_pred__base_type_info_proc_info_0[];
+	r2 = (Integer) mercury_data_hlds_pred__base_type_info_proc_info_0;
+	}
+	r3 = (Integer) detstackvar(4);
+	r4 = (Integer) detstackvar(5);
+	{
+	Declare_entry(mercury__map__lookup_3_1);
+	call_localret(ENTRY(mercury__map__lookup_3_1),
+		mercury__higher_order__traverse_other_procs_7_0_i6,
+		STATIC(mercury__higher_order__traverse_other_procs_7_0));
+	}
+Define_label(mercury__higher_order__traverse_other_procs_7_0_i6);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_other_procs_7_0));
+	detstackvar(9) = (Integer) r1;
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_goal_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_goal_2_0),
+		mercury__higher_order__traverse_other_procs_7_0_i7,
+		STATIC(mercury__higher_order__traverse_other_procs_7_0));
+	}
+Define_label(mercury__higher_order__traverse_other_procs_7_0_i7);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_other_procs_7_0));
+	detstackvar(10) = (Integer) r1;
+	r1 = (Integer) detstackvar(9);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_vartypes_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_vartypes_2_0),
+		mercury__higher_order__traverse_other_procs_7_0_i8,
+		STATIC(mercury__higher_order__traverse_other_procs_7_0));
+	}
+Define_label(mercury__higher_order__traverse_other_procs_7_0_i8);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_other_procs_7_0));
+	r2 = (Integer) detstackvar(3);
+	detstackvar(3) = (Integer) r1;
+	r1 = (Integer) detstackvar(10);
+	r4 = (Integer) r2;
+	tag_incr_hp(r2, mktag(0), ((Integer) 2));
+	field(mktag(0), (Integer) r2, ((Integer) 0)) = (Integer) detstackvar(1);
+	field(mktag(0), (Integer) r2, ((Integer) 1)) = (Integer) detstackvar(5);
+	tag_incr_hp(r3, mktag(0), ((Integer) 4));
+	field(mktag(0), (Integer) r3, ((Integer) 0)) = (Integer) detstackvar(7);
+	field(mktag(0), (Integer) r3, ((Integer) 1)) = (Integer) r4;
+	field(mktag(0), (Integer) r3, ((Integer) 2)) = (Integer) detstackvar(8);
+	field(mktag(0), (Integer) r3, ((Integer) 3)) = (Integer) detstackvar(2);
+	call_localret(STATIC(mercury__higher_order__traverse_goal_7_0),
+		mercury__higher_order__traverse_other_procs_7_0_i9,
+		STATIC(mercury__higher_order__traverse_other_procs_7_0));
+Define_label(mercury__higher_order__traverse_other_procs_7_0_i9);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_other_procs_7_0));
+	detstackvar(7) = (Integer) r1;
+	detstackvar(8) = (Integer) field(mktag(0), (Integer) r4, ((Integer) 1));
+	r1 = (Integer) detstackvar(9);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_headvars_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_headvars_2_0),
+		mercury__higher_order__traverse_other_procs_7_0_i10,
+		STATIC(mercury__higher_order__traverse_other_procs_7_0));
+	}
+Define_label(mercury__higher_order__traverse_other_procs_7_0_i10);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_other_procs_7_0));
+	detstackvar(10) = (Integer) r1;
+	r1 = (Integer) detstackvar(9);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_variables_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_variables_2_0),
+		mercury__higher_order__traverse_other_procs_7_0_i11,
+		STATIC(mercury__higher_order__traverse_other_procs_7_0));
+	}
+Define_label(mercury__higher_order__traverse_other_procs_7_0_i11);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_other_procs_7_0));
+	r3 = (Integer) r1;
+	r1 = (Integer) detstackvar(10);
+	r2 = (Integer) detstackvar(7);
+	r4 = (Integer) detstackvar(3);
+	{
+	Declare_entry(mercury__quantification__implicitly_quantify_clause_body_8_0);
+	call_localret(ENTRY(mercury__quantification__implicitly_quantify_clause_body_8_0),
+		mercury__higher_order__traverse_other_procs_7_0_i12,
+		STATIC(mercury__higher_order__traverse_other_procs_7_0));
+	}
+Define_label(mercury__higher_order__traverse_other_procs_7_0_i12);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_other_procs_7_0));
+	detstackvar(3) = (Integer) r2;
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(9);
+	detstackvar(7) = (Integer) r3;
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_set_goal_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_set_goal_3_0),
+		mercury__higher_order__traverse_other_procs_7_0_i13,
+		STATIC(mercury__higher_order__traverse_other_procs_7_0));
+	}
+Define_label(mercury__higher_order__traverse_other_procs_7_0_i13);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_other_procs_7_0));
+	r2 = (Integer) detstackvar(3);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_set_variables_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_set_variables_3_0),
+		mercury__higher_order__traverse_other_procs_7_0_i14,
+		STATIC(mercury__higher_order__traverse_other_procs_7_0));
+	}
+Define_label(mercury__higher_order__traverse_other_procs_7_0_i14);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_other_procs_7_0));
+	r2 = (Integer) detstackvar(7);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_set_vartypes_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_set_vartypes_3_0),
+		mercury__higher_order__traverse_other_procs_7_0_i15,
+		STATIC(mercury__higher_order__traverse_other_procs_7_0));
+	}
+Define_label(mercury__higher_order__traverse_other_procs_7_0_i15);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_other_procs_7_0));
+	r5 = (Integer) r1;
+	r1 = (Integer) mercury_data___base_type_info_int_0;
+	{
+	extern Word * mercury_data_hlds_pred__base_type_info_proc_info_0[];
+	r2 = (Integer) mercury_data_hlds_pred__base_type_info_proc_info_0;
+	}
+	r3 = (Integer) detstackvar(4);
+	r4 = (Integer) detstackvar(5);
+	{
+	Declare_entry(mercury__map__det_update_4_0);
+	call_localret(ENTRY(mercury__map__det_update_4_0),
+		mercury__higher_order__traverse_other_procs_7_0_i16,
+		STATIC(mercury__higher_order__traverse_other_procs_7_0));
+	}
+Define_label(mercury__higher_order__traverse_other_procs_7_0_i16);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_other_procs_7_0));
+	r5 = (Integer) r1;
+	r1 = (Integer) detstackvar(1);
+	r2 = (Integer) detstackvar(6);
+	r3 = (Integer) detstackvar(2);
+	r4 = (Integer) detstackvar(8);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(11);
+	decr_sp_pop_msg(11);
+	localtailcall(mercury__higher_order__traverse_other_procs_7_0,
+		STATIC(mercury__higher_order__traverse_other_procs_7_0));
+Define_label(mercury__higher_order__traverse_other_procs_7_0_i1003);
+	r1 = (Integer) r4;
+	r2 = (Integer) r5;
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module10)
+	init_entry(mercury__higher_order__traverse_goal_7_0);
+	init_label(mercury__higher_order__traverse_goal_7_0_i1032);
+	init_label(mercury__higher_order__traverse_goal_7_0_i1031);
+	init_label(mercury__higher_order__traverse_goal_7_0_i1030);
+	init_label(mercury__higher_order__traverse_goal_7_0_i1029);
+	init_label(mercury__higher_order__traverse_goal_7_0_i1028);
+	init_label(mercury__higher_order__traverse_goal_7_0_i1027);
+	init_label(mercury__higher_order__traverse_goal_7_0_i5);
+	init_label(mercury__higher_order__traverse_goal_7_0_i6);
+	init_label(mercury__higher_order__traverse_goal_7_0_i7);
+	init_label(mercury__higher_order__traverse_goal_7_0_i8);
+	init_label(mercury__higher_order__traverse_goal_7_0_i9);
+	init_label(mercury__higher_order__traverse_goal_7_0_i10);
+	init_label(mercury__higher_order__traverse_goal_7_0_i11);
+	init_label(mercury__higher_order__traverse_goal_7_0_i12);
+	init_label(mercury__higher_order__traverse_goal_7_0_i13);
+	init_label(mercury__higher_order__traverse_goal_7_0_i14);
+	init_label(mercury__higher_order__traverse_goal_7_0_i15);
+	init_label(mercury__higher_order__traverse_goal_7_0_i16);
+	init_label(mercury__higher_order__traverse_goal_7_0_i17);
+	init_label(mercury__higher_order__traverse_goal_7_0_i18);
+	init_label(mercury__higher_order__traverse_goal_7_0_i19);
+	init_label(mercury__higher_order__traverse_goal_7_0_i20);
+	init_label(mercury__higher_order__traverse_goal_7_0_i21);
+	init_label(mercury__higher_order__traverse_goal_7_0_i1022);
+	init_label(mercury__higher_order__traverse_goal_7_0_i1026);
+	init_label(mercury__higher_order__traverse_goal_7_0_i24);
+	init_label(mercury__higher_order__traverse_goal_7_0_i23);
+	init_label(mercury__higher_order__traverse_goal_7_0_i26);
+	init_label(mercury__higher_order__traverse_goal_7_0_i25);
+	init_label(mercury__higher_order__traverse_goal_7_0_i27);
+BEGIN_CODE
+
+/* code for predicate 'traverse_goal'/7 in mode 0 */
+Define_static(mercury__higher_order__traverse_goal_7_0);
+	r4 = (Integer) field(mktag(0), (Integer) r1, ((Integer) 0));
+	if ((tag((Integer) r4) != mktag(((Integer) 3))))
+		GOTO_LABEL(mercury__higher_order__traverse_goal_7_0_i1026);
+	COMPUTED_GOTO((Integer) field(mktag(3), (Integer) r4, ((Integer) 0)),
+		LABEL(mercury__higher_order__traverse_goal_7_0_i1032) AND
+		LABEL(mercury__higher_order__traverse_goal_7_0_i1031) AND
+		LABEL(mercury__higher_order__traverse_goal_7_0_i1030) AND
+		LABEL(mercury__higher_order__traverse_goal_7_0_i1029) AND
+		LABEL(mercury__higher_order__traverse_goal_7_0_i1028) AND
+		LABEL(mercury__higher_order__traverse_goal_7_0_i1027) AND
+		LABEL(mercury__higher_order__traverse_goal_7_0_i1022));
+Define_label(mercury__higher_order__traverse_goal_7_0_i1032);
+	incr_sp_push_msg(11, "traverse_goal");
+	detstackvar(11) = (Integer) succip;
+	GOTO_LABEL(mercury__higher_order__traverse_goal_7_0_i5);
+Define_label(mercury__higher_order__traverse_goal_7_0_i1031);
+	incr_sp_push_msg(11, "traverse_goal");
+	detstackvar(11) = (Integer) succip;
+	GOTO_LABEL(mercury__higher_order__traverse_goal_7_0_i7);
+Define_label(mercury__higher_order__traverse_goal_7_0_i1030);
+	incr_sp_push_msg(11, "traverse_goal");
+	detstackvar(11) = (Integer) succip;
+	GOTO_LABEL(mercury__higher_order__traverse_goal_7_0_i9);
+Define_label(mercury__higher_order__traverse_goal_7_0_i1029);
+	incr_sp_push_msg(11, "traverse_goal");
+	detstackvar(11) = (Integer) succip;
+	GOTO_LABEL(mercury__higher_order__traverse_goal_7_0_i11);
+Define_label(mercury__higher_order__traverse_goal_7_0_i1028);
+	incr_sp_push_msg(11, "traverse_goal");
+	detstackvar(11) = (Integer) succip;
+	GOTO_LABEL(mercury__higher_order__traverse_goal_7_0_i13);
+Define_label(mercury__higher_order__traverse_goal_7_0_i1027);
+	incr_sp_push_msg(11, "traverse_goal");
+	detstackvar(11) = (Integer) succip;
+	GOTO_LABEL(mercury__higher_order__traverse_goal_7_0_i15);
+Define_label(mercury__higher_order__traverse_goal_7_0_i5);
+	detstackvar(1) = (Integer) field(mktag(3), (Integer) r4, ((Integer) 1));
+	detstackvar(2) = (Integer) field(mktag(3), (Integer) r4, ((Integer) 2));
+	detstackvar(3) = (Integer) field(mktag(3), (Integer) r4, ((Integer) 4));
+	detstackvar(10) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 1));
+	r1 = (Integer) field(mktag(3), (Integer) r4, ((Integer) 3));
+	call_localret(STATIC(mercury__higher_order__traverse_cases_7_0),
+		mercury__higher_order__traverse_goal_7_0_i6,
+		STATIC(mercury__higher_order__traverse_goal_7_0));
+Define_label(mercury__higher_order__traverse_goal_7_0_i6);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_goal_7_0));
+	r5 = (Integer) r1;
+	tag_incr_hp(r1, mktag(0), ((Integer) 2));
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(3), ((Integer) 5));
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) tempr1;
+	field(mktag(3), (Integer) tempr1, ((Integer) 4)) = (Integer) detstackvar(3);
+	field(mktag(3), (Integer) tempr1, ((Integer) 3)) = (Integer) r5;
+	field(mktag(3), (Integer) tempr1, ((Integer) 2)) = (Integer) detstackvar(2);
+	field(mktag(3), (Integer) tempr1, ((Integer) 1)) = (Integer) detstackvar(1);
+	field(mktag(3), (Integer) tempr1, ((Integer) 0)) = ((Integer) 0);
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) detstackvar(10);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(11);
+	decr_sp_pop_msg(11);
+	proceed();
+	}
+Define_label(mercury__higher_order__traverse_goal_7_0_i7);
+	detstackvar(1) = (Integer) r1;
+	r1 = (Integer) field(mktag(3), (Integer) r4, ((Integer) 4));
+	r2 = (Integer) r3;
+	call_localret(STATIC(mercury__higher_order__check_unify_3_0),
+		mercury__higher_order__traverse_goal_7_0_i8,
+		STATIC(mercury__higher_order__traverse_goal_7_0));
+Define_label(mercury__higher_order__traverse_goal_7_0_i8);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_goal_7_0));
+	r4 = (Integer) r1;
+	r1 = (Integer) detstackvar(1);
+	r2 = ((Integer) 2);
+	r3 = ((Integer) 1);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(11);
+	decr_sp_pop_msg(11);
+	proceed();
+Define_label(mercury__higher_order__traverse_goal_7_0_i9);
+	detstackvar(1) = (Integer) field(mktag(3), (Integer) r4, ((Integer) 2));
+	detstackvar(10) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 1));
+	r1 = (Integer) field(mktag(3), (Integer) r4, ((Integer) 1));
+	call_localret(STATIC(mercury__higher_order__traverse_disj_7_0),
+		mercury__higher_order__traverse_goal_7_0_i10,
+		STATIC(mercury__higher_order__traverse_goal_7_0));
+Define_label(mercury__higher_order__traverse_goal_7_0_i10);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_goal_7_0));
+	r5 = (Integer) r1;
+	tag_incr_hp(r1, mktag(0), ((Integer) 2));
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(3), ((Integer) 3));
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) tempr1;
+	field(mktag(3), (Integer) tempr1, ((Integer) 1)) = (Integer) r5;
+	field(mktag(3), (Integer) tempr1, ((Integer) 0)) = ((Integer) 2);
+	field(mktag(3), (Integer) tempr1, ((Integer) 2)) = (Integer) detstackvar(1);
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) detstackvar(10);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(11);
+	decr_sp_pop_msg(11);
+	proceed();
+	}
+Define_label(mercury__higher_order__traverse_goal_7_0_i11);
+	detstackvar(10) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 1));
+	r1 = (Integer) field(mktag(3), (Integer) r4, ((Integer) 1));
+	localcall(mercury__higher_order__traverse_goal_7_0,
+		LABEL(mercury__higher_order__traverse_goal_7_0_i12),
+		STATIC(mercury__higher_order__traverse_goal_7_0));
+Define_label(mercury__higher_order__traverse_goal_7_0_i12);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_goal_7_0));
+	r5 = (Integer) r1;
+	tag_incr_hp(r1, mktag(0), ((Integer) 2));
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(3), ((Integer) 2));
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) tempr1;
+	field(mktag(3), (Integer) tempr1, ((Integer) 1)) = (Integer) r5;
+	field(mktag(3), (Integer) tempr1, ((Integer) 0)) = ((Integer) 3);
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) detstackvar(10);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(11);
+	decr_sp_pop_msg(11);
+	proceed();
+	}
+Define_label(mercury__higher_order__traverse_goal_7_0_i13);
+	detstackvar(1) = (Integer) field(mktag(3), (Integer) r4, ((Integer) 1));
+	detstackvar(10) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 1));
+	r1 = (Integer) field(mktag(3), (Integer) r4, ((Integer) 2));
+	localcall(mercury__higher_order__traverse_goal_7_0,
+		LABEL(mercury__higher_order__traverse_goal_7_0_i14),
+		STATIC(mercury__higher_order__traverse_goal_7_0));
+Define_label(mercury__higher_order__traverse_goal_7_0_i14);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_goal_7_0));
+	r5 = (Integer) r1;
+	tag_incr_hp(r1, mktag(0), ((Integer) 2));
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(3), ((Integer) 3));
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) tempr1;
+	field(mktag(3), (Integer) tempr1, ((Integer) 2)) = (Integer) r5;
+	field(mktag(3), (Integer) tempr1, ((Integer) 1)) = (Integer) detstackvar(1);
+	field(mktag(3), (Integer) tempr1, ((Integer) 0)) = ((Integer) 4);
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) detstackvar(10);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(11);
+	decr_sp_pop_msg(11);
+	proceed();
+	}
+Define_label(mercury__higher_order__traverse_goal_7_0_i15);
+	detstackvar(1) = (Integer) r2;
+	detstackvar(2) = (Integer) r3;
+	detstackvar(3) = (Integer) field(mktag(3), (Integer) r4, ((Integer) 1));
+	detstackvar(4) = (Integer) field(mktag(3), (Integer) r4, ((Integer) 3));
+	detstackvar(5) = (Integer) field(mktag(3), (Integer) r4, ((Integer) 4));
+	detstackvar(6) = (Integer) field(mktag(3), (Integer) r4, ((Integer) 5));
+	detstackvar(10) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 1));
+	r1 = (Integer) field(mktag(3), (Integer) r4, ((Integer) 2));
+	localcall(mercury__higher_order__traverse_goal_7_0,
+		LABEL(mercury__higher_order__traverse_goal_7_0_i16),
+		STATIC(mercury__higher_order__traverse_goal_7_0));
+Define_label(mercury__higher_order__traverse_goal_7_0_i16);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_goal_7_0));
+	{
+	Word tempr1;
+	tempr1 = (Integer) r1;
+	r1 = (Integer) detstackvar(4);
+	detstackvar(4) = (Integer) tempr1;
+	detstackvar(7) = (Integer) r2;
+	detstackvar(8) = (Integer) r3;
+	r2 = (Integer) detstackvar(1);
+	r3 = (Integer) r4;
+	localcall(mercury__higher_order__traverse_goal_7_0,
+		LABEL(mercury__higher_order__traverse_goal_7_0_i17),
+		STATIC(mercury__higher_order__traverse_goal_7_0));
+	}
+Define_label(mercury__higher_order__traverse_goal_7_0_i17);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_goal_7_0));
+	{
+	Word tempr1;
+	tempr1 = (Integer) r1;
+	r1 = (Integer) detstackvar(5);
+	detstackvar(5) = (Integer) r3;
+	r3 = (Integer) detstackvar(2);
+	detstackvar(2) = (Integer) r2;
+	r2 = (Integer) detstackvar(1);
+	detstackvar(1) = (Integer) tempr1;
+	detstackvar(9) = (Integer) r4;
+	localcall(mercury__higher_order__traverse_goal_7_0,
+		LABEL(mercury__higher_order__traverse_goal_7_0_i18),
+		STATIC(mercury__higher_order__traverse_goal_7_0));
+	}
+Define_label(mercury__higher_order__traverse_goal_7_0_i18);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_goal_7_0));
+	r5 = (Integer) detstackvar(1);
+	tag_incr_hp(detstackvar(1), mktag(0), ((Integer) 2));
+	{
+	Word tempr1, tempr2;
+	tag_incr_hp(tempr1, mktag(3), ((Integer) 6));
+	tempr2 = (Integer) r2;
+	r2 = (Integer) detstackvar(2);
+	detstackvar(2) = (Integer) tempr2;
+	field(mktag(3), (Integer) tempr1, ((Integer) 4)) = (Integer) r1;
+	field(mktag(3), (Integer) tempr1, ((Integer) 2)) = (Integer) detstackvar(4);
+	field(mktag(3), (Integer) tempr1, ((Integer) 1)) = (Integer) detstackvar(3);
+	field(mktag(0), (Integer) detstackvar(1), ((Integer) 0)) = (Integer) tempr1;
+	r1 = (Integer) detstackvar(7);
+	detstackvar(3) = (((Integer) detstackvar(8) + (Integer) detstackvar(5)) + (Integer) r3);
+	detstackvar(4) = (Integer) r4;
+	field(mktag(3), (Integer) tempr1, ((Integer) 3)) = (Integer) r5;
+	field(mktag(3), (Integer) tempr1, ((Integer) 0)) = ((Integer) 5);
+	field(mktag(3), (Integer) tempr1, ((Integer) 5)) = (Integer) detstackvar(6);
+	field(mktag(0), (Integer) detstackvar(1), ((Integer) 1)) = (Integer) detstackvar(10);
+	call_localret(STATIC(mercury__higher_order__update_changed_status_3_0),
+		mercury__higher_order__traverse_goal_7_0_i19,
+		STATIC(mercury__higher_order__traverse_goal_7_0));
+	}
+Define_label(mercury__higher_order__traverse_goal_7_0_i19);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_goal_7_0));
+	r2 = (Integer) detstackvar(2);
+	call_localret(STATIC(mercury__higher_order__update_changed_status_3_0),
+		mercury__higher_order__traverse_goal_7_0_i20,
+		STATIC(mercury__higher_order__traverse_goal_7_0));
+Define_label(mercury__higher_order__traverse_goal_7_0_i20);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_goal_7_0));
+	detstackvar(2) = (Integer) r1;
+	r1 = (Integer) detstackvar(9);
+	r2 = (Integer) detstackvar(4);
+	call_localret(STATIC(mercury__higher_order__merge_higher_order_infos_3_0),
+		mercury__higher_order__traverse_goal_7_0_i21,
+		STATIC(mercury__higher_order__traverse_goal_7_0));
+Define_label(mercury__higher_order__traverse_goal_7_0_i21);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_goal_7_0));
+	r4 = (Integer) r1;
+	r1 = (Integer) detstackvar(1);
+	r2 = (Integer) detstackvar(2);
+	r3 = (Integer) detstackvar(3);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(11);
+	decr_sp_pop_msg(11);
+	proceed();
+Define_label(mercury__higher_order__traverse_goal_7_0_i1022);
+	r4 = (Integer) r3;
+	r2 = ((Integer) 2);
+	r3 = ((Integer) 1);
+	proceed();
+Define_label(mercury__higher_order__traverse_goal_7_0_i1026);
+	incr_sp_push_msg(11, "traverse_goal");
+	detstackvar(11) = (Integer) succip;
+	if ((tag((Integer) r4) != mktag(((Integer) 0))))
+		GOTO_LABEL(mercury__higher_order__traverse_goal_7_0_i23);
+	detstackvar(10) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 1));
+	r1 = (Integer) field(mktag(0), (Integer) r4, ((Integer) 0));
+	r5 = (Integer) r3;
+	r3 = ((Integer) 2);
+	r4 = ((Integer) 0);
+	call_localret(STATIC(mercury__higher_order__traverse_conj_9_0),
+		mercury__higher_order__traverse_goal_7_0_i24,
+		STATIC(mercury__higher_order__traverse_goal_7_0));
+Define_label(mercury__higher_order__traverse_goal_7_0_i24);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_goal_7_0));
+	r5 = (Integer) r1;
+	tag_incr_hp(r1, mktag(0), ((Integer) 2));
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(0), ((Integer) 1));
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) tempr1;
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) detstackvar(10);
+	field(mktag(0), (Integer) tempr1, ((Integer) 0)) = (Integer) r5;
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(11);
+	decr_sp_pop_msg(11);
+	proceed();
+	}
+Define_label(mercury__higher_order__traverse_goal_7_0_i23);
+	if ((tag((Integer) r4) != mktag(((Integer) 1))))
+		GOTO_LABEL(mercury__higher_order__traverse_goal_7_0_i25);
+	call_localret(STATIC(mercury__higher_order__maybe_specialize_call_6_0),
+		mercury__higher_order__traverse_goal_7_0_i26,
+		STATIC(mercury__higher_order__traverse_goal_7_0));
+Define_label(mercury__higher_order__traverse_goal_7_0_i26);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_goal_7_0));
+	r4 = (Integer) r3;
+	r3 = ((Integer) 1);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(11);
+	decr_sp_pop_msg(11);
+	proceed();
+Define_label(mercury__higher_order__traverse_goal_7_0_i25);
+	call_localret(STATIC(mercury__higher_order__maybe_specialize_higher_order_call_6_0),
+		mercury__higher_order__traverse_goal_7_0_i27,
+		STATIC(mercury__higher_order__traverse_goal_7_0));
+Define_label(mercury__higher_order__traverse_goal_7_0_i27);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_goal_7_0));
+	r4 = (Integer) r3;
+	r3 = ((Integer) 1);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(11);
+	decr_sp_pop_msg(11);
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module11)
+	init_entry(mercury__higher_order__traverse_conj_9_0);
+	init_label(mercury__higher_order__traverse_conj_9_0_i4);
+	init_label(mercury__higher_order__traverse_conj_9_0_i5);
+	init_label(mercury__higher_order__traverse_conj_9_0_i6);
+	init_label(mercury__higher_order__traverse_conj_9_0_i1002);
+BEGIN_CODE
+
+/* code for predicate 'traverse_conj'/9 in mode 0 */
+Define_static(mercury__higher_order__traverse_conj_9_0);
+	if (((Integer) r1 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__traverse_conj_9_0_i1002);
+	incr_sp_push_msg(6, "traverse_conj");
+	detstackvar(6) = (Integer) succip;
+	detstackvar(1) = (Integer) r2;
+	detstackvar(2) = (Integer) r3;
+	detstackvar(3) = (Integer) r4;
+	detstackvar(4) = (Integer) field(mktag(1), (Integer) r1, ((Integer) 1));
+	r1 = (Integer) field(mktag(1), (Integer) r1, ((Integer) 0));
+	r3 = (Integer) r5;
+	call_localret(STATIC(mercury__higher_order__traverse_goal_7_0),
+		mercury__higher_order__traverse_conj_9_0_i4,
+		STATIC(mercury__higher_order__traverse_conj_9_0));
+Define_label(mercury__higher_order__traverse_conj_9_0_i4);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_conj_9_0));
+	{
+	Word tempr1;
+	tempr1 = (Integer) r1;
+	r1 = (Integer) detstackvar(2);
+	detstackvar(2) = (Integer) tempr1;
+	detstackvar(3) = ((Integer) detstackvar(3) + (Integer) r3);
+	detstackvar(5) = (Integer) r4;
+	call_localret(STATIC(mercury__higher_order__update_changed_status_3_0),
+		mercury__higher_order__traverse_conj_9_0_i5,
+		STATIC(mercury__higher_order__traverse_conj_9_0));
+	}
+Define_label(mercury__higher_order__traverse_conj_9_0_i5);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_conj_9_0));
+	r3 = (Integer) r1;
+	r1 = (Integer) detstackvar(4);
+	r2 = (Integer) detstackvar(1);
+	r4 = (Integer) detstackvar(3);
+	r5 = (Integer) detstackvar(5);
+	localcall(mercury__higher_order__traverse_conj_9_0,
+		LABEL(mercury__higher_order__traverse_conj_9_0_i6),
+		STATIC(mercury__higher_order__traverse_conj_9_0));
+Define_label(mercury__higher_order__traverse_conj_9_0_i6);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_conj_9_0));
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) tempr1, ((Integer) 1)) = (Integer) r1;
+	r1 = (Integer) tempr1;
+	field(mktag(1), (Integer) tempr1, ((Integer) 0)) = (Integer) detstackvar(2);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(6);
+	decr_sp_pop_msg(6);
+	proceed();
+	}
+Define_label(mercury__higher_order__traverse_conj_9_0_i1002);
+	r2 = (Integer) r3;
+	r3 = (Integer) r4;
+	r1 = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	r4 = (Integer) r5;
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module12)
+	init_entry(mercury__higher_order__traverse_disj_7_0);
+	init_label(mercury__higher_order__traverse_disj_7_0_i4);
+	init_label(mercury__higher_order__traverse_disj_7_0_i5);
+	init_label(mercury__higher_order__traverse_disj_7_0_i1002);
+BEGIN_CODE
+
+/* code for predicate 'traverse_disj'/7 in mode 0 */
+Define_static(mercury__higher_order__traverse_disj_7_0);
+	if (((Integer) r1 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__traverse_disj_7_0_i1002);
+	incr_sp_push_msg(4, "traverse_disj");
+	detstackvar(4) = (Integer) succip;
+	detstackvar(1) = (Integer) r2;
+	detstackvar(2) = (Integer) r3;
+	detstackvar(3) = (Integer) field(mktag(1), (Integer) r1, ((Integer) 1));
+	r1 = (Integer) field(mktag(1), (Integer) r1, ((Integer) 0));
+	call_localret(STATIC(mercury__higher_order__traverse_goal_7_0),
+		mercury__higher_order__traverse_disj_7_0_i4,
+		STATIC(mercury__higher_order__traverse_disj_7_0));
+Define_label(mercury__higher_order__traverse_disj_7_0_i4);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_disj_7_0));
+	r6 = (Integer) r4;
+	r4 = (Integer) r3;
+	r3 = (Integer) r2;
+	r2 = (Integer) detstackvar(1);
+	detstackvar(1) = (Integer) r1;
+	r1 = (Integer) detstackvar(3);
+	r5 = (Integer) detstackvar(2);
+	call_localret(STATIC(mercury__higher_order__traverse_disj_2_10_0),
+		mercury__higher_order__traverse_disj_7_0_i5,
+		STATIC(mercury__higher_order__traverse_disj_7_0));
+Define_label(mercury__higher_order__traverse_disj_7_0_i5);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_disj_7_0));
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) tempr1, ((Integer) 1)) = (Integer) r1;
+	r1 = (Integer) tempr1;
+	field(mktag(1), (Integer) tempr1, ((Integer) 0)) = (Integer) detstackvar(1);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(4);
+	decr_sp_pop_msg(4);
+	proceed();
+	}
+Define_label(mercury__higher_order__traverse_disj_7_0_i1002);
+	r4 = (Integer) r3;
+	r1 = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	r2 = ((Integer) 2);
+	r3 = ((Integer) 0);
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module13)
+	init_entry(mercury__higher_order__traverse_disj_2_10_0);
+	init_label(mercury__higher_order__traverse_disj_2_10_0_i4);
+	init_label(mercury__higher_order__traverse_disj_2_10_0_i5);
+	init_label(mercury__higher_order__traverse_disj_2_10_0_i6);
+	init_label(mercury__higher_order__traverse_disj_2_10_0_i7);
+	init_label(mercury__higher_order__traverse_disj_2_10_0_i1002);
+BEGIN_CODE
+
+/* code for predicate 'traverse_disj_2'/10 in mode 0 */
+Define_static(mercury__higher_order__traverse_disj_2_10_0);
+	if (((Integer) r1 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__traverse_disj_2_10_0_i1002);
+	incr_sp_push_msg(9, "traverse_disj_2");
+	detstackvar(9) = (Integer) succip;
+	detstackvar(1) = (Integer) r2;
+	detstackvar(2) = (Integer) r3;
+	detstackvar(3) = (Integer) r4;
+	detstackvar(4) = (Integer) r5;
+	detstackvar(5) = (Integer) r6;
+	detstackvar(6) = (Integer) field(mktag(1), (Integer) r1, ((Integer) 1));
+	r1 = (Integer) field(mktag(1), (Integer) r1, ((Integer) 0));
+	r3 = (Integer) r5;
+	call_localret(STATIC(mercury__higher_order__traverse_goal_7_0),
+		mercury__higher_order__traverse_disj_2_10_0_i4,
+		STATIC(mercury__higher_order__traverse_disj_2_10_0));
+Define_label(mercury__higher_order__traverse_disj_2_10_0_i4);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_disj_2_10_0));
+	{
+	Word tempr1;
+	tempr1 = (Integer) r1;
+	r1 = (Integer) detstackvar(2);
+	detstackvar(2) = (Integer) tempr1;
+	detstackvar(7) = (Integer) r3;
+	detstackvar(8) = (Integer) r4;
+	call_localret(STATIC(mercury__higher_order__update_changed_status_3_0),
+		mercury__higher_order__traverse_disj_2_10_0_i5,
+		STATIC(mercury__higher_order__traverse_disj_2_10_0));
+	}
+Define_label(mercury__higher_order__traverse_disj_2_10_0_i5);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_disj_2_10_0));
+	r3 = (Integer) detstackvar(3);
+	detstackvar(3) = (Integer) r1;
+	r1 = (Integer) detstackvar(5);
+	detstackvar(5) = ((Integer) r3 + (Integer) detstackvar(7));
+	r2 = (Integer) detstackvar(8);
+	call_localret(STATIC(mercury__higher_order__merge_higher_order_infos_3_0),
+		mercury__higher_order__traverse_disj_2_10_0_i6,
+		STATIC(mercury__higher_order__traverse_disj_2_10_0));
+Define_label(mercury__higher_order__traverse_disj_2_10_0_i6);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_disj_2_10_0));
+	r6 = (Integer) r1;
+	r1 = (Integer) detstackvar(6);
+	r2 = (Integer) detstackvar(1);
+	r3 = (Integer) detstackvar(3);
+	r4 = (Integer) detstackvar(5);
+	r5 = (Integer) detstackvar(4);
+	localcall(mercury__higher_order__traverse_disj_2_10_0,
+		LABEL(mercury__higher_order__traverse_disj_2_10_0_i7),
+		STATIC(mercury__higher_order__traverse_disj_2_10_0));
+Define_label(mercury__higher_order__traverse_disj_2_10_0_i7);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_disj_2_10_0));
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) tempr1, ((Integer) 1)) = (Integer) r1;
+	r1 = (Integer) tempr1;
+	field(mktag(1), (Integer) tempr1, ((Integer) 0)) = (Integer) detstackvar(2);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(9);
+	decr_sp_pop_msg(9);
+	proceed();
+	}
+Define_label(mercury__higher_order__traverse_disj_2_10_0_i1002);
+	r2 = (Integer) r3;
+	r3 = (Integer) r4;
+	r1 = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	r4 = (Integer) r6;
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module14)
+	init_entry(mercury__higher_order__traverse_cases_7_0);
+	init_label(mercury__higher_order__traverse_cases_7_0_i4);
+	init_label(mercury__higher_order__traverse_cases_7_0_i5);
+	init_label(mercury__higher_order__traverse_cases_7_0_i1003);
+BEGIN_CODE
+
+/* code for predicate 'traverse_cases'/7 in mode 0 */
+Define_static(mercury__higher_order__traverse_cases_7_0);
+	if (((Integer) r1 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__traverse_cases_7_0_i1003);
+	incr_sp_push_msg(5, "traverse_cases");
+	detstackvar(5) = (Integer) succip;
+	{
+	Word tempr1;
+	tempr1 = (Integer) field(mktag(1), (Integer) r1, ((Integer) 0));
+	detstackvar(4) = (Integer) field(mktag(1), (Integer) r1, ((Integer) 1));
+	r1 = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 1));
+	detstackvar(3) = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 0));
+	detstackvar(1) = (Integer) r2;
+	detstackvar(2) = (Integer) r3;
+	call_localret(STATIC(mercury__higher_order__traverse_goal_7_0),
+		mercury__higher_order__traverse_cases_7_0_i4,
+		STATIC(mercury__higher_order__traverse_cases_7_0));
+	}
+Define_label(mercury__higher_order__traverse_cases_7_0_i4);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_cases_7_0));
+	r6 = (Integer) r4;
+	r4 = (Integer) r3;
+	r3 = (Integer) r2;
+	r2 = (Integer) detstackvar(1);
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(0), ((Integer) 2));
+	detstackvar(1) = (Integer) tempr1;
+	field(mktag(0), (Integer) tempr1, ((Integer) 1)) = (Integer) r1;
+	r1 = (Integer) detstackvar(4);
+	r5 = (Integer) detstackvar(2);
+	field(mktag(0), (Integer) tempr1, ((Integer) 0)) = (Integer) detstackvar(3);
+	call_localret(STATIC(mercury__higher_order__traverse_cases_2_10_0),
+		mercury__higher_order__traverse_cases_7_0_i5,
+		STATIC(mercury__higher_order__traverse_cases_7_0));
+	}
+Define_label(mercury__higher_order__traverse_cases_7_0_i5);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_cases_7_0));
+	r5 = (Integer) r1;
+	tag_incr_hp(r1, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r1, ((Integer) 0)) = (Integer) detstackvar(1);
+	field(mktag(1), (Integer) r1, ((Integer) 1)) = (Integer) r5;
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(5);
+	decr_sp_pop_msg(5);
+	proceed();
+Define_label(mercury__higher_order__traverse_cases_7_0_i1003);
+	r4 = (Integer) r3;
+	r1 = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	r2 = ((Integer) 2);
+	r3 = ((Integer) 0);
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module15)
+	init_entry(mercury__higher_order__traverse_cases_2_10_0);
+	init_label(mercury__higher_order__traverse_cases_2_10_0_i4);
+	init_label(mercury__higher_order__traverse_cases_2_10_0_i5);
+	init_label(mercury__higher_order__traverse_cases_2_10_0_i6);
+	init_label(mercury__higher_order__traverse_cases_2_10_0_i7);
+	init_label(mercury__higher_order__traverse_cases_2_10_0_i1003);
+BEGIN_CODE
+
+/* code for predicate 'traverse_cases_2'/10 in mode 0 */
+Define_static(mercury__higher_order__traverse_cases_2_10_0);
+	if (((Integer) r1 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__traverse_cases_2_10_0_i1003);
+	incr_sp_push_msg(9, "traverse_cases_2");
+	detstackvar(9) = (Integer) succip;
+	detstackvar(2) = (Integer) r3;
+	{
+	Word tempr1;
+	tempr1 = (Integer) field(mktag(1), (Integer) r1, ((Integer) 0));
+	detstackvar(6) = (Integer) field(mktag(1), (Integer) r1, ((Integer) 1));
+	detstackvar(7) = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 0));
+	r1 = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 1));
+	r3 = (Integer) r5;
+	detstackvar(1) = (Integer) r2;
+	detstackvar(3) = (Integer) r4;
+	detstackvar(4) = (Integer) r5;
+	detstackvar(5) = (Integer) r6;
+	call_localret(STATIC(mercury__higher_order__traverse_goal_7_0),
+		mercury__higher_order__traverse_cases_2_10_0_i4,
+		STATIC(mercury__higher_order__traverse_cases_2_10_0));
+	}
+Define_label(mercury__higher_order__traverse_cases_2_10_0_i4);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_cases_2_10_0));
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(0), ((Integer) 2));
+	field(mktag(0), (Integer) tempr1, ((Integer) 1)) = (Integer) r1;
+	r1 = (Integer) detstackvar(2);
+	detstackvar(2) = (Integer) tempr1;
+	field(mktag(0), (Integer) tempr1, ((Integer) 0)) = (Integer) detstackvar(7);
+	detstackvar(7) = (Integer) r3;
+	detstackvar(8) = (Integer) r4;
+	call_localret(STATIC(mercury__higher_order__update_changed_status_3_0),
+		mercury__higher_order__traverse_cases_2_10_0_i5,
+		STATIC(mercury__higher_order__traverse_cases_2_10_0));
+	}
+Define_label(mercury__higher_order__traverse_cases_2_10_0_i5);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_cases_2_10_0));
+	r3 = (Integer) detstackvar(3);
+	detstackvar(3) = (Integer) r1;
+	r1 = (Integer) detstackvar(5);
+	detstackvar(5) = ((Integer) r3 + (Integer) detstackvar(7));
+	r2 = (Integer) detstackvar(8);
+	call_localret(STATIC(mercury__higher_order__merge_higher_order_infos_3_0),
+		mercury__higher_order__traverse_cases_2_10_0_i6,
+		STATIC(mercury__higher_order__traverse_cases_2_10_0));
+Define_label(mercury__higher_order__traverse_cases_2_10_0_i6);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_cases_2_10_0));
+	r6 = (Integer) r1;
+	r1 = (Integer) detstackvar(6);
+	r2 = (Integer) detstackvar(1);
+	r3 = (Integer) detstackvar(3);
+	r4 = (Integer) detstackvar(5);
+	r5 = (Integer) detstackvar(4);
+	localcall(mercury__higher_order__traverse_cases_2_10_0,
+		LABEL(mercury__higher_order__traverse_cases_2_10_0_i7),
+		STATIC(mercury__higher_order__traverse_cases_2_10_0));
+Define_label(mercury__higher_order__traverse_cases_2_10_0_i7);
+	update_prof_current_proc(LABEL(mercury__higher_order__traverse_cases_2_10_0));
+	r5 = (Integer) r1;
+	tag_incr_hp(r1, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r1, ((Integer) 0)) = (Integer) detstackvar(2);
+	field(mktag(1), (Integer) r1, ((Integer) 1)) = (Integer) r5;
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(9);
+	decr_sp_pop_msg(9);
+	proceed();
+Define_label(mercury__higher_order__traverse_cases_2_10_0_i1003);
+	r2 = (Integer) r3;
+	r3 = (Integer) r4;
+	r1 = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	r4 = (Integer) r6;
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module16)
+	init_entry(mercury__higher_order__merge_higher_order_infos_3_0);
+	init_label(mercury__higher_order__merge_higher_order_infos_3_0_i2);
+	init_label(mercury__higher_order__merge_higher_order_infos_3_0_i3);
+	init_label(mercury__higher_order__merge_higher_order_infos_3_0_i4);
+	init_label(mercury__higher_order__merge_higher_order_infos_3_0_i5);
+	init_label(mercury__higher_order__merge_higher_order_infos_3_0_i6);
+	init_label(mercury__higher_order__merge_higher_order_infos_3_0_i7);
+	init_label(mercury__higher_order__merge_higher_order_infos_3_0_i8);
+BEGIN_CODE
+
+/* code for predicate 'merge_higher_order_infos'/3 in mode 0 */
+Define_static(mercury__higher_order__merge_higher_order_infos_3_0);
+	r3 = (Integer) field(mktag(0), (Integer) r1, ((Integer) 0));
+	incr_sp_push_msg(6, "merge_higher_order_infos");
+	detstackvar(6) = (Integer) succip;
+	detstackvar(1) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 1));
+	detstackvar(2) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 2));
+	detstackvar(3) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 3));
+	detstackvar(4) = (Integer) field(mktag(0), (Integer) r2, ((Integer) 0));
+	detstackvar(5) = (Integer) field(mktag(0), (Integer) r2, ((Integer) 1));
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) mercury_data_higher_order__base_type_info_maybe_pred_and_args_0;
+	{
+	Declare_entry(mercury__map__to_assoc_list_2_0);
+	call_localret(ENTRY(mercury__map__to_assoc_list_2_0),
+		mercury__higher_order__merge_higher_order_infos_3_0_i2,
+		STATIC(mercury__higher_order__merge_higher_order_infos_3_0));
+	}
+Define_label(mercury__higher_order__merge_higher_order_infos_3_0_i2);
+	update_prof_current_proc(LABEL(mercury__higher_order__merge_higher_order_infos_3_0));
+	r3 = (Integer) detstackvar(4);
+	detstackvar(4) = (Integer) r1;
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) mercury_data_higher_order__base_type_info_maybe_pred_and_args_0;
+	{
+	Declare_entry(mercury__map__to_assoc_list_2_0);
+	call_localret(ENTRY(mercury__map__to_assoc_list_2_0),
+		mercury__higher_order__merge_higher_order_infos_3_0_i3,
+		STATIC(mercury__higher_order__merge_higher_order_infos_3_0));
+	}
+Define_label(mercury__higher_order__merge_higher_order_infos_3_0_i3);
+	update_prof_current_proc(LABEL(mercury__higher_order__merge_higher_order_infos_3_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(4);
+	call_localret(STATIC(mercury__higher_order__merge_pred_var_lists_3_0),
+		mercury__higher_order__merge_higher_order_infos_3_0_i4,
+		STATIC(mercury__higher_order__merge_higher_order_infos_3_0));
+Define_label(mercury__higher_order__merge_higher_order_infos_3_0_i4);
+	update_prof_current_proc(LABEL(mercury__higher_order__merge_higher_order_infos_3_0));
+	r3 = (Integer) r1;
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) mercury_data_higher_order__base_type_info_maybe_pred_and_args_0;
+	{
+	Declare_entry(mercury__map__from_assoc_list_2_0);
+	call_localret(ENTRY(mercury__map__from_assoc_list_2_0),
+		mercury__higher_order__merge_higher_order_infos_3_0_i5,
+		STATIC(mercury__higher_order__merge_higher_order_infos_3_0));
+	}
+Define_label(mercury__higher_order__merge_higher_order_infos_3_0_i5);
+	update_prof_current_proc(LABEL(mercury__higher_order__merge_higher_order_infos_3_0));
+	r2 = (Integer) detstackvar(1);
+	detstackvar(1) = (Integer) r1;
+	r1 = (Integer) mercury_data_higher_order__base_type_info_request_0;
+	r3 = (Integer) detstackvar(5);
+	{
+	Declare_entry(mercury__set__union_3_0);
+	call_localret(ENTRY(mercury__set__union_3_0),
+		mercury__higher_order__merge_higher_order_infos_3_0_i6,
+		STATIC(mercury__higher_order__merge_higher_order_infos_3_0));
+	}
+Define_label(mercury__higher_order__merge_higher_order_infos_3_0_i6);
+	update_prof_current_proc(LABEL(mercury__higher_order__merge_higher_order_infos_3_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) mercury_data_higher_order__base_type_info_request_0;
+	{
+	Declare_entry(mercury__set__to_sorted_list_2_0);
+	call_localret(ENTRY(mercury__set__to_sorted_list_2_0),
+		mercury__higher_order__merge_higher_order_infos_3_0_i7,
+		STATIC(mercury__higher_order__merge_higher_order_infos_3_0));
+	}
+Define_label(mercury__higher_order__merge_higher_order_infos_3_0_i7);
+	update_prof_current_proc(LABEL(mercury__higher_order__merge_higher_order_infos_3_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) mercury_data_higher_order__base_type_info_request_0;
+	{
+	Declare_entry(mercury__set__sorted_list_to_set_2_0);
+	call_localret(ENTRY(mercury__set__sorted_list_to_set_2_0),
+		mercury__higher_order__merge_higher_order_infos_3_0_i8,
+		STATIC(mercury__higher_order__merge_higher_order_infos_3_0));
+	}
+Define_label(mercury__higher_order__merge_higher_order_infos_3_0_i8);
+	update_prof_current_proc(LABEL(mercury__higher_order__merge_higher_order_infos_3_0));
+	r2 = (Integer) r1;
+	tag_incr_hp(r1, mktag(0), ((Integer) 4));
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) detstackvar(1);
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) r2;
+	field(mktag(0), (Integer) r1, ((Integer) 2)) = (Integer) detstackvar(2);
+	field(mktag(0), (Integer) r1, ((Integer) 3)) = (Integer) detstackvar(3);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(6);
+	decr_sp_pop_msg(6);
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module17)
+	init_entry(mercury__higher_order__merge_pred_var_lists_3_0);
+	init_label(mercury__higher_order__merge_pred_var_lists_3_0_i4);
+	init_label(mercury__higher_order__merge_pred_var_lists_3_0_i1002);
+BEGIN_CODE
+
+/* code for predicate 'merge_pred_var_lists'/3 in mode 0 */
+Define_static(mercury__higher_order__merge_pred_var_lists_3_0);
+	if (((Integer) r1 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__merge_pred_var_lists_3_0_i1002);
+	incr_sp_push_msg(2, "merge_pred_var_lists");
+	detstackvar(2) = (Integer) succip;
+	detstackvar(1) = (Integer) field(mktag(1), (Integer) r1, ((Integer) 1));
+	r1 = (Integer) field(mktag(1), (Integer) r1, ((Integer) 0));
+	call_localret(STATIC(mercury__higher_order__merge_pred_var_with_list_3_0),
+		mercury__higher_order__merge_pred_var_lists_3_0_i4,
+		STATIC(mercury__higher_order__merge_pred_var_lists_3_0));
+Define_label(mercury__higher_order__merge_pred_var_lists_3_0_i4);
+	update_prof_current_proc(LABEL(mercury__higher_order__merge_pred_var_lists_3_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(1);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(2);
+	decr_sp_pop_msg(2);
+	localtailcall(mercury__higher_order__merge_pred_var_lists_3_0,
+		STATIC(mercury__higher_order__merge_pred_var_lists_3_0));
+Define_label(mercury__higher_order__merge_pred_var_lists_3_0_i1002);
+	r1 = (Integer) r2;
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module18)
+	init_entry(mercury__higher_order__merge_pred_var_with_list_3_0);
+	init_label(mercury__higher_order__merge_pred_var_with_list_3_0_i6);
+	init_label(mercury__higher_order__merge_pred_var_with_list_3_0_i15);
+	init_label(mercury__higher_order__merge_pred_var_with_list_3_0_i11);
+	init_label(mercury__higher_order__merge_pred_var_with_list_3_0_i17);
+	init_label(mercury__higher_order__merge_pred_var_with_list_3_0_i10);
+	init_label(mercury__higher_order__merge_pred_var_with_list_3_0_i9);
+	init_label(mercury__higher_order__merge_pred_var_with_list_3_0_i5);
+	init_label(mercury__higher_order__merge_pred_var_with_list_3_0_i22);
+	init_label(mercury__higher_order__merge_pred_var_with_list_3_0_i3);
+BEGIN_CODE
+
+/* code for predicate 'merge_pred_var_with_list'/3 in mode 0 */
+Define_static(mercury__higher_order__merge_pred_var_with_list_3_0);
+	incr_sp_push_msg(8, "merge_pred_var_with_list");
+	detstackvar(8) = (Integer) succip;
+	if (((Integer) r2 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__merge_pred_var_with_list_3_0_i3);
+	r3 = (Integer) field(mktag(1), (Integer) r2, ((Integer) 0));
+	detstackvar(1) = (Integer) r1;
+	detstackvar(4) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 1));
+	detstackvar(2) = (Integer) r2;
+	detstackvar(6) = (Integer) field(mktag(1), (Integer) r2, ((Integer) 1));
+	detstackvar(7) = (Integer) r3;
+	r1 = (Integer) field(mktag(0), (Integer) r1, ((Integer) 0));
+	detstackvar(3) = (Integer) r1;
+	detstackvar(5) = (Integer) field(mktag(0), (Integer) r3, ((Integer) 1));
+	r2 = (Integer) field(mktag(0), (Integer) r3, ((Integer) 0));
+	{
+	Declare_entry(mercury____Unify___mercury_builtin__var_0_0);
+	call_localret(ENTRY(mercury____Unify___mercury_builtin__var_0_0),
+		mercury__higher_order__merge_pred_var_with_list_3_0_i6,
+		STATIC(mercury__higher_order__merge_pred_var_with_list_3_0));
+	}
+Define_label(mercury__higher_order__merge_pred_var_with_list_3_0_i6);
+	update_prof_current_proc(LABEL(mercury__higher_order__merge_pred_var_with_list_3_0));
+	if (!((Integer) r1))
+		GOTO_LABEL(mercury__higher_order__merge_pred_var_with_list_3_0_i5);
+	r1 = (Integer) detstackvar(4);
+	r2 = (Integer) detstackvar(5);
+	call_localret(STATIC(mercury____Unify___higher_order__maybe_pred_and_args_0_0),
+		mercury__higher_order__merge_pred_var_with_list_3_0_i15,
+		STATIC(mercury__higher_order__merge_pred_var_with_list_3_0));
+Define_label(mercury__higher_order__merge_pred_var_with_list_3_0_i15);
+	update_prof_current_proc(LABEL(mercury__higher_order__merge_pred_var_with_list_3_0));
+	if ((Integer) r1)
+		GOTO_LABEL(mercury__higher_order__merge_pred_var_with_list_3_0_i11);
+	r2 = (Integer) detstackvar(3);
+	r3 = (Integer) detstackvar(6);
+	GOTO_LABEL(mercury__higher_order__merge_pred_var_with_list_3_0_i10);
+Define_label(mercury__higher_order__merge_pred_var_with_list_3_0_i11);
+	if (((Integer) detstackvar(4) != (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__merge_pred_var_with_list_3_0_i17);
+	r2 = (Integer) detstackvar(3);
+	r3 = (Integer) detstackvar(6);
+	GOTO_LABEL(mercury__higher_order__merge_pred_var_with_list_3_0_i10);
+Define_label(mercury__higher_order__merge_pred_var_with_list_3_0_i17);
+	if (((Integer) detstackvar(5) != (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__merge_pred_var_with_list_3_0_i9);
+	r2 = (Integer) detstackvar(3);
+	r3 = (Integer) detstackvar(6);
+Define_label(mercury__higher_order__merge_pred_var_with_list_3_0_i10);
+	tag_incr_hp(r1, mktag(1), ((Integer) 2));
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(0), ((Integer) 2));
+	field(mktag(1), (Integer) r1, ((Integer) 0)) = (Integer) tempr1;
+	field(mktag(1), (Integer) r1, ((Integer) 1)) = (Integer) r3;
+	field(mktag(0), (Integer) tempr1, ((Integer) 1)) = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	field(mktag(0), (Integer) tempr1, ((Integer) 0)) = (Integer) r2;
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(8);
+	decr_sp_pop_msg(8);
+	proceed();
+	}
+Define_label(mercury__higher_order__merge_pred_var_with_list_3_0_i9);
+	r1 = (Integer) detstackvar(2);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(8);
+	decr_sp_pop_msg(8);
+	proceed();
+Define_label(mercury__higher_order__merge_pred_var_with_list_3_0_i5);
+	r1 = (Integer) detstackvar(1);
+	r2 = (Integer) detstackvar(6);
+	localcall(mercury__higher_order__merge_pred_var_with_list_3_0,
+		LABEL(mercury__higher_order__merge_pred_var_with_list_3_0_i22),
+		STATIC(mercury__higher_order__merge_pred_var_with_list_3_0));
+Define_label(mercury__higher_order__merge_pred_var_with_list_3_0_i22);
+	update_prof_current_proc(LABEL(mercury__higher_order__merge_pred_var_with_list_3_0));
+	r2 = (Integer) r1;
+	tag_incr_hp(r1, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r1, ((Integer) 0)) = (Integer) detstackvar(7);
+	field(mktag(1), (Integer) r1, ((Integer) 1)) = (Integer) r2;
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(8);
+	decr_sp_pop_msg(8);
+	proceed();
+Define_label(mercury__higher_order__merge_pred_var_with_list_3_0_i3);
+	r2 = (Integer) r1;
+	tag_incr_hp(r1, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r1, ((Integer) 0)) = (Integer) r2;
+	field(mktag(1), (Integer) r1, ((Integer) 1)) = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(8);
+	decr_sp_pop_msg(8);
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module19)
+	init_entry(mercury__higher_order__check_unify_3_0);
+	init_label(mercury__higher_order__check_unify_3_0_i1031);
+	init_label(mercury__higher_order__check_unify_3_0_i6);
+	init_label(mercury__higher_order__check_unify_3_0_i1030);
+	init_label(mercury__higher_order__check_unify_3_0_i13);
+	init_label(mercury__higher_order__check_unify_3_0_i17);
+	init_label(mercury__higher_order__check_unify_3_0_i1022);
+	init_label(mercury__higher_order__check_unify_3_0_i12);
+	init_label(mercury__higher_order__check_unify_3_0_i1024);
+	init_label(mercury__higher_order__check_unify_3_0_i7);
+	init_label(mercury__higher_order__check_unify_3_0_i21);
+	init_label(mercury__higher_order__check_unify_3_0_i24);
+	init_label(mercury__higher_order__check_unify_3_0_i27);
+	init_label(mercury__higher_order__check_unify_3_0_i1029);
+BEGIN_CODE
+
+/* code for predicate 'check_unify'/3 in mode 0 */
+Define_static(mercury__higher_order__check_unify_3_0);
+	r3 = tag((Integer) r1);
+	if (((Integer) r3 != mktag(((Integer) 3))))
+		GOTO_LABEL(mercury__higher_order__check_unify_3_0_i1030);
+	r3 = (Integer) field(mktag(3), (Integer) r1, ((Integer) 0));
+	if (((Integer) r3 != ((Integer) 0)))
+		GOTO_LABEL(mercury__higher_order__check_unify_3_0_i1031);
+	r1 = (Integer) r2;
+	proceed();
+Define_label(mercury__higher_order__check_unify_3_0_i1031);
+	incr_sp_push_msg(9, "check_unify");
+	detstackvar(9) = (Integer) succip;
+	detstackvar(1) = (Integer) r2;
+	r1 = string_const("higher_order:check_unify - complicated unification", 50);
+	{
+	Declare_entry(mercury__require__error_1_0);
+	call_localret(ENTRY(mercury__require__error_1_0),
+		mercury__higher_order__check_unify_3_0_i6,
+		STATIC(mercury__higher_order__check_unify_3_0));
+	}
+Define_label(mercury__higher_order__check_unify_3_0_i6);
+	update_prof_current_proc(LABEL(mercury__higher_order__check_unify_3_0));
+	r1 = (Integer) detstackvar(1);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(9);
+	decr_sp_pop_msg(9);
+	proceed();
+Define_label(mercury__higher_order__check_unify_3_0_i1030);
+	incr_sp_push_msg(9, "check_unify");
+	detstackvar(9) = (Integer) succip;
+	if (((Integer) r3 != mktag(((Integer) 0))))
+		GOTO_LABEL(mercury__higher_order__check_unify_3_0_i7);
+	r3 = (Integer) field(mktag(0), (Integer) r2, ((Integer) 3));
+	r4 = (Integer) field(mktag(0), (Integer) r2, ((Integer) 2));
+	r5 = (Integer) field(mktag(0), (Integer) r2, ((Integer) 1));
+	r6 = (Integer) field(mktag(0), (Integer) r2, ((Integer) 0));
+	if ((tag((Integer) field(mktag(0), (Integer) r1, ((Integer) 1))) != mktag(((Integer) 3))))
+		GOTO_LABEL(mercury__higher_order__check_unify_3_0_i1024);
+	if (((Integer) field(mktag(3), (Integer) field(mktag(0), (Integer) r1, ((Integer) 1)), ((Integer) 0)) != ((Integer) 1)))
+		GOTO_LABEL(mercury__higher_order__check_unify_3_0_i1024);
+	detstackvar(5) = (Integer) r4;
+	detstackvar(6) = (Integer) r3;
+	r4 = (Integer) field(mktag(0), (Integer) r1, ((Integer) 0));
+	detstackvar(1) = (Integer) r4;
+	{
+	Word tempr1;
+	tempr1 = (Integer) field(mktag(0), (Integer) r1, ((Integer) 1));
+	detstackvar(2) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 2));
+	detstackvar(8) = (Integer) field(mktag(3), (Integer) tempr1, ((Integer) 2));
+	detstackvar(7) = (Integer) field(mktag(3), (Integer) tempr1, ((Integer) 1));
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) mercury_data_higher_order__base_type_info_maybe_pred_and_args_0;
+	r3 = (Integer) r6;
+	detstackvar(3) = (Integer) r6;
+	detstackvar(4) = (Integer) r5;
+	{
+	Declare_entry(mercury__map__search_3_1);
+	call_localret(ENTRY(mercury__map__search_3_1),
+		mercury__higher_order__check_unify_3_0_i13,
+		STATIC(mercury__higher_order__check_unify_3_0));
+	}
+	}
+Define_label(mercury__higher_order__check_unify_3_0_i13);
+	update_prof_current_proc(LABEL(mercury__higher_order__check_unify_3_0));
+	if (!((Integer) r1))
+		GOTO_LABEL(mercury__higher_order__check_unify_3_0_i12);
+	if (((Integer) r2 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__check_unify_3_0_i1022);
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) mercury_data_higher_order__base_type_info_maybe_pred_and_args_0;
+	r3 = (Integer) detstackvar(3);
+	r4 = (Integer) detstackvar(1);
+	r5 = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	{
+	Declare_entry(mercury__map__det_update_4_0);
+	call_localret(ENTRY(mercury__map__det_update_4_0),
+		mercury__higher_order__check_unify_3_0_i17,
+		STATIC(mercury__higher_order__check_unify_3_0));
+	}
+Define_label(mercury__higher_order__check_unify_3_0_i17);
+	update_prof_current_proc(LABEL(mercury__higher_order__check_unify_3_0));
+	r2 = (Integer) r1;
+	tag_incr_hp(r1, mktag(0), ((Integer) 4));
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) r2;
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) detstackvar(4);
+	field(mktag(0), (Integer) r1, ((Integer) 2)) = (Integer) detstackvar(5);
+	field(mktag(0), (Integer) r1, ((Integer) 3)) = (Integer) detstackvar(6);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(9);
+	decr_sp_pop_msg(9);
+	proceed();
+Define_label(mercury__higher_order__check_unify_3_0_i1022);
+	tag_incr_hp(r1, mktag(0), ((Integer) 4));
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) detstackvar(3);
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) detstackvar(4);
+	field(mktag(0), (Integer) r1, ((Integer) 2)) = (Integer) detstackvar(5);
+	field(mktag(0), (Integer) r1, ((Integer) 3)) = (Integer) detstackvar(6);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(9);
+	decr_sp_pop_msg(9);
+	proceed();
+Define_label(mercury__higher_order__check_unify_3_0_i12);
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) mercury_data_higher_order__base_type_info_maybe_pred_and_args_0;
+	r3 = (Integer) detstackvar(3);
+	r4 = (Integer) detstackvar(1);
+	tag_incr_hp(r5, mktag(1), ((Integer) 3));
+	field(mktag(1), (Integer) r5, ((Integer) 0)) = (Integer) detstackvar(7);
+	field(mktag(1), (Integer) r5, ((Integer) 1)) = (Integer) detstackvar(8);
+	field(mktag(1), (Integer) r5, ((Integer) 2)) = (Integer) detstackvar(2);
+	{
+	Declare_entry(mercury__map__set_4_1);
+	call_localret(ENTRY(mercury__map__set_4_1),
+		mercury__higher_order__check_unify_3_0_i17,
+		STATIC(mercury__higher_order__check_unify_3_0));
+	}
+Define_label(mercury__higher_order__check_unify_3_0_i1024);
+	tag_incr_hp(r1, mktag(0), ((Integer) 4));
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) r6;
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) r5;
+	field(mktag(0), (Integer) r1, ((Integer) 2)) = (Integer) r4;
+	field(mktag(0), (Integer) r1, ((Integer) 3)) = (Integer) r3;
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(9);
+	decr_sp_pop_msg(9);
+	proceed();
+Define_label(mercury__higher_order__check_unify_3_0_i7);
+	if (((Integer) r3 != mktag(((Integer) 1))))
+		GOTO_LABEL(mercury__higher_order__check_unify_3_0_i21);
+	r1 = (Integer) r2;
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(9);
+	decr_sp_pop_msg(9);
+	proceed();
+Define_label(mercury__higher_order__check_unify_3_0_i21);
+	r3 = (Integer) field(mktag(0), (Integer) r2, ((Integer) 0));
+	detstackvar(2) = (Integer) r3;
+	r4 = (Integer) field(mktag(2), (Integer) r1, ((Integer) 1));
+	detstackvar(1) = (Integer) field(mktag(2), (Integer) r1, ((Integer) 0));
+	detstackvar(3) = (Integer) field(mktag(0), (Integer) r2, ((Integer) 1));
+	detstackvar(4) = (Integer) field(mktag(0), (Integer) r2, ((Integer) 2));
+	detstackvar(5) = (Integer) field(mktag(0), (Integer) r2, ((Integer) 3));
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) mercury_data_higher_order__base_type_info_maybe_pred_and_args_0;
+	{
+	Declare_entry(mercury__map__search_3_1);
+	call_localret(ENTRY(mercury__map__search_3_1),
+		mercury__higher_order__check_unify_3_0_i24,
+		STATIC(mercury__higher_order__check_unify_3_0));
+	}
+Define_label(mercury__higher_order__check_unify_3_0_i24);
+	update_prof_current_proc(LABEL(mercury__higher_order__check_unify_3_0));
+	if (!((Integer) r1))
+		GOTO_LABEL(mercury__higher_order__check_unify_3_0_i1029);
+	if (((Integer) r2 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__check_unify_3_0_i1029);
+	r5 = (Integer) r2;
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) mercury_data_higher_order__base_type_info_maybe_pred_and_args_0;
+	r3 = (Integer) detstackvar(2);
+	r4 = (Integer) detstackvar(1);
+	{
+	Declare_entry(mercury__map__set_4_1);
+	call_localret(ENTRY(mercury__map__set_4_1),
+		mercury__higher_order__check_unify_3_0_i27,
+		STATIC(mercury__higher_order__check_unify_3_0));
+	}
+Define_label(mercury__higher_order__check_unify_3_0_i27);
+	update_prof_current_proc(LABEL(mercury__higher_order__check_unify_3_0));
+	r2 = (Integer) r1;
+	tag_incr_hp(r1, mktag(0), ((Integer) 4));
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) r2;
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) detstackvar(3);
+	field(mktag(0), (Integer) r1, ((Integer) 2)) = (Integer) detstackvar(4);
+	field(mktag(0), (Integer) r1, ((Integer) 3)) = (Integer) detstackvar(5);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(9);
+	decr_sp_pop_msg(9);
+	proceed();
+Define_label(mercury__higher_order__check_unify_3_0_i1029);
+	tag_incr_hp(r1, mktag(0), ((Integer) 4));
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) detstackvar(2);
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) detstackvar(3);
+	field(mktag(0), (Integer) r1, ((Integer) 2)) = (Integer) detstackvar(4);
+	field(mktag(0), (Integer) r1, ((Integer) 3)) = (Integer) detstackvar(5);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(9);
+	decr_sp_pop_msg(9);
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module20)
+	init_entry(mercury__higher_order__maybe_specialize_higher_order_call_6_0);
+	init_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i1016);
+	init_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i5);
+	init_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i6);
+	init_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i9);
+	init_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i12);
+	init_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i13);
+	init_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i14);
+	init_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i15);
+	init_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i16);
+	init_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i17);
+	init_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i1015);
+BEGIN_CODE
+
+/* code for predicate 'maybe_specialize_higher_order_call'/6 in mode 0 */
+Define_static(mercury__higher_order__maybe_specialize_higher_order_call_6_0);
+	r4 = (Integer) field(mktag(0), (Integer) r3, ((Integer) 3));
+	r5 = (Integer) field(mktag(0), (Integer) r3, ((Integer) 2));
+	r6 = (Integer) field(mktag(0), (Integer) r3, ((Integer) 1));
+	r7 = (Integer) field(mktag(0), (Integer) r3, ((Integer) 0));
+	r8 = (Integer) field(mktag(0), (Integer) r1, ((Integer) 1));
+	r9 = (Integer) field(mktag(0), (Integer) r1, ((Integer) 0));
+	if ((tag((Integer) r9) != mktag(((Integer) 2))))
+		GOTO_LABEL(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i1016);
+	r1 = (Integer) r2;
+	r6 = (Integer) r8;
+	r5 = (Integer) r9;
+	r10 = (Integer) field(mktag(2), (Integer) r9, ((Integer) 1));
+	r2 = (Integer) r3;
+	r8 = (Integer) field(mktag(0), (Integer) r3, ((Integer) 2));
+	r3 = (Integer) r7;
+	{
+	Word tempr1;
+	tempr1 = (Integer) r4;
+	r4 = (Integer) field(mktag(2), (Integer) r9, ((Integer) 0));
+	r9 = (Integer) tempr1;
+	r7 = (Integer) field(mktag(0), (Integer) r2, ((Integer) 1));
+	incr_sp_push_msg(15, "maybe_specialize_higher_order_call");
+	detstackvar(15) = (Integer) succip;
+	GOTO_LABEL(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i6);
+	}
+Define_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i1016);
+	incr_sp_push_msg(15, "maybe_specialize_higher_order_call");
+	detstackvar(15) = (Integer) succip;
+	detstackvar(1) = (Integer) r2;
+	detstackvar(2) = (Integer) r3;
+	detstackvar(3) = (Integer) r9;
+	detstackvar(4) = (Integer) r8;
+	detstackvar(5) = (Integer) r7;
+	detstackvar(6) = (Integer) r6;
+	detstackvar(7) = (Integer) r5;
+	detstackvar(8) = (Integer) r4;
+	r1 = string_const("higher_order.m: higher_order_call expected", 42);
+	{
+	Declare_entry(mercury__require__error_1_0);
+	call_localret(ENTRY(mercury__require__error_1_0),
+		mercury__higher_order__maybe_specialize_higher_order_call_6_0_i5,
+		STATIC(mercury__higher_order__maybe_specialize_higher_order_call_6_0));
+	}
+Define_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i5);
+	update_prof_current_proc(LABEL(mercury__higher_order__maybe_specialize_higher_order_call_6_0));
+	r4 = (Integer) r1;
+	r1 = (Integer) detstackvar(1);
+	r2 = (Integer) detstackvar(2);
+	r3 = (Integer) detstackvar(5);
+	r5 = (Integer) detstackvar(3);
+	r6 = (Integer) detstackvar(4);
+	r7 = (Integer) detstackvar(6);
+	r8 = (Integer) detstackvar(7);
+	r9 = (Integer) detstackvar(8);
+	r10 = (Integer) detstackvar(9);
+Define_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i6);
+	detstackvar(1) = (Integer) r1;
+	detstackvar(2) = (Integer) r2;
+	detstackvar(3) = (Integer) r5;
+	detstackvar(4) = (Integer) r6;
+	detstackvar(5) = (Integer) r3;
+	detstackvar(6) = (Integer) r7;
+	detstackvar(7) = (Integer) r8;
+	detstackvar(8) = (Integer) r9;
+	detstackvar(9) = (Integer) r10;
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) mercury_data_higher_order__base_type_info_maybe_pred_and_args_0;
+	{
+	Declare_entry(mercury__map__search_3_1);
+	call_localret(ENTRY(mercury__map__search_3_1),
+		mercury__higher_order__maybe_specialize_higher_order_call_6_0_i9,
+		STATIC(mercury__higher_order__maybe_specialize_higher_order_call_6_0));
+	}
+Define_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i9);
+	update_prof_current_proc(LABEL(mercury__higher_order__maybe_specialize_higher_order_call_6_0));
+	if (!((Integer) r1))
+		GOTO_LABEL(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i1015);
+	if (((Integer) r2 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i1015);
+	detstackvar(11) = (Integer) field(mktag(1), (Integer) r2, ((Integer) 1));
+	detstackvar(12) = (Integer) field(mktag(1), (Integer) r2, ((Integer) 2));
+	r2 = (Integer) field(mktag(1), (Integer) r2, ((Integer) 0));
+	detstackvar(10) = (Integer) r2;
+	r1 = (Integer) detstackvar(8);
+	{
+	Declare_entry(mercury__hlds_module__module_info_pred_info_3_0);
+	call_localret(ENTRY(mercury__hlds_module__module_info_pred_info_3_0),
+		mercury__higher_order__maybe_specialize_higher_order_call_6_0_i12,
+		STATIC(mercury__higher_order__maybe_specialize_higher_order_call_6_0));
+	}
+Define_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i12);
+	update_prof_current_proc(LABEL(mercury__higher_order__maybe_specialize_higher_order_call_6_0));
+	detstackvar(13) = (Integer) r1;
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_module_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_module_2_0),
+		mercury__higher_order__maybe_specialize_higher_order_call_6_0_i13,
+		STATIC(mercury__higher_order__maybe_specialize_higher_order_call_6_0));
+	}
+Define_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i13);
+	update_prof_current_proc(LABEL(mercury__higher_order__maybe_specialize_higher_order_call_6_0));
+	r2 = (Integer) detstackvar(13);
+	detstackvar(13) = (Integer) r1;
+	r1 = (Integer) r2;
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_name_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_name_2_0),
+		mercury__higher_order__maybe_specialize_higher_order_call_6_0_i14,
+		STATIC(mercury__higher_order__maybe_specialize_higher_order_call_6_0));
+	}
+Define_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i14);
+	update_prof_current_proc(LABEL(mercury__higher_order__maybe_specialize_higher_order_call_6_0));
+	detstackvar(14) = (Integer) r1;
+	r1 = (Integer) detstackvar(8);
+	r2 = (Integer) detstackvar(10);
+	r3 = (Integer) detstackvar(11);
+	{
+	Declare_entry(mercury__code_util__is_builtin_4_0);
+	call_localret(ENTRY(mercury__code_util__is_builtin_4_0),
+		mercury__higher_order__maybe_specialize_higher_order_call_6_0_i15,
+		STATIC(mercury__higher_order__maybe_specialize_higher_order_call_6_0));
+	}
+Define_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i15);
+	update_prof_current_proc(LABEL(mercury__higher_order__maybe_specialize_higher_order_call_6_0));
+	r3 = (Integer) detstackvar(9);
+	detstackvar(9) = (Integer) r1;
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) detstackvar(12);
+	{
+	Declare_entry(mercury__list__append_3_1);
+	call_localret(ENTRY(mercury__list__append_3_1),
+		mercury__higher_order__maybe_specialize_higher_order_call_6_0_i16,
+		STATIC(mercury__higher_order__maybe_specialize_higher_order_call_6_0));
+	}
+Define_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i16);
+	update_prof_current_proc(LABEL(mercury__higher_order__maybe_specialize_higher_order_call_6_0));
+	r2 = (Integer) r1;
+	tag_incr_hp(r1, mktag(0), ((Integer) 2));
+	tag_incr_hp(r3, mktag(1), ((Integer) 6));
+	field(mktag(1), (Integer) r3, ((Integer) 0)) = (Integer) detstackvar(10);
+	field(mktag(1), (Integer) r3, ((Integer) 1)) = (Integer) detstackvar(11);
+	field(mktag(1), (Integer) r3, ((Integer) 2)) = (Integer) r2;
+	field(mktag(1), (Integer) r3, ((Integer) 3)) = (Integer) detstackvar(9);
+	field(mktag(1), (Integer) r3, ((Integer) 4)) = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	r2 = (Integer) detstackvar(1);
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) tempr1, ((Integer) 1)) = (Integer) detstackvar(14);
+	field(mktag(1), (Integer) tempr1, ((Integer) 0)) = (Integer) detstackvar(13);
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) detstackvar(4);
+	field(mktag(1), (Integer) r3, ((Integer) 5)) = (Integer) tempr1;
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) r3;
+	r3 = (Integer) detstackvar(2);
+	call_localret(STATIC(mercury__higher_order__maybe_specialize_call_6_0),
+		mercury__higher_order__maybe_specialize_higher_order_call_6_0_i17,
+		STATIC(mercury__higher_order__maybe_specialize_higher_order_call_6_0));
+	}
+Define_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i17);
+	update_prof_current_proc(LABEL(mercury__higher_order__maybe_specialize_higher_order_call_6_0));
+	r4 = (Integer) r1;
+	tag_incr_hp(r1, mktag(0), ((Integer) 2));
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) field(mktag(0), (Integer) r4, ((Integer) 0));
+	r2 = ((Integer) 0);
+	r6 = (Integer) r3;
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) detstackvar(4);
+	tag_incr_hp(r3, mktag(0), ((Integer) 4));
+	field(mktag(0), (Integer) r3, ((Integer) 0)) = (Integer) detstackvar(5);
+	field(mktag(0), (Integer) r3, ((Integer) 1)) = (Integer) field(mktag(0), (Integer) r6, ((Integer) 1));
+	field(mktag(0), (Integer) r3, ((Integer) 2)) = (Integer) detstackvar(7);
+	field(mktag(0), (Integer) r3, ((Integer) 3)) = (Integer) detstackvar(8);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(15);
+	decr_sp_pop_msg(15);
+	proceed();
+Define_label(mercury__higher_order__maybe_specialize_higher_order_call_6_0_i1015);
+	tag_incr_hp(r1, mktag(0), ((Integer) 2));
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) detstackvar(3);
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) detstackvar(4);
+	r2 = ((Integer) 2);
+	tag_incr_hp(r3, mktag(0), ((Integer) 4));
+	field(mktag(0), (Integer) r3, ((Integer) 0)) = (Integer) detstackvar(5);
+	field(mktag(0), (Integer) r3, ((Integer) 1)) = (Integer) detstackvar(6);
+	field(mktag(0), (Integer) r3, ((Integer) 2)) = (Integer) detstackvar(7);
+	field(mktag(0), (Integer) r3, ((Integer) 3)) = (Integer) detstackvar(8);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(15);
+	decr_sp_pop_msg(15);
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module21)
+	init_entry(mercury__higher_order__maybe_specialize_call_6_0);
+	init_label(mercury__higher_order__maybe_specialize_call_6_0_i1000);
+	init_label(mercury__higher_order__maybe_specialize_call_6_0_i5);
+	init_label(mercury__higher_order__maybe_specialize_call_6_0_i6);
+	init_label(mercury__higher_order__maybe_specialize_call_6_0_i7);
+	init_label(mercury__higher_order__maybe_specialize_call_6_0_i8);
+	init_label(mercury__higher_order__maybe_specialize_call_6_0_i13);
+	init_label(mercury__higher_order__maybe_specialize_call_6_0_i15);
+	init_label(mercury__higher_order__maybe_specialize_call_6_0_i16);
+	init_label(mercury__higher_order__maybe_specialize_call_6_0_i20);
+	init_label(mercury__higher_order__maybe_specialize_call_6_0_i19);
+	init_label(mercury__higher_order__maybe_specialize_call_6_0_i18);
+	init_label(mercury__higher_order__maybe_specialize_call_6_0_i21);
+	init_label(mercury__higher_order__maybe_specialize_call_6_0_i12);
+	init_label(mercury__higher_order__maybe_specialize_call_6_0_i22);
+BEGIN_CODE
+
+/* code for predicate 'maybe_specialize_call'/6 in mode 0 */
+Define_static(mercury__higher_order__maybe_specialize_call_6_0);
+	r4 = (Integer) field(mktag(0), (Integer) r3, ((Integer) 3));
+	r5 = (Integer) field(mktag(0), (Integer) r3, ((Integer) 2));
+	r6 = (Integer) field(mktag(0), (Integer) r3, ((Integer) 1));
+	r7 = (Integer) field(mktag(0), (Integer) r3, ((Integer) 0));
+	r8 = (Integer) field(mktag(0), (Integer) r1, ((Integer) 1));
+	r9 = (Integer) field(mktag(0), (Integer) r1, ((Integer) 0));
+	if ((tag((Integer) r9) != mktag(((Integer) 1))))
+		GOTO_LABEL(mercury__higher_order__maybe_specialize_call_6_0_i1000);
+	r1 = (Integer) r2;
+	r6 = (Integer) r9;
+	r7 = (Integer) r8;
+	r2 = (Integer) field(mktag(0), (Integer) r3, ((Integer) 0));
+	r8 = (Integer) field(mktag(0), (Integer) r3, ((Integer) 1));
+	r9 = (Integer) r5;
+	r10 = (Integer) r4;
+	r11 = (Integer) field(mktag(1), (Integer) r6, ((Integer) 0));
+	r12 = (Integer) field(mktag(1), (Integer) r6, ((Integer) 1));
+	r5 = (Integer) field(mktag(1), (Integer) r6, ((Integer) 2));
+	r13 = (Integer) field(mktag(1), (Integer) r6, ((Integer) 3));
+	r14 = (Integer) field(mktag(1), (Integer) r6, ((Integer) 4));
+	r3 = ((Integer) 1);
+	r4 = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	incr_sp_push_msg(16, "maybe_specialize_call");
+	detstackvar(16) = (Integer) succip;
+	GOTO_LABEL(mercury__higher_order__maybe_specialize_call_6_0_i6);
+Define_label(mercury__higher_order__maybe_specialize_call_6_0_i1000);
+	incr_sp_push_msg(16, "maybe_specialize_call");
+	detstackvar(16) = (Integer) succip;
+	detstackvar(1) = (Integer) r2;
+	detstackvar(2) = (Integer) r9;
+	detstackvar(3) = (Integer) r8;
+	detstackvar(4) = (Integer) r7;
+	detstackvar(5) = (Integer) r6;
+	detstackvar(6) = (Integer) r5;
+	detstackvar(7) = (Integer) r4;
+	r1 = string_const("higher_order.m: call expected", 29);
+	{
+	Declare_entry(mercury__require__error_1_0);
+	call_localret(ENTRY(mercury__require__error_1_0),
+		mercury__higher_order__maybe_specialize_call_6_0_i5,
+		STATIC(mercury__higher_order__maybe_specialize_call_6_0));
+	}
+Define_label(mercury__higher_order__maybe_specialize_call_6_0_i5);
+	update_prof_current_proc(LABEL(mercury__higher_order__maybe_specialize_call_6_0));
+	r4 = (Integer) r3;
+	r5 = (Integer) r1;
+	r3 = (Integer) r2;
+	r1 = (Integer) detstackvar(1);
+	r2 = (Integer) detstackvar(4);
+	r6 = (Integer) detstackvar(2);
+	r7 = (Integer) detstackvar(3);
+	r8 = (Integer) detstackvar(5);
+	r9 = (Integer) detstackvar(6);
+	r10 = (Integer) detstackvar(7);
+	r11 = (Integer) detstackvar(8);
+	r12 = (Integer) detstackvar(9);
+	r13 = (Integer) detstackvar(10);
+	r14 = (Integer) detstackvar(11);
+Define_label(mercury__higher_order__maybe_specialize_call_6_0_i6);
+	detstackvar(1) = (Integer) r1;
+	detstackvar(2) = (Integer) r6;
+	detstackvar(3) = (Integer) r7;
+	detstackvar(4) = (Integer) r2;
+	detstackvar(5) = (Integer) r8;
+	detstackvar(6) = (Integer) r9;
+	detstackvar(7) = (Integer) r10;
+	detstackvar(8) = (Integer) r11;
+	detstackvar(9) = (Integer) r12;
+	detstackvar(10) = (Integer) r13;
+	detstackvar(11) = (Integer) r14;
+	r1 = (Integer) r5;
+	call_localret(STATIC(mercury__higher_order__find_higher_order_args_7_0),
+		mercury__higher_order__maybe_specialize_call_6_0_i7,
+		STATIC(mercury__higher_order__maybe_specialize_call_6_0));
+Define_label(mercury__higher_order__maybe_specialize_call_6_0_i7);
+	update_prof_current_proc(LABEL(mercury__higher_order__maybe_specialize_call_6_0));
+	if (((Integer) r1 != (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__maybe_specialize_call_6_0_i8);
+	tag_incr_hp(r1, mktag(0), ((Integer) 2));
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) detstackvar(2);
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) detstackvar(3);
+	r2 = ((Integer) 2);
+	tag_incr_hp(r3, mktag(0), ((Integer) 4));
+	field(mktag(0), (Integer) r3, ((Integer) 0)) = (Integer) detstackvar(4);
+	field(mktag(0), (Integer) r3, ((Integer) 1)) = (Integer) detstackvar(5);
+	field(mktag(0), (Integer) r3, ((Integer) 2)) = (Integer) detstackvar(6);
+	field(mktag(0), (Integer) r3, ((Integer) 3)) = (Integer) detstackvar(7);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(16);
+	decr_sp_pop_msg(16);
+	proceed();
+Define_label(mercury__higher_order__maybe_specialize_call_6_0_i8);
+	detstackvar(12) = (Integer) r1;
+	detstackvar(13) = (Integer) r2;
+	r1 = (Integer) mercury_data_hlds_pred__base_type_info_pred_proc_id_0;
+	r2 = (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_0);
+	r3 = (Integer) detstackvar(6);
+	tag_incr_hp(r4, mktag(0), ((Integer) 2));
+	field(mktag(0), (Integer) r4, ((Integer) 0)) = (Integer) detstackvar(8);
+	field(mktag(0), (Integer) r4, ((Integer) 1)) = (Integer) detstackvar(9);
+	{
+	Declare_entry(mercury__map__search_3_1);
+	call_localret(ENTRY(mercury__map__search_3_1),
+		mercury__higher_order__maybe_specialize_call_6_0_i13,
+		STATIC(mercury__higher_order__maybe_specialize_call_6_0));
+	}
+Define_label(mercury__higher_order__maybe_specialize_call_6_0_i13);
+	update_prof_current_proc(LABEL(mercury__higher_order__maybe_specialize_call_6_0));
+	if (!((Integer) r1))
+		GOTO_LABEL(mercury__higher_order__maybe_specialize_call_6_0_i12);
+	r1 = (Integer) mercury_data_higher_order__base_type_info_new_pred_0;
+	{
+	Declare_entry(mercury__set__to_sorted_list_2_0);
+	call_localret(ENTRY(mercury__set__to_sorted_list_2_0),
+		mercury__higher_order__maybe_specialize_call_6_0_i15,
+		STATIC(mercury__higher_order__maybe_specialize_call_6_0));
+	}
+Define_label(mercury__higher_order__maybe_specialize_call_6_0_i15);
+	update_prof_current_proc(LABEL(mercury__higher_order__maybe_specialize_call_6_0));
+	r3 = (Integer) r1;
+	r1 = (Integer) mercury_data_higher_order__base_type_info_new_pred_0;
+	tag_incr_hp(r2, mktag(0), ((Integer) 3));
+	field(mktag(0), (Integer) r2, ((Integer) 0)) = ((Integer) 1);
+	field(mktag(0), (Integer) r2, ((Integer) 1)) = (Integer) STATIC(mercury__higher_order__LambdaGoal__1_2_0);
+	field(mktag(0), (Integer) r2, ((Integer) 2)) = (Integer) detstackvar(12);
+	{
+	Declare_entry(mercury__list__filter_3_0);
+	call_localret(ENTRY(mercury__list__filter_3_0),
+		mercury__higher_order__maybe_specialize_call_6_0_i16,
+		STATIC(mercury__higher_order__maybe_specialize_call_6_0));
+	}
+Define_label(mercury__higher_order__maybe_specialize_call_6_0_i16);
+	update_prof_current_proc(LABEL(mercury__higher_order__maybe_specialize_call_6_0));
+	if (((Integer) r1 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__maybe_specialize_call_6_0_i12);
+	if (((Integer) field(mktag(1), (Integer) r1, ((Integer) 1)) == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__maybe_specialize_call_6_0_i19);
+	r1 = string_const("multiple specializations", 24);
+	{
+	Declare_entry(mercury__require__error_1_0);
+	call_localret(ENTRY(mercury__require__error_1_0),
+		mercury__higher_order__maybe_specialize_call_6_0_i20,
+		STATIC(mercury__higher_order__maybe_specialize_call_6_0));
+	}
+Define_label(mercury__higher_order__maybe_specialize_call_6_0_i20);
+	update_prof_current_proc(LABEL(mercury__higher_order__maybe_specialize_call_6_0));
+	r14 = (Integer) detstackvar(13);
+	r1 = (Integer) r14;
+	r3 = (Integer) detstackvar(12);
+	r5 = (Integer) detstackvar(3);
+	r6 = (Integer) detstackvar(4);
+	r7 = (Integer) detstackvar(5);
+	r8 = (Integer) detstackvar(6);
+	r9 = (Integer) detstackvar(7);
+	r12 = (Integer) detstackvar(10);
+	r13 = (Integer) detstackvar(11);
+	r15 = (Integer) detstackvar(14);
+	r16 = (Integer) detstackvar(15);
+	GOTO_LABEL(mercury__higher_order__maybe_specialize_call_6_0_i18);
+Define_label(mercury__higher_order__maybe_specialize_call_6_0_i19);
+	r2 = (Integer) field(mktag(1), (Integer) r1, ((Integer) 0));
+	r16 = (Integer) field(mktag(0), (Integer) r2, ((Integer) 2));
+	r15 = (Integer) field(mktag(0), (Integer) r2, ((Integer) 1));
+	r14 = (Integer) field(mktag(0), (Integer) r2, ((Integer) 0));
+	r1 = (Integer) detstackvar(13);
+	r3 = (Integer) detstackvar(12);
+	r5 = (Integer) detstackvar(3);
+	r6 = (Integer) detstackvar(4);
+	r7 = (Integer) detstackvar(5);
+	r8 = (Integer) detstackvar(6);
+	r9 = (Integer) detstackvar(7);
+	r12 = (Integer) detstackvar(10);
+	r13 = (Integer) detstackvar(11);
+Define_label(mercury__higher_order__maybe_specialize_call_6_0_i18);
+	detstackvar(3) = (Integer) r5;
+	detstackvar(4) = (Integer) r6;
+	detstackvar(5) = (Integer) r7;
+	detstackvar(6) = (Integer) r8;
+	detstackvar(7) = (Integer) r9;
+	detstackvar(10) = (Integer) r12;
+	detstackvar(11) = (Integer) r13;
+	detstackvar(13) = (Integer) r14;
+	detstackvar(14) = (Integer) r15;
+	detstackvar(15) = (Integer) r16;
+	r2 = ((Integer) 1);
+	call_localret(STATIC(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0),
+		mercury__higher_order__maybe_specialize_call_6_0_i21,
+		STATIC(mercury__higher_order__maybe_specialize_call_6_0));
+Define_label(mercury__higher_order__maybe_specialize_call_6_0_i21);
+	update_prof_current_proc(LABEL(mercury__higher_order__maybe_specialize_call_6_0));
+	r2 = (Integer) r1;
+	tag_incr_hp(r1, mktag(0), ((Integer) 2));
+	tag_incr_hp(r3, mktag(1), ((Integer) 6));
+	field(mktag(1), (Integer) r3, ((Integer) 0)) = (Integer) detstackvar(13);
+	field(mktag(1), (Integer) r3, ((Integer) 1)) = (Integer) detstackvar(14);
+	field(mktag(1), (Integer) r3, ((Integer) 2)) = (Integer) r2;
+	field(mktag(1), (Integer) r3, ((Integer) 3)) = (Integer) detstackvar(10);
+	field(mktag(1), (Integer) r3, ((Integer) 4)) = (Integer) detstackvar(11);
+	field(mktag(1), (Integer) r3, ((Integer) 5)) = (Integer) detstackvar(15);
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) r3;
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) detstackvar(3);
+	r2 = ((Integer) 0);
+	tag_incr_hp(r3, mktag(0), ((Integer) 4));
+	field(mktag(0), (Integer) r3, ((Integer) 0)) = (Integer) detstackvar(4);
+	field(mktag(0), (Integer) r3, ((Integer) 1)) = (Integer) detstackvar(5);
+	field(mktag(0), (Integer) r3, ((Integer) 2)) = (Integer) detstackvar(6);
+	field(mktag(0), (Integer) r3, ((Integer) 3)) = (Integer) detstackvar(7);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(16);
+	decr_sp_pop_msg(16);
+	proceed();
+Define_label(mercury__higher_order__maybe_specialize_call_6_0_i12);
+	r1 = (Integer) mercury_data_higher_order__base_type_info_request_0;
+	r2 = (Integer) detstackvar(5);
+	tag_incr_hp(r3, mktag(0), ((Integer) 3));
+	field(mktag(0), (Integer) r3, ((Integer) 0)) = (Integer) detstackvar(1);
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(0), ((Integer) 2));
+	field(mktag(0), (Integer) r3, ((Integer) 1)) = (Integer) tempr1;
+	field(mktag(0), (Integer) r3, ((Integer) 2)) = (Integer) detstackvar(12);
+	field(mktag(0), (Integer) tempr1, ((Integer) 1)) = (Integer) detstackvar(9);
+	field(mktag(0), (Integer) tempr1, ((Integer) 0)) = (Integer) detstackvar(8);
+	{
+	Declare_entry(mercury__set__insert_3_1);
+	call_localret(ENTRY(mercury__set__insert_3_1),
+		mercury__higher_order__maybe_specialize_call_6_0_i22,
+		STATIC(mercury__higher_order__maybe_specialize_call_6_0));
+	}
+	}
+Define_label(mercury__higher_order__maybe_specialize_call_6_0_i22);
+	update_prof_current_proc(LABEL(mercury__higher_order__maybe_specialize_call_6_0));
+	r4 = (Integer) r1;
+	tag_incr_hp(r1, mktag(0), ((Integer) 2));
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) detstackvar(3);
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) detstackvar(2);
+	r2 = ((Integer) 1);
+	tag_incr_hp(r3, mktag(0), ((Integer) 4));
+	field(mktag(0), (Integer) r3, ((Integer) 0)) = (Integer) detstackvar(4);
+	field(mktag(0), (Integer) r3, ((Integer) 1)) = (Integer) r4;
+	field(mktag(0), (Integer) r3, ((Integer) 2)) = (Integer) detstackvar(6);
+	field(mktag(0), (Integer) r3, ((Integer) 3)) = (Integer) detstackvar(7);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(16);
+	decr_sp_pop_msg(16);
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module22)
+	init_entry(mercury__higher_order__find_higher_order_args_7_0);
+	init_label(mercury__higher_order__find_higher_order_args_7_0_i6);
+	init_label(mercury__higher_order__find_higher_order_args_7_0_i9);
+	init_label(mercury__higher_order__find_higher_order_args_7_0_i10);
+	init_label(mercury__higher_order__find_higher_order_args_7_0_i11);
+	init_label(mercury__higher_order__find_higher_order_args_7_0_i12);
+	init_label(mercury__higher_order__find_higher_order_args_7_0_i5);
+	init_label(mercury__higher_order__find_higher_order_args_7_0_i1005);
+BEGIN_CODE
+
+/* code for predicate 'find_higher_order_args'/7 in mode 0 */
+Define_static(mercury__higher_order__find_higher_order_args_7_0);
+	if (((Integer) r1 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__find_higher_order_args_7_0_i1005);
+	incr_sp_push_msg(11, "find_higher_order_args");
+	detstackvar(11) = (Integer) succip;
+	detstackvar(3) = (Integer) r4;
+	detstackvar(2) = (Integer) r3;
+	r3 = (Integer) r2;
+	r4 = (Integer) field(mktag(1), (Integer) r1, ((Integer) 0));
+	detstackvar(1) = (Integer) r2;
+	detstackvar(5) = (Integer) field(mktag(1), (Integer) r1, ((Integer) 1));
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) mercury_data_higher_order__base_type_info_maybe_pred_and_args_0;
+	detstackvar(4) = (Integer) r5;
+	detstackvar(6) = ((Integer) detstackvar(2) + ((Integer) 1));
+	{
+	Declare_entry(mercury__map__search_3_1);
+	call_localret(ENTRY(mercury__map__search_3_1),
+		mercury__higher_order__find_higher_order_args_7_0_i6,
+		STATIC(mercury__higher_order__find_higher_order_args_7_0));
+	}
+Define_label(mercury__higher_order__find_higher_order_args_7_0_i6);
+	update_prof_current_proc(LABEL(mercury__higher_order__find_higher_order_args_7_0));
+	if (!((Integer) r1))
+		GOTO_LABEL(mercury__higher_order__find_higher_order_args_7_0_i5);
+	if (((Integer) r2 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__find_higher_order_args_7_0_i5);
+	detstackvar(7) = (Integer) field(mktag(1), (Integer) r2, ((Integer) 0));
+	detstackvar(8) = (Integer) field(mktag(1), (Integer) r2, ((Integer) 1));
+	detstackvar(9) = (Integer) field(mktag(1), (Integer) r2, ((Integer) 2));
+	r1 = (Integer) detstackvar(9);
+	r2 = (Integer) detstackvar(1);
+	r3 = ((Integer) 1);
+	r4 = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	r5 = (Integer) r1;
+	localcall(mercury__higher_order__find_higher_order_args_7_0,
+		LABEL(mercury__higher_order__find_higher_order_args_7_0_i9),
+		STATIC(mercury__higher_order__find_higher_order_args_7_0));
+Define_label(mercury__higher_order__find_higher_order_args_7_0_i9);
+	update_prof_current_proc(LABEL(mercury__higher_order__find_higher_order_args_7_0));
+	detstackvar(10) = (Integer) r2;
+	r2 = (Integer) detstackvar(9);
+	detstackvar(9) = (Integer) r1;
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	{
+	Declare_entry(mercury__list__length_2_0);
+	call_localret(ENTRY(mercury__list__length_2_0),
+		mercury__higher_order__find_higher_order_args_7_0_i10,
+		STATIC(mercury__higher_order__find_higher_order_args_7_0));
+	}
+Define_label(mercury__higher_order__find_higher_order_args_7_0_i10);
+	update_prof_current_proc(LABEL(mercury__higher_order__find_higher_order_args_7_0));
+	r2 = (Integer) detstackvar(10);
+	detstackvar(10) = (Integer) r1;
+	r1 = (Integer) r2;
+	r2 = ((Integer) 1);
+	r3 = (Integer) detstackvar(9);
+	call_localret(STATIC(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0),
+		mercury__higher_order__find_higher_order_args_7_0_i11,
+		STATIC(mercury__higher_order__find_higher_order_args_7_0));
+Define_label(mercury__higher_order__find_higher_order_args_7_0_i11);
+	update_prof_current_proc(LABEL(mercury__higher_order__find_higher_order_args_7_0));
+	r2 = (Integer) detstackvar(2);
+	tag_incr_hp(detstackvar(2), mktag(1), ((Integer) 2));
+	tag_incr_hp(r3, mktag(0), ((Integer) 5));
+	field(mktag(0), (Integer) r3, ((Integer) 0)) = (Integer) detstackvar(7);
+	field(mktag(0), (Integer) r3, ((Integer) 1)) = (Integer) detstackvar(8);
+	field(mktag(0), (Integer) r3, ((Integer) 2)) = (Integer) r2;
+	field(mktag(0), (Integer) r3, ((Integer) 3)) = (Integer) detstackvar(10);
+	field(mktag(0), (Integer) r3, ((Integer) 4)) = (Integer) detstackvar(9);
+	field(mktag(1), (Integer) detstackvar(2), ((Integer) 0)) = (Integer) r3;
+	field(mktag(1), (Integer) detstackvar(2), ((Integer) 1)) = (Integer) detstackvar(3);
+	r3 = (Integer) r1;
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) detstackvar(4);
+	{
+	Declare_entry(mercury__list__append_3_1);
+	call_localret(ENTRY(mercury__list__append_3_1),
+		mercury__higher_order__find_higher_order_args_7_0_i12,
+		STATIC(mercury__higher_order__find_higher_order_args_7_0));
+	}
+Define_label(mercury__higher_order__find_higher_order_args_7_0_i12);
+	update_prof_current_proc(LABEL(mercury__higher_order__find_higher_order_args_7_0));
+	r5 = (Integer) r1;
+	r1 = (Integer) detstackvar(5);
+	r2 = (Integer) detstackvar(1);
+	r3 = (Integer) detstackvar(6);
+	r4 = (Integer) detstackvar(2);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(11);
+	decr_sp_pop_msg(11);
+	localtailcall(mercury__higher_order__find_higher_order_args_7_0,
+		STATIC(mercury__higher_order__find_higher_order_args_7_0));
+Define_label(mercury__higher_order__find_higher_order_args_7_0_i5);
+	r2 = (Integer) detstackvar(1);
+	r1 = (Integer) detstackvar(5);
+	r3 = (Integer) detstackvar(6);
+	r4 = (Integer) detstackvar(3);
+	r5 = (Integer) detstackvar(4);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(11);
+	decr_sp_pop_msg(11);
+	localtailcall(mercury__higher_order__find_higher_order_args_7_0,
+		STATIC(mercury__higher_order__find_higher_order_args_7_0));
+Define_label(mercury__higher_order__find_higher_order_args_7_0_i1005);
+	r1 = (Integer) r4;
+	r2 = (Integer) r5;
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module23)
+	init_entry(mercury__higher_order__update_changed_status_3_0);
+	init_label(mercury__higher_order__update_changed_status_3_0_i3);
+	init_label(mercury__higher_order__update_changed_status_3_0_i6);
+	init_label(mercury__higher_order__update_changed_status_3_0_i7);
+	init_label(mercury__higher_order__update_changed_status_3_0_i4);
+BEGIN_CODE
+
+/* code for predicate 'update_changed_status'/3 in mode 0 */
+Define_static(mercury__higher_order__update_changed_status_3_0);
+	if (((Integer) r1 != ((Integer) 0)))
+		GOTO_LABEL(mercury__higher_order__update_changed_status_3_0_i3);
+	r1 = ((Integer) 0);
+	proceed();
+Define_label(mercury__higher_order__update_changed_status_3_0_i3);
+	if (((Integer) r1 != ((Integer) 1)))
+		GOTO_LABEL(mercury__higher_order__update_changed_status_3_0_i4);
+	if (((Integer) r2 != ((Integer) 0)))
+		GOTO_LABEL(mercury__higher_order__update_changed_status_3_0_i6);
+	r1 = ((Integer) 0);
+	proceed();
+Define_label(mercury__higher_order__update_changed_status_3_0_i6);
+	if (((Integer) r2 != ((Integer) 1)))
+		GOTO_LABEL(mercury__higher_order__update_changed_status_3_0_i7);
+	r1 = ((Integer) 1);
+	proceed();
+Define_label(mercury__higher_order__update_changed_status_3_0_i7);
+	r1 = ((Integer) 1);
+	proceed();
+Define_label(mercury__higher_order__update_changed_status_3_0_i4);
+	r1 = (Integer) r2;
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module24)
+	init_entry(mercury__higher_order__create_new_preds_11_0);
+	init_label(mercury__higher_order__create_new_preds_11_0_i4);
+	init_label(mercury__higher_order__create_new_preds_11_0_i7);
+	init_label(mercury__higher_order__create_new_preds_11_0_i16);
+	init_label(mercury__higher_order__create_new_preds_11_0_i17);
+	init_label(mercury__higher_order__create_new_preds_11_0_i15);
+	init_label(mercury__higher_order__create_new_preds_11_0_i20);
+	init_label(mercury__higher_order__create_new_preds_11_0_i21);
+	init_label(mercury__higher_order__create_new_preds_11_0_i22);
+	init_label(mercury__higher_order__create_new_preds_11_0_i9);
+	init_label(mercury__higher_order__create_new_preds_11_0_i6);
+	init_label(mercury__higher_order__create_new_preds_11_0_i24);
+	init_label(mercury__higher_order__create_new_preds_11_0_i25);
+	init_label(mercury__higher_order__create_new_preds_11_0_i26);
+	init_label(mercury__higher_order__create_new_preds_11_0_i1016);
+BEGIN_CODE
+
+/* code for predicate 'create_new_preds'/11 in mode 0 */
+Define_static(mercury__higher_order__create_new_preds_11_0);
+	if (((Integer) r1 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__create_new_preds_11_0_i1016);
+	incr_sp_push_msg(15, "create_new_preds");
+	detstackvar(15) = (Integer) succip;
+	detstackvar(1) = (Integer) r2;
+	{
+	Word tempr1;
+	tempr1 = (Integer) field(mktag(1), (Integer) r1, ((Integer) 0));
+	r2 = (Integer) r3;
+	detstackvar(5) = (Integer) tempr1;
+	detstackvar(6) = (Integer) field(mktag(1), (Integer) r1, ((Integer) 1));
+	detstackvar(8) = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 2));
+	detstackvar(7) = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 1));
+	r3 = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 0));
+	r1 = (Integer) mercury_data_hlds_pred__base_type_info_pred_proc_id_0;
+	detstackvar(2) = (Integer) r4;
+	detstackvar(3) = (Integer) r5;
+	detstackvar(4) = (Integer) r6;
+	{
+	Declare_entry(mercury__set__insert_3_1);
+	call_localret(ENTRY(mercury__set__insert_3_1),
+		mercury__higher_order__create_new_preds_11_0_i4,
+		STATIC(mercury__higher_order__create_new_preds_11_0));
+	}
+	}
+Define_label(mercury__higher_order__create_new_preds_11_0_i4);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_preds_11_0));
+	detstackvar(9) = (Integer) r1;
+	r1 = (Integer) mercury_data_hlds_pred__base_type_info_pred_proc_id_0;
+	r2 = (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_0);
+	r3 = (Integer) detstackvar(1);
+	r4 = (Integer) detstackvar(7);
+	{
+	Declare_entry(mercury__map__search_3_1);
+	call_localret(ENTRY(mercury__map__search_3_1),
+		mercury__higher_order__create_new_preds_11_0_i7,
+		STATIC(mercury__higher_order__create_new_preds_11_0));
+	}
+Define_label(mercury__higher_order__create_new_preds_11_0_i7);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_preds_11_0));
+	if (!((Integer) r1))
+		GOTO_LABEL(mercury__higher_order__create_new_preds_11_0_i6);
+	detstackvar(12) = (Integer) curfr;
+	detstackvar(13) = (Integer) maxfr;
+	detstackvar(14) = (Integer) bt_redoip((Integer) maxfr);
+	LVALUE_CAST(Word,bt_redoip((Integer) maxfr)) = (Integer) LABEL(mercury__higher_order__create_new_preds_11_0_i15);
+	detstackvar(10) = (Integer) r2;
+	r1 = (Integer) mercury_data_higher_order__base_type_info_new_pred_0;
+	{
+	Declare_entry(mercury__set__member_2_1);
+	call_localret(ENTRY(mercury__set__member_2_1),
+		mercury__higher_order__create_new_preds_11_0_i16,
+		STATIC(mercury__higher_order__create_new_preds_11_0));
+	}
+Define_label(mercury__higher_order__create_new_preds_11_0_i16);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_preds_11_0));
+	r2 = (Integer) field(mktag(0), (Integer) r1, ((Integer) 3));
+	r1 = (Integer) mercury_data_higher_order__base_type_info_higher_order_arg_0;
+	r3 = (Integer) detstackvar(8);
+	{
+	Declare_entry(mercury____Unify___mercury_builtin__list_1_0);
+	call_localret(ENTRY(mercury____Unify___mercury_builtin__list_1_0),
+		mercury__higher_order__create_new_preds_11_0_i17,
+		STATIC(mercury__higher_order__create_new_preds_11_0));
+	}
+Define_label(mercury__higher_order__create_new_preds_11_0_i17);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_preds_11_0));
+	{
+	Declare_entry(do_redo);
+	if (!((Integer) r1))
+		GOTO(ENTRY(do_redo));
+	}
+	LVALUE_CAST(Word,maxfr) = (Integer) detstackvar(13);
+	LVALUE_CAST(Word,bt_redoip((Integer) maxfr)) = (Integer) detstackvar(14);
+	LVALUE_CAST(Word,curfr) = (Integer) detstackvar(12);
+	GOTO_LABEL(mercury__higher_order__create_new_preds_11_0_i9);
+Define_label(mercury__higher_order__create_new_preds_11_0_i15);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_preds_11_0));
+	LVALUE_CAST(Word,curfr) = (Integer) detstackvar(12);
+	r2 = (Integer) detstackvar(10);
+	LVALUE_CAST(Word,bt_redoip((Integer) maxfr)) = (Integer) detstackvar(14);
+	detstackvar(10) = (Integer) r2;
+	r1 = (Integer) detstackvar(5);
+	r2 = (Integer) detstackvar(2);
+	r3 = (Integer) detstackvar(3);
+	r4 = (Integer) detstackvar(4);
+	call_localret(STATIC(mercury__higher_order__create_new_pred_8_0),
+		mercury__higher_order__create_new_preds_11_0_i20,
+		STATIC(mercury__higher_order__create_new_preds_11_0));
+Define_label(mercury__higher_order__create_new_preds_11_0_i20);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_preds_11_0));
+	detstackvar(8) = (Integer) r2;
+	r2 = (Integer) detstackvar(10);
+	detstackvar(10) = (Integer) r3;
+	r3 = (Integer) r1;
+	r1 = (Integer) mercury_data_higher_order__base_type_info_new_pred_0;
+	detstackvar(11) = (Integer) r4;
+	{
+	Declare_entry(mercury__set__insert_3_1);
+	call_localret(ENTRY(mercury__set__insert_3_1),
+		mercury__higher_order__create_new_preds_11_0_i21,
+		STATIC(mercury__higher_order__create_new_preds_11_0));
+	}
+Define_label(mercury__higher_order__create_new_preds_11_0_i21);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_preds_11_0));
+	r5 = (Integer) r1;
+	r1 = (Integer) mercury_data_hlds_pred__base_type_info_pred_proc_id_0;
+	r2 = (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_0);
+	r3 = (Integer) detstackvar(1);
+	r4 = (Integer) detstackvar(7);
+	{
+	Declare_entry(mercury__map__det_update_4_0);
+	call_localret(ENTRY(mercury__map__det_update_4_0),
+		mercury__higher_order__create_new_preds_11_0_i22,
+		STATIC(mercury__higher_order__create_new_preds_11_0));
+	}
+Define_label(mercury__higher_order__create_new_preds_11_0_i22);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_preds_11_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(6);
+	r3 = (Integer) detstackvar(9);
+	r4 = (Integer) detstackvar(8);
+	r5 = (Integer) detstackvar(10);
+	r6 = (Integer) detstackvar(11);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(15);
+	decr_sp_pop_msg(15);
+	localtailcall(mercury__higher_order__create_new_preds_11_0,
+		STATIC(mercury__higher_order__create_new_preds_11_0));
+Define_label(mercury__higher_order__create_new_preds_11_0_i9);
+	r1 = (Integer) detstackvar(6);
+	r3 = (Integer) detstackvar(9);
+	r4 = (Integer) detstackvar(2);
+	r5 = (Integer) detstackvar(3);
+	r6 = (Integer) detstackvar(4);
+	r2 = (Integer) detstackvar(1);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(15);
+	decr_sp_pop_msg(15);
+	localtailcall(mercury__higher_order__create_new_preds_11_0,
+		STATIC(mercury__higher_order__create_new_preds_11_0));
+Define_label(mercury__higher_order__create_new_preds_11_0_i6);
+	r1 = (Integer) detstackvar(5);
+	r2 = (Integer) detstackvar(2);
+	r3 = (Integer) detstackvar(3);
+	r4 = (Integer) detstackvar(4);
+	call_localret(STATIC(mercury__higher_order__create_new_pred_8_0),
+		mercury__higher_order__create_new_preds_11_0_i24,
+		STATIC(mercury__higher_order__create_new_preds_11_0));
+Define_label(mercury__higher_order__create_new_preds_11_0_i24);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_preds_11_0));
+	detstackvar(8) = (Integer) r2;
+	r2 = (Integer) r1;
+	r1 = (Integer) mercury_data_higher_order__base_type_info_new_pred_0;
+	detstackvar(10) = (Integer) r3;
+	detstackvar(11) = (Integer) r4;
+	{
+	Declare_entry(mercury__set__singleton_set_2_1);
+	call_localret(ENTRY(mercury__set__singleton_set_2_1),
+		mercury__higher_order__create_new_preds_11_0_i25,
+		STATIC(mercury__higher_order__create_new_preds_11_0));
+	}
+Define_label(mercury__higher_order__create_new_preds_11_0_i25);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_preds_11_0));
+	r5 = (Integer) r1;
+	r1 = (Integer) mercury_data_hlds_pred__base_type_info_pred_proc_id_0;
+	r2 = (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_0);
+	r3 = (Integer) detstackvar(1);
+	r4 = (Integer) detstackvar(7);
+	{
+	Declare_entry(mercury__map__set_4_1);
+	call_localret(ENTRY(mercury__map__set_4_1),
+		mercury__higher_order__create_new_preds_11_0_i26,
+		STATIC(mercury__higher_order__create_new_preds_11_0));
+	}
+Define_label(mercury__higher_order__create_new_preds_11_0_i26);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_preds_11_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(6);
+	r3 = (Integer) detstackvar(9);
+	r4 = (Integer) detstackvar(8);
+	r5 = (Integer) detstackvar(10);
+	r6 = (Integer) detstackvar(11);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(15);
+	decr_sp_pop_msg(15);
+	localtailcall(mercury__higher_order__create_new_preds_11_0,
+		STATIC(mercury__higher_order__create_new_preds_11_0));
+Define_label(mercury__higher_order__create_new_preds_11_0_i1016);
+	r1 = (Integer) r2;
+	r2 = (Integer) r3;
+	r3 = (Integer) r4;
+	r4 = (Integer) r5;
+	r5 = (Integer) r6;
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module25)
+	init_entry(mercury__higher_order__create_new_pred_8_0);
+	init_label(mercury__higher_order__create_new_pred_8_0_i2);
+	init_label(mercury__higher_order__create_new_pred_8_0_i3);
+	init_label(mercury__higher_order__create_new_pred_8_0_i4);
+	init_label(mercury__higher_order__create_new_pred_8_0_i5);
+	init_label(mercury__higher_order__create_new_pred_8_0_i6);
+	init_label(mercury__higher_order__create_new_pred_8_0_i7);
+	init_label(mercury__higher_order__create_new_pred_8_0_i8);
+	init_label(mercury__higher_order__create_new_pred_8_0_i9);
+	init_label(mercury__higher_order__create_new_pred_8_0_i10);
+	init_label(mercury__higher_order__create_new_pred_8_0_i11);
+	init_label(mercury__higher_order__create_new_pred_8_0_i12);
+	init_label(mercury__higher_order__create_new_pred_8_0_i16);
+	init_label(mercury__higher_order__create_new_pred_8_0_i17);
+	init_label(mercury__higher_order__create_new_pred_8_0_i18);
+	init_label(mercury__higher_order__create_new_pred_8_0_i13);
+	init_label(mercury__higher_order__create_new_pred_8_0_i19);
+	init_label(mercury__higher_order__create_new_pred_8_0_i20);
+	init_label(mercury__higher_order__create_new_pred_8_0_i21);
+	init_label(mercury__higher_order__create_new_pred_8_0_i23);
+	init_label(mercury__higher_order__create_new_pred_8_0_i24);
+	init_label(mercury__higher_order__create_new_pred_8_0_i25);
+	init_label(mercury__higher_order__create_new_pred_8_0_i26);
+	init_label(mercury__higher_order__create_new_pred_8_0_i27);
+	init_label(mercury__higher_order__create_new_pred_8_0_i28);
+	init_label(mercury__higher_order__create_new_pred_8_0_i29);
+	init_label(mercury__higher_order__create_new_pred_8_0_i32);
+	init_label(mercury__higher_order__create_new_pred_8_0_i31);
+	init_label(mercury__higher_order__create_new_pred_8_0_i34);
+	init_label(mercury__higher_order__create_new_pred_8_0_i1016);
+	init_label(mercury__higher_order__create_new_pred_8_0_i36);
+	init_label(mercury__higher_order__create_new_pred_8_0_i37);
+	init_label(mercury__higher_order__create_new_pred_8_0_i38);
+	init_label(mercury__higher_order__create_new_pred_8_0_i39);
+	init_label(mercury__higher_order__create_new_pred_8_0_i40);
+	init_label(mercury__higher_order__create_new_pred_8_0_i41);
+BEGIN_CODE
+
+/* code for predicate 'create_new_pred'/8 in mode 0 */
+Define_static(mercury__higher_order__create_new_pred_8_0);
+	incr_sp_push_msg(18, "create_new_pred");
+	detstackvar(18) = (Integer) succip;
+	detstackvar(1) = (Integer) r2;
+	detstackvar(3) = (Integer) r3;
+	detstackvar(2) = (Integer) r4;
+	detstackvar(5) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 2));
+	detstackvar(4) = (Integer) field(mktag(0), (Integer) field(mktag(0), (Integer) r1, ((Integer) 1)), ((Integer) 0));
+	r1 = (Integer) r3;
+	{
+	Declare_entry(mercury__hlds_module__module_info_get_predicate_table_2_0);
+	call_localret(ENTRY(mercury__hlds_module__module_info_get_predicate_table_2_0),
+		mercury__higher_order__create_new_pred_8_0_i2,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i2);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	detstackvar(7) = (Integer) r1;
+	{
+	Declare_entry(mercury__hlds_module__predicate_table_get_preds_2_0);
+	call_localret(ENTRY(mercury__hlds_module__predicate_table_get_preds_2_0),
+		mercury__higher_order__create_new_pred_8_0_i3,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i3);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	r3 = (Integer) r1;
+	r1 = (Integer) mercury_data___base_type_info_int_0;
+	{
+	extern Word * mercury_data_hlds_pred__base_type_info_pred_info_0[];
+	r2 = (Integer) mercury_data_hlds_pred__base_type_info_pred_info_0;
+	}
+	r4 = (Integer) detstackvar(4);
+	{
+	Declare_entry(mercury__map__lookup_3_1);
+	call_localret(ENTRY(mercury__map__lookup_3_1),
+		mercury__higher_order__create_new_pred_8_0_i4,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i4);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	detstackvar(8) = (Integer) r1;
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_name_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_name_2_0),
+		mercury__higher_order__create_new_pred_8_0_i5,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i5);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	detstackvar(6) = (Integer) r1;
+	r1 = (Integer) detstackvar(8);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_arity_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_arity_2_0),
+		mercury__higher_order__create_new_pred_8_0_i6,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i6);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	detstackvar(9) = (Integer) r1;
+	r1 = (Integer) detstackvar(8);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_get_is_pred_or_func_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_get_is_pred_or_func_2_0),
+		mercury__higher_order__create_new_pred_8_0_i7,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i7);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	detstackvar(10) = (Integer) r1;
+	r1 = (Integer) detstackvar(3);
+	{
+	Declare_entry(mercury__hlds_module__module_info_name_2_0);
+	call_localret(ENTRY(mercury__hlds_module__module_info_name_2_0),
+		mercury__higher_order__create_new_pred_8_0_i8,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i8);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	detstackvar(11) = (Integer) r1;
+	r1 = (Integer) detstackvar(8);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_module_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_module_2_0),
+		mercury__higher_order__create_new_pred_8_0_i9,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i9);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	r2 = (Integer) detstackvar(2);
+	detstackvar(2) = (Integer) r1;
+	r1 = ((Integer) 12);
+	{
+	Declare_entry(mercury__globals__io_lookup_bool_option_4_0);
+	call_localret(ENTRY(mercury__globals__io_lookup_bool_option_4_0),
+		mercury__higher_order__create_new_pred_8_0_i10,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i10);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	detstackvar(4) = (Integer) r1;
+	detstackvar(12) = (Integer) r2;
+	r1 = (Integer) detstackvar(8);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_arg_types_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_arg_types_3_0),
+		mercury__higher_order__create_new_pred_8_0_i11,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i11);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	detstackvar(13) = (Integer) r1;
+	detstackvar(14) = (Integer) r2;
+	r1 = (Integer) detstackvar(9);
+	{
+	Declare_entry(mercury__string__int_to_string_2_0);
+	call_localret(ENTRY(mercury__string__int_to_string_2_0),
+		mercury__higher_order__create_new_pred_8_0_i12,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i12);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	if (((Integer) detstackvar(4) != ((Integer) 0)))
+		GOTO_LABEL(mercury__higher_order__create_new_pred_8_0_i13);
+	r2 = (Integer) r1;
+	tag_incr_hp(r1, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r1, ((Integer) 0)) = string_const("% Specializing calls to `", 25);
+	tag_incr_hp(r3, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r3, ((Integer) 0)) = (Integer) detstackvar(2);
+	tag_incr_hp(r4, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r4, ((Integer) 0)) = string_const(":", 1);
+	tag_incr_hp(r5, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r5, ((Integer) 0)) = (Integer) detstackvar(6);
+	tag_incr_hp(r6, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r6, ((Integer) 0)) = string_const("'/", 2);
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r6, ((Integer) 1)) = (Integer) tempr1;
+	field(mktag(1), (Integer) tempr1, ((Integer) 0)) = (Integer) r2;
+	r2 = (Integer) detstackvar(12);
+	field(mktag(1), (Integer) r1, ((Integer) 1)) = (Integer) r3;
+	field(mktag(1), (Integer) r3, ((Integer) 1)) = (Integer) r4;
+	field(mktag(1), (Integer) r4, ((Integer) 1)) = (Integer) r5;
+	field(mktag(1), (Integer) r5, ((Integer) 1)) = (Integer) r6;
+	field(mktag(1), (Integer) tempr1, ((Integer) 1)) = (Integer) mkword(mktag(1), (Integer) mercury_data_higher_order__common_1);
+	{
+	Declare_entry(mercury__io__write_strings_3_0);
+	call_localret(ENTRY(mercury__io__write_strings_3_0),
+		mercury__higher_order__create_new_pred_8_0_i16,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i16);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	detstackvar(4) = (Integer) r1;
+	{
+	extern Word * mercury_data_mercury_builtin__base_type_info_term_0[];
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_term_0;
+	}
+	r2 = (Integer) detstackvar(14);
+	{
+	Declare_entry(mercury__list__length_2_0);
+	call_localret(ENTRY(mercury__list__length_2_0),
+		mercury__higher_order__create_new_pred_8_0_i17,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i17);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	r2 = ((Integer) r1 - (Integer) detstackvar(9));
+	r1 = (Integer) detstackvar(3);
+	r3 = (Integer) detstackvar(5);
+	r4 = (Integer) detstackvar(4);
+	call_localret(STATIC(mercury__higher_order__output_higher_order_args_5_0),
+		mercury__higher_order__create_new_pred_8_0_i18,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+Define_label(mercury__higher_order__create_new_pred_8_0_i18);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	r3 = (Integer) r1;
+	r1 = (Integer) detstackvar(1);
+	r2 = (Integer) detstackvar(3);
+	r4 = (Integer) detstackvar(5);
+	r5 = (Integer) detstackvar(7);
+	r6 = (Integer) detstackvar(8);
+	r7 = (Integer) detstackvar(6);
+	r8 = (Integer) detstackvar(9);
+	r9 = (Integer) detstackvar(10);
+	r10 = (Integer) detstackvar(11);
+	r11 = (Integer) detstackvar(2);
+	r12 = (Integer) detstackvar(13);
+	r13 = (Integer) detstackvar(14);
+	GOTO_LABEL(mercury__higher_order__create_new_pred_8_0_i19);
+Define_label(mercury__higher_order__create_new_pred_8_0_i13);
+	r1 = (Integer) detstackvar(1);
+	r2 = (Integer) detstackvar(3);
+	r3 = (Integer) detstackvar(12);
+	r4 = (Integer) detstackvar(5);
+	r5 = (Integer) detstackvar(7);
+	r6 = (Integer) detstackvar(8);
+	r7 = (Integer) detstackvar(6);
+	r8 = (Integer) detstackvar(9);
+	r9 = (Integer) detstackvar(10);
+	r10 = (Integer) detstackvar(11);
+	r11 = (Integer) detstackvar(2);
+	r12 = (Integer) detstackvar(13);
+	r13 = (Integer) detstackvar(14);
+Define_label(mercury__higher_order__create_new_pred_8_0_i19);
+	detstackvar(1) = (Integer) r1;
+	detstackvar(3) = (Integer) r2;
+	detstackvar(4) = (Integer) r3;
+	detstackvar(5) = (Integer) r4;
+	detstackvar(7) = (Integer) r5;
+	detstackvar(8) = (Integer) r6;
+	detstackvar(6) = (Integer) r7;
+	detstackvar(9) = (Integer) r8;
+	detstackvar(10) = (Integer) r9;
+	detstackvar(11) = (Integer) r10;
+	detstackvar(2) = (Integer) r11;
+	detstackvar(13) = (Integer) r12;
+	detstackvar(14) = (Integer) r13;
+	{
+	Declare_entry(mercury__string__int_to_string_2_0);
+	call_localret(ENTRY(mercury__string__int_to_string_2_0),
+		mercury__higher_order__create_new_pred_8_0_i20,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i20);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	r2 = ((Integer) detstackvar(1) + ((Integer) 1));
+	if ((strcmp((char *)(Integer) detstackvar(11), (char *)(Integer) detstackvar(2)) !=0))
+		GOTO_LABEL(mercury__higher_order__create_new_pred_8_0_i21);
+	r3 = (Integer) detstackvar(3);
+	r4 = (Integer) detstackvar(4);
+	r5 = (Integer) detstackvar(5);
+	r6 = (Integer) detstackvar(7);
+	r7 = (Integer) detstackvar(8);
+	r8 = (Integer) detstackvar(9);
+	r9 = (Integer) detstackvar(10);
+	r10 = (Integer) detstackvar(11);
+	r11 = (Integer) detstackvar(13);
+	r12 = (Integer) detstackvar(14);
+	r13 = (Integer) r1;
+	tag_incr_hp(r1, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r1, ((Integer) 0)) = string_const("", 0);
+	tag_incr_hp(r14, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r14, ((Integer) 0)) = (Integer) detstackvar(6);
+	tag_incr_hp(r15, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r15, ((Integer) 0)) = string_const("__ho", 4);
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) tempr1, ((Integer) 1)) = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	field(mktag(1), (Integer) tempr1, ((Integer) 0)) = (Integer) r13;
+	field(mktag(1), (Integer) r1, ((Integer) 1)) = (Integer) r14;
+	field(mktag(1), (Integer) r14, ((Integer) 1)) = (Integer) r15;
+	field(mktag(1), (Integer) r15, ((Integer) 1)) = (Integer) tempr1;
+	GOTO_LABEL(mercury__higher_order__create_new_pred_8_0_i24);
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i21);
+	detstackvar(1) = (Integer) r1;
+	r1 = (Integer) detstackvar(2);
+	detstackvar(2) = (Integer) r2;
+	r2 = string_const("__", 2);
+	{
+	Declare_entry(mercury__string__append_3_2);
+	call_localret(ENTRY(mercury__string__append_3_2),
+		mercury__higher_order__create_new_pred_8_0_i23,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i23);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	r2 = (Integer) detstackvar(2);
+	r3 = (Integer) detstackvar(3);
+	r4 = (Integer) detstackvar(4);
+	r5 = (Integer) detstackvar(5);
+	r6 = (Integer) detstackvar(7);
+	r7 = (Integer) detstackvar(8);
+	r8 = (Integer) detstackvar(9);
+	r9 = (Integer) detstackvar(10);
+	r10 = (Integer) detstackvar(11);
+	r11 = (Integer) detstackvar(13);
+	r12 = (Integer) detstackvar(14);
+	r13 = (Integer) r1;
+	tag_incr_hp(r1, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r1, ((Integer) 0)) = (Integer) r13;
+	tag_incr_hp(r14, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r14, ((Integer) 0)) = (Integer) detstackvar(6);
+	tag_incr_hp(r15, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r15, ((Integer) 0)) = string_const("__ho", 4);
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) tempr1, ((Integer) 1)) = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	field(mktag(1), (Integer) tempr1, ((Integer) 0)) = (Integer) detstackvar(1);
+	field(mktag(1), (Integer) r1, ((Integer) 1)) = (Integer) r14;
+	field(mktag(1), (Integer) r14, ((Integer) 1)) = (Integer) r15;
+	field(mktag(1), (Integer) r15, ((Integer) 1)) = (Integer) tempr1;
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i24);
+	detstackvar(2) = (Integer) r2;
+	detstackvar(3) = (Integer) r3;
+	detstackvar(4) = (Integer) r4;
+	detstackvar(5) = (Integer) r5;
+	detstackvar(7) = (Integer) r6;
+	detstackvar(8) = (Integer) r7;
+	detstackvar(9) = (Integer) r8;
+	detstackvar(10) = (Integer) r9;
+	detstackvar(11) = (Integer) r10;
+	detstackvar(13) = (Integer) r11;
+	detstackvar(14) = (Integer) r12;
+	{
+	Declare_entry(mercury__string__append_list_2_0);
+	call_localret(ENTRY(mercury__string__append_list_2_0),
+		mercury__higher_order__create_new_pred_8_0_i25,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i25);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	detstackvar(12) = (Integer) r1;
+	r1 = (Integer) detstackvar(8);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_typevarset_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_typevarset_2_0),
+		mercury__higher_order__create_new_pred_8_0_i26,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i26);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	r2 = (Integer) detstackvar(14);
+	detstackvar(14) = (Integer) r1;
+	r1 = (Integer) r2;
+	r2 = ((Integer) 1);
+	r3 = (Integer) detstackvar(5);
+	call_localret(STATIC(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0),
+		mercury__higher_order__create_new_pred_8_0_i27,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+Define_label(mercury__higher_order__create_new_pred_8_0_i27);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	detstackvar(15) = (Integer) r1;
+	r1 = (Integer) detstackvar(8);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_context_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_context_2_0),
+		mercury__higher_order__create_new_pred_8_0_i28,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i28);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	detstackvar(16) = (Integer) r1;
+	r1 = (Integer) detstackvar(8);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_clauses_info_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_clauses_info_2_0),
+		mercury__higher_order__create_new_pred_8_0_i29,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i29);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	detstackvar(17) = (Integer) r1;
+	r1 = (Integer) detstackvar(8);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_is_inlined_1_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_is_inlined_1_0),
+		mercury__higher_order__create_new_pred_8_0_i32,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i32);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	if (!((Integer) r1))
+		GOTO_LABEL(mercury__higher_order__create_new_pred_8_0_i31);
+	r2 = (Integer) detstackvar(2);
+	r3 = (Integer) detstackvar(3);
+	r4 = (Integer) detstackvar(4);
+	r5 = (Integer) detstackvar(5);
+	r6 = (Integer) detstackvar(7);
+	r1 = (Integer) detstackvar(8);
+	r7 = (Integer) detstackvar(9);
+	r8 = (Integer) detstackvar(10);
+	r9 = (Integer) detstackvar(11);
+	r10 = (Integer) detstackvar(13);
+	r11 = (Integer) detstackvar(12);
+	r12 = (Integer) detstackvar(14);
+	r13 = (Integer) detstackvar(15);
+	r14 = (Integer) detstackvar(16);
+	r15 = (Integer) detstackvar(17);
+	r16 = ((Integer) 0);
+	GOTO_LABEL(mercury__higher_order__create_new_pred_8_0_i34);
+Define_label(mercury__higher_order__create_new_pred_8_0_i31);
+	r1 = (Integer) detstackvar(8);
+	r2 = (Integer) detstackvar(2);
+	r3 = (Integer) detstackvar(3);
+	r4 = (Integer) detstackvar(4);
+	r5 = (Integer) detstackvar(5);
+	r6 = (Integer) detstackvar(7);
+	r7 = (Integer) detstackvar(9);
+	r8 = (Integer) detstackvar(10);
+	r9 = (Integer) detstackvar(11);
+	r10 = (Integer) detstackvar(13);
+	r11 = (Integer) detstackvar(12);
+	r12 = (Integer) detstackvar(14);
+	r13 = (Integer) detstackvar(15);
+	r14 = (Integer) detstackvar(16);
+	r15 = (Integer) detstackvar(17);
+	r16 = ((Integer) 1);
+Define_label(mercury__higher_order__create_new_pred_8_0_i34);
+	detstackvar(2) = (Integer) r2;
+	detstackvar(3) = (Integer) r3;
+	detstackvar(4) = (Integer) r4;
+	detstackvar(5) = (Integer) r5;
+	detstackvar(7) = (Integer) r6;
+	detstackvar(9) = (Integer) r7;
+	detstackvar(10) = (Integer) r8;
+	detstackvar(11) = (Integer) r9;
+	detstackvar(13) = (Integer) r10;
+	detstackvar(12) = (Integer) r11;
+	detstackvar(14) = (Integer) r12;
+	detstackvar(15) = (Integer) r13;
+	detstackvar(16) = (Integer) r14;
+	detstackvar(17) = (Integer) r15;
+	detstackvar(1) = (Integer) r16;
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_get_goal_type_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_get_goal_type_2_0),
+		mercury__higher_order__create_new_pred_8_0_i1016,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i1016);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	r11 = (Integer) r1;
+	tag_incr_hp(r2, mktag(1), ((Integer) 2));
+	detstackvar(6) = (Integer) r2;
+	r1 = (Integer) detstackvar(11);
+	r3 = (Integer) detstackvar(9);
+	r4 = (Integer) detstackvar(13);
+	r5 = (Integer) detstackvar(15);
+	r6 = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	r7 = (Integer) detstackvar(16);
+	r8 = (Integer) detstackvar(17);
+	r9 = ((Integer) 8);
+	r10 = (Integer) detstackvar(1);
+	r12 = (Integer) detstackvar(10);
+	field(mktag(1), (Integer) r2, ((Integer) 1)) = (Integer) detstackvar(12);
+	field(mktag(1), (Integer) r2, ((Integer) 0)) = (Integer) r1;
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_init_13_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_init_13_0),
+		mercury__higher_order__create_new_pred_8_0_i36,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i36);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	r2 = (Integer) detstackvar(14);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_set_typevarset_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_set_typevarset_3_0),
+		mercury__higher_order__create_new_pred_8_0_i37,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i37);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	detstackvar(1) = (Integer) r1;
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_procedures_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_procedures_2_0),
+		mercury__higher_order__create_new_pred_8_0_i38,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i38);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	r2 = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	{
+	Declare_entry(mercury__make_hlds__next_mode_id_3_0);
+	call_localret(ENTRY(mercury__make_hlds__next_mode_id_3_0),
+		mercury__higher_order__create_new_pred_8_0_i39,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i39);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	r2 = (Integer) detstackvar(1);
+	detstackvar(1) = (Integer) r1;
+	r1 = (Integer) detstackvar(7);
+	{
+	Declare_entry(mercury__hlds_module__predicate_table_insert_4_0);
+	call_localret(ENTRY(mercury__hlds_module__predicate_table_insert_4_0),
+		mercury__higher_order__create_new_pred_8_0_i40,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i40);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	r3 = (Integer) detstackvar(1);
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(0), ((Integer) 4));
+	detstackvar(1) = (Integer) tempr1;
+	field(mktag(0), (Integer) tempr1, ((Integer) 0)) = (Integer) r1;
+	r1 = (Integer) detstackvar(3);
+	field(mktag(0), (Integer) tempr1, ((Integer) 3)) = (Integer) detstackvar(5);
+	field(mktag(0), (Integer) tempr1, ((Integer) 2)) = (Integer) detstackvar(6);
+	field(mktag(0), (Integer) tempr1, ((Integer) 1)) = (Integer) r3;
+	{
+	Declare_entry(mercury__hlds_module__module_info_set_predicate_table_3_0);
+	call_localret(ENTRY(mercury__hlds_module__module_info_set_predicate_table_3_0),
+		mercury__higher_order__create_new_pred_8_0_i41,
+		STATIC(mercury__higher_order__create_new_pred_8_0));
+	}
+	}
+Define_label(mercury__higher_order__create_new_pred_8_0_i41);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_new_pred_8_0));
+	r3 = (Integer) r1;
+	r1 = (Integer) detstackvar(1);
+	r2 = (Integer) detstackvar(2);
+	r4 = (Integer) detstackvar(4);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(18);
+	decr_sp_pop_msg(18);
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module26)
+	init_entry(mercury__higher_order__output_higher_order_args_5_0);
+	init_label(mercury__higher_order__output_higher_order_args_5_0_i4);
+	init_label(mercury__higher_order__output_higher_order_args_5_0_i5);
+	init_label(mercury__higher_order__output_higher_order_args_5_0_i6);
+	init_label(mercury__higher_order__output_higher_order_args_5_0_i7);
+	init_label(mercury__higher_order__output_higher_order_args_5_0_i8);
+	init_label(mercury__higher_order__output_higher_order_args_5_0_i9);
+	init_label(mercury__higher_order__output_higher_order_args_5_0_i10);
+	init_label(mercury__higher_order__output_higher_order_args_5_0_i11);
+	init_label(mercury__higher_order__output_higher_order_args_5_0_i12);
+	init_label(mercury__higher_order__output_higher_order_args_5_0_i13);
+	init_label(mercury__higher_order__output_higher_order_args_5_0_i14);
+	init_label(mercury__higher_order__output_higher_order_args_5_0_i15);
+	init_label(mercury__higher_order__output_higher_order_args_5_0_i1002);
+BEGIN_CODE
+
+/* code for predicate 'output_higher_order_args'/5 in mode 0 */
+Define_static(mercury__higher_order__output_higher_order_args_5_0);
+	if (((Integer) r3 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__output_higher_order_args_5_0_i1002);
+	incr_sp_push_msg(8, "output_higher_order_args");
+	detstackvar(8) = (Integer) succip;
+	detstackvar(2) = (Integer) r2;
+	{
+	Word tempr1;
+	tempr1 = (Integer) field(mktag(1), (Integer) r3, ((Integer) 0));
+	detstackvar(4) = (Integer) field(mktag(1), (Integer) r3, ((Integer) 1));
+	detstackvar(6) = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 3));
+	detstackvar(5) = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 2));
+	r2 = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 0));
+	detstackvar(1) = (Integer) r1;
+	detstackvar(3) = (Integer) r4;
+	{
+	Declare_entry(mercury__hlds_module__module_info_pred_info_3_0);
+	call_localret(ENTRY(mercury__hlds_module__module_info_pred_info_3_0),
+		mercury__higher_order__output_higher_order_args_5_0_i4,
+		STATIC(mercury__higher_order__output_higher_order_args_5_0));
+	}
+	}
+Define_label(mercury__higher_order__output_higher_order_args_5_0_i4);
+	update_prof_current_proc(LABEL(mercury__higher_order__output_higher_order_args_5_0));
+	detstackvar(7) = (Integer) r1;
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_name_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_name_2_0),
+		mercury__higher_order__output_higher_order_args_5_0_i5,
+		STATIC(mercury__higher_order__output_higher_order_args_5_0));
+	}
+Define_label(mercury__higher_order__output_higher_order_args_5_0_i5);
+	update_prof_current_proc(LABEL(mercury__higher_order__output_higher_order_args_5_0));
+	r2 = (Integer) detstackvar(7);
+	detstackvar(7) = (Integer) r1;
+	r1 = (Integer) r2;
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_arity_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_arity_2_0),
+		mercury__higher_order__output_higher_order_args_5_0_i6,
+		STATIC(mercury__higher_order__output_higher_order_args_5_0));
+	}
+Define_label(mercury__higher_order__output_higher_order_args_5_0_i6);
+	update_prof_current_proc(LABEL(mercury__higher_order__output_higher_order_args_5_0));
+	r2 = (Integer) detstackvar(3);
+	detstackvar(3) = (Integer) r1;
+	detstackvar(5) = ((Integer) detstackvar(5) - (Integer) detstackvar(2));
+	r1 = string_const("\tHeadVar__", 10);
+	{
+	Declare_entry(mercury__io__write_string_3_0);
+	call_localret(ENTRY(mercury__io__write_string_3_0),
+		mercury__higher_order__output_higher_order_args_5_0_i7,
+		STATIC(mercury__higher_order__output_higher_order_args_5_0));
+	}
+Define_label(mercury__higher_order__output_higher_order_args_5_0_i7);
+	update_prof_current_proc(LABEL(mercury__higher_order__output_higher_order_args_5_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(5);
+	{
+	Declare_entry(mercury__io__write_int_3_0);
+	call_localret(ENTRY(mercury__io__write_int_3_0),
+		mercury__higher_order__output_higher_order_args_5_0_i8,
+		STATIC(mercury__higher_order__output_higher_order_args_5_0));
+	}
+Define_label(mercury__higher_order__output_higher_order_args_5_0_i8);
+	update_prof_current_proc(LABEL(mercury__higher_order__output_higher_order_args_5_0));
+	r2 = (Integer) r1;
+	r1 = string_const(" = `", 4);
+	{
+	Declare_entry(mercury__io__write_string_3_0);
+	call_localret(ENTRY(mercury__io__write_string_3_0),
+		mercury__higher_order__output_higher_order_args_5_0_i9,
+		STATIC(mercury__higher_order__output_higher_order_args_5_0));
+	}
+Define_label(mercury__higher_order__output_higher_order_args_5_0_i9);
+	update_prof_current_proc(LABEL(mercury__higher_order__output_higher_order_args_5_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(7);
+	{
+	Declare_entry(mercury__io__write_string_3_0);
+	call_localret(ENTRY(mercury__io__write_string_3_0),
+		mercury__higher_order__output_higher_order_args_5_0_i10,
+		STATIC(mercury__higher_order__output_higher_order_args_5_0));
+	}
+Define_label(mercury__higher_order__output_higher_order_args_5_0_i10);
+	update_prof_current_proc(LABEL(mercury__higher_order__output_higher_order_args_5_0));
+	r2 = (Integer) r1;
+	r1 = string_const("'/", 2);
+	{
+	Declare_entry(mercury__io__write_string_3_0);
+	call_localret(ENTRY(mercury__io__write_string_3_0),
+		mercury__higher_order__output_higher_order_args_5_0_i11,
+		STATIC(mercury__higher_order__output_higher_order_args_5_0));
+	}
+Define_label(mercury__higher_order__output_higher_order_args_5_0_i11);
+	update_prof_current_proc(LABEL(mercury__higher_order__output_higher_order_args_5_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(3);
+	{
+	Declare_entry(mercury__io__write_int_3_0);
+	call_localret(ENTRY(mercury__io__write_int_3_0),
+		mercury__higher_order__output_higher_order_args_5_0_i12,
+		STATIC(mercury__higher_order__output_higher_order_args_5_0));
+	}
+Define_label(mercury__higher_order__output_higher_order_args_5_0_i12);
+	update_prof_current_proc(LABEL(mercury__higher_order__output_higher_order_args_5_0));
+	r2 = (Integer) r1;
+	r1 = string_const(" with ", 6);
+	{
+	Declare_entry(mercury__io__write_string_3_0);
+	call_localret(ENTRY(mercury__io__write_string_3_0),
+		mercury__higher_order__output_higher_order_args_5_0_i13,
+		STATIC(mercury__higher_order__output_higher_order_args_5_0));
+	}
+Define_label(mercury__higher_order__output_higher_order_args_5_0_i13);
+	update_prof_current_proc(LABEL(mercury__higher_order__output_higher_order_args_5_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(6);
+	{
+	Declare_entry(mercury__io__write_int_3_0);
+	call_localret(ENTRY(mercury__io__write_int_3_0),
+		mercury__higher_order__output_higher_order_args_5_0_i14,
+		STATIC(mercury__higher_order__output_higher_order_args_5_0));
+	}
+Define_label(mercury__higher_order__output_higher_order_args_5_0_i14);
+	update_prof_current_proc(LABEL(mercury__higher_order__output_higher_order_args_5_0));
+	r2 = (Integer) r1;
+	r1 = string_const(" curried arguments\n", 19);
+	{
+	Declare_entry(mercury__io__write_string_3_0);
+	call_localret(ENTRY(mercury__io__write_string_3_0),
+		mercury__higher_order__output_higher_order_args_5_0_i15,
+		STATIC(mercury__higher_order__output_higher_order_args_5_0));
+	}
+Define_label(mercury__higher_order__output_higher_order_args_5_0_i15);
+	update_prof_current_proc(LABEL(mercury__higher_order__output_higher_order_args_5_0));
+	r4 = (Integer) r1;
+	r1 = (Integer) detstackvar(1);
+	r2 = (Integer) detstackvar(2);
+	r3 = (Integer) detstackvar(4);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(8);
+	decr_sp_pop_msg(8);
+	localtailcall(mercury__higher_order__output_higher_order_args_5_0,
+		STATIC(mercury__higher_order__output_higher_order_args_5_0));
+Define_label(mercury__higher_order__output_higher_order_args_5_0_i1002);
+	r1 = (Integer) r4;
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module27)
+	init_entry(mercury__higher_order__fixup_preds_4_0);
+	init_label(mercury__higher_order__fixup_preds_4_0_i4);
+	init_label(mercury__higher_order__fixup_preds_4_0_i5);
+	init_label(mercury__higher_order__fixup_preds_4_0_i6);
+	init_label(mercury__higher_order__fixup_preds_4_0_i7);
+	init_label(mercury__higher_order__fixup_preds_4_0_i8);
+	init_label(mercury__higher_order__fixup_preds_4_0_i9);
+	init_label(mercury__higher_order__fixup_preds_4_0_i10);
+	init_label(mercury__higher_order__fixup_preds_4_0_i11);
+	init_label(mercury__higher_order__fixup_preds_4_0_i12);
+	init_label(mercury__higher_order__fixup_preds_4_0_i13);
+	init_label(mercury__higher_order__fixup_preds_4_0_i14);
+	init_label(mercury__higher_order__fixup_preds_4_0_i15);
+	init_label(mercury__higher_order__fixup_preds_4_0_i16);
+	init_label(mercury__higher_order__fixup_preds_4_0_i17);
+	init_label(mercury__higher_order__fixup_preds_4_0_i18);
+	init_label(mercury__higher_order__fixup_preds_4_0_i19);
+	init_label(mercury__higher_order__fixup_preds_4_0_i20);
+	init_label(mercury__higher_order__fixup_preds_4_0_i21);
+	init_label(mercury__higher_order__fixup_preds_4_0_i22);
+	init_label(mercury__higher_order__fixup_preds_4_0_i1002);
+BEGIN_CODE
+
+/* code for predicate 'fixup_preds'/4 in mode 0 */
+Define_static(mercury__higher_order__fixup_preds_4_0);
+	if (((Integer) r1 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__fixup_preds_4_0_i1002);
+	incr_sp_push_msg(13, "fixup_preds");
+	detstackvar(13) = (Integer) succip;
+	{
+	Word tempr1;
+	tempr1 = (Integer) field(mktag(1), (Integer) r1, ((Integer) 0));
+	detstackvar(3) = (Integer) tempr1;
+	detstackvar(4) = (Integer) field(mktag(1), (Integer) r1, ((Integer) 1));
+	detstackvar(6) = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 1));
+	detstackvar(5) = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 0));
+	r1 = (Integer) r3;
+	detstackvar(1) = (Integer) r2;
+	detstackvar(2) = (Integer) r3;
+	{
+	Declare_entry(mercury__hlds_module__module_info_preds_2_0);
+	call_localret(ENTRY(mercury__hlds_module__module_info_preds_2_0),
+		mercury__higher_order__fixup_preds_4_0_i4,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+	}
+	}
+Define_label(mercury__higher_order__fixup_preds_4_0_i4);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	r3 = (Integer) r1;
+	detstackvar(7) = (Integer) r1;
+	r1 = (Integer) mercury_data___base_type_info_int_0;
+	{
+	extern Word * mercury_data_hlds_pred__base_type_info_pred_info_0[];
+	r2 = (Integer) mercury_data_hlds_pred__base_type_info_pred_info_0;
+	}
+	r4 = (Integer) detstackvar(5);
+	{
+	Declare_entry(mercury__map__lookup_3_1);
+	call_localret(ENTRY(mercury__map__lookup_3_1),
+		mercury__higher_order__fixup_preds_4_0_i5,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+	}
+Define_label(mercury__higher_order__fixup_preds_4_0_i5);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	detstackvar(8) = (Integer) r1;
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_procedures_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_procedures_2_0),
+		mercury__higher_order__fixup_preds_4_0_i6,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+	}
+Define_label(mercury__higher_order__fixup_preds_4_0_i6);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	r3 = (Integer) r1;
+	detstackvar(9) = (Integer) r1;
+	r1 = (Integer) mercury_data___base_type_info_int_0;
+	{
+	extern Word * mercury_data_hlds_pred__base_type_info_proc_info_0[];
+	r2 = (Integer) mercury_data_hlds_pred__base_type_info_proc_info_0;
+	}
+	r4 = (Integer) detstackvar(6);
+	{
+	Declare_entry(mercury__map__lookup_3_1);
+	call_localret(ENTRY(mercury__map__lookup_3_1),
+		mercury__higher_order__fixup_preds_4_0_i7,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+	}
+Define_label(mercury__higher_order__fixup_preds_4_0_i7);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	detstackvar(10) = (Integer) r1;
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_goal_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_goal_2_0),
+		mercury__higher_order__fixup_preds_4_0_i8,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+	}
+Define_label(mercury__higher_order__fixup_preds_4_0_i8);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	detstackvar(11) = (Integer) r1;
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) mercury_data_higher_order__base_type_info_maybe_pred_and_args_0;
+	{
+	Declare_entry(mercury__map__init_1_0);
+	call_localret(ENTRY(mercury__map__init_1_0),
+		mercury__higher_order__fixup_preds_4_0_i9,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+	}
+Define_label(mercury__higher_order__fixup_preds_4_0_i9);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	detstackvar(12) = (Integer) r1;
+	r1 = (Integer) mercury_data_higher_order__base_type_info_request_0;
+	{
+	Declare_entry(mercury__set__init_1_0);
+	call_localret(ENTRY(mercury__set__init_1_0),
+		mercury__higher_order__fixup_preds_4_0_i10,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+	}
+Define_label(mercury__higher_order__fixup_preds_4_0_i10);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	tag_incr_hp(r3, mktag(0), ((Integer) 4));
+	field(mktag(0), (Integer) r3, ((Integer) 1)) = (Integer) r1;
+	r1 = (Integer) detstackvar(11);
+	r2 = (Integer) detstackvar(3);
+	field(mktag(0), (Integer) r3, ((Integer) 3)) = (Integer) detstackvar(2);
+	field(mktag(0), (Integer) r3, ((Integer) 2)) = (Integer) detstackvar(1);
+	field(mktag(0), (Integer) r3, ((Integer) 0)) = (Integer) detstackvar(12);
+	call_localret(STATIC(mercury__higher_order__traverse_goal_7_0),
+		mercury__higher_order__fixup_preds_4_0_i11,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+Define_label(mercury__higher_order__fixup_preds_4_0_i11);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	detstackvar(3) = (Integer) r1;
+	r1 = (Integer) detstackvar(10);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_variables_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_variables_2_0),
+		mercury__higher_order__fixup_preds_4_0_i12,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+	}
+Define_label(mercury__higher_order__fixup_preds_4_0_i12);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	detstackvar(11) = (Integer) r1;
+	r1 = (Integer) detstackvar(10);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_headvars_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_headvars_2_0),
+		mercury__higher_order__fixup_preds_4_0_i13,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+	}
+Define_label(mercury__higher_order__fixup_preds_4_0_i13);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	detstackvar(12) = (Integer) r1;
+	r1 = (Integer) detstackvar(10);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_vartypes_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_vartypes_2_0),
+		mercury__higher_order__fixup_preds_4_0_i14,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+	}
+Define_label(mercury__higher_order__fixup_preds_4_0_i14);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	r4 = (Integer) r1;
+	r1 = (Integer) detstackvar(12);
+	r2 = (Integer) detstackvar(3);
+	r3 = (Integer) detstackvar(11);
+	{
+	Declare_entry(mercury__quantification__implicitly_quantify_clause_body_8_0);
+	call_localret(ENTRY(mercury__quantification__implicitly_quantify_clause_body_8_0),
+		mercury__higher_order__fixup_preds_4_0_i15,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+	}
+Define_label(mercury__higher_order__fixup_preds_4_0_i15);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	detstackvar(3) = (Integer) r2;
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(10);
+	detstackvar(10) = (Integer) r3;
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_set_goal_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_set_goal_3_0),
+		mercury__higher_order__fixup_preds_4_0_i16,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+	}
+Define_label(mercury__higher_order__fixup_preds_4_0_i16);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	r2 = (Integer) detstackvar(3);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_set_variables_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_set_variables_3_0),
+		mercury__higher_order__fixup_preds_4_0_i17,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+	}
+Define_label(mercury__higher_order__fixup_preds_4_0_i17);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	r2 = (Integer) detstackvar(10);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_set_vartypes_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_set_vartypes_3_0),
+		mercury__higher_order__fixup_preds_4_0_i18,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+	}
+Define_label(mercury__higher_order__fixup_preds_4_0_i18);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	r5 = (Integer) r1;
+	r1 = (Integer) mercury_data___base_type_info_int_0;
+	{
+	extern Word * mercury_data_hlds_pred__base_type_info_proc_info_0[];
+	r2 = (Integer) mercury_data_hlds_pred__base_type_info_proc_info_0;
+	}
+	r3 = (Integer) detstackvar(9);
+	r4 = (Integer) detstackvar(6);
+	{
+	Declare_entry(mercury__map__det_update_4_0);
+	call_localret(ENTRY(mercury__map__det_update_4_0),
+		mercury__higher_order__fixup_preds_4_0_i19,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+	}
+Define_label(mercury__higher_order__fixup_preds_4_0_i19);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(8);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_set_procedures_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_set_procedures_3_0),
+		mercury__higher_order__fixup_preds_4_0_i20,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+	}
+Define_label(mercury__higher_order__fixup_preds_4_0_i20);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	r5 = (Integer) r1;
+	r1 = (Integer) mercury_data___base_type_info_int_0;
+	{
+	extern Word * mercury_data_hlds_pred__base_type_info_pred_info_0[];
+	r2 = (Integer) mercury_data_hlds_pred__base_type_info_pred_info_0;
+	}
+	r3 = (Integer) detstackvar(7);
+	r4 = (Integer) detstackvar(5);
+	{
+	Declare_entry(mercury__map__det_update_4_0);
+	call_localret(ENTRY(mercury__map__det_update_4_0),
+		mercury__higher_order__fixup_preds_4_0_i21,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+	}
+Define_label(mercury__higher_order__fixup_preds_4_0_i21);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(2);
+	{
+	Declare_entry(mercury__hlds_module__module_info_set_preds_3_0);
+	call_localret(ENTRY(mercury__hlds_module__module_info_set_preds_3_0),
+		mercury__higher_order__fixup_preds_4_0_i22,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+	}
+Define_label(mercury__higher_order__fixup_preds_4_0_i22);
+	update_prof_current_proc(LABEL(mercury__higher_order__fixup_preds_4_0));
+	r3 = (Integer) r1;
+	r1 = (Integer) detstackvar(4);
+	r2 = (Integer) detstackvar(1);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(13);
+	decr_sp_pop_msg(13);
+	localtailcall(mercury__higher_order__fixup_preds_4_0,
+		STATIC(mercury__higher_order__fixup_preds_4_0));
+Define_label(mercury__higher_order__fixup_preds_4_0_i1002);
+	r1 = (Integer) r3;
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module28)
+	init_entry(mercury__higher_order__create_specialized_versions_8_0);
+	init_label(mercury__higher_order__create_specialized_versions_8_0_i4);
+	init_label(mercury__higher_order__create_specialized_versions_8_0_i5);
+	init_label(mercury__higher_order__create_specialized_versions_8_0_i6);
+	init_label(mercury__higher_order__create_specialized_versions_8_0_i7);
+	init_label(mercury__higher_order__create_specialized_versions_8_0_i1002);
+BEGIN_CODE
+
+/* code for predicate 'create_specialized_versions'/8 in mode 0 */
+Define_static(mercury__higher_order__create_specialized_versions_8_0);
+	if (((Integer) r1 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__create_specialized_versions_8_0_i1002);
+	incr_sp_push_msg(7, "create_specialized_versions");
+	detstackvar(7) = (Integer) succip;
+	detstackvar(2) = (Integer) r3;
+	detstackvar(3) = (Integer) r4;
+	r4 = (Integer) field(mktag(1), (Integer) r1, ((Integer) 0));
+	detstackvar(5) = (Integer) r4;
+	r3 = (Integer) r2;
+	detstackvar(1) = (Integer) r2;
+	detstackvar(6) = (Integer) field(mktag(1), (Integer) r1, ((Integer) 1));
+	r1 = (Integer) mercury_data_hlds_pred__base_type_info_pred_proc_id_0;
+	r2 = (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_0);
+	detstackvar(4) = (Integer) r5;
+	{
+	Declare_entry(mercury__map__lookup_3_1);
+	call_localret(ENTRY(mercury__map__lookup_3_1),
+		mercury__higher_order__create_specialized_versions_8_0_i4,
+		STATIC(mercury__higher_order__create_specialized_versions_8_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_8_0_i4);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_8_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) mercury_data_higher_order__base_type_info_new_pred_0;
+	{
+	Declare_entry(mercury__set__to_sorted_list_2_0);
+	call_localret(ENTRY(mercury__set__to_sorted_list_2_0),
+		mercury__higher_order__create_specialized_versions_8_0_i5,
+		STATIC(mercury__higher_order__create_specialized_versions_8_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_8_0_i5);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_8_0));
+	{
+	Word tempr1;
+	tempr1 = (Integer) detstackvar(5);
+	r2 = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 0));
+	r3 = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 1));
+	detstackvar(5) = (Integer) r1;
+	r1 = (Integer) detstackvar(4);
+	{
+	Declare_entry(mercury__hlds_module__module_info_pred_proc_info_5_0);
+	call_localret(ENTRY(mercury__hlds_module__module_info_pred_proc_info_5_0),
+		mercury__higher_order__create_specialized_versions_8_0_i6,
+		STATIC(mercury__higher_order__create_specialized_versions_8_0));
+	}
+	}
+Define_label(mercury__higher_order__create_specialized_versions_8_0_i6);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_8_0));
+	r3 = (Integer) r2;
+	r1 = (Integer) detstackvar(5);
+	r2 = (Integer) detstackvar(1);
+	r4 = (Integer) detstackvar(2);
+	r5 = (Integer) detstackvar(3);
+	r6 = (Integer) detstackvar(4);
+	call_localret(STATIC(mercury__higher_order__create_specialized_versions_2_9_0),
+		mercury__higher_order__create_specialized_versions_8_0_i7,
+		STATIC(mercury__higher_order__create_specialized_versions_8_0));
+Define_label(mercury__higher_order__create_specialized_versions_8_0_i7);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_8_0));
+	r5 = (Integer) r3;
+	r3 = (Integer) r1;
+	r4 = (Integer) r2;
+	r1 = (Integer) detstackvar(6);
+	r2 = (Integer) detstackvar(1);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(7);
+	decr_sp_pop_msg(7);
+	localtailcall(mercury__higher_order__create_specialized_versions_8_0,
+		STATIC(mercury__higher_order__create_specialized_versions_8_0));
+Define_label(mercury__higher_order__create_specialized_versions_8_0_i1002);
+	r1 = (Integer) r3;
+	r2 = (Integer) r4;
+	r3 = (Integer) r5;
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module29)
+	init_entry(mercury__higher_order__create_specialized_versions_2_9_0);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i4);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i5);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i6);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i7);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i8);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i9);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i10);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i11);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i12);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i16);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i13);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i17);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i18);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i19);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i20);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i21);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i22);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i23);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i24);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i25);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i26);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i27);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i28);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i29);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i30);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i31);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i32);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i33);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i34);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i35);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i36);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i37);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i38);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i39);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i40);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i41);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i42);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i43);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i44);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i45);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i46);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i47);
+	init_label(mercury__higher_order__create_specialized_versions_2_9_0_i1009);
+BEGIN_CODE
+
+/* code for predicate 'create_specialized_versions_2'/9 in mode 0 */
+Define_static(mercury__higher_order__create_specialized_versions_2_9_0);
+	if (((Integer) r1 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__create_specialized_versions_2_9_0_i1009);
+	incr_sp_push_msg(23, "create_specialized_versions_2");
+	detstackvar(23) = (Integer) succip;
+	{
+	Word tempr1;
+	tempr1 = (Integer) field(mktag(1), (Integer) r1, ((Integer) 0));
+	detstackvar(6) = (Integer) field(mktag(1), (Integer) r1, ((Integer) 1));
+	detstackvar(9) = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 3));
+	detstackvar(8) = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 1));
+	detstackvar(7) = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 0));
+	r1 = (Integer) r6;
+	detstackvar(1) = (Integer) r2;
+	detstackvar(2) = (Integer) r3;
+	detstackvar(3) = (Integer) r4;
+	detstackvar(4) = (Integer) r5;
+	detstackvar(5) = (Integer) r6;
+	{
+	Declare_entry(mercury__hlds_module__module_info_get_predicate_table_2_0);
+	call_localret(ENTRY(mercury__hlds_module__module_info_get_predicate_table_2_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i4,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i4);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	detstackvar(10) = (Integer) r1;
+	{
+	Declare_entry(mercury__hlds_module__predicate_table_get_preds_2_0);
+	call_localret(ENTRY(mercury__hlds_module__predicate_table_get_preds_2_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i5,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i5);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r3 = (Integer) r1;
+	detstackvar(11) = (Integer) r1;
+	r1 = (Integer) mercury_data___base_type_info_int_0;
+	{
+	extern Word * mercury_data_hlds_pred__base_type_info_pred_info_0[];
+	r2 = (Integer) mercury_data_hlds_pred__base_type_info_pred_info_0;
+	}
+	r4 = (Integer) detstackvar(7);
+	{
+	Declare_entry(mercury__map__lookup_3_1);
+	call_localret(ENTRY(mercury__map__lookup_3_1),
+		mercury__higher_order__create_specialized_versions_2_9_0_i6,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i6);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	detstackvar(12) = (Integer) r1;
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_procedures_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_procedures_2_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i7,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i7);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	detstackvar(13) = (Integer) r1;
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	{
+	extern Word * mercury_data_mercury_builtin__base_type_info_term_0[];
+	r2 = (Integer) mercury_data_mercury_builtin__base_type_info_term_0;
+	}
+	{
+	Declare_entry(mercury__map__init_1_0);
+	call_localret(ENTRY(mercury__map__init_1_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i8,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i8);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	detstackvar(14) = (Integer) r1;
+	r1 = (Integer) detstackvar(2);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_headvars_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_headvars_2_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i9,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i9);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	detstackvar(15) = (Integer) r1;
+	r1 = (Integer) detstackvar(2);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_argmodes_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_argmodes_2_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i10,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i10);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r3 = (Integer) r1;
+	r1 = (Integer) detstackvar(5);
+	r2 = (Integer) detstackvar(15);
+	r4 = (Integer) detstackvar(9);
+	r5 = (Integer) detstackvar(2);
+	r6 = (Integer) detstackvar(12);
+	r7 = (Integer) detstackvar(14);
+	call_localret(STATIC(mercury__higher_order__construct_higher_order_terms_13_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i11,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i11);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	detstackvar(12) = (Integer) r1;
+	detstackvar(14) = (Integer) r2;
+	detstackvar(15) = (Integer) r3;
+	detstackvar(16) = (Integer) r4;
+	detstackvar(17) = (Integer) r5;
+	detstackvar(18) = (Integer) r6;
+	r1 = (Integer) r3;
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_goal_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_goal_2_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i12,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i12);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r2 = (Integer) field(mktag(0), (Integer) r1, ((Integer) 1));
+	r3 = (Integer) field(mktag(0), (Integer) r1, ((Integer) 0));
+	if ((tag((Integer) r3) != mktag(((Integer) 0))))
+		GOTO_LABEL(mercury__higher_order__create_specialized_versions_2_9_0_i13);
+	{
+	Word tempr1;
+	tempr1 = (Integer) r2;
+	r2 = (Integer) detstackvar(18);
+	detstackvar(18) = (Integer) tempr1;
+	r3 = (Integer) field(mktag(0), (Integer) r3, ((Integer) 0));
+	r1 = (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_2);
+	{
+	Declare_entry(mercury__list__append_3_1);
+	call_localret(ENTRY(mercury__list__append_3_1),
+		mercury__higher_order__create_specialized_versions_2_9_0_i16,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i16);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r4 = (Integer) detstackvar(1);
+	r5 = (Integer) detstackvar(2);
+	r6 = (Integer) detstackvar(3);
+	r7 = (Integer) detstackvar(4);
+	r8 = (Integer) detstackvar(5);
+	r9 = (Integer) detstackvar(6);
+	r10 = (Integer) detstackvar(7);
+	r11 = (Integer) detstackvar(8);
+	r3 = (Integer) detstackvar(9);
+	r12 = (Integer) detstackvar(10);
+	r13 = (Integer) detstackvar(11);
+	r14 = (Integer) detstackvar(13);
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(12);
+	r15 = (Integer) detstackvar(14);
+	r16 = (Integer) detstackvar(15);
+	r17 = (Integer) detstackvar(16);
+	r18 = (Integer) detstackvar(17);
+	tag_incr_hp(r19, mktag(0), ((Integer) 2));
+	field(mktag(0), (Integer) r19, ((Integer) 1)) = (Integer) detstackvar(18);
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(0), ((Integer) 1));
+	field(mktag(0), (Integer) tempr1, ((Integer) 0)) = (Integer) r2;
+	r2 = ((Integer) 1);
+	field(mktag(0), (Integer) r19, ((Integer) 0)) = (Integer) tempr1;
+	GOTO_LABEL(mercury__higher_order__create_specialized_versions_2_9_0_i18);
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i13);
+	r3 = (Integer) detstackvar(18);
+	detstackvar(18) = (Integer) r2;
+	r4 = (Integer) r1;
+	r1 = (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_2);
+	r2 = (Integer) r3;
+	tag_incr_hp(r3, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r3, ((Integer) 0)) = (Integer) r4;
+	field(mktag(1), (Integer) r3, ((Integer) 1)) = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	{
+	Declare_entry(mercury__list__append_3_1);
+	call_localret(ENTRY(mercury__list__append_3_1),
+		mercury__higher_order__create_specialized_versions_2_9_0_i17,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i17);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r4 = (Integer) detstackvar(1);
+	r5 = (Integer) detstackvar(2);
+	r6 = (Integer) detstackvar(3);
+	r7 = (Integer) detstackvar(4);
+	r8 = (Integer) detstackvar(5);
+	r9 = (Integer) detstackvar(6);
+	r10 = (Integer) detstackvar(7);
+	r11 = (Integer) detstackvar(8);
+	r3 = (Integer) detstackvar(9);
+	r12 = (Integer) detstackvar(10);
+	r13 = (Integer) detstackvar(11);
+	r14 = (Integer) detstackvar(13);
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(12);
+	r15 = (Integer) detstackvar(14);
+	r16 = (Integer) detstackvar(15);
+	r17 = (Integer) detstackvar(16);
+	r18 = (Integer) detstackvar(17);
+	tag_incr_hp(r19, mktag(0), ((Integer) 2));
+	field(mktag(0), (Integer) r19, ((Integer) 1)) = (Integer) detstackvar(18);
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(0), ((Integer) 1));
+	field(mktag(0), (Integer) tempr1, ((Integer) 0)) = (Integer) r2;
+	r2 = ((Integer) 1);
+	field(mktag(0), (Integer) r19, ((Integer) 0)) = (Integer) tempr1;
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i18);
+	detstackvar(1) = (Integer) r4;
+	detstackvar(2) = (Integer) r5;
+	detstackvar(3) = (Integer) r6;
+	detstackvar(4) = (Integer) r7;
+	detstackvar(5) = (Integer) r8;
+	detstackvar(6) = (Integer) r9;
+	detstackvar(7) = (Integer) r10;
+	detstackvar(8) = (Integer) r11;
+	detstackvar(9) = (Integer) r3;
+	detstackvar(10) = (Integer) r12;
+	detstackvar(11) = (Integer) r13;
+	detstackvar(13) = (Integer) r14;
+	detstackvar(14) = (Integer) r15;
+	detstackvar(15) = (Integer) r16;
+	detstackvar(16) = (Integer) r17;
+	detstackvar(17) = (Integer) r18;
+	detstackvar(12) = (Integer) r19;
+	call_localret(STATIC(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i19,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i19);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r3 = (Integer) detstackvar(9);
+	detstackvar(9) = (Integer) r1;
+	r1 = (Integer) detstackvar(14);
+	r2 = ((Integer) 1);
+	call_localret(STATIC(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i20,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i20);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	detstackvar(14) = (Integer) r1;
+	r1 = (Integer) detstackvar(15);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_vartypes_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_vartypes_2_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i21,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i21);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r2 = (Integer) detstackvar(17);
+	{
+	Declare_entry(mercury__type_util__apply_substitution_to_type_map_3_0);
+	call_localret(ENTRY(mercury__type_util__apply_substitution_to_type_map_3_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i22,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i22);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r4 = (Integer) r1;
+	detstackvar(17) = (Integer) r1;
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	{
+	extern Word * mercury_data_mercury_builtin__base_type_info_term_0[];
+	r2 = (Integer) mercury_data_mercury_builtin__base_type_info_term_0;
+	}
+	r3 = (Integer) detstackvar(9);
+	{
+	Declare_entry(mercury__map__apply_to_list_3_0);
+	call_localret(ENTRY(mercury__map__apply_to_list_3_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i23,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i23);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	detstackvar(18) = (Integer) r1;
+	{
+	Declare_entry(mercury__term__vars_list_2_0);
+	call_localret(ENTRY(mercury__term__vars_list_2_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i24,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i24);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	detstackvar(19) = (Integer) r1;
+	{
+	Declare_entry(mercury__varset__init_1_0);
+	call_localret(ENTRY(mercury__varset__init_1_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i25,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i25);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	detstackvar(20) = (Integer) r1;
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	{
+	extern Word * mercury_data_mercury_builtin__base_type_info_term_0[];
+	r2 = (Integer) mercury_data_mercury_builtin__base_type_info_term_0;
+	}
+	{
+	Declare_entry(mercury__map__init_1_0);
+	call_localret(ENTRY(mercury__map__init_1_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i26,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i26);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	detstackvar(21) = (Integer) r1;
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	{
+	Declare_entry(mercury__map__init_1_0);
+	call_localret(ENTRY(mercury__map__init_1_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i27,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i27);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	detstackvar(22) = (Integer) r1;
+	{
+	Declare_entry(mercury__varset__init_1_0);
+	call_localret(ENTRY(mercury__varset__init_1_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i28,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i28);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r6 = (Integer) r1;
+	r5 = (Integer) detstackvar(21);
+	r1 = (Integer) detstackvar(19);
+	r2 = (Integer) detstackvar(20);
+	r3 = (Integer) r5;
+	r4 = (Integer) detstackvar(22);
+	{
+	Declare_entry(mercury__goal_util__create_variables_9_0);
+	call_localret(ENTRY(mercury__goal_util__create_variables_9_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i29,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i29);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	{
+	Word tempr1;
+	tempr1 = (Integer) r1;
+	r1 = (Integer) detstackvar(18);
+	detstackvar(18) = (Integer) tempr1;
+	r2 = (Integer) r3;
+	{
+	Declare_entry(mercury__term__apply_variable_renaming_to_list_3_0);
+	call_localret(ENTRY(mercury__term__apply_variable_renaming_to_list_3_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i30,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i30);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r3 = (Integer) r1;
+	r1 = (Integer) detstackvar(16);
+	r2 = (Integer) detstackvar(18);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_set_arg_types_4_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_set_arg_types_4_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i31,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i31);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	detstackvar(16) = (Integer) r1;
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) mercury_data_higher_order__base_type_info_maybe_pred_and_args_0;
+	{
+	Declare_entry(mercury__map__init_1_0);
+	call_localret(ENTRY(mercury__map__init_1_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i32,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i32);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r3 = (Integer) r1;
+	r1 = (Integer) detstackvar(12);
+	tag_incr_hp(r2, mktag(0), ((Integer) 2));
+	field(mktag(0), (Integer) r2, ((Integer) 0)) = (Integer) detstackvar(7);
+	field(mktag(0), (Integer) r2, ((Integer) 1)) = (Integer) detstackvar(8);
+	r4 = (Integer) r3;
+	tag_incr_hp(r3, mktag(0), ((Integer) 4));
+	field(mktag(0), (Integer) r3, ((Integer) 0)) = (Integer) r4;
+	field(mktag(0), (Integer) r3, ((Integer) 1)) = (Integer) detstackvar(3);
+	field(mktag(0), (Integer) r3, ((Integer) 2)) = (Integer) detstackvar(1);
+	field(mktag(0), (Integer) r3, ((Integer) 3)) = (Integer) detstackvar(5);
+	call_localret(STATIC(mercury__higher_order__traverse_goal_7_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i33,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i33);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r5 = (Integer) r3;
+	r3 = (Integer) detstackvar(4);
+	detstackvar(3) = (Integer) r1;
+	detstackvar(4) = (Integer) field(mktag(0), (Integer) r4, ((Integer) 1));
+	r1 = (Integer) mercury_data___base_type_info_int_0;
+	r2 = (Integer) mercury_data___base_type_info_int_0;
+	r4 = (Integer) detstackvar(7);
+	{
+	Declare_entry(mercury__map__set_4_1);
+	call_localret(ENTRY(mercury__map__set_4_1),
+		mercury__higher_order__create_specialized_versions_2_9_0_i34,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i34);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	detstackvar(12) = (Integer) r1;
+	r1 = (Integer) detstackvar(15);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_variables_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_variables_2_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i35,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i35);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r3 = (Integer) r1;
+	r1 = (Integer) detstackvar(9);
+	r2 = (Integer) detstackvar(3);
+	r4 = (Integer) detstackvar(17);
+	{
+	Declare_entry(mercury__quantification__implicitly_quantify_clause_body_8_0);
+	call_localret(ENTRY(mercury__quantification__implicitly_quantify_clause_body_8_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i36,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i36);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	detstackvar(3) = (Integer) r2;
+	r2 = (Integer) detstackvar(5);
+	detstackvar(5) = (Integer) r3;
+	{
+	Declare_entry(mercury__mode_util__recompute_instmap_delta_4_0);
+	call_localret(ENTRY(mercury__mode_util__recompute_instmap_delta_4_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i37,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i37);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r3 = (Integer) r1;
+	r1 = (Integer) detstackvar(15);
+	detstackvar(15) = (Integer) r2;
+	r2 = (Integer) r3;
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_set_goal_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_set_goal_3_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i38,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i38);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r2 = (Integer) detstackvar(3);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_set_variables_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_set_variables_3_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i39,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i39);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r2 = (Integer) detstackvar(5);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_set_vartypes_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_set_vartypes_3_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i40,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i40);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r2 = (Integer) detstackvar(14);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_set_argmodes_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_set_argmodes_3_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i41,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i41);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r2 = (Integer) detstackvar(9);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_set_headvars_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_set_headvars_3_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i42,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i42);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r5 = (Integer) r1;
+	r1 = (Integer) mercury_data___base_type_info_int_0;
+	{
+	extern Word * mercury_data_hlds_pred__base_type_info_proc_info_0[];
+	r2 = (Integer) mercury_data_hlds_pred__base_type_info_proc_info_0;
+	}
+	r3 = (Integer) detstackvar(13);
+	r4 = (Integer) detstackvar(8);
+	{
+	Declare_entry(mercury__map__det_insert_4_0);
+	call_localret(ENTRY(mercury__map__det_insert_4_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i43,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i43);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(16);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_set_procedures_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_set_procedures_3_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i44,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i44);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r5 = (Integer) r1;
+	r1 = (Integer) mercury_data___base_type_info_int_0;
+	{
+	extern Word * mercury_data_hlds_pred__base_type_info_pred_info_0[];
+	r2 = (Integer) mercury_data_hlds_pred__base_type_info_pred_info_0;
+	}
+	r3 = (Integer) detstackvar(11);
+	r4 = (Integer) detstackvar(7);
+	{
+	Declare_entry(mercury__map__det_update_4_0);
+	call_localret(ENTRY(mercury__map__det_update_4_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i45,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i45);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(10);
+	{
+	Declare_entry(mercury__hlds_module__predicate_table_set_preds_3_0);
+	call_localret(ENTRY(mercury__hlds_module__predicate_table_set_preds_3_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i46,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i46);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(15);
+	{
+	Declare_entry(mercury__hlds_module__module_info_set_predicate_table_3_0);
+	call_localret(ENTRY(mercury__hlds_module__module_info_set_predicate_table_3_0),
+		mercury__higher_order__create_specialized_versions_2_9_0_i47,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+	}
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i47);
+	update_prof_current_proc(LABEL(mercury__higher_order__create_specialized_versions_2_9_0));
+	r6 = (Integer) r1;
+	r1 = (Integer) detstackvar(6);
+	r2 = (Integer) detstackvar(1);
+	r3 = (Integer) detstackvar(2);
+	r4 = (Integer) detstackvar(4);
+	r5 = (Integer) detstackvar(12);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(23);
+	decr_sp_pop_msg(23);
+	localtailcall(mercury__higher_order__create_specialized_versions_2_9_0,
+		STATIC(mercury__higher_order__create_specialized_versions_2_9_0));
+Define_label(mercury__higher_order__create_specialized_versions_2_9_0_i1009);
+	r1 = (Integer) r4;
+	r2 = (Integer) r5;
+	r3 = (Integer) r6;
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module30)
+	init_entry(mercury__higher_order__construct_higher_order_terms_13_0);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i4);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i5);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i6);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i7);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i10);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i9);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i12);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i13);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i14);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i15);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i16);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i17);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i18);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i19);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i20);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i21);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i24);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i23);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i26);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i27);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i30);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i34);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i36);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i33);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i29);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i38);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i39);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i40);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i41);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i42);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i43);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i44);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i45);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i46);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i47);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i48);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i1034);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i50);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i51);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i52);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i53);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i54);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i55);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i56);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i57);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i58);
+	init_label(mercury__higher_order__construct_higher_order_terms_13_0_i1024);
+BEGIN_CODE
+
+/* code for predicate 'construct_higher_order_terms'/13 in mode 0 */
+Define_static(mercury__higher_order__construct_higher_order_terms_13_0);
+	if (((Integer) r4 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury__higher_order__construct_higher_order_terms_13_0_i1024);
+	incr_sp_push_msg(35, "construct_higher_order_terms");
+	detstackvar(35) = (Integer) succip;
+	detstackvar(4) = (Integer) r3;
+	detstackvar(1) = (Integer) r1;
+	{
+	Word tempr1;
+	tempr1 = (Integer) field(mktag(1), (Integer) r4, ((Integer) 0));
+	r3 = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 2));
+	detstackvar(12) = (Integer) field(mktag(1), (Integer) r4, ((Integer) 1));
+	detstackvar(17) = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 4));
+	detstackvar(16) = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 3));
+	detstackvar(15) = (Integer) r3;
+	detstackvar(13) = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 0));
+	detstackvar(14) = (Integer) field(mktag(0), (Integer) tempr1, ((Integer) 1));
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	detstackvar(2) = (Integer) r2;
+	detstackvar(6) = (Integer) r5;
+	detstackvar(8) = (Integer) r6;
+	detstackvar(10) = (Integer) r7;
+	{
+	Declare_entry(mercury__list__index1_det_3_0);
+	call_localret(ENTRY(mercury__list__index1_det_3_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i4,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i4);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	detstackvar(18) = (Integer) r1;
+	r1 = (Integer) detstackvar(1);
+	r2 = (Integer) detstackvar(13);
+	r3 = (Integer) detstackvar(14);
+	{
+	Declare_entry(mercury__hlds_module__module_info_pred_proc_info_5_0);
+	call_localret(ENTRY(mercury__hlds_module__module_info_pred_proc_info_5_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i5,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i5);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	detstackvar(19) = (Integer) r1;
+	detstackvar(3) = (Integer) r2;
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_arg_types_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_arg_types_3_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i6,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i6);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	detstackvar(20) = (Integer) r1;
+	detstackvar(21) = (Integer) r2;
+	r1 = (Integer) detstackvar(3);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_argmodes_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_argmodes_2_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i7,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i7);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r3 = (Integer) r1;
+	{
+	extern Word * mercury_data_prog_data__base_type_info_mode_0[];
+	r1 = (Integer) mercury_data_prog_data__base_type_info_mode_0;
+	}
+	r2 = (Integer) detstackvar(16);
+	{
+	Declare_entry(mercury__list__split_list_4_0);
+	call_localret(ENTRY(mercury__list__split_list_4_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i10,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i10);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	if (!((Integer) r1))
+		GOTO_LABEL(mercury__higher_order__construct_higher_order_terms_13_0_i9);
+	r17 = (Integer) r2;
+	r18 = (Integer) r3;
+	r1 = (Integer) detstackvar(6);
+	r2 = (Integer) detstackvar(1);
+	r3 = (Integer) detstackvar(2);
+	r4 = (Integer) detstackvar(4);
+	r5 = (Integer) detstackvar(8);
+	r6 = (Integer) detstackvar(10);
+	r7 = (Integer) detstackvar(12);
+	r8 = (Integer) detstackvar(13);
+	r9 = (Integer) detstackvar(14);
+	r10 = (Integer) detstackvar(15);
+	r11 = (Integer) detstackvar(16);
+	r12 = (Integer) detstackvar(17);
+	r13 = (Integer) detstackvar(18);
+	r14 = (Integer) detstackvar(19);
+	r15 = (Integer) detstackvar(20);
+	r16 = (Integer) detstackvar(21);
+	GOTO_LABEL(mercury__higher_order__construct_higher_order_terms_13_0_i13);
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i9);
+	r1 = string_const("list__split_list_failed", 23);
+	{
+	Declare_entry(mercury__require__error_1_0);
+	call_localret(ENTRY(mercury__require__error_1_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i12,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i12);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r2 = (Integer) detstackvar(1);
+	r3 = (Integer) detstackvar(2);
+	r4 = (Integer) detstackvar(4);
+	r1 = (Integer) detstackvar(6);
+	r5 = (Integer) detstackvar(8);
+	r6 = (Integer) detstackvar(10);
+	r7 = (Integer) detstackvar(12);
+	r8 = (Integer) detstackvar(13);
+	r9 = (Integer) detstackvar(14);
+	r10 = (Integer) detstackvar(15);
+	r11 = (Integer) detstackvar(16);
+	r12 = (Integer) detstackvar(17);
+	r13 = (Integer) detstackvar(18);
+	r14 = (Integer) detstackvar(19);
+	r15 = (Integer) detstackvar(20);
+	r16 = (Integer) detstackvar(21);
+	r17 = (Integer) detstackvar(22);
+	r18 = (Integer) detstackvar(23);
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i13);
+	detstackvar(1) = (Integer) r2;
+	detstackvar(2) = (Integer) r3;
+	detstackvar(4) = (Integer) r4;
+	detstackvar(6) = (Integer) r1;
+	detstackvar(8) = (Integer) r5;
+	detstackvar(10) = (Integer) r6;
+	detstackvar(12) = (Integer) r7;
+	detstackvar(13) = (Integer) r8;
+	detstackvar(14) = (Integer) r9;
+	detstackvar(15) = (Integer) r10;
+	detstackvar(16) = (Integer) r11;
+	detstackvar(17) = (Integer) r12;
+	detstackvar(18) = (Integer) r13;
+	detstackvar(19) = (Integer) r14;
+	detstackvar(20) = (Integer) r15;
+	detstackvar(21) = (Integer) r16;
+	detstackvar(22) = (Integer) r17;
+	detstackvar(23) = (Integer) r18;
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_variables_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_variables_2_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i14,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i14);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r2 = (Integer) detstackvar(16);
+	{
+	Declare_entry(mercury__varset__new_vars_4_0);
+	call_localret(ENTRY(mercury__varset__new_vars_4_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i15,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i15);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	detstackvar(24) = (Integer) r1;
+	r1 = (Integer) detstackvar(6);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_set_variables_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_set_variables_3_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i16,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i16);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	detstackvar(25) = (Integer) r1;
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_vartypes_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_vartypes_2_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i17,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i17);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r3 = (Integer) r1;
+	detstackvar(26) = (Integer) r1;
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	{
+	extern Word * mercury_data_mercury_builtin__base_type_info_term_0[];
+	r2 = (Integer) mercury_data_mercury_builtin__base_type_info_term_0;
+	}
+	r4 = (Integer) detstackvar(18);
+	{
+	Declare_entry(mercury__map__lookup_3_1);
+	call_localret(ENTRY(mercury__map__lookup_3_1),
+		mercury__higher_order__construct_higher_order_terms_13_0_i18,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i18);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	detstackvar(27) = (Integer) r1;
+	r1 = (Integer) detstackvar(8);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_typevarset_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_typevarset_2_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i19,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i19);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r2 = (Integer) detstackvar(20);
+	r3 = (Integer) detstackvar(21);
+	{
+	Declare_entry(mercury__varset__merge_5_0);
+	call_localret(ENTRY(mercury__varset__merge_5_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i20,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i20);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	detstackvar(3) = (Integer) r2;
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(8);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_set_typevarset_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_set_typevarset_3_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i21,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i21);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	detstackvar(28) = (Integer) r1;
+	{
+	extern Word * mercury_data_mercury_builtin__base_type_info_term_0[];
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_term_0;
+	}
+	r2 = (Integer) detstackvar(16);
+	r3 = (Integer) detstackvar(3);
+	{
+	Declare_entry(mercury__list__split_list_4_0);
+	call_localret(ENTRY(mercury__list__split_list_4_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i24,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i24);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	if (!((Integer) r1))
+		GOTO_LABEL(mercury__higher_order__construct_higher_order_terms_13_0_i23);
+	r20 = (Integer) r2;
+	r21 = (Integer) r3;
+	r1 = (Integer) detstackvar(27);
+	r2 = (Integer) detstackvar(1);
+	r3 = (Integer) detstackvar(2);
+	r4 = (Integer) detstackvar(4);
+	r5 = (Integer) detstackvar(10);
+	r6 = (Integer) detstackvar(12);
+	r7 = (Integer) detstackvar(13);
+	r8 = (Integer) detstackvar(14);
+	r9 = (Integer) detstackvar(15);
+	r10 = (Integer) detstackvar(16);
+	r11 = (Integer) detstackvar(17);
+	r12 = (Integer) detstackvar(18);
+	r13 = (Integer) detstackvar(19);
+	r14 = (Integer) detstackvar(22);
+	r15 = (Integer) detstackvar(23);
+	r16 = (Integer) detstackvar(24);
+	r17 = (Integer) detstackvar(25);
+	r18 = (Integer) detstackvar(26);
+	r19 = (Integer) detstackvar(28);
+	GOTO_LABEL(mercury__higher_order__construct_higher_order_terms_13_0_i27);
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i23);
+	r1 = string_const("list__split failed", 18);
+	{
+	Declare_entry(mercury__require__error_1_0);
+	call_localret(ENTRY(mercury__require__error_1_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i26,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i26);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r2 = (Integer) detstackvar(1);
+	r3 = (Integer) detstackvar(2);
+	r4 = (Integer) detstackvar(4);
+	r5 = (Integer) detstackvar(10);
+	r6 = (Integer) detstackvar(12);
+	r7 = (Integer) detstackvar(13);
+	r8 = (Integer) detstackvar(14);
+	r9 = (Integer) detstackvar(15);
+	r10 = (Integer) detstackvar(16);
+	r11 = (Integer) detstackvar(17);
+	r12 = (Integer) detstackvar(18);
+	r13 = (Integer) detstackvar(19);
+	r14 = (Integer) detstackvar(22);
+	r15 = (Integer) detstackvar(23);
+	r16 = (Integer) detstackvar(24);
+	r17 = (Integer) detstackvar(25);
+	r18 = (Integer) detstackvar(26);
+	r1 = (Integer) detstackvar(27);
+	r19 = (Integer) detstackvar(28);
+	r20 = (Integer) detstackvar(29);
+	r21 = (Integer) detstackvar(3);
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i27);
+	detstackvar(1) = (Integer) r2;
+	detstackvar(2) = (Integer) r3;
+	detstackvar(4) = (Integer) r4;
+	detstackvar(10) = (Integer) r5;
+	detstackvar(12) = (Integer) r6;
+	detstackvar(13) = (Integer) r7;
+	detstackvar(14) = (Integer) r8;
+	detstackvar(15) = (Integer) r9;
+	detstackvar(16) = (Integer) r10;
+	detstackvar(17) = (Integer) r11;
+	detstackvar(18) = (Integer) r12;
+	detstackvar(19) = (Integer) r13;
+	detstackvar(22) = (Integer) r14;
+	detstackvar(23) = (Integer) r15;
+	detstackvar(24) = (Integer) r16;
+	detstackvar(25) = (Integer) r17;
+	detstackvar(26) = (Integer) r18;
+	detstackvar(28) = (Integer) r19;
+	detstackvar(29) = (Integer) r20;
+	detstackvar(3) = (Integer) r21;
+	{
+	Declare_entry(mercury__type_util__type_is_higher_order_3_0);
+	call_localret(ENTRY(mercury__type_util__type_is_higher_order_3_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i30,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i30);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	if (!((Integer) r1))
+		GOTO_LABEL(mercury__higher_order__construct_higher_order_terms_13_0_i29);
+	r1 = (Integer) r3;
+	r2 = (Integer) detstackvar(3);
+	{
+	Declare_entry(mercury__type_util__type_list_subsumes_3_0);
+	call_localret(ENTRY(mercury__type_util__type_list_subsumes_3_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i34,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i34);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	if (!((Integer) r1))
+		GOTO_LABEL(mercury__higher_order__construct_higher_order_terms_13_0_i33);
+	r4 = (Integer) r2;
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	{
+	extern Word * mercury_data_mercury_builtin__base_type_info_term_0[];
+	r2 = (Integer) mercury_data_mercury_builtin__base_type_info_term_0;
+	}
+	r3 = (Integer) detstackvar(10);
+	{
+	Declare_entry(mercury__map__overlay_3_0);
+	call_localret(ENTRY(mercury__map__overlay_3_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i36,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i36);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r6 = (Integer) detstackvar(1);
+	r7 = (Integer) detstackvar(2);
+	r8 = (Integer) detstackvar(4);
+	r9 = (Integer) detstackvar(12);
+	r10 = (Integer) detstackvar(13);
+	r11 = (Integer) detstackvar(14);
+	r12 = (Integer) detstackvar(15);
+	r13 = (Integer) detstackvar(16);
+	r14 = (Integer) detstackvar(17);
+	r15 = (Integer) detstackvar(18);
+	r16 = (Integer) detstackvar(19);
+	r17 = (Integer) detstackvar(22);
+	r18 = (Integer) detstackvar(23);
+	r4 = (Integer) detstackvar(24);
+	r19 = (Integer) detstackvar(25);
+	r3 = (Integer) detstackvar(26);
+	r20 = (Integer) detstackvar(28);
+	r5 = (Integer) detstackvar(29);
+	r21 = (Integer) r1;
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	{
+	extern Word * mercury_data_mercury_builtin__base_type_info_term_0[];
+	r2 = (Integer) mercury_data_mercury_builtin__base_type_info_term_0;
+	}
+	GOTO_LABEL(mercury__higher_order__construct_higher_order_terms_13_0_i39);
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i33);
+	r6 = (Integer) detstackvar(1);
+	r7 = (Integer) detstackvar(2);
+	r8 = (Integer) detstackvar(4);
+	r9 = (Integer) detstackvar(12);
+	r10 = (Integer) detstackvar(13);
+	r11 = (Integer) detstackvar(14);
+	r12 = (Integer) detstackvar(15);
+	r13 = (Integer) detstackvar(16);
+	r14 = (Integer) detstackvar(17);
+	r15 = (Integer) detstackvar(18);
+	r16 = (Integer) detstackvar(19);
+	r17 = (Integer) detstackvar(22);
+	r18 = (Integer) detstackvar(23);
+	r4 = (Integer) detstackvar(24);
+	r19 = (Integer) detstackvar(25);
+	r3 = (Integer) detstackvar(26);
+	r20 = (Integer) detstackvar(28);
+	r5 = (Integer) detstackvar(29);
+	r21 = (Integer) detstackvar(10);
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	{
+	extern Word * mercury_data_mercury_builtin__base_type_info_term_0[];
+	r2 = (Integer) mercury_data_mercury_builtin__base_type_info_term_0;
+	}
+	GOTO_LABEL(mercury__higher_order__construct_higher_order_terms_13_0_i39);
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i29);
+	r1 = string_const("specialized argument not of higher-order type", 45);
+	{
+	Declare_entry(mercury__require__error_1_0);
+	call_localret(ENTRY(mercury__require__error_1_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i38,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i38);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r6 = (Integer) detstackvar(1);
+	r7 = (Integer) detstackvar(2);
+	r8 = (Integer) detstackvar(4);
+	r9 = (Integer) detstackvar(12);
+	r10 = (Integer) detstackvar(13);
+	r11 = (Integer) detstackvar(14);
+	r12 = (Integer) detstackvar(15);
+	r13 = (Integer) detstackvar(16);
+	r14 = (Integer) detstackvar(17);
+	r15 = (Integer) detstackvar(18);
+	r16 = (Integer) detstackvar(19);
+	r17 = (Integer) detstackvar(22);
+	r18 = (Integer) detstackvar(23);
+	r4 = (Integer) detstackvar(24);
+	r19 = (Integer) detstackvar(25);
+	r3 = (Integer) detstackvar(26);
+	r20 = (Integer) detstackvar(28);
+	r5 = (Integer) detstackvar(29);
+	r21 = (Integer) detstackvar(3);
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i39);
+	detstackvar(1) = (Integer) r6;
+	detstackvar(2) = (Integer) r7;
+	detstackvar(4) = (Integer) r8;
+	detstackvar(12) = (Integer) r9;
+	detstackvar(13) = (Integer) r10;
+	detstackvar(14) = (Integer) r11;
+	detstackvar(15) = (Integer) r12;
+	detstackvar(16) = (Integer) r13;
+	detstackvar(17) = (Integer) r14;
+	detstackvar(18) = (Integer) r15;
+	detstackvar(19) = (Integer) r16;
+	detstackvar(22) = (Integer) r17;
+	detstackvar(23) = (Integer) r18;
+	detstackvar(24) = (Integer) r4;
+	detstackvar(25) = (Integer) r19;
+	detstackvar(28) = (Integer) r20;
+	detstackvar(3) = (Integer) r21;
+	{
+	Declare_entry(mercury__map__det_insert_from_corresponding_lists_4_0);
+	call_localret(ENTRY(mercury__map__det_insert_from_corresponding_lists_4_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i40,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i40);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(25);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_set_vartypes_3_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_set_vartypes_3_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i41,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i41);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r5 = (Integer) r1;
+	r1 = (Integer) detstackvar(1);
+	r2 = (Integer) detstackvar(24);
+	r3 = (Integer) detstackvar(22);
+	r4 = (Integer) detstackvar(17);
+	r6 = (Integer) detstackvar(28);
+	r7 = (Integer) detstackvar(3);
+	localcall(mercury__higher_order__construct_higher_order_terms_13_0,
+		LABEL(mercury__higher_order__construct_higher_order_terms_13_0_i42),
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i42);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	detstackvar(3) = (Integer) r1;
+	detstackvar(5) = (Integer) r2;
+	detstackvar(7) = (Integer) r3;
+	detstackvar(9) = (Integer) r4;
+	detstackvar(11) = (Integer) r5;
+	detstackvar(30) = (Integer) r6;
+	r1 = (Integer) r2;
+	r2 = ((Integer) 1);
+	r3 = (Integer) detstackvar(17);
+	call_localret(STATIC(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i43,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i43);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r2 = (Integer) detstackvar(3);
+	detstackvar(3) = (Integer) r1;
+	r1 = (Integer) r2;
+	r2 = ((Integer) 1);
+	r3 = (Integer) detstackvar(17);
+	call_localret(STATIC(mercury__higher_order__remove_listof_higher_order_args__ua10000_4_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i44,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i44);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r3 = (Integer) detstackvar(3);
+	detstackvar(3) = (Integer) r1;
+	{
+	extern Word * mercury_data_prog_data__base_type_info_mode_0[];
+	r1 = (Integer) mercury_data_prog_data__base_type_info_mode_0;
+	}
+	r2 = (Integer) detstackvar(4);
+	{
+	Declare_entry(mercury__list__append_3_1);
+	call_localret(ENTRY(mercury__list__append_3_1),
+		mercury__higher_order__construct_higher_order_terms_13_0_i45,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i45);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r3 = (Integer) detstackvar(3);
+	detstackvar(3) = (Integer) r1;
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) detstackvar(2);
+	{
+	Declare_entry(mercury__list__append_3_1);
+	call_localret(ENTRY(mercury__list__append_3_1),
+		mercury__higher_order__construct_higher_order_terms_13_0_i46,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i46);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	detstackvar(31) = (Integer) r1;
+	r1 = (Integer) detstackvar(19);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_module_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_module_2_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i47,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i47);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	detstackvar(32) = (Integer) r1;
+	r1 = (Integer) detstackvar(19);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_name_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_name_2_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i48,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i48);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r2 = (Integer) detstackvar(5);
+	tag_incr_hp(detstackvar(5), mktag(1), ((Integer) 2));
+	tag_incr_hp(r3, mktag(0), ((Integer) 2));
+	field(mktag(1), (Integer) detstackvar(5), ((Integer) 1)) = (Integer) detstackvar(24);
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) tempr1, ((Integer) 1)) = (Integer) r1;
+	field(mktag(1), (Integer) tempr1, ((Integer) 0)) = (Integer) detstackvar(32);
+	field(mktag(0), (Integer) r3, ((Integer) 1)) = (Integer) detstackvar(16);
+	field(mktag(1), (Integer) detstackvar(5), ((Integer) 0)) = (Integer) r3;
+	field(mktag(0), (Integer) r3, ((Integer) 0)) = (Integer) tempr1;
+	tag_incr_hp(detstackvar(32), mktag(0), ((Integer) 2));
+	tag_incr_hp(tempr1, mktag(1), ((Integer) 1));
+	field(mktag(0), (Integer) detstackvar(32), ((Integer) 0)) = (Integer) tempr1;
+	r1 = (Integer) r2;
+	r3 = (Integer) detstackvar(1);
+	field(mktag(1), (Integer) tempr1, ((Integer) 0)) = (Integer) detstackvar(15);
+	field(mktag(0), (Integer) detstackvar(32), ((Integer) 1)) = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	{
+	Declare_entry(mercury__mode_util__modes_to_uni_modes_4_0);
+	call_localret(ENTRY(mercury__mode_util__modes_to_uni_modes_4_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i1034,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i1034);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	tag_incr_hp(r2, mktag(0), ((Integer) 4));
+	field(mktag(0), (Integer) r2, ((Integer) 0)) = (Integer) detstackvar(18);
+	detstackvar(33) = (Integer) r2;
+	tag_incr_hp(r2, mktag(3), ((Integer) 3));
+	r3 = (Integer) detstackvar(33);
+	field(mktag(0), (Integer) r3, ((Integer) 1)) = (Integer) r2;
+	field(mktag(0), (Integer) r3, ((Integer) 3)) = (Integer) r1;
+	r1 = (Integer) detstackvar(7);
+	field(mktag(3), (Integer) r2, ((Integer) 2)) = (Integer) detstackvar(14);
+	field(mktag(3), (Integer) r2, ((Integer) 0)) = ((Integer) 1);
+	field(mktag(3), (Integer) r2, ((Integer) 1)) = (Integer) detstackvar(13);
+	field(mktag(0), (Integer) r3, ((Integer) 2)) = (Integer) detstackvar(24);
+	{
+	Declare_entry(mercury__hlds_pred__proc_info_inferred_determinism_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__proc_info_inferred_determinism_2_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i50,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i50);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	detstackvar(34) = (Integer) r1;
+	r1 = (Integer) detstackvar(9);
+	{
+	Declare_entry(mercury__hlds_pred__pred_info_get_is_pred_or_func_2_0);
+	call_localret(ENTRY(mercury__hlds_pred__pred_info_get_is_pred_or_func_2_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i51,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i51);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r2 = (Integer) detstackvar(5);
+	tag_incr_hp(r3, mktag(3), ((Integer) 3));
+	field(mktag(3), (Integer) r3, ((Integer) 0)) = ((Integer) 1);
+	field(mktag(3), (Integer) r3, ((Integer) 1)) = ((Integer) 0);
+	detstackvar(5) = (Integer) r3;
+	tag_incr_hp(r3, mktag(1), ((Integer) 1));
+	{
+	Word tempr1;
+	tag_incr_hp(tempr1, mktag(0), ((Integer) 3));
+	field(mktag(0), (Integer) tempr1, ((Integer) 2)) = (Integer) detstackvar(34);
+	field(mktag(0), (Integer) tempr1, ((Integer) 1)) = (Integer) detstackvar(23);
+	field(mktag(0), (Integer) tempr1, ((Integer) 0)) = (Integer) r1;
+	r4 = (Integer) detstackvar(5);
+	field(mktag(3), (Integer) r4, ((Integer) 2)) = (Integer) r3;
+	field(mktag(1), (Integer) r3, ((Integer) 0)) = (Integer) tempr1;
+	r3 = (Integer) detstackvar(32);
+	tag_incr_hp(r1, mktag(3), ((Integer) 6));
+	field(mktag(3), (Integer) r1, ((Integer) 2)) = (Integer) r2;
+	field(mktag(3), (Integer) r1, ((Integer) 0)) = ((Integer) 1);
+	field(mktag(3), (Integer) r1, ((Integer) 1)) = (Integer) detstackvar(18);
+	detstackvar(32) = (Integer) r1;
+	tag_incr_hp(r7, mktag(0), ((Integer) 2));
+	tag_incr_hp(r1, mktag(0), ((Integer) 2));
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) r4;
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	field(mktag(0), (Integer) r7, ((Integer) 0)) = (Integer) r1;
+	tag_incr_hp(r1, mktag(0), ((Integer) 2));
+	field(mktag(0), (Integer) r7, ((Integer) 1)) = (Integer) r1;
+	r2 = (Integer) detstackvar(32);
+	field(mktag(3), (Integer) r2, ((Integer) 5)) = (Integer) r3;
+	field(mktag(3), (Integer) r2, ((Integer) 4)) = (Integer) detstackvar(33);
+	field(mktag(3), (Integer) r2, ((Integer) 3)) = (Integer) r7;
+	field(mktag(0), (Integer) r1, ((Integer) 1)) = (Integer) r4;
+	field(mktag(0), (Integer) r1, ((Integer) 0)) = (Integer) r4;
+	{
+	Declare_entry(mercury__hlds_goal__goal_info_init_1_0);
+	call_localret(ENTRY(mercury__hlds_goal__goal_info_init_1_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i52,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i52);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r2 = (Integer) detstackvar(34);
+	{
+	Declare_entry(mercury__hlds_goal__goal_info_set_determinism_3_0);
+	call_localret(ENTRY(mercury__hlds_goal__goal_info_set_determinism_3_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i53,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i53);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	detstackvar(33) = (Integer) r1;
+	{
+	Declare_entry(mercury__instmap__instmap_delta_init_reachable_1_0);
+	call_localret(ENTRY(mercury__instmap__instmap_delta_init_reachable_1_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i54,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i54);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r2 = (Integer) detstackvar(18);
+	r3 = (Integer) detstackvar(5);
+	{
+	Declare_entry(mercury__instmap__instmap_delta_insert_4_0);
+	call_localret(ENTRY(mercury__instmap__instmap_delta_insert_4_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i55,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i55);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r2 = (Integer) r1;
+	r1 = (Integer) detstackvar(33);
+	{
+	Declare_entry(mercury__hlds_goal__goal_info_set_instmap_delta_3_0);
+	call_localret(ENTRY(mercury__hlds_goal__goal_info_set_instmap_delta_3_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i56,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i56);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r3 = (Integer) detstackvar(3);
+	detstackvar(3) = (Integer) r1;
+	r1 = (Integer) detstackvar(1);
+	r2 = (Integer) detstackvar(31);
+	r4 = (Integer) detstackvar(12);
+	r5 = (Integer) detstackvar(7);
+	r6 = (Integer) detstackvar(9);
+	r7 = (Integer) detstackvar(11);
+	localcall(mercury__higher_order__construct_higher_order_terms_13_0,
+		LABEL(mercury__higher_order__construct_higher_order_terms_13_0_i57),
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i57);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r7 = (Integer) detstackvar(3);
+	detstackvar(3) = (Integer) r1;
+	r1 = (Integer) mkword(mktag(0), (Integer) mercury_data_higher_order__common_2);
+	detstackvar(5) = (Integer) r2;
+	detstackvar(7) = (Integer) r3;
+	detstackvar(9) = (Integer) r4;
+	detstackvar(11) = (Integer) r5;
+	tag_incr_hp(r2, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r2, ((Integer) 0)) = (Integer) detstackvar(30);
+	tag_incr_hp(r10, mktag(1), ((Integer) 2));
+	tag_incr_hp(r11, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r11, ((Integer) 1)) = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	tag_incr_hp(r3, mktag(0), ((Integer) 2));
+	field(mktag(0), (Integer) r3, ((Integer) 1)) = (Integer) r7;
+	field(mktag(0), (Integer) r3, ((Integer) 0)) = (Integer) detstackvar(32);
+	field(mktag(1), (Integer) r10, ((Integer) 0)) = (Integer) r11;
+	field(mktag(1), (Integer) r11, ((Integer) 0)) = (Integer) r3;
+	tag_incr_hp(r3, mktag(1), ((Integer) 2));
+	field(mktag(1), (Integer) r10, ((Integer) 1)) = (Integer) r3;
+	field(mktag(1), (Integer) r2, ((Integer) 1)) = (Integer) r10;
+	field(mktag(1), (Integer) r3, ((Integer) 1)) = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	field(mktag(1), (Integer) r3, ((Integer) 0)) = (Integer) r6;
+	{
+	Declare_entry(mercury__list__condense_2_0);
+	call_localret(ENTRY(mercury__list__condense_2_0),
+		mercury__higher_order__construct_higher_order_terms_13_0_i58,
+		STATIC(mercury__higher_order__construct_higher_order_terms_13_0));
+	}
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i58);
+	update_prof_current_proc(LABEL(mercury__higher_order__construct_higher_order_terms_13_0));
+	r6 = (Integer) r1;
+	r1 = (Integer) detstackvar(3);
+	r2 = (Integer) detstackvar(5);
+	r3 = (Integer) detstackvar(7);
+	r4 = (Integer) detstackvar(9);
+	r5 = (Integer) detstackvar(11);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(35);
+	decr_sp_pop_msg(35);
+	proceed();
+Define_label(mercury__higher_order__construct_higher_order_terms_13_0_i1024);
+	r1 = (Integer) r2;
+	r2 = (Integer) r3;
+	r3 = (Integer) r5;
+	r4 = (Integer) r6;
+	r5 = (Integer) r7;
+	r6 = (Integer) mkword(mktag(0), mkbody(((Integer) 0)));
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module31)
+	init_entry(mercury____Unify___higher_order__request_0_0);
+	init_label(mercury____Unify___higher_order__request_0_0_i2);
+	init_label(mercury____Unify___higher_order__request_0_0_i4);
+	init_label(mercury____Unify___higher_order__request_0_0_i1);
+BEGIN_CODE
+
+/* code for predicate '__Unify__'/2 in mode 0 */
+Define_static(mercury____Unify___higher_order__request_0_0);
+	incr_sp_push_msg(5, "__Unify__");
+	detstackvar(5) = (Integer) succip;
+	detstackvar(1) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 1));
+	detstackvar(2) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 2));
+	detstackvar(3) = (Integer) field(mktag(0), (Integer) r2, ((Integer) 1));
+	detstackvar(4) = (Integer) field(mktag(0), (Integer) r2, ((Integer) 2));
+	r1 = (Integer) field(mktag(0), (Integer) r1, ((Integer) 0));
+	r2 = (Integer) field(mktag(0), (Integer) r2, ((Integer) 0));
+	{
+	Declare_entry(mercury____Unify___hlds_pred__pred_proc_id_0_0);
+	call_localret(ENTRY(mercury____Unify___hlds_pred__pred_proc_id_0_0),
+		mercury____Unify___higher_order__request_0_0_i2,
+		STATIC(mercury____Unify___higher_order__request_0_0));
+	}
+Define_label(mercury____Unify___higher_order__request_0_0_i2);
+	update_prof_current_proc(LABEL(mercury____Unify___higher_order__request_0_0));
+	if (!((Integer) r1))
+		GOTO_LABEL(mercury____Unify___higher_order__request_0_0_i1);
+	r1 = (Integer) detstackvar(1);
+	r2 = (Integer) detstackvar(3);
+	{
+	Declare_entry(mercury____Unify___hlds_pred__pred_proc_id_0_0);
+	call_localret(ENTRY(mercury____Unify___hlds_pred__pred_proc_id_0_0),
+		mercury____Unify___higher_order__request_0_0_i4,
+		STATIC(mercury____Unify___higher_order__request_0_0));
+	}
+Define_label(mercury____Unify___higher_order__request_0_0_i4);
+	update_prof_current_proc(LABEL(mercury____Unify___higher_order__request_0_0));
+	if (!((Integer) r1))
+		GOTO_LABEL(mercury____Unify___higher_order__request_0_0_i1);
+	r1 = (Integer) mercury_data_higher_order__base_type_info_higher_order_arg_0;
+	r2 = (Integer) detstackvar(2);
+	r3 = (Integer) detstackvar(4);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(5);
+	decr_sp_pop_msg(5);
+	{
+	Declare_entry(mercury____Unify___mercury_builtin__list_1_0);
+	tailcall(ENTRY(mercury____Unify___mercury_builtin__list_1_0),
+		STATIC(mercury____Unify___higher_order__request_0_0));
+	}
+Define_label(mercury____Unify___higher_order__request_0_0_i1);
+	r1 = FALSE;
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(5);
+	decr_sp_pop_msg(5);
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module32)
+	init_entry(mercury____Index___higher_order__request_0_0);
+BEGIN_CODE
+
+/* code for predicate '__Index__'/2 in mode 0 */
+Define_static(mercury____Index___higher_order__request_0_0);
+	tailcall(STATIC(mercury____Index___higher_order_request_0__ua10000_2_0),
+		STATIC(mercury____Index___higher_order__request_0_0));
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module33)
+	init_entry(mercury____Compare___higher_order__request_0_0);
+	init_label(mercury____Compare___higher_order__request_0_0_i4);
+	init_label(mercury____Compare___higher_order__request_0_0_i5);
+	init_label(mercury____Compare___higher_order__request_0_0_i3);
+	init_label(mercury____Compare___higher_order__request_0_0_i10);
+BEGIN_CODE
+
+/* code for predicate '__Compare__'/3 in mode 0 */
+Define_static(mercury____Compare___higher_order__request_0_0);
+	incr_sp_push_msg(5, "__Compare__");
+	detstackvar(5) = (Integer) succip;
+	detstackvar(1) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 1));
+	detstackvar(2) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 2));
+	detstackvar(3) = (Integer) field(mktag(0), (Integer) r2, ((Integer) 1));
+	detstackvar(4) = (Integer) field(mktag(0), (Integer) r2, ((Integer) 2));
+	r1 = (Integer) field(mktag(0), (Integer) r1, ((Integer) 0));
+	r2 = (Integer) field(mktag(0), (Integer) r2, ((Integer) 0));
+	{
+	Declare_entry(mercury____Compare___hlds_pred__pred_proc_id_0_0);
+	call_localret(ENTRY(mercury____Compare___hlds_pred__pred_proc_id_0_0),
+		mercury____Compare___higher_order__request_0_0_i4,
+		STATIC(mercury____Compare___higher_order__request_0_0));
+	}
+Define_label(mercury____Compare___higher_order__request_0_0_i4);
+	update_prof_current_proc(LABEL(mercury____Compare___higher_order__request_0_0));
+	if (((Integer) r1 == ((Integer) 0)))
+		GOTO_LABEL(mercury____Compare___higher_order__request_0_0_i3);
+Define_label(mercury____Compare___higher_order__request_0_0_i5);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(5);
+	decr_sp_pop_msg(5);
+	proceed();
+Define_label(mercury____Compare___higher_order__request_0_0_i3);
+	r1 = (Integer) detstackvar(1);
+	r2 = (Integer) detstackvar(3);
+	{
+	Declare_entry(mercury____Compare___hlds_pred__pred_proc_id_0_0);
+	call_localret(ENTRY(mercury____Compare___hlds_pred__pred_proc_id_0_0),
+		mercury____Compare___higher_order__request_0_0_i10,
+		STATIC(mercury____Compare___higher_order__request_0_0));
+	}
+Define_label(mercury____Compare___higher_order__request_0_0_i10);
+	update_prof_current_proc(LABEL(mercury____Compare___higher_order__request_0_0));
+	if (((Integer) r1 != ((Integer) 0)))
+		GOTO_LABEL(mercury____Compare___higher_order__request_0_0_i5);
+	r1 = (Integer) mercury_data_higher_order__base_type_info_higher_order_arg_0;
+	r2 = (Integer) detstackvar(2);
+	r3 = (Integer) detstackvar(4);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(5);
+	decr_sp_pop_msg(5);
+	{
+	Declare_entry(mercury____Compare___mercury_builtin__list_1_0);
+	tailcall(ENTRY(mercury____Compare___mercury_builtin__list_1_0),
+		STATIC(mercury____Compare___higher_order__request_0_0));
+	}
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module34)
+	init_entry(mercury____Unify___higher_order__higher_order_arg_0_0);
+	init_label(mercury____Unify___higher_order__higher_order_arg_0_0_i1005);
+BEGIN_CODE
+
+/* code for predicate '__Unify__'/2 in mode 0 */
+Define_static(mercury____Unify___higher_order__higher_order_arg_0_0);
+	if (((Integer) field(mktag(0), (Integer) r1, ((Integer) 0)) != (Integer) field(mktag(0), (Integer) r2, ((Integer) 0))))
+		GOTO_LABEL(mercury____Unify___higher_order__higher_order_arg_0_0_i1005);
+	if (((Integer) field(mktag(0), (Integer) r1, ((Integer) 1)) != (Integer) field(mktag(0), (Integer) r2, ((Integer) 1))))
+		GOTO_LABEL(mercury____Unify___higher_order__higher_order_arg_0_0_i1005);
+	if (((Integer) field(mktag(0), (Integer) r1, ((Integer) 2)) != (Integer) field(mktag(0), (Integer) r2, ((Integer) 2))))
+		GOTO_LABEL(mercury____Unify___higher_order__higher_order_arg_0_0_i1005);
+	if (((Integer) field(mktag(0), (Integer) r1, ((Integer) 3)) != (Integer) field(mktag(0), (Integer) r2, ((Integer) 3))))
+		GOTO_LABEL(mercury____Unify___higher_order__higher_order_arg_0_0_i1005);
+	r3 = (Integer) field(mktag(0), (Integer) r2, ((Integer) 4));
+	r2 = (Integer) field(mktag(0), (Integer) r1, ((Integer) 4));
+	r1 = (Integer) mercury_data_higher_order__base_type_info_higher_order_arg_0;
+	{
+	Declare_entry(mercury____Unify___mercury_builtin__list_1_0);
+	tailcall(ENTRY(mercury____Unify___mercury_builtin__list_1_0),
+		STATIC(mercury____Unify___higher_order__higher_order_arg_0_0));
+	}
+Define_label(mercury____Unify___higher_order__higher_order_arg_0_0_i1005);
+	r1 = FALSE;
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module35)
+	init_entry(mercury____Index___higher_order__higher_order_arg_0_0);
+BEGIN_CODE
+
+/* code for predicate '__Index__'/2 in mode 0 */
+Define_static(mercury____Index___higher_order__higher_order_arg_0_0);
+	tailcall(STATIC(mercury____Index___higher_order_higher_order_arg_0__ua10000_2_0),
+		STATIC(mercury____Index___higher_order__higher_order_arg_0_0));
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module36)
+	init_entry(mercury____Compare___higher_order__higher_order_arg_0_0);
+	init_label(mercury____Compare___higher_order__higher_order_arg_0_0_i4);
+	init_label(mercury____Compare___higher_order__higher_order_arg_0_0_i5);
+	init_label(mercury____Compare___higher_order__higher_order_arg_0_0_i3);
+	init_label(mercury____Compare___higher_order__higher_order_arg_0_0_i10);
+	init_label(mercury____Compare___higher_order__higher_order_arg_0_0_i16);
+	init_label(mercury____Compare___higher_order__higher_order_arg_0_0_i22);
+BEGIN_CODE
+
+/* code for predicate '__Compare__'/3 in mode 0 */
+Define_static(mercury____Compare___higher_order__higher_order_arg_0_0);
+	incr_sp_push_msg(9, "__Compare__");
+	detstackvar(9) = (Integer) succip;
+	detstackvar(1) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 1));
+	detstackvar(2) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 2));
+	detstackvar(3) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 3));
+	detstackvar(4) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 4));
+	detstackvar(5) = (Integer) field(mktag(0), (Integer) r2, ((Integer) 1));
+	detstackvar(6) = (Integer) field(mktag(0), (Integer) r2, ((Integer) 2));
+	detstackvar(7) = (Integer) field(mktag(0), (Integer) r2, ((Integer) 3));
+	detstackvar(8) = (Integer) field(mktag(0), (Integer) r2, ((Integer) 4));
+	r1 = (Integer) field(mktag(0), (Integer) r1, ((Integer) 0));
+	r2 = (Integer) field(mktag(0), (Integer) r2, ((Integer) 0));
+	{
+	Declare_entry(mercury__builtin_compare_int_3_0);
+	call_localret(ENTRY(mercury__builtin_compare_int_3_0),
+		mercury____Compare___higher_order__higher_order_arg_0_0_i4,
+		STATIC(mercury____Compare___higher_order__higher_order_arg_0_0));
+	}
+Define_label(mercury____Compare___higher_order__higher_order_arg_0_0_i4);
+	update_prof_current_proc(LABEL(mercury____Compare___higher_order__higher_order_arg_0_0));
+	if (((Integer) r1 == ((Integer) 0)))
+		GOTO_LABEL(mercury____Compare___higher_order__higher_order_arg_0_0_i3);
+Define_label(mercury____Compare___higher_order__higher_order_arg_0_0_i5);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(9);
+	decr_sp_pop_msg(9);
+	proceed();
+Define_label(mercury____Compare___higher_order__higher_order_arg_0_0_i3);
+	r1 = (Integer) detstackvar(1);
+	r2 = (Integer) detstackvar(5);
+	{
+	Declare_entry(mercury__builtin_compare_int_3_0);
+	call_localret(ENTRY(mercury__builtin_compare_int_3_0),
+		mercury____Compare___higher_order__higher_order_arg_0_0_i10,
+		STATIC(mercury____Compare___higher_order__higher_order_arg_0_0));
+	}
+Define_label(mercury____Compare___higher_order__higher_order_arg_0_0_i10);
+	update_prof_current_proc(LABEL(mercury____Compare___higher_order__higher_order_arg_0_0));
+	if (((Integer) r1 != ((Integer) 0)))
+		GOTO_LABEL(mercury____Compare___higher_order__higher_order_arg_0_0_i5);
+	r1 = (Integer) detstackvar(2);
+	r2 = (Integer) detstackvar(6);
+	{
+	Declare_entry(mercury__builtin_compare_int_3_0);
+	call_localret(ENTRY(mercury__builtin_compare_int_3_0),
+		mercury____Compare___higher_order__higher_order_arg_0_0_i16,
+		STATIC(mercury____Compare___higher_order__higher_order_arg_0_0));
+	}
+Define_label(mercury____Compare___higher_order__higher_order_arg_0_0_i16);
+	update_prof_current_proc(LABEL(mercury____Compare___higher_order__higher_order_arg_0_0));
+	if (((Integer) r1 != ((Integer) 0)))
+		GOTO_LABEL(mercury____Compare___higher_order__higher_order_arg_0_0_i5);
+	r1 = (Integer) detstackvar(3);
+	r2 = (Integer) detstackvar(7);
+	{
+	Declare_entry(mercury__builtin_compare_int_3_0);
+	call_localret(ENTRY(mercury__builtin_compare_int_3_0),
+		mercury____Compare___higher_order__higher_order_arg_0_0_i22,
+		STATIC(mercury____Compare___higher_order__higher_order_arg_0_0));
+	}
+Define_label(mercury____Compare___higher_order__higher_order_arg_0_0_i22);
+	update_prof_current_proc(LABEL(mercury____Compare___higher_order__higher_order_arg_0_0));
+	if (((Integer) r1 != ((Integer) 0)))
+		GOTO_LABEL(mercury____Compare___higher_order__higher_order_arg_0_0_i5);
+	r1 = (Integer) mercury_data_higher_order__base_type_info_higher_order_arg_0;
+	r2 = (Integer) detstackvar(4);
+	r3 = (Integer) detstackvar(8);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(9);
+	decr_sp_pop_msg(9);
+	{
+	Declare_entry(mercury____Compare___mercury_builtin__list_1_0);
+	tailcall(ENTRY(mercury____Compare___mercury_builtin__list_1_0),
+		STATIC(mercury____Compare___higher_order__higher_order_arg_0_0));
+	}
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module37)
+	init_entry(mercury____Unify___higher_order__maybe_pred_and_args_0_0);
+	init_label(mercury____Unify___higher_order__maybe_pred_and_args_0_0_i1010);
+	init_label(mercury____Unify___higher_order__maybe_pred_and_args_0_0_i1007);
+	init_label(mercury____Unify___higher_order__maybe_pred_and_args_0_0_i1);
+	init_label(mercury____Unify___higher_order__maybe_pred_and_args_0_0_i1009);
+BEGIN_CODE
+
+/* code for predicate '__Unify__'/2 in mode 0 */
+Define_static(mercury____Unify___higher_order__maybe_pred_and_args_0_0);
+	if (((Integer) r1 != (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury____Unify___higher_order__maybe_pred_and_args_0_0_i1010);
+	if (((Integer) r2 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury____Unify___higher_order__maybe_pred_and_args_0_0_i1007);
+	r1 = FALSE;
+	proceed();
+Define_label(mercury____Unify___higher_order__maybe_pred_and_args_0_0_i1010);
+	incr_sp_push_msg(1, "__Unify__");
+	detstackvar(1) = (Integer) succip;
+	if (((Integer) r2 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury____Unify___higher_order__maybe_pred_and_args_0_0_i1);
+	if (((Integer) field(mktag(1), (Integer) r1, ((Integer) 0)) != (Integer) field(mktag(1), (Integer) r2, ((Integer) 0))))
+		GOTO_LABEL(mercury____Unify___higher_order__maybe_pred_and_args_0_0_i1);
+	decr_sp_pop_msg(1);
+	if (((Integer) field(mktag(1), (Integer) r1, ((Integer) 1)) != (Integer) field(mktag(1), (Integer) r2, ((Integer) 1))))
+		GOTO_LABEL(mercury____Unify___higher_order__maybe_pred_and_args_0_0_i1009);
+	r3 = (Integer) field(mktag(1), (Integer) r2, ((Integer) 2));
+	r2 = (Integer) field(mktag(1), (Integer) r1, ((Integer) 2));
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	{
+	Declare_entry(mercury____Unify___mercury_builtin__list_1_0);
+	tailcall(ENTRY(mercury____Unify___mercury_builtin__list_1_0),
+		STATIC(mercury____Unify___higher_order__maybe_pred_and_args_0_0));
+	}
+Define_label(mercury____Unify___higher_order__maybe_pred_and_args_0_0_i1007);
+	r1 = TRUE;
+	proceed();
+Define_label(mercury____Unify___higher_order__maybe_pred_and_args_0_0_i1);
+	r1 = FALSE;
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(1);
+	decr_sp_pop_msg(1);
+	proceed();
+Define_label(mercury____Unify___higher_order__maybe_pred_and_args_0_0_i1009);
+	r1 = FALSE;
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module38)
+	init_entry(mercury____Index___higher_order__maybe_pred_and_args_0_0);
+	init_label(mercury____Index___higher_order__maybe_pred_and_args_0_0_i3);
+BEGIN_CODE
+
+/* code for predicate '__Index__'/2 in mode 0 */
+Define_static(mercury____Index___higher_order__maybe_pred_and_args_0_0);
+	if (((Integer) r1 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury____Index___higher_order__maybe_pred_and_args_0_0_i3);
+	r1 = ((Integer) 0);
+	proceed();
+Define_label(mercury____Index___higher_order__maybe_pred_and_args_0_0_i3);
+	r1 = ((Integer) 1);
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module39)
+	init_entry(mercury____Compare___higher_order__maybe_pred_and_args_0_0);
+	init_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i2);
+	init_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i3);
+	init_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i4);
+	init_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i6);
+	init_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i11);
+	init_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i16);
+	init_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i17);
+	init_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i15);
+	init_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i22);
+	init_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i9);
+BEGIN_CODE
+
+/* code for predicate '__Compare__'/3 in mode 0 */
+Define_static(mercury____Compare___higher_order__maybe_pred_and_args_0_0);
+	incr_sp_push_msg(5, "__Compare__");
+	detstackvar(5) = (Integer) succip;
+	detstackvar(1) = (Integer) r1;
+	detstackvar(2) = (Integer) r2;
+	call_localret(STATIC(mercury____Index___higher_order__maybe_pred_and_args_0_0),
+		mercury____Compare___higher_order__maybe_pred_and_args_0_0_i2,
+		STATIC(mercury____Compare___higher_order__maybe_pred_and_args_0_0));
+Define_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i2);
+	update_prof_current_proc(LABEL(mercury____Compare___higher_order__maybe_pred_and_args_0_0));
+	detstackvar(3) = (Integer) r1;
+	r1 = (Integer) detstackvar(2);
+	call_localret(STATIC(mercury____Index___higher_order__maybe_pred_and_args_0_0),
+		mercury____Compare___higher_order__maybe_pred_and_args_0_0_i3,
+		STATIC(mercury____Compare___higher_order__maybe_pred_and_args_0_0));
+Define_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i3);
+	update_prof_current_proc(LABEL(mercury____Compare___higher_order__maybe_pred_and_args_0_0));
+	if (((Integer) detstackvar(3) >= (Integer) r1))
+		GOTO_LABEL(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i4);
+	r1 = ((Integer) 1);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(5);
+	decr_sp_pop_msg(5);
+	proceed();
+Define_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i4);
+	if (((Integer) detstackvar(3) <= (Integer) r1))
+		GOTO_LABEL(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i6);
+	r1 = ((Integer) 2);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(5);
+	decr_sp_pop_msg(5);
+	proceed();
+Define_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i6);
+	if (((Integer) detstackvar(1) != (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i11);
+	if (((Integer) detstackvar(2) != (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i9);
+	r1 = ((Integer) 0);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(5);
+	decr_sp_pop_msg(5);
+	proceed();
+Define_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i11);
+	r3 = (Integer) detstackvar(2);
+	if (((Integer) r3 == (Integer) mkword(mktag(0), mkbody(((Integer) 0)))))
+		GOTO_LABEL(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i9);
+	r2 = (Integer) field(mktag(1), (Integer) r3, ((Integer) 0));
+	detstackvar(3) = (Integer) field(mktag(1), (Integer) r3, ((Integer) 1));
+	detstackvar(4) = (Integer) field(mktag(1), (Integer) r3, ((Integer) 2));
+	{
+	Word tempr1;
+	tempr1 = (Integer) detstackvar(1);
+	r1 = (Integer) field(mktag(1), (Integer) tempr1, ((Integer) 0));
+	detstackvar(2) = (Integer) field(mktag(1), (Integer) tempr1, ((Integer) 2));
+	detstackvar(1) = (Integer) field(mktag(1), (Integer) tempr1, ((Integer) 1));
+	{
+	Declare_entry(mercury__builtin_compare_int_3_0);
+	call_localret(ENTRY(mercury__builtin_compare_int_3_0),
+		mercury____Compare___higher_order__maybe_pred_and_args_0_0_i16,
+		STATIC(mercury____Compare___higher_order__maybe_pred_and_args_0_0));
+	}
+	}
+Define_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i16);
+	update_prof_current_proc(LABEL(mercury____Compare___higher_order__maybe_pred_and_args_0_0));
+	if (((Integer) r1 == ((Integer) 0)))
+		GOTO_LABEL(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i15);
+Define_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i17);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(5);
+	decr_sp_pop_msg(5);
+	proceed();
+Define_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i15);
+	r1 = (Integer) detstackvar(1);
+	r2 = (Integer) detstackvar(3);
+	{
+	Declare_entry(mercury__builtin_compare_int_3_0);
+	call_localret(ENTRY(mercury__builtin_compare_int_3_0),
+		mercury____Compare___higher_order__maybe_pred_and_args_0_0_i22,
+		STATIC(mercury____Compare___higher_order__maybe_pred_and_args_0_0));
+	}
+Define_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i22);
+	update_prof_current_proc(LABEL(mercury____Compare___higher_order__maybe_pred_and_args_0_0));
+	if (((Integer) r1 != ((Integer) 0)))
+		GOTO_LABEL(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i17);
+	r1 = (Integer) mercury_data_mercury_builtin__base_type_info_var_0;
+	r2 = (Integer) detstackvar(2);
+	r3 = (Integer) detstackvar(4);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(5);
+	decr_sp_pop_msg(5);
+	{
+	Declare_entry(mercury____Compare___mercury_builtin__list_1_0);
+	tailcall(ENTRY(mercury____Compare___mercury_builtin__list_1_0),
+		STATIC(mercury____Compare___higher_order__maybe_pred_and_args_0_0));
+	}
+Define_label(mercury____Compare___higher_order__maybe_pred_and_args_0_0_i9);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(5);
+	decr_sp_pop_msg(5);
+	{
+	Declare_entry(mercury__compare_error_0_0);
+	tailcall(ENTRY(mercury__compare_error_0_0),
+		STATIC(mercury____Compare___higher_order__maybe_pred_and_args_0_0));
+	}
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module40)
+	init_entry(mercury____Unify___higher_order__new_pred_0_0);
+	init_label(mercury____Unify___higher_order__new_pred_0_0_i2);
+	init_label(mercury____Unify___higher_order__new_pred_0_0_i1004);
+	init_label(mercury____Unify___higher_order__new_pred_0_0_i1);
+BEGIN_CODE
+
+/* code for predicate '__Unify__'/2 in mode 0 */
+Define_static(mercury____Unify___higher_order__new_pred_0_0);
+	if (((Integer) field(mktag(0), (Integer) r1, ((Integer) 0)) != (Integer) field(mktag(0), (Integer) r2, ((Integer) 0))))
+		GOTO_LABEL(mercury____Unify___higher_order__new_pred_0_0_i1004);
+	if (((Integer) field(mktag(0), (Integer) r1, ((Integer) 1)) != (Integer) field(mktag(0), (Integer) r2, ((Integer) 1))))
+		GOTO_LABEL(mercury____Unify___higher_order__new_pred_0_0_i1004);
+	incr_sp_push_msg(3, "__Unify__");
+	detstackvar(3) = (Integer) succip;
+	detstackvar(1) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 3));
+	detstackvar(2) = (Integer) field(mktag(0), (Integer) r2, ((Integer) 3));
+	r1 = (Integer) field(mktag(0), (Integer) r1, ((Integer) 2));
+	r2 = (Integer) field(mktag(0), (Integer) r2, ((Integer) 2));
+	{
+	Declare_entry(mercury____Unify___prog_data__sym_name_0_0);
+	call_localret(ENTRY(mercury____Unify___prog_data__sym_name_0_0),
+		mercury____Unify___higher_order__new_pred_0_0_i2,
+		STATIC(mercury____Unify___higher_order__new_pred_0_0));
+	}
+Define_label(mercury____Unify___higher_order__new_pred_0_0_i2);
+	update_prof_current_proc(LABEL(mercury____Unify___higher_order__new_pred_0_0));
+	if (!((Integer) r1))
+		GOTO_LABEL(mercury____Unify___higher_order__new_pred_0_0_i1);
+	r1 = (Integer) mercury_data_higher_order__base_type_info_higher_order_arg_0;
+	r2 = (Integer) detstackvar(1);
+	r3 = (Integer) detstackvar(2);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(3);
+	decr_sp_pop_msg(3);
+	{
+	Declare_entry(mercury____Unify___mercury_builtin__list_1_0);
+	tailcall(ENTRY(mercury____Unify___mercury_builtin__list_1_0),
+		STATIC(mercury____Unify___higher_order__new_pred_0_0));
+	}
+Define_label(mercury____Unify___higher_order__new_pred_0_0_i1004);
+	r1 = FALSE;
+	proceed();
+Define_label(mercury____Unify___higher_order__new_pred_0_0_i1);
+	r1 = FALSE;
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(3);
+	decr_sp_pop_msg(3);
+	proceed();
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module41)
+	init_entry(mercury____Index___higher_order__new_pred_0_0);
+BEGIN_CODE
+
+/* code for predicate '__Index__'/2 in mode 0 */
+Define_static(mercury____Index___higher_order__new_pred_0_0);
+	tailcall(STATIC(mercury____Index___higher_order_new_pred_0__ua10000_2_0),
+		STATIC(mercury____Index___higher_order__new_pred_0_0));
+END_MODULE
+
+BEGIN_MODULE(mercury__higher_order_module42)
+	init_entry(mercury____Compare___higher_order__new_pred_0_0);
+	init_label(mercury____Compare___higher_order__new_pred_0_0_i4);
+	init_label(mercury____Compare___higher_order__new_pred_0_0_i5);
+	init_label(mercury____Compare___higher_order__new_pred_0_0_i3);
+	init_label(mercury____Compare___higher_order__new_pred_0_0_i10);
+	init_label(mercury____Compare___higher_order__new_pred_0_0_i16);
+BEGIN_CODE
+
+/* code for predicate '__Compare__'/3 in mode 0 */
+Define_static(mercury____Compare___higher_order__new_pred_0_0);
+	incr_sp_push_msg(7, "__Compare__");
+	detstackvar(7) = (Integer) succip;
+	detstackvar(1) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 1));
+	detstackvar(2) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 2));
+	detstackvar(3) = (Integer) field(mktag(0), (Integer) r1, ((Integer) 3));
+	detstackvar(4) = (Integer) field(mktag(0), (Integer) r2, ((Integer) 1));
+	detstackvar(5) = (Integer) field(mktag(0), (Integer) r2, ((Integer) 2));
+	detstackvar(6) = (Integer) field(mktag(0), (Integer) r2, ((Integer) 3));
+	r1 = (Integer) field(mktag(0), (Integer) r1, ((Integer) 0));
+	r2 = (Integer) field(mktag(0), (Integer) r2, ((Integer) 0));
+	{
+	Declare_entry(mercury__builtin_compare_int_3_0);
+	call_localret(ENTRY(mercury__builtin_compare_int_3_0),
+		mercury____Compare___higher_order__new_pred_0_0_i4,
+		STATIC(mercury____Compare___higher_order__new_pred_0_0));
+	}
+Define_label(mercury____Compare___higher_order__new_pred_0_0_i4);
+	update_prof_current_proc(LABEL(mercury____Compare___higher_order__new_pred_0_0));
+	if (((Integer) r1 == ((Integer) 0)))
+		GOTO_LABEL(mercury____Compare___higher_order__new_pred_0_0_i3);
+Define_label(mercury____Compare___higher_order__new_pred_0_0_i5);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(7);
+	decr_sp_pop_msg(7);
+	proceed();
+Define_label(mercury____Compare___higher_order__new_pred_0_0_i3);
+	r1 = (Integer) detstackvar(1);
+	r2 = (Integer) detstackvar(4);
+	{
+	Declare_entry(mercury__builtin_compare_int_3_0);
+	call_localret(ENTRY(mercury__builtin_compare_int_3_0),
+		mercury____Compare___higher_order__new_pred_0_0_i10,
+		STATIC(mercury____Compare___higher_order__new_pred_0_0));
+	}
+Define_label(mercury____Compare___higher_order__new_pred_0_0_i10);
+	update_prof_current_proc(LABEL(mercury____Compare___higher_order__new_pred_0_0));
+	if (((Integer) r1 != ((Integer) 0)))
+		GOTO_LABEL(mercury____Compare___higher_order__new_pred_0_0_i5);
+	r1 = (Integer) detstackvar(2);
+	r2 = (Integer) detstackvar(5);
+	{
+	Declare_entry(mercury____Compare___prog_data__sym_name_0_0);
+	call_localret(ENTRY(mercury____Compare___prog_data__sym_name_0_0),
+		mercury____Compare___higher_order__new_pred_0_0_i16,
+		STATIC(mercury____Compare___higher_order__new_pred_0_0));
+	}
+Define_label(mercury____Compare___higher_order__new_pred_0_0_i16);
+	update_prof_current_proc(LABEL(mercury____Compare___higher_order__new_pred_0_0));
+	if (((Integer) r1 != ((Integer) 0)))
+		GOTO_LABEL(mercury____Compare___higher_order__new_pred_0_0_i5);
+	r1 = (Integer) mercury_data_higher_order__base_type_info_higher_order_arg_0;
+	r2 = (Integer) detstackvar(3);
+	r3 = (Integer) detstackvar(6);
+	LVALUE_CAST(Word,succip) = (Integer) detstackvar(7);
+	decr_sp_pop_msg(7);
+	{
+	Declare_entry(mercury____Compare___mercury_builtin__list_1_0);
+	tailcall(ENTRY(mercury____Compare___mercury_builtin__list_1_0),
+		STATIC(mercury____Compare___higher_order__new_pred_0_0));
+	}
+END_MODULE
+
+#if (defined(USE_GCC_NONLOCAL_GOTOS) && !defined(USE_ASM_LABELS)) \
+	|| defined(PROFILE_CALLS) || defined(DEBUG_GOTOS) \
+	|| defined(DEBUG_LABELS) || !defined(SPEED) \
+	|| defined(NATIVE_GC) 
+
+static void mercury__higher_order_bunch_0(void)
+{
+	mercury__higher_order_module0();
+	mercury__higher_order_module1();
+	mercury__higher_order_module2();
+	mercury__higher_order_module3();
+	mercury__higher_order_module4();
+	mercury__higher_order_module5();
+	mercury__higher_order_module6();
+	mercury__higher_order_module7();
+	mercury__higher_order_module8();
+	mercury__higher_order_module9();
+	mercury__higher_order_module10();
+	mercury__higher_order_module11();
+	mercury__higher_order_module12();
+	mercury__higher_order_module13();
+	mercury__higher_order_module14();
+	mercury__higher_order_module15();
+	mercury__higher_order_module16();
+	mercury__higher_order_module17();
+	mercury__higher_order_module18();
+	mercury__higher_order_module19();
+	mercury__higher_order_module20();
+	mercury__higher_order_module21();
+	mercury__higher_order_module22();
+	mercury__higher_order_module23();
+	mercury__higher_order_module24();
+	mercury__higher_order_module25();
+	mercury__higher_order_module26();
+	mercury__higher_order_module27();
+	mercury__higher_order_module28();
+	mercury__higher_order_module29();
+	mercury__higher_order_module30();
+	mercury__higher_order_module31();
+	mercury__higher_order_module32();
+	mercury__higher_order_module33();
+	mercury__higher_order_module34();
+	mercury__higher_order_module35();
+	mercury__higher_order_module36();
+	mercury__higher_order_module37();
+	mercury__higher_order_module38();
+	mercury__higher_order_module39();
+	mercury__higher_order_module40();
+}
+
+static void mercury__higher_order_bunch_1(void)
+{
+	mercury__higher_order_module41();
+	mercury__higher_order_module42();
+}
+
+#endif
+
+void mercury__higher_order__init(void); /* suppress gcc warning */
+void mercury__higher_order__init(void)
+{
+#if (defined(USE_GCC_NONLOCAL_GOTOS) && !defined(USE_ASM_LABELS)) \
+	|| defined(PROFILE_CALLS) || defined(DEBUG_GOTOS) \
+	|| defined(DEBUG_LABELS) || !defined(SPEED) \
+	|| defined(NATIVE_GC) 
+
+	mercury__higher_order_bunch_0();
+	mercury__higher_order_bunch_1();
+#endif
+}

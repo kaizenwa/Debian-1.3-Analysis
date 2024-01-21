@@ -1,0 +1,41 @@
+#!/usr/local/bin/expect --
+# a dumb little 'expect' program to check the status of gw.wd0fhg.ampr.org
+
+set timeout 5
+set addr "44.32.0.32"
+set call "WD0FHG"
+set pass ""
+set prompt "empire>*"
+
+puts [timestamp -format %c]		;# time tag the output
+
+spawn telnet $addr
+expect "login: " { send "$call\r" }
+expect "word: " { send "$pass\r" }
+
+expect "NET/ROM*"  { send "j \r" }	;# for now we will just look at ax0
+
+expect  {			;# no easy way to tell that the list is 
+				;# complete so we'll just time out
+	"NET/WRONG*"  {}	;# looking for we can't find.
+	}
+
+expect "*"	{ send "\r@\r" };# flush the expect buffer and go to sysop
+
+expect $prompt	{ send "uptime\r" }
+expect $prompt	{ send "syncstat\r" }
+expect $prompt	{ send "asystat\r" }
+expect $prompt	{ send "dom db\r" }
+expect $prompt	{ send "route\r" }
+expect $prompt	{ send "exit\r" }
+
+expect "mode...*"	{ }
+
+expect "*"	{ send "\rb\r" };# flush the expect buffer and signoff
+
+expect "closed*"		;# wait for the connection to close
+
+exec sleep 3
+
+expect eof
+

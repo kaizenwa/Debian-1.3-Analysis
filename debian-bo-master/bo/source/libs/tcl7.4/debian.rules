@@ -1,0 +1,105 @@
+#! /usr/bin/make -f
+#
+# To make the distributed dpkg archive, the ``Debianized'' source package
+# and the context diff to the original package, type `./debian.rules dist'.
+# Make sure that `debian.rules' is executable before the final distribution
+# is made.
+#
+# Invoke each target with `./debian.rules <target>'.  All targets should be
+# invoked with the package root as the current directory.
+
+bp = tcl
+p = tcl74
+bv = 7.4
+v = 7.4p3
+d = 5
+a = $(shell dpkg --print-architecture)
+
+build:
+# Builds the binary package.
+	./configure --prefix=/usr
+	make CC=gcc CFLAGS="-O2 -s" LDFLAGS=-s
+	touch stamp-build
+
+clean:
+# Undoes the effect of `make -f debian.rules build'.
+	make distclean
+	rm -f stamp-build
+	rm -rf run-tmp dev-tmp
+
+binary:
+# Makes a binary package.
+	test -f stamp-build || make -f debian.rules build
+	#
+	rm -rf run-tmp dev-tmp
+	install -d run-tmp dev-tmp
+	chmod g-s run-tmp dev-tmp
+	#
+	install -d run-tmp/usr
+	make INSTALL_ROOT=`pwd`/run-tmp install
+	strip run-tmp/usr/lib/libtcl$(bv).so.1
+	strip --strip-debug run-tmp/usr/lib/libtcl$(bv).a
+	#
+	cd run-tmp/usr/man/man1 && \
+	  mv tclsh.1 tclsh$(bv).1
+	install -d dev-tmp/usr
+	mv -f run-tmp/usr/include dev-tmp/usr
+	install -d dev-tmp/usr/lib
+	mv -f run-tmp/usr/lib/lib*.{a,so} dev-tmp/usr/lib
+	install -d dev-tmp/usr/man
+	mv -f run-tmp/usr/man/man3 dev-tmp/usr/man
+	#
+	install -d run-tmp/usr/doc/$(p)
+	install -m 644 README run-tmp/usr/doc/$(p)
+	install -m 644 changes run-tmp/usr/doc/$(p)
+	gzip -9f run-tmp/usr/doc/$(p)/*
+	install -m 644 license.terms run-tmp/usr/doc/$(p)/copyright
+	install -d dev-tmp/usr/doc
+	ln -sf $(p) dev-tmp/usr/doc/$(p)-dev
+	#
+	install -d run-tmp/DEBIAN
+	sed -e 's/PpP/$(p)/' -e 's/VvV/$(v)/' -e 's/DdD/$(d)/' \
+	  -e 's/AaA/$(a)/' debian.control-run > run-tmp/DEBIAN/control
+	sed -e 's/PpP/$(p)/' -e 's/VvV/$(v)/' -e 's/DdD/$(d)/' \
+	  -e 's/BbB/$(bv)/' debian.shlibs > run-tmp/DEBIAN/shlibs
+	install -m 755 debian.postinst-run run-tmp/DEBIAN/postinst
+	install -m 755 debian.prerm-run run-tmp/DEBIAN/prerm
+	install -d dev-tmp/DEBIAN
+	sed -e 's/PpP/$(p)/' -e 's/VvV/$(v)/' -e 's/DdD/$(d)/' \
+	  -e 's/AaA/$(a)/' debian.control-dev > dev-tmp/DEBIAN/control
+	#
+	chmod -R g-w run-tmp dev-tmp
+	chown -R root.root run-tmp dev-tmp
+	dpkg --build run-tmp
+	dpkg-name -o -s .. run-tmp.deb
+	dpkg --build dev-tmp
+	dpkg-name -o -s .. dev-tmp.deb
+
+source:
+# Makes a source package.
+	-test -f stamp-build && make -f debian.rules clean
+	( cd .. && \
+	  tar cf $(p)_$(v)-$(d).tar $(bp)$(bv) && \
+	  gzip -9f $(p)_$(v)-$(d).tar )
+
+diff:
+# Makes a context diff.
+	-test -f stamp-build && make -f debian.rules clean
+	test -d ../$(bp)$(bv).orig || \
+	  ( echo "Original not available in ../$(bp)$(bv).orig." ; false )
+	( cd .. && \
+	  ( diff -uNr $(bp)$(bv).orig $(bp)$(bv) > $(p)_$(v)-$(d).diff ; \
+	    [ $$? = 1 ] ) && \
+	  gzip -9f $(p)_$(v)-$(d).diff )
+
+FILES = $(p)_$(v)-$(d).tar.gz $(p)_$(v)-$(d).diff.gz \
+	$(p)_$(v)-$(d)_$(a).deb $(p)-dev_$(v)-$(d)_$(a).deb
+
+dchanges:
+# Prepares the .changes file.
+	( cd .. && \
+	  dchanges -n -e -p ce=$(bp)$(bv)/debian.changes $(FILES) \
+	)
+
+dist: binary source diff dchanges
+# Prepares the package for distribution.

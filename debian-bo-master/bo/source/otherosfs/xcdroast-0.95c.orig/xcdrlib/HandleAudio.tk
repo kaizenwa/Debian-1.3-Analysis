@@ -1,0 +1,250 @@
+# Module: HandleAudio.tk 
+# 6.4.96 T.Niederreiter
+#
+# External called funktions:
+#
+# - preplay_doit { w }: plays an audio-track interactively
+#
+# - audioplay_doit { w }: plays an audio-track on HD
+#
+
+# Opens a new window and starts the audioplay subprocess
+
+proc preplay_doit { w } {
+global READCDDA
+global PLAYICO PAUSEICO QUITICO STOPICO
+global preplay_track
+global preplay_off1
+global preplay_off2
+global XCDR_SOURCE_CDROM
+global XCDR_DSP_DEV
+global pre_fileseconds
+global ENDIANSWAP
+global pipe tmpw tmpcur
+
+	set genname [ convertnametogendevice $XCDR_SOURCE_CDROM ]
+	set blkname [ convertnametoblkdevice $XCDR_SOURCE_CDROM ]
+
+	if { $ENDIANSWAP == 1 } {
+		set swap "-x"
+	} else {
+		set swap ""
+	} 
+	set cmd "$READCDDA -D $genname -B $blkname -t $preplay_track -o $preplay_off1 -s $preplay_off2 -e $XCDR_DSP_DEV -q -n $swap -T -S 1"
+	set pipe [open "|$cmd" r+]
+	set pre_fileseconds [gets $pipe]
+
+	frame $w.up
+	frame $w.down
+	frame $w.up.tmpspace -width 5
+	canvas $w.up.c -height 30 -width 296 -borderwidth 2 -relief sunken
+	pre_drawticks $w.up.c $pre_fileseconds
+	set cursor [$w.up.c create polygon 0 0 0 0 0 0 0 0 -fill black]
+	label $w.up.l -height 2 -width 6 -relief sunken -borderwidth 2 -anchor c
+	
+	button $w.down.bquit -bitmap @$QUITICO -command \
+        	"puts $pipe quit; flush $pipe; catch {close $pipe}; pre_quit $w" 
+	button $w.down.bstop -bitmap @$STOPICO -command \
+		"puts $pipe stop; flush $pipe"
+	button $w.down.bplay -bitmap @$PLAYICO -command \
+		"puts $pipe play; flush $pipe"
+	button $w.down.bpause -bitmap @$PAUSEICO -command \
+		"puts $pipe pause; flush $pipe"
+
+	set total [presec2min $pre_fileseconds]
+
+	message $w.down.ename -text "Track $preplay_track: $total" -width 180 \
+		-relief sunken
+
+	pack $w.up $w.down -side top -expand 1 -fill x -padx 10 -pady 10
+	pack $w.up.c $w.up.tmpspace $w.up.l -side left 
+	pack $w.down.bquit $w.down.bpause $w.down.bstop $w.down.bplay \
+		-ipadx 5 -ipady 5 -side right
+	pack $w.down.ename -side left -fill both -expand 1
+	update
+
+	bind $w.up.c <Button-1> { pre_setslider %x }
+	
+	set out 0
+	set playstatus 0
+	set playsec 0
+	set tmpw $w
+	set tmpcur $cursor
+
+	# Wait for input in the pipe, then excute script
+	fileevent $pipe readable {
+		global pipe tmpw tmpcur 
+
+		set out [gets $pipe] 
+		if {$out != "" } { 
+         		scan $out "%c%d" playstatus playsec
+          		pre_drawslider $tmpw.up.c $playsec $tmpcur 
+          		$tmpw.up.l configure -text [ presec2min $playsec ] 
+
+			# Are we getting status "stop" ?
+          		if {$playstatus == "115"} {  
+           			$tmpw.down.bplay configure -relief raised 
+           			if {$playsec != "0" } {
+             				$tmpw.down.bpause configure -relief sunken
+           			} 
+          		} else {
+          			$tmpw.down.bplay configure -relief sunken 
+          			$tmpw.down.bpause configure -relief raised
+          		}
+        	}
+	}
+}
+
+
+# Convert the coordinates where you clicked into seconds
+
+proc pre_convert_x_to_sec { x fileseconds} {
+        return [expr ($x-10)*$fileseconds/283]
+}
+
+
+# Convert seconds to screen coordinates
+
+proc pre_convert_sec_to_x { s fileseconds} {
+        return [expr ($s*283/$fileseconds)+10]
+}
+
+
+# Called when on the slider is clicked, used
+# to set the play position
+
+proc pre_setslider { x } {
+global pipe
+global pre_fileseconds 
+
+        set s [pre_convert_x_to_sec $x $pre_fileseconds]
+        if { $s < 0 } { set s 0 }
+        if { $s > $pre_fileseconds} { set s $pre_fileseconds }
+        puts $pipe "set$s"
+        flush $pipe
+}
+
+
+# Draw the slider
+
+proc pre_drawslider { c s cursor } {
+global pre_fileseconds 
+
+        set x [pre_convert_sec_to_x $s $pre_fileseconds]
+        $c coords $cursor [expr $x-4] 7 [expr $x+4] 30 \
+                          [expr $x-4] 30 [expr $x+4] 7 
+        update
+}  
+
+
+# Draw the 10-sec ticks into the slider-bar
+
+proc pre_drawticks { c fileseconds } {
+
+        $c create line 10 6 10 31
+        $c create line 293 6 293 31 
+        $c create line 10 18 293 18 
+        for {set i 0} {$i < $fileseconds} {incr i 10} {
+                set x [pre_convert_sec_to_x $i $fileseconds]
+                $c create line $x 16 $x 21
+            }
+}
+
+proc presec2min { playsec } {
+
+	set min [expr $playsec/60]
+	set sec [expr $playsec%60]
+	return [format "%u:%02u" $min $sec]	
+}
+
+# Called when quit-button is pressed
+
+proc pre_quit { w } {
+
+	destroy $w
+}
+
+
+# Opens a new window and starts the audioplay subprocess
+
+proc audioplay_doit { w } {
+global PLAYCDDA
+global PLAYICO PAUSEICO QUITICO STOPICO
+global XCDR_DSP_DEV
+global ENDIANSWAP
+global audioplayfname
+global pre_fileseconds
+global pipe tmpw tmpcur
+
+	if { $ENDIANSWAP == 1 } {
+		set swap "-x"
+	} else {
+		set swap ""
+	} 
+
+	set cmd "$PLAYCDDA -q -T $swap -d $XCDR_DSP_DEV $audioplayfname"
+	set pipe [open "|$cmd" r+]
+	set filesize [file size $audioplayfname]
+	set pre_fileseconds [expr $filesize/2352/75]
+
+	frame $w.up
+	frame $w.down
+	frame $w.up.tmpspace -width 5
+	canvas $w.up.c -height 30 -width 296 -borderwidth 2 -relief sunken
+	pre_drawticks $w.up.c $pre_fileseconds
+	set cursor [$w.up.c create polygon 0 0 0 0 0 0 0 0 -fill black]
+	label $w.up.l -height 2 -width 6 -relief sunken -borderwidth 2 -anchor c
+	
+	button $w.down.bquit -bitmap @$QUITICO -command \
+        	"puts $pipe quit; flush $pipe; catch {close $pipe}; pre_quit $w" 
+	button $w.down.bstop -bitmap @$STOPICO -command \
+		"puts $pipe stop; flush $pipe"
+	button $w.down.bplay -bitmap @$PLAYICO -command \
+		"puts $pipe play; flush $pipe"
+	button $w.down.bpause -bitmap @$PAUSEICO -command \
+		"puts $pipe pause; flush $pipe"
+
+	set total [presec2min $pre_fileseconds]
+
+	message $w.down.ename -text "File [file tail $audioplayfname]: $total" -width 180 \
+		-relief sunken
+
+	pack $w.up $w.down -side top -expand 1 -fill x -padx 10 -pady 10
+	pack $w.up.c $w.up.tmpspace $w.up.l -side left 
+	pack $w.down.bquit $w.down.bpause $w.down.bstop $w.down.bplay \
+		-ipadx 5 -ipady 5 -side right
+	pack $w.down.ename -side left -fill both -expand 1
+	update
+
+	bind $w.up.c <Button-1> { pre_setslider %x }
+	
+	set out 0
+	set playstatus 0
+	set playsec 0
+	set tmpw $w
+	set tmpcur $cursor
+
+	# Wait for input in the pipe, then excute script
+	fileevent $pipe readable {
+		global pipe tmpw tmpcur
+
+		set out [gets $pipe] 
+		if {$out != "" } { 
+         		scan $out "%c%d" playstatus playsec
+          		pre_drawslider $tmpw.up.c $playsec $tmpcur 
+          		$tmpw.up.l configure -text [ presec2min $playsec ] 
+
+			# Are we getting status "stop" ?
+          		if {$playstatus == "115"} {  
+           			$tmpw.down.bplay configure -relief raised 
+           			if {$playsec != "0" } {
+             				$tmpw.down.bpause configure -relief sunken
+           			} 
+          		} else {
+          			$tmpw.down.bplay configure -relief sunken 
+          			$tmpw.down.bpause configure -relief raised
+          		}
+        	}
+	}
+}
+

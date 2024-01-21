@@ -1,0 +1,72 @@
+# Gcov test driver.
+
+# Load support procs.
+load_lib gcc-dg.exp
+
+global CC
+
+# For now find gcov in the same directory as $CC.
+if [string match "*/*" [lindex $CC 0]] {
+    set GCOV [file dirname [lindex $CC 0]]/gcov
+} else {
+    set GCOV gcov
+}
+
+# Proc to delete the working files created by the compiler for gcov.
+
+proc clean-gcov { testcase } {
+    set basename [file tail $testcase]
+    set base [file rootname $basename]
+    catch "exec rm -f $base.bb $base.bbg $base.da $basename.gcov"
+}
+
+# Called by dg-final to run gcov and analyze the results.
+
+proc run-gcov { testcase } {
+    global GCOV
+
+    verbose "Running $GCOV $testcase" 2
+    if [catch "exec $GCOV $testcase" errmsg] {
+	fail "gcov failed: $errmsg"
+	clean-gcov $testcase
+	return
+    }
+
+    set output [grep $testcase.gcov ".*count\\(\[0-9\]+\\)" line]
+    #send_user "output:$output\n"
+    set failed 0
+    foreach line $output {
+	verbose "Processing count line: $line" 3
+	#send_user "line:$line\n"
+	if [regexp "(\[0-9\]+) *(\[0-9\]+).*count\\((\[0-9\]+)\\)" "$line" all n is shouldbe] {
+	    #send_user "n $n:is $is:shouldbe $shouldbe\n"
+	    if { $is == "" } {
+		fail "$testcase:$n:no data available for this line"
+		incr failed
+	    } elseif { $is != $shouldbe } {
+		fail "$testcase:$n:is $is:should be $shouldbe"
+		incr failed
+	    }
+	} else {
+	    fail "$testcase: can't parse $line (in wrong place?)"
+	    incr failed
+	}
+    }
+    clean-gcov $testcase
+    if !$failed {
+	pass "gcov $testcase"
+    }
+}
+
+# Initialize harness.
+dg-init
+
+# Delete old .da files.
+catch "exec rm -f [glob -nocomplain gcov-*.da]"
+
+# Main loop.
+dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/gcov-*.c]] "" ""
+
+# All done.
+#catch "exec rm -f [glob -nocomplain gcov-*.bb gcov-*.bbg gcov-*.da gcov-*.gcov]"
+dg-finish

@@ -1,0 +1,228 @@
+# Makefile for interface-independent code in Xconq.
+# Copyright (C) 1992, 1993, 1994, 1995 Stanley T. Shebs.
+
+# Xconq is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+
+prefix = /usr/games
+
+exec_prefix = $(prefix)
+bindir = $(exec_prefix)/bin
+libdir = $(exec_prefix)/lib
+datadir = $(prefix)/lib/xconq
+mandir = $(prefix)/man
+man6dir = $(mandir)/man6
+infodir = $(prefix)/info
+docdir = $(datadir)/doc
+
+srcdir = .
+srcroot = $(srcdir)/..
+
+SHELL = /bin/sh
+
+INSTALL = install -c
+INSTALL_PROGRAM = $(INSTALL)
+INSTALL_DATA = $(INSTALL)
+
+CC = cc
+
+CFLAGS = -g
+
+AR = ar
+
+AR_FLAGS = rcu
+
+RANLIB = ranlib
+
+# Host and target-dependent makefile fragments come in here.
+####
+# End of host and target-dependent makefile fragments.
+
+LISP_H = lisp.h keyword.def
+
+GAME_H = game.h utype.def mtype.def ttype.def gvar.def table.def
+
+UNIT_H = unit.h action.def plan.def task.def goal.def
+
+HISTORY_H = history.h history.def
+
+ALL_H = conq.h config.h misc.h dir.h $(LISP_H) module.h $(GAME_H) \
+	player.h side.h $(UNIT_H) world.h $(HISTORY_H) score.h help.h \
+	ai.h system.h
+
+# Non-interface-specific object files.
+
+OBJS = \
+	init.o \
+	cmdline.o \
+	ai.o \
+	mplayer.o \
+	actions.o \
+	combat.o \
+	run.o \
+	score.o \
+	world.o \
+	history.o \
+	module.o \
+	write.o \
+	read.o \
+	mkterr.o \
+	mkunits.o \
+	mkrivers.o \
+	mkroads.o \
+	mknames.o \
+	side.o \
+	unit.o \
+	plan.o \
+	task.o \
+	nlang.o \
+	ui.o \
+	ps.o \
+	help.o \
+	copying.o
+
+LOBJS = \
+	imf.o \
+	lisp.o \
+	util.o \
+	unix.o
+
+# Object files needed by nonspecialized executables.
+
+GOBJS =	generic.o \
+	types.o \
+	tables.o
+
+# Random C compiler flags.
+
+UNIX_CFLAGS = -DUNIX -DXCONQLIB=\"$(datadir)\"
+
+ALL_CFLAGS = $(CFLAGS) $(UNIX_CFLAGS) -I$(srcdir)
+
+.c.o:
+	$(CC) -c $(ALL_CFLAGS) $<
+
+# Do it all.
+# (We used to build skelconq always, but between it and the .a files and
+# all the debugging info, a lot of space is chewed up; so if you want to
+# run tests or whatever, build it explicitly.)
+
+all: libconq.a libconqlow.a
+
+# The kernel library.  This is linked with interface code.
+
+libconq.a: $(OBJS) $(GOBJS)
+	rm -f libconq.a
+	$(AR) $(AR_FLAGS) libconq.a $(OBJS) $(GOBJS) 
+	$(RANLIB) libconq.a
+
+# The low-level kernel library.  This is linked with both complete games
+# and with GDL-using tools.
+
+libconqlow.a: $(LOBJS)
+	rm -f libconqlow.a
+	$(AR) $(AR_FLAGS) libconqlow.a $(LOBJS)
+	$(RANLIB) libconqlow.a
+
+# Specialized version (note that generic type/table code not linked in).
+#
+#conq-s.a: $(OBJS)
+#	rm -f conq-s.a
+#	ar ru conq-s.a $(OBJS)
+#	ranlib conq-s.a
+
+# Test version of xconq.
+
+skelconq: skelconq.o compile.o libconq.a libconqlow.a
+	rm -f skelconq
+	$(CC) -o skelconq $(ALL_CFLAGS) skelconq.o compile.o libconq.a libconqlow.a
+
+imf2imf: imf2imf.o libconqlow.a
+	rm -f imf2imf
+	$(CC) -o imf2imf $(ALL_CFLAGS) imf2imf.o libconqlow.a
+
+# Support things.
+
+# (should do with a shell script, then can intercept failures)
+special.h: skelconq
+	skelconq <compile >special.h
+
+skelconq.6:	skelconq.6in ../kernel/cmdline.6in
+	sed -e '/.so ...kernel.cmdline.6in/r $(srcdir)/../kernel/cmdline.6in' -e '/.so ...kernel.cmdline.6in/d' $(srcdir)/skelconq.6in >skelconq.6.new
+	$(srcdir)/../move-if-change skelconq.6.new skelconq.6
+
+install: all install-only
+
+# Note that skelconq is not really something that we want to install
+# anywhere.
+
+install-only:
+
+# Usual cleaning, and flushing of anything junk-like.
+
+clean:
+	rm -f *.o lint.out core
+	rm -f *.a *conq *.log
+
+distclean: clean
+	rm -f Makefile config.status
+
+realclean: distclean
+
+Makefile: Makefile.in $(host_makefile_frag) $(target_makefile_frag)
+	$(SHELL) config.status
+
+# All the .h dependencies.
+
+init.o:		$(ALL_H) version.h
+cmdline.o:	$(ALL_H)
+mknames.o:	$(ALL_H)
+ai.o:		$(ALL_H)
+actions.o:	$(ALL_H)
+combat.o:	$(ALL_H)
+plan.o:		$(ALL_H)
+task.o:		$(ALL_H)
+run.o:		$(ALL_H)
+score.o:	$(ALL_H)
+world.o:	$(ALL_H)
+history.o:	$(ALL_H)
+module.o:	$(ALL_H)
+read.o:		$(ALL_H) keyword.def
+write.o:	$(ALL_H)
+side.o:		$(ALL_H)
+unit.o:		$(ALL_H)
+help.o:		$(ALL_H)
+copying.o:	$(ALL_H)
+nlang.o:	$(ALL_H)
+util.o:		$(ALL_H)
+mkunits.o:	$(ALL_H)
+mkterr.o:	$(ALL_H)
+mkrivers.o:	$(ALL_H)
+mkroads.o:	$(ALL_H)
+mplayer.o:	$(ALL_H)
+
+generic.o:	config.h misc.h $(LISP_H) $(GAME_H)
+types.o:	config.h misc.h $(LISP_H) $(GAME_H)
+tables.o:	config.h misc.h $(LISP_H) $(GAME_H)
+
+imf.o:		config.h misc.h $(LISP_H) imf.h
+
+lisp.o:		config.h misc.h $(LISP_H)
+
+unix.o:		config.h misc.h dir.h $(LISP_H) module.h system.h
+
+ui.o:		$(ALL_H) ui.h imf.h
+
+ps.o:		$(ALL_H) print.h
+
+skelconq.o:	$(ALL_H) print.h
+
+imf2imf.o:	config.h misc.h $(LISP_H) imf.h
+
+# This *must* be compiled by a proper ANSI compiler.
+
+compile.o:	$(ALL_H)
+#	gcc $(ALL_CFLAGS) -c compile.c
+#	$(CC) -c compile.c

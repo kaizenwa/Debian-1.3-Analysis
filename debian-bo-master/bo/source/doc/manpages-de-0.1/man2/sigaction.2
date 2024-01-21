@@ -1,0 +1,235 @@
+.\" Copyright (c) 1994 Mike Battersby <mike@starbug.apana.org.au>
+.\" based on work by faith@cs.unc.edu
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\"
+.\" German translation by René Tschirley (gremlin@cs.tu-berlin.de)
+.\"
+.TH SIGACTION 2 "24 September 1994" "Linux 1.0" "Systemaufrufe"
+
+.SH BEZEICHNUNG
+sigaction, sigprocmask, sigpending, sigsuspend \- POSIX Funktionen zur
+Signalbenutzung.
+
+.SH ÜBERSICHT
+.B #include <signal.h>
+.sp
+.BI "int sigaction(int " signum ", const struct sigaction *" act ","
+.BI "struct sigaction *" oldact );
+.sp
+.BI "int sigprocmask(int " how ", const sigset_t *" set ", "
+.BI "sigset_t *" oldset );
+.sp
+.BI "int sigpending(sigset_t *" set );
+.sp
+.BI "int sigsuspend(const sigset_t *" mask );
+
+.SH BESCHREIBUNG
+Der Systemaufruf
+.B sigaction
+kann zur Veränderung der Aktion für ein Signal benutzt werden.
+
+.I signum
+gibt das Signal an, es kann jedes gültige Signal außer
+.B SIGKILL
+und
+.B SIGSTOP
+sein.
+
+Wenn
+.I act
+nicht Null ist, wird
+.IR act
+als Aktion für das Signal
+.I signum
+eingebunden.
+Wenn
+.I oldact
+nicht Null ist, wird die vorherige Aktion in
+.IR oldact
+gespeichert.
+.PP
+Die Struktur
+.B sigaction
+wird definiert durch
+.sp
+.RS
+.nf
+struct sigaction {
+    void (*sa_handler)(int);
+    sigset_t sa_mask;
+    int sa_flags;
+    void (*sa_restorer)(void);
+}
+.fi
+.RE
+.PP
+Mögliche Werte für
+.I sa_handler
+sind
+.B SIG_DFL
+für die voreingestellte Aktion,
+.B SIG_IGN
+um dieses Signal zu ignorieren oder ein Zeiger auf eine
+Signalhandlerfunktion.
+.PP
+.I sa_mask
+ist eine Signalmaske, die angibt, welche Signale während der
+Ausführung des Signalhandlers blockiert werden sollen.
+.PP
+.I sa_flags
+ist das Ergebnis einer bitweisen ODER-Verknüpfung von Null oder
+mehreren der folgenden Flags
+.RS
+.TP
+.B SA_NOCLDSTOP
+Verhindert die Auslösung von SIGCHLD-Signalen wenn ein Kindprozeß
+terminiert.
+.TP
+.B SA_ONESHOT
+Stellt den Ausgangszustand des Status wieder her, der vor Aufruf des
+Signalhandlers vorlag.  Dies ist das voreingestellte Verhalten.
+.TP
+.B SA_RESTART
+Das Gegenstück zu
+.BR SA_ONESHOT ,
+womit der Ausgangszustand von vor Aufruf des Signalhandlers nicht
+wiederhergestellt wird.  Dies erlaubt kompatibles Verhalten zur BSD
+Signalsemantik.
+.TP
+.B SA_NOMASK
+Es soll nicht verhindert werden, daß der Empfang des Signals selbst in
+seiner Signalhandlerfunktion möglich ist.
+.RE
+.PP
+Das Element
+.I sa_restorer
+ist veraltet und sollte nicht mehr benutzt werden.
+.PP
+Die Funktion
+.B sigprocmask
+wird benutzt, um die Liste der augenblicklich blockierten Signale zu
+verändern.  Das Verhalten der Funktion ist abhängig vom Wert von
+.IR how ,
+das die folgenden Werte annehmen kann.
+.RS
+.TP
+.B SIG_BLOCK
+Zu blockierende Signale sind die bereits als zu blockierenden plus die
+im Argument
+.I set
+angegebenen.
+.TP
+.B SIG_UNBLOCK
+Die Signale in 
+.I set
+werden von der Liste der zu blockierenden Signale gestrichen.  Es ist
+kein Fehler, Signale zu entfernen, die nicht blockiert werden sollten.
+.TP
+.B SIG_SETMASK
+Die zu blockierenden Signale sind die im Argument
+.IR set
+angegebenen.
+.RE
+.PP
+Ist das Argument
+.I oldset
+nicht Null, wird der vorherige Wert der Signalmaske in
+.IR oldset
+abgelegt.
+.PP
+Die Funktion
+.B sigpending
+erlaubt die Untersuchung von bereits anliegenden weiteren Signalen,
+die ausgelöst wurden, während sie blockiert waren.  Die Signalmaske
+wartender Signale wird in
+.IR set
+abgelegt.
+.PP
+Die Funktion
+.B sigsuspend
+ersetzt termporär die Signalmaske des Prozesses mit dem Argument
+.I mask
+und unterbricht den Prozeß dann bis ein Signal empfangen wird.
+
+.SH "RÜCKGABEWERTE"
+.BR sigaction ,
+.BR sigprocmask ,
+.B sigpending
+und
+.B sigsuspend
+liefern 0 bei Erfolg und -1 bei aufgetretenen Fehlern.
+
+.SH FEHLER
+.TP
+.B EINVAL
+Ein ungültiges Signal wurde angegeben.  Dieser Fehler wird auch
+ausgelöst, wenn die Aktion für SIGKILL oder SIGSTOP versucht wird, zu
+ändern, da diese Aktionen nicht abgefangen werden können.
+.TP
+.B EFAULT
+.IR act ,
+.I oldact
+oder der Signalhandler verweisen auf Speicherbereiche, die keine
+gültigen Teile des Adreßraumes des Prozesses sind.
+.TP
+.B EINTR
+Der Systemaufruf wurde unterbrochen.
+
+.SH ANMERKUNGEN
+Es ist nicht möglich, mit der Funktion sigprocmask die Signale SIGKILL
+oder SIGSTOP zu blockieren.  Versuche werden stillschweigend
+unterdrückt.
+.PP
+Die POSIX Spezifikationen definieren lediglich
+.BR SA_NOCLDSTOP .
+Die Benutzung von 
+.B SA_ONESHOT
+und
+.B SA_RESTART
+ist nicht portabel.
+.PP
+Wird
+.B sigaction
+mit Null als zweitem Argument aufgerufen, kann der augenblickliche
+Signalhandler abgefragt werden.  Die Funktion kann auch dazu benutzt
+werden, die Gültigkeit eines Signales für die augenblickliche Maschine
+zu überprüfen, indem sie mit Null als zweitem und drittem Argument
+aufgerufen wird.
+.PP
+Siehe auch
+.BR sigsetops (3)
+für detaillierte Informationen über die Manipulation von Signalen.
+.SH "KONFORM ZU"
+POSIX
+
+.SH "SIEHE AUCH"
+.BR sigvec (2)
+.BR kill (1),
+.BR kill (2),
+.BR killpg (2),
+.BR pause (2),
+.BR raise (3),
+.BR siginterrupt (3),
+.BR signal (2),
+.BR signal (7),
+.BR sigsetops (3),
+.BR sigvec (2).

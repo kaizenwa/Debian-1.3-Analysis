@@ -1,0 +1,313 @@
+*** obj-format.c.orig	Fri Nov 11 12:04:18 1994
+--- obj-format.c	Fri Nov 11 12:15:32 1994
+***************
+*** 334,339 ****
+--- 334,342 ----
+  
+  static segT previous_section;
+  static int previous_subsection;
++ #ifdef TEST_EXECUTABLE
++ static int previous_executable;
++ #endif
+  
+  /* Handle the .section pseudo-op.  This code supports two different
+     syntaxes.  
+***************
+*** 445,450 ****
+--- 448,456 ----
+    /* Switch to the section, creating it if necessary.  */
+    previous_section = now_seg;
+    previous_subsection = now_subseg;
++ #ifdef TEST_EXECUTABLE
++   previous_executable = section_is_executable;
++ #endif
+  
+    new_sec = bfd_get_section_by_name (stdoutput, string) == NULL;
+    sec = subseg_new (string, 0);
+***************
+*** 604,609 ****
+--- 610,622 ----
+      }
+  
+    bfd_set_section_flags (stdoutput, sec, flags);
++  
++ #ifdef TEST_EXECUTABLE
++   if (flags & SEC_CODE)
++     section_is_executable = 1;
++   else
++     section_is_executable = 0;
++ #endif
+  
+    demand_empty_rest_of_line ();
+  }
+***************
+*** 616,621 ****
+--- 629,638 ----
+  {
+    previous_section = now_seg;
+    previous_subsection = now_subseg;
++ #ifdef TEST_EXECUTABLE
++   previous_executable = section_is_executable;
++   section_is_executable = 0;
++ #endif
+    s_data (i);
+  }
+  
+***************
+*** 627,632 ****
+--- 644,653 ----
+  {
+    previous_section = now_seg;
+    previous_subsection = now_subseg;
++ #ifdef TEST_EXECUTABLE
++   previous_executable = section_is_executable;
++   section_is_executable = 1;
++ #endif
+    s_text (i);
+  }
+  
+***************
+*** 640,645 ****
+--- 661,669 ----
+        return;
+      }
+    subseg_set (previous_section, previous_subsection);
++ #ifdef TEST_EXECUTABLE
++   section_is_executable = previous_executable;
++ #endif
+    previous_section = 0;
+  }
+  
+*** obj-format.h.orig	Fri Nov 11 12:11:00 1994
+--- obj-format.h	Fri Nov 11 12:13:44 1994
+***************
+*** 119,122 ****
+--- 119,124 ----
+  extern void elf_frob_symbol PARAMS ((struct symbol *));
+  #define obj_frob_symbol(symp, punt) elf_frob_symbol (symp)
+  
++ #define TEST_EXECUTABLE
++ 
+  #endif /* _OBJ_ELF_H */
+*** read.c.orig	Fri Nov 11 11:38:43 1994
+--- read.c	Fri Nov 11 12:02:23 1994
+***************
+*** 159,164 ****
+--- 159,168 ----
+  int new_broken_words;
+  #endif
+  
++ #ifdef TEST_EXECUTABLE
++ int section_is_executable = 0;
++ #endif
++ 
+  char *demand_copy_string PARAMS ((int *lenP));
+  int is_it_end_of_statement PARAMS ((void));
+  static segT get_segmented_expression PARAMS ((expressionS *expP));
+***************
+*** 560,566 ****
+  			  OBJ_GENERATE_ASM_LINENO (s, lineno);
+  		        }
+  #endif
+! 
+  		      md_assemble (s);	/* Assemble 1 instruction. */
+  
+  		      *input_line_pointer++ = c;
+--- 564,574 ----
+  			  OBJ_GENERATE_ASM_LINENO (s, lineno);
+  		        }
+  #endif
+! #ifdef TEST_EXECUTABLE
+! 		      /* Be sure this section is executable. */
+! 		      assert_executable(1);
+! #endif
+! 		      
+  		      md_assemble (s);	/* Assemble 1 instruction. */
+  
+  		      *input_line_pointer++ = c;
+***************
+*** 922,927 ****
+--- 930,939 ----
+    segT section;
+    register int temp;
+  
++ #ifdef TEST_EXECUTABLE
++   section_is_executable = 0;	/* This section is not executable! */
++ #endif
++   
+    temp = get_absolute_expression ();
+    if (flag_readonly_data_in_text)
+      {
+***************
+*** 1004,1010 ****
+    register long temp_fill = 0;
+    char *p;
+  
+! 
+    temp_repeat = get_absolute_expression ();
+    if (*input_line_pointer == ',')
+      {
+--- 1016,1025 ----
+    register long temp_fill = 0;
+    char *p;
+  
+! #ifdef TEST_EXECUTABLE
+!   assert_executable(0);
+! #endif
+!   
+    temp_repeat = get_absolute_expression ();
+    if (*input_line_pointer == ',')
+      {
+***************
+*** 1428,1433 ****
+--- 1443,1452 ----
+    register long temp_fill;
+    register char *p;
+  
++ #ifdef TEST_EXECUTABLE
++   assert_executable(0);
++ #endif
++   
+    /* Just like .fill, but temp_size = 1 */
+    if (get_absolute_expression_and_terminator (&temp_repeat) == ',')
+      {
+***************
+*** 1463,1468 ****
+--- 1482,1491 ----
+  {
+    register int temp;
+  
++ #ifdef TEST_EXECUTABLE
++   section_is_executable = 1;	/* This section is executable */
++ #endif
++   
+    temp = get_absolute_expression ();
+    subseg_set (text_section, (subsegT) temp);
+    demand_empty_rest_of_line ();
+***************
+*** 1664,1669 ****
+--- 1687,1696 ----
+  {
+    expressionS exp;
+  
++ #ifdef TEST_EXECUTABLE
++   assert_executable(0);
++ #endif
++   
+    if (is_it_end_of_statement ())
+      {
+        demand_empty_rest_of_line ();
+***************
+*** 2171,2176 ****
+--- 2198,2207 ----
+    register char *err;		/* Error from scanning floating literal. */
+    char temp[MAXIMUM_NUMBER_OF_CHARS_FOR_FLOAT];
+  
++ #ifdef TEST_EXECUTABLE
++   assert_executable(0);
++ #endif
++   
+    if (is_it_end_of_statement ())
+      {
+        demand_empty_rest_of_line ();
+***************
+*** 2253,2258 ****
+--- 2284,2293 ----
+  {
+    register unsigned int c;
+  
++ #ifdef TEST_EXECUTABLE
++   assert_executable(0);
++ #endif
++   
+    /*
+     * The following awkward logic is to parse ZERO or more strings,
+     * comma seperated. Recall a string expression includes spaces
+***************
+*** 2694,2698 ****
+--- 2729,2750 ----
+    ++input_line_pointer;
+  }
+  
++ #ifdef TEST_EXECUTABLE
++ void
++ assert_executable (flag)
++  int flag;
++ {
++   if (flag && !section_is_executable)
++     {
++       as_bad("Assemble an instruction in a not executable section");
++       return;
++     }
++   else if (!flag && section_is_executable)
++     {
++       as_bad("Bad pseudo-operation in a executable section");
++       return;
++     }
++ }
++ #endif
+  
+  /* end of read.c */
+*** read.h.orig	Fri Nov 11 11:39:13 1994
+--- read.h	Fri Nov 11 12:01:33 1994
+***************
+*** 58,63 ****
+--- 58,68 ----
+  /* This flag whether to generate line info for asm file */
+  extern int generate_asm_lineno;
+  
++ #ifdef TEST_EXECUTABLE
++ /* This flag whether to test if the section is good for the operation */
++ extern int section_is_executable;
++ #endif
++ 
+  #ifdef SEPARATE_STAB_SECTIONS
+  unsigned int get_stab_string_offset PARAMS ((const char *string,
+  					     const char *stabstr_secname));
+***************
+*** 104,108 ****
+--- 109,116 ----
+  void s_text PARAMS ((int));
+  void stringer PARAMS ((int append_zero));
+  void s_xstab PARAMS ((int what));
++ #ifdef TEST_EXECUTABLE
++ void assert_executable PARAMS((int flag));
++ #endif
+  
+  /* end of read.h */
+*** stabs.c.orig	Fri Nov 11 12:34:55 1994
+--- stabs.c	Fri Nov 11 12:34:45 1994
+***************
+*** 227,234 ****
+--- 227,242 ----
+  
+      if (what == 's' || what == 'n')
+        {
++ #ifdef TEST_EXECUTABLE
++ 	int previous_executable;
++ 	previous_executable = section_is_executable;
++ 	section_is_executable = 0;
++ #endif
+  	/* Pick up the value from the input line.  */
+  	cons (4);
++ #ifdef TEST_EXECUTABLE
++ 	section_is_executable = previous_executable;
++ #endif
+  	input_line_pointer--;
+        }
+      else
+*** targ-cpu.c.orig	Fri Nov 11 12:04:06 1994
+--- targ-cpu.c	Fri Nov 11 12:03:45 1994
+***************
+*** 2726,2731 ****
+--- 2726,2735 ----
+       int ignore;
+  {
+    register int temp;
++   
++ #ifdef TEST_EXECUTABLE
++   section_is_executable = 0;
++ #endif
+  
+    temp = get_absolute_expression ();
+    subseg_set (bss_section, (subsegT) temp);

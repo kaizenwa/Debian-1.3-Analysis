@@ -1,0 +1,89 @@
+#!/usr/bin/make -f
+
+package=html2latex
+version=0.9c
+debian=1
+arch=$(shell dpkg --print-architecture)
+
+gccversion=$(shell gcc -v 2>&1 | tail -1 | cut -d' ' -f3)
+ifeq ($(gccversion),2.7.2.l.3)
+CC="gcc -V2.7.2"
+else
+CC=gcc
+endif
+
+EXAMPLE_DIR=debian-tmp/usr/doc/examples/$(package)
+EXAMPLES=
+DOC_DIR=debian-tmp/usr/doc/$(package)
+DOCS=html2latex.html html2latex.tex debian.README debian.changelog
+
+build:
+	$(checkdir)
+	$(MAKE) LDFLAGS=-s CC=$(CC) CFLAGS="-g -O2"
+	touch build
+
+clean:
+	$(checkdir)
+	-/bin/rm -f build *~
+	$(MAKE) clean
+
+binary: build
+	test -f build || make -f debian.rules build
+	@-[ "`whoami`" != root ] && \
+	        echo "Enter the root password to build the .deb file"
+	@su -c "umask 22; exec make -f debian.rules binary-root"
+
+binary-root:
+	mkdir debian-tmp debian-tmp/DEBIAN
+	install -d debian-tmp/usr/doc/copyright
+	sed -e '2s/=/$(version)-$(debian)/' -e '12s/=/$(arch)/' \
+		debian.control > debian-tmp/DEBIAN/control
+	install -d debian-tmp/usr/bin
+	install -s -m 755 html2latex debian-tmp/usr/bin
+	install -m 644 debian.copyright debian-tmp/usr/doc/copyright/$(package)
+	install -d $(DOC_DIR)
+	for doc in $(DOCS) ; do \
+		gzip -9vc $$doc >$(DOC_DIR)/$$doc.gz ; done
+	chmod -R g-ws debian-tmp
+	dpkg --build debian-tmp && dpkg-name -o -s .. debian-tmp.deb
+	-rm -rf debian-tmp
+
+new: 
+	( perl -ne '\
+		if ( /^\s*$(package)\s*\($(version)-$(debian)\)/ ) \
+			{ $$copy=1 } \
+		print if $$copy;' \
+	  < debian.changelog ; \
+	) >../$(package)_$(version)-$(debian).new
+
+changes: binary source diff new
+	( cd ..; \
+	  dchanges ce=$(package)_$(version)-$(debian).new \
+		   $(package)_$(version)-$(debian)_$(arch).deb\
+		   $(package)_$(version)-$(debian).tar.gz \
+		   $(package)_$(version)-$(debian).diff.gz \
+	)
+
+define checkdir
+	test -f html2latex.html
+endef
+
+# Below here is fairly generic really
+
+source:		clean
+	chmod +x debian.rules
+	cd .. && \
+	tar cf $(package)_$(version)-$(debian).tar $(package)_$(version) && \
+	gzip -9vf $(package)_$(version)-$(debian).tar
+ 
+diff:		clean
+	cd .. && \
+	(diff -ruN $(package)_$(version).orig $(package)_$(version) \
+	 >$(package)_$(version)-$(debian).diff; [ $$? = 1 ]) && \
+	gzip -9vf $(package)_$(version)-$(debian).diff
+
+checkroot:
+	$(checkdir)
+	test root = "`whoami`"
+
+.PHONY: binary source diff clean checkroot announce md5sum

@@ -1,0 +1,57 @@
+#! /usr/bin/make -f
+#
+# Debian rules for building "dftp" package
+
+package	:= dftp
+
+default:
+	@echo "What to do?"
+	@echo " - build, build-user, binary, binary-user, source, diff,"
+	@echo " - distfiles, clean, realclean"
+	@echo " "
+
+build:
+	$(checkdir)
+	touch stamp-build
+
+clean:
+	$(checkdir)
+	-rm -f stamp-build
+	-rm -rf debian/tmp
+	find . \( -name "#*" -o -name "*~" \) -print | xargs rm -f
+
+binary:	checkroot build
+	-rm -rf debian/tmp
+	mkdir -p debian/tmp debian/tmp/DEBIAN debian/tmp/usr/doc/$(package)
+	mkdir -p debian/tmp/etc debian/tmp/usr/sbin
+	cp debian/conffiles debian/tmp/DEBIAN/conffiles
+	cp dftp.conf debian/tmp/etc
+	cp dftp debian/tmp/usr/sbin
+	cp debian/README debian/tmp/usr/doc/$(package)/Copyright
+	chown -R root.root debian/tmp
+	chmod -R go=rX debian/tmp
+	dpkg-gencontrol -is -ip
+	dpkg --build debian/tmp
+	dpkg-name -o -s .. debian/tmp.deb
+
+define checkdir
+	test -e dftp.conf
+endef
+
+dist:	source binary
+	cp dftp ../dftp_$(version)-$(debian).pl
+	@echo " "
+	ls -l ../$(package)*_$(version)-$(debian)*
+	@echo " "
+
+source:	clean
+	chmod +x debian/rules
+	cd .. && \
+	tar cfh $(package)_$(version)-$(debian).tar $(package)-$(version) && \
+	gzip -9vf $(package)_$(version)-$(debian).tar
+ 
+checkroot:
+	$(checkdir)
+	test root = "`whoami`"
+
+.PHONY: binary source diff clean clean checkroot distfiles

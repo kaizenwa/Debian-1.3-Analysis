@@ -1,0 +1,82 @@
+#!@PERL@
+##############################################################
+#
+# Script wrapper, mails output if there is any
+#
+# Mainly intended for running cfengine.
+#
+##############################################################
+
+if ($< != 0)
+   {
+   die "cfwrap: Bad luck, only root can run this one!\n";
+   }
+
+$mail = 0;
+
+
+$prefix = @prefix@;
+$ENV{CFINPUTS} = "$prefix/lib/cfengine/inputs";
+$ENV{LD_LIBRARY_PATH} = "/usr/ucblib";
+$sysadm = `$prefix/bin/cfengine -a`;
+
+$comm = join(" ",@ARGV);
+@path = split(m;/;,$comm);
+$suff = $path[$#path];
+$tmpfile = "/tmp/cfwrap.$$";
+$subjectfile = "/tmp/cfwrapsub.$$";
+
+open (H,"/bin/hostname |") || die "cfwrap: Can't get hostname";
+$hostname = <H>;
+chop $hostname;
+close(H);
+
+open (SH,"$comm 2>&1 | ") || die "cfwrap: Can't start shell\n";
+open (OUT,">/tmp/cfwrap.$$") || die "cfwrap: Can't open workfile\n";
+
+while (<SH>)
+   {
+   if ( /\S/ )
+      {
+      print OUT "$_";
+      $mail = 1;
+      }
+   }
+
+
+if ($mail)
+   {
+   open (SUB,">$subjectfile") || die "Cannot open $subjectfile\n";
+   print SUB "Subject: cfengine ($hostname)\n\n";
+   print SUB "This message originates from host $hostname\n";
+   print SUB "The full command issued was: $comm.\n\n";
+   close(SUB);
+   }
+
+close(OUT);
+close(SH);
+
+if ($mail)
+   {
+   system ("/bin/cat $subjectfile $tmpfile | $prefix/lib/cfengine/bin/cfmail $sysadm");
+   }
+
+unlink ("$subjectfile");
+unlink ("$tmpfile");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

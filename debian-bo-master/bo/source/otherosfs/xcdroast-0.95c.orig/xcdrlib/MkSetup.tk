@@ -1,0 +1,425 @@
+# Module: MkSetup.tk
+# 30.1.96 T.Niederreiter
+# 
+# External called functions:
+# - mksetup { w }: creates the setup-menu 
+#
+
+# Creates the Setup-Menu
+
+proc mksetup { w } {
+global forcesetup
+	
+	log $w "entering Setup"
+	# Save the XCDR* variables
+	backupglobals
+
+	# Draw header-bar
+	label $w.l -text "SETUP" -relief sunken -borderwidth 2 -anchor c
+	pack $w.l -fill x -expand 1 -ipady 10 -pady 5
+
+	# Create notebook and set background to gray
+	tixNoteBook $w.nb -ipadx 6 -ipady 6
+	$w config -bg gray
+	$w.nb subwidget nbframe config -backpagecolor gray
+
+	# Add pages in notebook
+	$w.nb add cd-setup -label "CD Setup"
+	$w.nb add hd-setup -label "HD Setup"
+	$w.nb add misc -label "Misc."
+	pack $w.nb -expand 1 -fill both -padx 5 -pady 5 -side top
+
+	# Create first page
+	set f [$w.nb subwidget cd-setup]
+	mksetup_cd $f
+
+	# Create second page
+	set f [$w.nb subwidget hd-setup]
+	mksetup_hd $f 
+
+	# Create third page
+	set f [$w.nb subwidget misc]
+	mksetup_misc $f
+
+	# Create button box
+	tixButtonBox $w.box -orientation horizontal
+	$w.box add ok -text "OK" -command "setup:ok_cmd $w" -width 5
+	$w.box add save -text "Save" -command "setup:save_cmd $w" -width 5
+	$w.box add cancel -text "Cancel" -command "setup:cancel_cmd $w" -width 5
+
+	pack $w.box -fill x -expand 1
+
+	# Don't allow the user to press cancel when setup was forced
+	if { $forcesetup == 1 } {
+		$w.box subwidget cancel configure -state disabled
+	}
+ 
+}
+
+proc setup:ok_cmd { w } {
+
+	# Check if settings are sane
+	set stat [CheckIfSane $w]
+	if { $stat == 0 } { #; all ok 
+		setEndianorder
+		destroy $w
+	}
+}
+
+proc setup:save_cmd { w } {
+
+	# Check if settings are sane
+	set stat [CheckIfSane $w]
+	if { $stat == 0 } { #; all ok 
+		savecfgfile
+		Msg_CfgSaved .cfgsaved $w
+	}
+	log $w "Setup: Configuration saved"
+}
+
+# Cancel pressed, restore old values and exit
+
+proc setup:cancel_cmd { w } {
+
+	restoreglobals
+	destroy $w
+}
+
+# Draws the CD-Setup-page
+
+proc mksetup_cd { f } {
+global XCDR_SOURCE_CDROM
+global XCDR_AUDIOREAD_SPEED 
+global XCDR_DEST_WRITER_DEV
+global XCDR_DEST_WRITER_MODE
+global XCDR_DEST_WRITER_SPEED 
+global OPTMENUFIX
+
+	tixLabelFrame $f.cdrom -label CD-ROM 
+	set f1 [$f.cdrom subwidget frame]
+
+	pack $f.cdrom
+
+	# older versions of Tix require that the variable in an OptionMenu
+	# is not set...therefore I backup the variable and unset it.
+	set tmpval $XCDR_SOURCE_CDROM
+	unset XCDR_SOURCE_CDROM
+
+	if { $OPTMENUFIX } { 
+		tixOptionMenu $f1.s_cd_dev -label "Source CD-ROM-Device : " \
+        	-variable XCDR_SOURCE_CDROM -dynamicgeometry 1 \
+        	-options { label.width 25 label.anchor e menubutton.width 27 }
+	} else {
+		tixOptionMenu $f1.s_cd_dev -label "Source CD-ROM-Device : " \
+        	-variable XCDR_SOURCE_CDROM \
+        	-options { label.width 25 label.anchor e menubutton.width 27 }
+	}
+
+	set tmplist [createnamelist 4 5]
+	foreach i $tmplist {
+        	$f1.s_cd_dev add command $i 
+
+		if { $XCDR_SOURCE_CDROM == "" } {
+			set XCDR_SOURCE_CDROM $i
+		}
+	}
+	# catch the error, when $tmpval contains an invalid value
+	# (happens e.g. when you disconnect a scsi-device earlier connected)
+	if { $tmpval != "" } {
+		catch { $f1.s_cd_dev configure -value $tmpval }
+	}	
+	pack $f1.s_cd_dev 
+	
+	frame $f1.s_cd_spd 
+	tixLabelWidget $f1.s_cd_spd.l -label "Audio Read-Back-Speed : " \
+		-options {label.width 25 label.anchor e}
+	radiobutton $f1.s_cd_spd.b0 -text "Default" -variable XCDR_AUDIOREAD_SPEED \
+		-value -1
+	radiobutton $f1.s_cd_spd.b1 -text "1x" -variable XCDR_AUDIOREAD_SPEED \
+		-value 1
+	radiobutton $f1.s_cd_spd.b2 -text "2x" -variable XCDR_AUDIOREAD_SPEED \
+		-value 2
+	radiobutton $f1.s_cd_spd.b3 -text "4x" -variable XCDR_AUDIOREAD_SPEED \
+		-value 4
+
+	pack $f1.s_cd_spd -expand 1 -fill x 
+	pack $f1.s_cd_spd.l $f1.s_cd_spd.b0 $f1.s_cd_spd.b1 $f1.s_cd_spd.b2 $f1.s_cd_spd.b3 \
+		-side left 
+
+	tixLabelFrame $f.cdw -label CD-Writer 
+	set f2 [$f.cdw subwidget frame]
+
+	pack $f.cdw
+
+	# older versions of Tix require that the variable in an OptionMenu
+	# is not set...therefore I backup the variable and unset it.
+	set tmpval $XCDR_DEST_WRITER_DEV
+	unset XCDR_DEST_WRITER_DEV
+
+	if { $OPTMENUFIX } { 
+		tixOptionMenu $f2.d_cd_dev -label "CD-Writer-Device : " \
+        	-variable XCDR_DEST_WRITER_DEV -dynamicgeometry 1 \
+        	-options { label.width 25 label.anchor e menubutton.width 27}
+	} else {
+		tixOptionMenu $f2.d_cd_dev -label "CD-Writer-Device : " \
+        	-variable XCDR_DEST_WRITER_DEV \
+        	-options { label.width 25 label.anchor e menubutton.width 27}
+	}
+
+	set tmplist [createnamelist 4 5]
+	foreach i $tmplist {
+        	$f2.d_cd_dev add command $i 
+
+		if { $XCDR_DEST_WRITER_DEV == "" } {
+			set XCDR_DEST_WRITER_DEV $i
+		}
+	}
+	if { $tmpval != "" } {
+		catch { $f2.d_cd_dev configure -value $tmpval }
+	}
+	
+	pack $f2.d_cd_dev
+
+	# older versions of Tix require that the variable in an OptionMenu
+	# is not set...therefore I backup the variable and unset it.
+	set tmpval $XCDR_DEST_WRITER_MODE
+	unset XCDR_DEST_WRITER_MODE
+
+	if { $OPTMENUFIX } {
+		tixOptionMenu $f2.d_cd_mde -label "CD-Writer-Mode : " \
+        	-variable XCDR_DEST_WRITER_MODE -dynamicgeometry 1 \
+        	-options { label.width 25 label.anchor e menubutton.width 27}
+	} else {
+		tixOptionMenu $f2.d_cd_mde -label "CD-Writer-Mode : " \
+        	-variable XCDR_DEST_WRITER_MODE \
+        	-options { label.width 25 label.anchor e menubutton.width 27}
+	}
+
+	set tmplist { "Autodetect" "Philips/Kodak/IMS" "HP" "Yamaha" \
+		      "Sony" }
+	foreach i $tmplist {
+		$f2.d_cd_mde add command $i 
+
+		if { $XCDR_DEST_WRITER_MODE == "" } {
+			set XCDR_DEST_WRITER_MODE $i
+		}
+	}
+	if { $tmpval != "" } {
+		catch { $f2.d_cd_mde configure -value $tmpval }
+	}
+
+	pack $f2.d_cd_mde
+
+	frame $f2.d_cd_spd
+	tixLabelWidget $f2.d_cd_spd.l -label "CD-Writer Speed : " \
+		-options {label.width 25 label.anchor e}
+	radiobutton $f2.d_cd_spd.b1 -text "1x" -variable XCDR_DEST_WRITER_SPEED \
+		-value 1
+	radiobutton $f2.d_cd_spd.b2 -text "2x" -variable XCDR_DEST_WRITER_SPEED \
+		-value 2
+	radiobutton $f2.d_cd_spd.b3 -text "4x" -variable XCDR_DEST_WRITER_SPEED \
+		-value 4
+	radiobutton $f2.d_cd_spd.b4 -text "6x" -variable XCDR_DEST_WRITER_SPEED \
+		-value 6
+	radiobutton $f2.d_cd_spd.b5 -text "8x" -variable XCDR_DEST_WRITER_SPEED \
+		-value 8
+
+	$f2.d_cd_spd.b4 configure -state disabled
+	$f2.d_cd_spd.b5 configure -state disabled
+
+	pack $f2.d_cd_spd -expand 1 -fill x
+	pack $f2.d_cd_spd.l $f2.d_cd_spd.b1 $f2.d_cd_spd.b2 $f2.d_cd_spd.b3 \
+		$f2.d_cd_spd.b4 $f2.d_cd_spd.b5 -side left 
+}
+
+# Draws the HD-Setup-page
+ 
+proc mksetup_hd { f } {
+global XCDR_IMAGE_PART
+global XCDR_IMAGE_MNTPNT
+
+	tixLabelFrame $f.lock -label "Security" 
+	set f1 [$f.lock subwidget frame]
+
+	pack $f.lock -fill x -expand 1 -padx 2
+
+	frame $f1.lck
+	tixLabelWidget $f1.lck.l -label "Write-Protect (Lock) Partitions : " \
+		-options { label.width 30 label.anchor e }
+	button $f1.lck.b -text "Select" \
+		-command "spawnsubwindow selectlockpartitions .lock .setup"
+		
+	pack $f1.lck -expand 1 -fill x
+	pack $f1.lck.l $f1.lck.b -side left 
+
+	tixLabelFrame $f.image -label "Image"
+	set f2 [$f.image subwidget frame]
+
+	pack $f.image -expand 1 -fill x
+	frame $f2.imgprt 
+	tixLabelWidget $f2.imgprt.l -label "Image-Partition : " \
+		-options {label.width 25 label.anchor e}
+	frame $f2.imgprt.f -width 250 -relief sunken -borderwidth 2 
+	pack $f2.imgprt.f -side right -expand 1 -fill x
+	pack $f2.imgprt.l
+	message $f2.imgprt.f.msg -anchor w -width 250    
+	pack $f2.imgprt.f.msg -expand 1 -fill x
+
+	
+	global TMP_imgprt_id
+	set TMP_imgprt_id $f2.imgprt.f.msg
+	updateselimagetextbox
+
+	pack $f2.imgprt -expand 1 -fill x
+	frame $f2.imgprt2
+	tixLabelWidget $f2.imgprt2.l \
+		-options {label.width 25 label.anchor e}
+	button $f2.imgprt2.b -text "Select" \
+		-command "spawnsubwindow selectimagepartition .sel .setup"
+	pack $f2.imgprt2 -fill x -expand 1
+	pack $f2.imgprt2.l $f2.imgprt2.b -side left
+
+	frame $f2.imgmnt
+	tixLabelEntry $f2.imgmnt.e -label "Image-Mountpoint : " \
+		-options { 
+			label.width 25 label.anchor e 
+			entry.width 20 entry.textVariable XCDR_IMAGE_MNTPNT }
+
+	button $f2.imgmnt.b -text "Browse" \
+		-command "spawnsubwindow selectimagemntpnt .mnt .setup" 
+	pack $f2.imgmnt.e $f2.imgmnt.b -side left
+	pack $f2.imgmnt -expand 1 -fill x
+}
+
+
+# Draws the Misc-Setup-page
+
+proc mksetup_misc { f } {
+global XCDR_BEEP
+global XCDR_LOGFILE
+global XCDR_LOGNAME
+global XCDR_DSP_DEV
+global OPTMENUFIX
+
+	tixLabelFrame $f.misc -label "Misc" 
+	set f1 [$f.misc subwidget frame]
+
+	pack $f.misc -fill x -expand 1 -padx 2
+
+	frame $f1.beep 
+	tixLabelWidget $f1.beep.l -label "Beep when ready : " \
+		-options {label.width 25 label.anchor e}
+	radiobutton $f1.beep.b1 -text "Never" -variable XCDR_BEEP \
+		-value "off" 
+	radiobutton $f1.beep.b2 -text "Always" -variable XCDR_BEEP \
+		-value "on" 
+
+	pack $f1.beep -expand 1 -fill x
+	pack $f1.beep.l $f1.beep.b1 $f1.beep.b2 -side left
+
+	frame $f1.beep2
+	tixLabelWidget $f1.beep2.l \
+		-options {label.width 25 label.anchor e}
+	radiobutton $f1.beep2.b3 -text "On Completion" -variable XCDR_BEEP \
+		-value "oncompl" 
+	radiobutton $f1.beep2.b4 -text "On Warnings" -variable XCDR_BEEP \
+		-value "onwarn" 
+
+	pack $f1.beep2 -expand 1 -fill x
+	pack $f1.beep2.l $f1.beep2.b3 $f1.beep2.b4 -side left
+
+	frame $f1.log
+	tixLabelWidget $f1.log.l -label "Logfile : " \
+		-options {label.width 25 label.anchor e}
+	radiobutton $f1.log.b1 -text "None" -variable XCDR_LOGFILE \
+		-value "off" -command "$f1.log2.e configure -state disabled"
+	radiobutton $f1.log.b2 -text "Filename:" -variable XCDR_LOGFILE \
+		-value "on" -command "$f1.log2.e configure -state normal"
+
+	pack $f1.log -expand 1 -fill x
+	pack $f1.log.l $f1.log.b1 $f1.log.b2 -side left
+
+	frame $f1.log2
+	tixLabelEntry $f1.log2.e -disabledforeground gray \
+		-options { 
+			label.width 25 label.anchor e 
+			entry.width 20 entry.textVariable XCDR_LOGNAME 
+		 }
+	button $f1.log2.b -text "Browse" \
+		-command "spawnsubwindow selectlogfilename .sellog .setup" 
+	pack $f1.log2.e $f1.log2.b -side left
+	pack $f1.log2 -fill x -expand 1
+
+	# older versions of Tix require that the variable in an OptionMenu
+	# is not set...therefore I backup the variable and unset it.
+	set tmpval $XCDR_DSP_DEV
+	unset XCDR_DSP_DEV
+
+	if { $OPTMENUFIX } {
+		tixOptionMenu $f1.dspdev -label "DSP-Device for Audio : " \
+        	-variable XCDR_DSP_DEV -dynamicgeometry 1 \
+        	-options { label.width 25 label.anchor e menubutton.width 27 }
+	} else {
+		tixOptionMenu $f1.dspdev -label "DSP-Device for Audio : " \
+        	-variable XCDR_DSP_DEV \
+        	-options { label.width 25 label.anchor e menubutton.width 27 }
+	}
+
+	$f1.dspdev add command "None"
+	# Get all dsp-devices 
+	set tmplist [glob /dev/dsp*]
+	foreach i $tmplist {
+        	$f1.dspdev add command $i 
+
+		if { $XCDR_DSP_DEV == "" } {
+			set XCDR_DSP_DEV "None" 
+		}
+	}
+	if { $tmpval != "" } {
+		catch { $f1.dspdev configure -value $tmpval }
+	}
+
+	pack $f1.dspdev
+
+	# trigger radiobutton, to be sure the -command-scripts
+	# have been run
+	if { $XCDR_LOGFILE == "off" } "$f1.log.b1 invoke"
+}
+
+
+# Check if all settings are sane. Warn the user if anything is 
+# missing. Executed by the Ok-Button.
+# Return 0 if all is ok, 1 on problems.
+
+proc CheckIfSane { w } {
+global XCDR_AUDIOREAD_SPEED
+global XCDR_BEEP
+global XCDR_DEST_WRITER_SPEED
+global XCDR_LOGFILE
+global XCDR_SOURCE_CDROM
+global XCDR_DEST_WRITER_DEV
+global XCDR_IMAGE_PART
+global XCDR_IMAGE_MNTPNT
+global XCDR_LOGFILE
+global XCDR_LOGNAME
+
+	set ok 0
+	if { $XCDR_SOURCE_CDROM == "" || $XCDR_DEST_WRITER_DEV == "" ||
+	     $XCDR_IMAGE_PART == "" || $XCDR_IMAGE_MNTPNT == "" ||
+	     $XCDR_AUDIOREAD_SPEED == "" || $XCDR_BEEP == "" ||
+	     $XCDR_DEST_WRITER_SPEED == "" || $XCDR_LOGFILE == "" } {
+		set ok 1	
+		set stat [Msg_SetupNotCompl1 .setnc $w ]
+		if { $stat == 1 } {	;# Bail out
+			exit
+		}
+	}
+	
+	if { $XCDR_LOGFILE == "on" && $XCDR_LOGNAME == "" } {
+		set ok 1
+		Msg_SetupNotCompl2 .setnc2 $w 
+	}
+
+	return $ok
+}
+

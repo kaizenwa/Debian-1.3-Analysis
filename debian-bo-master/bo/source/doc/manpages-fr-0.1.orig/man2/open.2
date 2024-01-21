@@ -1,0 +1,234 @@
+.\" Hey Emacs! This file is -*- nroff -*- source.
+.\"
+.\" This manpage is Copyright (C) 1992 Drew Eckhardt;
+.\"                               1993 Michael Haardt, Ian Jackson.
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\"
+.\" Modified Wed Jul 21 22:42:16 1993 by Rik Faith (faith@cs.unc.edu)
+.\" Modified Sun Aug 21 18:18:14 1994: Michael Haardt's NFS diffs were
+.\"          applied by hand (faith@cs.unc.edu).
+.\" 
+.\" Traduction  10/10/1996 Christophe BLAESS (ccb@club-internet.fr)
+.\" 
+.TH OPEN 2 "10 Octobre 1996" "Linux 0.99.7" "Manuel du programmeur Linux"
+.SH NOM
+open, creat \- Ouvrir ou creer eventuellement un fichier.
+.SH SYNOPSIS
+.nf
+.B #include <sys/types.h>
+.B #include <sys/stat.h>
+.B #include <fcntl.h>
+.sp
+.BI "int open(const char *" pathname ", int " flags );
+.BI "int open(const char *" pathname ", int " flags ", mode_t " mode );
+.BI "int creat(const char *" pathname ", mode_t " mode );
+.fi
+.SH DESCRIPTION
+.B open
+essaye d'ouvrir un fichier et retourne un descripteur de fichier
+(petit entier non negatif a utiliser avec 
+.BR read ", " write ", etc...)"
+
+.I flags
+est l'un des elements
+.BR O_RDONLY ", " O_WRONLY " ou " O_RDWR
+qui reclament respectivement l'ouverture du fichier en lecture seule, 
+ecriture seule, ou lecture/ecriture.
+
+.I flags
+peut aussi etre un
+.I OU binaire
+( | ) avec un ou plusieurs des elements suivants :
+.TP
+.B O_CREAT
+Creer le fichier s'il n'existe pas.
+.TP
+.B O_EXCL
+En conjonction avec
+.BR O_CREAT ,
+declenchera une erreur si le fichier existe, et
+.B open
+echouera
+(voir la section BUGS plus bas).
+.TP
+.B O_NOCTTY
+Si
+.I pathname
+correspond a un peripherique de terminal \(em voir
+.BR tty (4)
+\(em, il ne deviendra pas le terminal controlant le processus
+meme si celui\-ci n'est attache a aucun autre terminal.
+.TP
+.B O_TRUNC
+Si le fichier existe il sera tronque.
+.TP
+.B O_APPEND
+Le fichier est ouvert en mode "ajout". Initialement, et avant
+chaque
+.BR write ,
+la tete de lecture/ecriture est placee a la fin du fichier
+comme avec
+.BR lseek .
+.TP
+.BR O_NONBLOCK " or " O_NDELAY
+Le fichier est ouvert en mode "non-bloquant". Ni la fonction
+.B open
+ni aucune autre operation ulterieure sur ce fichier
+ne laissera le processus appelant en attente.
+.TP
+.B O_SYNC
+Le fichier est ouvert en ecriture synchronisee. Chaque appel a
+.BR write 
+sur le fichier bloquera le processus appelant jusqu'a ce que les
+donnees aient ete ecrites physiquement sur le support materiel
+(voir la section BUGS plus bas).
+.PP
+Certains de ces attributs optionnels peuvent etre modifies
+par la suite avec la fonction
+.BR fcntl .
+
+.I mode
+indique les permissions a utiliser si un nouveau fichier est cree.
+Cette valeur est modifiee par le
+.BR umask
+du processus : la veritable valeur utilisee est
+.BR "(mode & ~umask)" .
+
+.I mode
+devrait toujours etre indique quand 
+.B O_CREAT
+est dans les attributs
+.IR flags ,
+(il est ignore dans les autres cas).
+
+.B creat
+est equivalent a 
+.B open
+avec l'attribut
+.I flags
+egal a
+.BR "O_CREAT | O_WRONLY | O_TRUNC" .
+.SH "VALEUR RENVOYEE"
+.BR open " et " creat
+renvoient le nouveau descripteur de fichier s'ils reussissent, 
+ou \-1 s'ils echouent, auquel cas
+.I errno
+contient le code d'erreur.
+.SH ERREURS
+.TP
+.B EEXIST
+.I pathname
+existe deja et
+.BR O_CREAT " et " O_EXCL
+ont ete indiques.
+.TP
+.B EISDIR
+On a demande une ecriture alors que
+.I pathname
+correspond a un repertoire.
+.TP
+.B ETXTBSY
+On a demande une ecriture alors que
+.I pathname
+correspond a un fichier executable actuellement utilise.
+.TP
+.B EFAULT
+.IR pathname " pointe en dehors de l'espace d'adressage accessible"
+.TP
+.B EACCES
+L'acces demande au fichier est interdit, ou l'un des repertoires
+du chemin
+.IR pathname
+ne permet pas de consultation.
+.TP
+.B ENAMETOOLONG
+.IR pathname " est trop long."
+.TP
+.B ENOENT
+Un repertoire du chemin d'acces
+.I pathname
+n'existe pas ou est un lien symbolique pointant nulle part.
+.TP
+.B ENOTDIR
+Un element du chemin d'acces
+.I pathname
+n'est pas un repertoire.
+.TP
+.B EMFILE
+Le processus a deja ouvert le nombre maximal de fichiers.
+.TP
+.B ENFILE
+La limite du nombre total de fichiers ouverts sur le systeme est
+atteinte.
+.TP
+.B ENOMEM
+Pas assez de memoire pour le noyau
+.TP
+.B EROFS
+Un acces en ecriture est demande alors que
+.I pathname
+reside sur un systeme de fichiers en lecture seule.
+.TP
+.B ELOOP
+.I pathname
+contient une reference circulaire (a travers un lien symbolique)
+.TP
+.B ENOSPC
+.I pathname
+devrait etre cree mais le peripherique concerne n'a plus assez de
+place pour un nouveau fichier.
+.SH "CONFORME A"
+SVID, AT&T, POSIX, X/OPEN, BSD 4.3
+.SH BUGS
+.\" .B O_SYNC
+.\" is not currently implemented (as of Linux 0.99pl7).
+
+Plusieurs problemes se posent avec le protocole NFS, concernant
+entre autres
+.BR O_SYNC ", " O_NDELAY ", and " O_APPEND .
+
+.B O_EXCL
+ne fonctionne pas sur les systemes de fichiers NFS. Les programmes qui
+ont besoin de cette fonctionnalite pour verrouiller des taches risquent
+de rencontrer une "race condition". La solution consiste a creer un 
+fichier unique sur le meme systeme de fichiers (par exemple avec le pid et
+le nom de l'hote), utiliser
+.BR link (2)
+pour creer un lien sur un fichier de verrouillage et d'utiliser
+.BR stat (2)
+sur ce fichier unique pour verifier si le nombre de liens a augmente
+jusqu'a 2. Ne pas utiliser la valeur de retour de \fBlink()\fP.
+
+
+Notez que
+.B open
+peut ouvrir des liens symboliques mais pas en creer,
+il faut utiliser
+.BR mknod (2)
+a la place.
+
+
+.SH "VOIR AUSSI"
+.BR read "(2), " write "(2), " fcntl "(2), " close (2),
+.BR unlink "(2), " mknod "(2), " stat "(2), " umask (2),
+.BR mount "(2), " socket "(2), " socket "(2), " fopen (3),
+.BR link (2).

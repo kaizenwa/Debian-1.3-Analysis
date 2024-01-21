@@ -1,0 +1,101 @@
+;; virtual-action.gwm --- "Active spots" on the Virtual Screen 
+;;
+;; Author: Anders Holst  (aho@sans.kth.se)  
+;; Copyright (C) 1995  Anders Holst
+;; Version: virtual-1.0
+;; Last change: 11/7 1995
+;;
+;; This file is copyrighted under the same terms as the rest of GWM
+;; (see the X Inc license for details). There is no warranty that it
+;; works. 
+;;
+;; --------------------------------------------------------------------- 
+;;
+;; This file implements "active spots" on the virtual screen, ie.
+;; positions associated with actions that are run whenever the user
+;; moves to (or from) such a position. Can be used for example to
+;; implement different background colors at different places on the
+;; virtual screen.
+;;
+;; There are no user customizable variables. Use 'virtual-action-add'
+;; and 'virtual-action-remove' to add and remove actions.
+;;
+;; The call '(virtual-action-add POS ACTION1 [ACTION2] )' adds to
+;; position POS (as returned from 'add-door' for example) the arrival
+;; action ACTION1 and the (optional) leave action ACTION2.
+;; You may add more actions to the same position with several calls to
+;; 'virtual-action-add'.
+;;
+;; The call '(virtual-action-remove POS)' removes *all* actions (both
+;; arrival and leave ones) associated with position POS.
+;; 
+
+(declare-screen-dependent
+  virtual-active-spot-list
+)
+
+(for screen (list-of-screens)
+     (setq virtual-active-spot-list ())
+)
+
+;; Redefinition, to call active spot stuff
+(defun virtual-move-windows (deltax deltay)
+  ;; Moves windows by deltax and deltay adjusting virt-pos 
+  ;; appropriately
+  (virtual-action-execute ())
+  (with (move-window-func (if (boundp 'move-window-orig) 
+                              move-window-orig   ; to work with vtwm profile
+                              move-window))
+    (for wob (virt-movable)
+         (move-window-func (+ window-x deltax) (+ window-y deltay))))
+  (with (x (# 0 virt-pos) y (# 1 virt-pos))
+	(setq virt-pos (list (+ x deltax) (+ y deltay))))
+  (virtual-action-execute t)
+  (virtual-update))
+
+;; Adds new arrive and leave actions to a position
+(defun virtual-action-add args
+  (with (vpos (list (- (# 0 (# 0 args))) (- (# 1 (# 0 args))))
+         action1 (# 1 args)
+         action2 (# 2 args)
+         ind (member vpos virtual-active-spot-list)
+         ele1 (if ind (# (+ 1 ind) virtual-active-spot-list))
+         ele2 (if ind (# (+ 2 ind) virtual-active-spot-list)))
+    (if (and ind (= (% ind 3) 0))
+        (progn
+          (if action1
+              (## (+ 1 ind) virtual-active-spot-list
+                  (if (not ele1)
+                      action1
+                    (and (eq (type ele1) 'list)
+                         (eq (# 0 ele1) 'progn))
+                      (+ ele1 (list action1))
+                      (+ '(progn) (list ele1) (list action1)))))
+          (if action2
+              (## (+ 2 ind) virtual-active-spot-list
+                  (if (not ele2)
+                      action2
+                    (and (eq (type ele2) 'list)
+                         (eq (# 0 ele2) 'progn))
+                      (+ ele2 (list action2))
+                      (+ '(progn) (list ele2) (list action2))))))
+      (setq virtual-active-spot-list
+            (+ (list vpos action1 action2)
+               virtual-active-spot-list)))))
+
+;; Removes *all* actions at a position
+(defun virtual-action-remove (pos)
+  (with (vpos (list (- (# 0 pos)) (- (# 1 pos)))
+         ind (member vpos virtual-active-spot-list))
+    (if (and ind (= (% ind 3) 0))
+        (progn
+          (delete-nth (+ 2 ind) virtual-active-spot-list)
+          (delete-nth (+ 1 ind) virtual-active-spot-list)
+          (delete-nth ind virtual-active-spot-list)))))
+
+(defun virtual-action-execute (arrive)
+  (with (ind (member virt-pos virtual-active-spot-list))
+    (if (and ind (= (% ind 3) 0))
+        (if arrive
+            (eval (# (+ 1 ind) virtual-active-spot-list))
+          (eval (# (+ 2 ind) virtual-active-spot-list))))))

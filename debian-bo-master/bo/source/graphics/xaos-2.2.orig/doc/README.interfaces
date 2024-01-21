@@ -1,0 +1,254 @@
+WHY THIS DESCRIPTION
+====================
+
+This file tries to explain interfaces between parts of program
+It should be helpful for someone, who wants to write better user 
+interface for XaoS. I hope that someone will do this :)
+
+You may use any library of XaoS separatly(if you are interested)
+but please LET ME KNOW before! You will make me happy :)
+Also keep my copyright and put my credit somewhere in documantation
+
+Also should be helpful for other extensions-new formulas, planes,
+ coloring modes etc..
+
+Ugly interface is designed to be portable but for example screen
+saver version, some UI with dialogs for X, Mac, Amiga or OS/2 should
+be welcomed. 
+
+This document is bit outdated. so some parameters does not fit very well.
+I will update it after releasing 3.0 with many planned changes to api
+
+NICE DIAGRAM
+============
+To make easy using XaoS in other interfaces I designed it as few
+indepentent libraries with quite clean interface(not much..but should
+be cleaned.) following diagram tryes to explain how libraries works
+
+complex.h              xlib.c             mktable.c
+    |                    |                    |
+    v                    v                    v
+formulas.c    plane.c ui_x11.c ui_mac.c  ui_curses.c  ui_dog.c
+    |           |        |         |          |          |
+    +-----------'        `---+-----+----------+----------+ .....
+    |                        |
+    |                        |                   gifcompr.c
+    |  julia.c               |                       |
+    v    |                   v                       v
+  zoom.c |   palette.c   drivers.c   autopilot.c   gif.c  timers.c
+    |    |      |            |           |           |       |
+    `----+------+------------+-----------+-----------+-------'
+                             v
+                            ui.c
+
+As you can see ugly interface just controls all main libararies
+by few functions
+
+
+DESCRIPTION OF FILES
+====================
+aconfig.h     file that defines configuration options needed to know 
+              before including standard.h files..this file if generated 
+	      by configure script. In case other architectures KEEP 
+	      THIS FILE MINIMAL to minimalize colizions in .h files
+allegro.h     Include file for djgpp graphics library allegro. Just to 
+              simplify compilation
+autopilot.c   Implements autopilot
+autopilot.h
+complex.h     Some complex number operations(like adding) implemented
+              as macros to generate as optimized code as possible
+config.h      Second configuration file. Now included after standard.h
+              files so here you may define everything you need. Contatins
+	      many thinks needed by various part of XaoS.
+ctrl87.c      Handling of comprocessor in dos port
+ctrl87.h
+drivers.c     Here are registered all drivers
+formulas.c    Contains fractal calculation formulas.
+formulas.h
+gif.c         Gif saving functions by Dawid Rowley 
+gif.h
+gifcompr.c    Gif encoding functions
+help.h        help text displayed by ugly interface
+keytables.h   Translates scancodes to ascii. Used by svgalib port
+mktable.c     Makes table for converting colorfull image into ascii
+              Used by ui_curses
+mktable.h
+palette.c     Generates random and default palette
+palette.h
+param.c       Argv/argc parser for ugly interface
+param.h
+plane.c       Implements conversion to various planes(1/mu etc)
+plane.h
+port.h        LZW compression copyrights etc..
+prefix.h      Used by mac prot..
+ui.c          Ugly interface
+ui.h
+ui_curses.c   curses port
+ui_dog.c
+ui_mac.c
+ui_plan9.c
+ui_svga.c
+ui_template.c Template for new drivers
+ui_x11.c
+xlib.c        Library that helps to X port. Supports inicialising 
+              of window, handling with 256 images on many displays
+xlib.h
+zoom.c        Main zooming routines(finally:)
+zoom.h
+
+The most interesting for writing user interface is zoom.c..
+so skip to this first if you are interested in this topic..
+
+Formulas.c
+==========
+
+This file is used by zooming engine. so this info is probably helpful
+only in case you are adding new formula. It contains calculation
+function for all fractals plus:
+
+incoloring - variable that specifies incoloring mode
+outcoloring
+
+incolorname
+outcolorname - this is array of strings that specifies names for various
+             modes
+
+MAXITER - variable that specifies number of iterations
+
+INCOLORING
+OUTCOLORING - number of incoloring/outcoloring mode
+
+formulas - array of structures for every formula in formula.c
+     contains:
+      calculate - pointer to function that calculates fractal
+      name[2] - names for Mandelbrot and Julia versions of fractal
+      Mandelbrot - if default is Mandelbrot or Julia form
+      v - default position
+      pre,pim - default Julia parameters
+      out,in - arrays of symmetries for various outcoloring and 
+               incoloring modes
+        symmetry info are describet by following structure:
+	 xsym,ysym - x position of vertical symmetry line
+	             and y position of horizontal one..
+		     if fractal is not symmetrical, specify INT_MAX
+	 nsymetries -number of symmetry line
+	 *symetry  - array of size nsymetries that contains
+	             lines of symmetry, 8symmetry,6symmetry and so on is
+		     specified..
+                     line is specifies by y for x=0 and
+		     multiplying coefficient: y(x)=y0+k*x
+         juliamode - number for julia generator(1=z^2+c,2=z^3+c..)
+
+Plane.c
+=======
+
+This file provides planes transformations. It exports following:
+PLANES - number of transformations
+planename[] - array of names for various transformations
+recalculate - function that recalculates to specified plane..
+recaclulateback - should recalculate back to original but not implemented
+              for now..
+
+Zoom.c
+======
+
+This is main zooming engine. The most significant part of XaoS.
+It uses struct zoom_context to save its state so it can be used
+for multiple windows at time. This structure contains many field where
+most of them are internal. Interesting for user are:
+ maxiter        (*) - maximum of iterations
+ incoloringmode (*) 
+ outcoloringmode(*) - coloring modes
+ plane          (*) - current transformation plane
+ colors         (*) - array that transfers number of iterations 
+                      modulo maxiter to color index.
+ cmap           (*) - array used for saving to gif.
+ interrupt          - set this to one to interrupt current calculation
+ s                  - current view
+ dirty              - set to 0 if current image is perfect
+
+ following variables can be used for status information
+ pass               - current pass of calculation
+ pos                - current position on calculation
+ max                - maximal pos in current calculation
+
+(*) after changing this varibale you need to call init_tables to get
+    good results
+
+Following functions are used to manipulate with contexts:
+ make_context - creates new context. Parameters:
+   width,height - width and height of screen
+   scanline - size of line in bytes.(usually width)
+   formula - formula to start with
+   full - if program runs full-screen or in window. This have
+     effect to recalculation of view. If full is 1 XaoS hopes
+     that screen is 4:3 and pixel does not must be rectangular
+     full=0 means that we are using window, where pixels are 
+     rectangular
+   switchptr - pointer to function used to switch buffers
+     (zoom needs two buffers for calculation - one for old
+     frame and one for new frame, because new frame is constructed
+     using pixel calculated in previous one. Some kind of 
+     double-buffering.
+   waitfunc - pointer to function that is called ad various places
+     during calculation - it should display status and so on..
+   vbuf,vold - pointers to both buffers
+
+   returns NULL in case of out of memory
+ resizeto - resizes buffers. Takes similiar parameters to make_context.
+   returns 0 in case of problems
+ free_context(context) - frees context
+ set_view(context,s) - sets view to specified s and does recalculations
+     to keep set rectangular
+ set_formula - sets formula and initializes view
+ init_tables - this disables to use previous frame in calculation -
+     good when formula is changed or color indexes and so on..
+ do_fractals - finally makes fractal...
+ rotate_palette(context,direction) - rotates palette(values in cmap array)
+
+Palette.c
+=========
+
+This is used for calculating of random palette. It have following 
+functions:
+  mkdefaultpalette(context,cfunction,randomsize)
+  cfunction is function for changing palette described in README.driver
+  if randomsize is set to 1 XaoS makes random size of palette
+  mkdepalette(context,function,randomsize)
+  makes random palette
+
+Autopilot.c
+===========
+
+This part is not designed too portably but it is usable..
+functions:
+  clean_autopilot() - need to be called before enabling autopilot
+    and after all significant changes that are not invoked by it.
+  do_autopilot(context,x,y,controls,changes)
+    this functions needs to be called 25 times per second. It 
+    sets position of mouse to x,y and mask of BUTTON? to controls.
+    Changes is function called when autopilot wants to restart zooming.
+    Output must be processed by same way how ui_mouse in ugly interface
+    works. BUTTON1 = zoomin, BUTTON3 = zoomout
+
+Gif.c
+=====
+
+Used for saving gifs..functions:writegif(context)
+select filename automagically..
+
+Xlib.c
+======
+
+Quite clever library that handles images..browse sources to see more :)
+
+Timers.c
+========
+
+General purpose timing library
+
+
+
+and thats all folks...
+
+

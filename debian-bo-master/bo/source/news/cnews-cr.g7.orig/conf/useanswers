@@ -1,0 +1,181 @@
+#! /bin/sh
+# useanswers [-v] answers makeinc substs config.make
+# this is an undocumented interface which may change; use at your own risk
+
+uaverbose=no
+case "$1" in
+-v)	uaverbose=yes ; shift	;;
+esac
+
+uaans="$1"
+uamakeinc="$2"
+uasubsts="$3"
+uacm="$4"
+
+tf=/tmp/ua$$
+
+if test ! -r $uaans
+then
+	echo "$0: unable to read \`$uaans'" >&2
+	exit 1
+fi
+. $uaans
+
+test " $uaverbose" = " yes" && echo "building $uamakeinc..."
+(
+	echo "# makefile substitutions file"
+	echo "# how to include ../include/config.make"
+	case "$include" in
+	svr4)	echo 'INCLUDE		include ../include/config.make' ;;
+	bsd|noway)	echo 'INCLUDE		.include "../include/config.make"' ;;
+	*)	echo 'Internal error, aborting...' >&2
+		exit 1
+		;;
+	esac
+) >$tf
+if cmp $tf $uamakeinc >/dev/null 2>/dev/null
+then
+	echo "unchanged, old one left in place"
+else
+	>$uamakeinc
+	if test ! -w $uamakeinc
+	then
+		echo "$0: unable to create \`$uamakeinc'; aborting" >&2
+		exit 1
+	fi
+	cp $tf $uamakeinc || exit 1
+fi
+
+test " $uaverbose" = " yes" && echo "building $uasubsts..."
+(
+	echo "# general substitutions file"
+	echo "NEWSBIN	$newsbin"
+	echo "NEWSCTL	$newsctl"
+	echo "NEWSARTS	$newsarts"
+	echo "NEWSOV	$newsov"
+	echo "NEWSPATH	$newspath"
+	echo "NEWSUMASK	$newsumask"
+	echo "NEWSCONFIG	$newsconfig"
+) >$tf
+if cmp $tf $uasubsts >/dev/null 2>/dev/null
+then
+	echo "unchanged, old one left in place"
+else
+	>$uasubsts
+	if test ! -w $uasubsts
+	then
+		echo "$0: unable to create \`$uasubsts'; aborting" >&2
+		exit 1
+	fi
+	cp $tf $uasubsts || exit 1
+fi
+
+test " $uaverbose" = " yes" && echo "building $uacm..."
+(
+	echo "# make header file"
+	echo "# pathname variables"
+	echo "# =()<NEWSARTS=@<NEWSARTS>@>()="
+	echo "NEWSARTS=$newsarts"
+	echo "# =()<NEWSOV=@<NEWSOV>@>()="
+	echo "NEWSOV=$newsov"
+	echo "# =()<NEWSBIN=@<NEWSBIN>@>()="
+	echo "NEWSBIN=$newsbin"
+	echo "# =()<NEWSCTL=@<NEWSCTL>@>()="
+	echo "NEWSCTL=$newsctl"
+	echo "# =()<NEWSCONFIG=@<NEWSCONFIG>@>()="
+	echo "NEWSCONFIG=$newsconfig"
+	echo
+	echo "# workaround for System V make bug"
+	echo "SHELL=/bin/sh"
+	echo
+	echo "# directories where things go"
+	echo "UIBIN=$bin"
+	echo "RBIN=$rbin"
+	echo
+	echo "# compilation stuff"
+	echo "# LIB is for makefile dependencies, LIBS for cc invocations"
+	echo "LIB=../libcnews.a"
+	echo "LIBS=../libcnews.a $postlibs"
+	tmp=
+	case "$addrsize" in
+	small)	tmp='-DSMALLMEM'	;;
+	esac
+	case "$faststrchr" in
+	yes)	tmp="$tmp -DFASTSTRCHR"	;;
+	esac
+	echo "CFLAGS=\$(MORECFLAGS) $copts $tmp -I../include"
+	echo "LDFLAGS=\$(CFLAGS) $ldopts"
+	echo "LINTFLAGS=\$(MORELINTFLAGS) -I../include"
+	echo
+	echo "# directories etc."
+	echo "CONF=../conf"
+	case "$include" in
+	noway)	echo "MAKE=../conf/maker"	;;
+	*)	echo "MAKE=$make"		;;
+	esac
+	case "$cc" in
+	''|cc)	;;
+	*)	echo "CC=$cc"	;;
+	esac
+	echo "TO=\$(CONF)/cpto"
+	echo "IN=\$(CONF)/cmpto \$(CMPOPT)"
+	echo "CF=\$(CONF)/checkfile \$(CMPOPT)"
+	echo "MKDIR=\$(CONF)/mkdirs"
+	echo "MX=chmod +x"
+	case "$ranlib" in
+	yes)	up=update.ran	;;
+	*)	up=update.sym	;;
+	esac
+	echo "UPDATE=\$(CONF)/$up ../libcnews.a"
+	echo "LIBCMP=\$(CONF)/libcmp ../libcnews.a"
+	echo
+	echo "# misc configuration bits"
+	echo "SPACEFOR=$dftype"
+	case "$sftype" in
+	c)	echo "DOSPACEFOR=dospacefor"	;;
+	sh)	echo "DOSPACEFOR="	;;
+	esac
+	echo "QUEUELEN=$uucptype"
+	echo "UID=$newsuid"
+	echo "GID=$newsgid"
+	echo "SIZE=$addrsize"
+	uadbz=libdbz
+	for f in $fake
+	do
+		if test " $f" = " dbz.o"
+		then
+			uadbz=
+		fi
+	done
+	echo "DBZ=$uadbz"
+	case "$faststdio" in
+	yes)	echo "STDIO=ourstdio"	;;
+	*)	echo "STDIO=sysstdio"	;;
+	esac
+	case "$nfsgroup" in
+	yes)	echo "SERVER=server"
+		echo "SERVERNAME=$server"
+		;;
+	*)	echo "SERVER="	;;
+	esac
+	echo "REPORTTO=$newsmaster"
+	echo "URGENTTO=$newscrisis"
+	echo
+	echo "# things for testing"
+	echo "HERE=. ../conf/rsetup ;"
+	echo
+	echo "# fake files needed"
+	echo "HFAKE=$fakehdrs"
+	echo "OFAKE=$fake"
+) >$tf
+# this one we always change, so makefile knows when quiz was re-run
+>$uacm
+if test ! -w $uacm
+then
+	echo "$0: unable to create \`$uacm'; aborting" >&2
+	exit 1
+fi
+cp $tf $uacm || exit 1
+
+rm -f $tf
+exit 0

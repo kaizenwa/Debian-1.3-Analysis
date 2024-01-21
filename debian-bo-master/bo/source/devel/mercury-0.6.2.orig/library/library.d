@@ -1,0 +1,95 @@
+library.optdate library.c library.err library.o : library.m \
+	array.int \
+	assoc_list.int \
+	bag.int \
+	bimap.int \
+	bintree.int \
+	bintree_set.int \
+	bool.int \
+	char.int \
+	dir.int \
+	eqvclass.int \
+	float.int \
+	getopt.int \
+	graph.int \
+	group.int \
+	int.int \
+	io.int \
+	lexer.int \
+	list.int \
+	map.int \
+	math.int \
+	mercury_builtin.int \
+	multi_map.int \
+	ops.int \
+	parser.int \
+	pqueue.int \
+	queue.int \
+	random.int \
+	rbtree.int \
+	relation.int \
+	require.int \
+	set.int \
+	set_bbbtree.int \
+	set_ordlist.int \
+	set_unordlist.int \
+	stack.int \
+	std_util.int \
+	store.int \
+	string.int \
+	term.int \
+	term_io.int \
+	time.int \
+	tree234.int \
+	uniq_array.int \
+	varset.int
+
+library.date : library.m \
+	array.int3 \
+	assoc_list.int3 \
+	bag.int3 \
+	bimap.int3 \
+	bintree.int3 \
+	bintree_set.int3 \
+	bool.int3 \
+	char.int3 \
+	dir.int3 \
+	eqvclass.int3 \
+	float.int3 \
+	getopt.int3 \
+	graph.int3 \
+	group.int3 \
+	int.int3 \
+	io.int3 \
+	lexer.int3 \
+	list.int3 \
+	map.int3 \
+	math.int3 \
+	mercury_builtin.int3 \
+	multi_map.int3 \
+	ops.int3 \
+	parser.int3 \
+	pqueue.int3 \
+	queue.int3 \
+	random.int3 \
+	rbtree.int3 \
+	relation.int3 \
+	require.int3 \
+	set.int3 \
+	set_bbbtree.int3 \
+	set_ordlist.int3 \
+	set_unordlist.int3 \
+	stack.int3 \
+	std_util.int3 \
+	store.int3 \
+	string.int3 \
+	term.int3 \
+	term_io.int3 \
+	time.int3 \
+	tree234.int3 \
+	uniq_array.int3 \
+	varset.int3
+
+library.dir/library_000.o: library.m
+	rm -rf library.dir
+	$(MCS) -s$(GRADE) $(MCSFLAGS) library.m

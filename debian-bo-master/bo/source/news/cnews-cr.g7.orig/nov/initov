@@ -1,0 +1,48 @@
+#! /bin/sh
+# initialise overview files first time
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/nov:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+stamp=$NEWSCTL/time.stamp
+
+verbose=n
+case "$1" in
+-v)	verbose=y	;;
+esac
+
+lock LOCK $$
+trap '' 1 2 15
+sleep 2
+touch $stamp		# anything newer we'll get from relaynews
+sleep 2
+>$NEWSCTL/headers	# avoid duplicates
+unlock LOCK
+trap 1 2 15
+# after unlocking, relaynews may write new headers, to be processed later
+# by domkov
+
+lock LOCKoverview $$
+trap "rm -f $stamp ; unlock LOCKoverview ; trap 0 ; exit" 0 1 2 15
+
+# the sort is an attempt to maximise locality of reference in the file system
+for d in ` awk '{print $1}' $NEWSCTL/active | tr . / | sort `
+do
+	cd $NEWSARTS
+	if test ! -d $d
+	then
+		continue
+	fi
+	cd $d
+	test " $verbose" = " y" && echo $d
+	o=$NEWSOV/$d
+	if test ! -d $o
+	then
+		mkpdir $o
+	fi
+	# sort -n ensures numeric article order
+	ls -f | sort -n | mkov -aio $stamp >$NEWSOV/$d/.overview
+done

@@ -1,0 +1,154 @@
+/*
+ ===========================================================================
+ =                                                                         =
+ =  (C) Copyright 1995 Computer Technology Institute                       =
+ =                                                                         =
+ ===========================================================================
+ =                                                                         =
+ =                        CTI-Print Project                                =
+ =                                                                         =
+ = Author:                                                                 =
+ =   Panos Dimakopoulos, System Programmer,                                =
+ =   Computer Center                                                       =
+ =   Computer Technology Institute                                         =
+ =   (e-mail: dimakop@cti.gr)                                              =
+ =                                                                         =
+ ===========================================================================
+*/
+
+		TECHNICAL REPORT
+		----------------
+
+	The filters developed in Phase II of the CTI-Print project are for the
+HP LaserJet 4 Series printers and provide the interface between the lpd and the
+printer. They do not work for model 4L. The duplex option works only for models
+4Si, 4SiMx, 4Plus and 4MPlus.
+
+	The hp printer control is achieved by the use of two filters with
+names bphp4 and ifhp4. The former is a simple filter which deals with the
+cover page printing. Its name should be assigned to the :bp: capability of the
+printer printcap file. The latter is the one which deals with all the printing
+activity as well as the printer language switching.
+
+	The two filters get exec'ed by the lpd daemon which passes them all the
+necessary info. The whole syntax is 
+
+filtername arguments \   <- from PRINTCAP entry
+	-PPrinter -wwidth -llength -xwidth -ylength [-c] [-iindent] \
+	[-Zoptions] [-Cclass] [-Jjob] [-Raccntname] -nlogin -hHost  \
+	-Nfilename -S["Printer Decsr"|Descr] -Fformat -Ddebug -Ypermsline \
+	[-Nfilename] [-Sprcomment] [affile]
+ 
+1. Parameters can be in different order than the above.
+2. Optional parameters can be missing
+3. Values specified for the width, length, etc., are from PRINTCAP
+   or from the overridding user specified options.
+
+VARIABLE  FLAG          TYPE    PURPOSE / PRINTCAP ENTRTY
+name     name of filter char*    argv[0], program identification
+width    -wwidth        int      PW, width in chars
+length   -llength       int      PL, length in lines
+xwidth   -xwidth        int      PX, width in pixels
+xlength  -xlength       int      PY, length in pixels
+literal  -c             int      if set, ignore control chars
+indent   -iindent       int      indent amount (depends on device)
+zopts    -Zoptions      char*    extra options for printer
+class    -Cclass        char*    classname
+job      -Jjob          char*    jobname
+accntname-Raccntname   char*    account for billing purposes
+login    -nlogin        char*    login name
+filename -Nfname        char*    file to be printed name
+host     -hhost         char*    host name
+format   -Fformat       char*    format
+accntfile file          char*    AF, accounting file
+pr_commnt-SPrnterDecsr char*    Printer Description String
+npages   - number of pages for accounting
+debug    - sets debug level
+
+	On successful termination,  the accounting file will be updated from
+both filters with the total count of the printed pages. The filter exits with
+0 when the job was done successfully, 1 if some problem came up and retry is
+required, 2 when the job is to be aborted. On exit with 1 the spooler is
+instructed to keep the file to be printed in the spool area which does not
+take place on exit with 2. 
+
+	Printer malfunctions like no more paper, off line or any other
+problem are reported in the standard error. How the filter persist in such
+cases is determined by two env variables SLEEPTIME and RETRIES. If RETRIES is 
+set to zero the filters check and retry indefinitely after sleeping for 
+SLEEPTIME seconds every time. Otherwise they try RETRIES number of times.
+
+	Apart from the env variables mentioned above there are also few others
+to adjust the filter to the System Administrator's wishes. To make it possible 
+to set env variables at the time the lpd invokes the filter the printcap
+capabilities are not assigned the filter names themshelves but two shell 
+script names bphpiii.sh and ifhpiii.sh. Inside these two scripts the required
+variables can be set ON or OFF. If wrapping is required the WRAP variable is
+to be set and if tracing of what chars are received by the filter is required 
+the TRACE variable is to be set. After that the script execs the filter itself 
+by passing the lpd passed arguments.
+
+	The filter with name ifhpiii is the one which sends the file chars to
+the printer. It can check the file beforehand and decide if it is a simple
+ascii, a PCL or a PostScript file. In the first case it downloads the 
+appropriate font required according to the machine the request came from. For
+this reason file /usr/etc/machines_fonts.<host name> is scanned. The System
+Administrator can place there keywords specifying which font files to be
+downloaded to the printer. If NOFONT is specified then the default pc-8 font is
+downloaded. If the file to be printed is in PCL the filter switches the printer
+to PCL mode and then sends the file to be printed. For the Postscript case the 
+printer acts similarly except that it first checks if the required Postscript 
+cartridge is placed on. If not it just exits.
+
+	In file /usr/etc/printer_perms.<host name> accounting info can be
+kept and updated by the filter after every request. The entries there can be
+either for each user separately or for machines or groups together as regular
+expressions can be used. However to avoid extra load on the filter it is 
+assumed that which line should change has been examined by the spooler and its
+number is passed to the filter. The filter just has the task of getting the
+page count of the job printed and update the current pages field.
+
+	The interface is through the standard file descriptors corresponding
+to stdin, stdout and stderr. The development and testing took place on an
+HP 4m LaserJet Plus printer which used the HP JetDirect Network Interface to
+communicate with the printer server. So the network software had to be provided
+by a pipe which implemented the interconnection transparently to the filter.
+For this job the tcp-lp pipe provided with the PLP (The Public Line Printer
+Spooler, Release 3.4, August 1994) software was used. Similar pipes can be
+written for the parallel and serial interfaces.
+
+	For the printer job level control the PJL (Printer Job Language) is
+fully utilised. Actually the principles described in Chapter 9, Programming
+Tips for Using PJL, of the Printer Job Language Technical Reference Manual
+(HP 5961-0603, First Edition - July 1993) have considerably been taken into
+account.
+
+	From the technical point of view the filter forks into two processes
+which communicate through a pipe. The child is the one which monitors the
+printer port by being in an eternal loop. Every time it receives something
+from the printer port it places that in the pipe and notifies its father to
+parse it and act accordingly. The child does not send anything to the printer
+port which is its father's job. The father's job starts off by trying to 
+synchronise with the printer. If the attempt is successful it carries on with
+sending the job start command followed by the job itself. When all that has 
+proceeded successfully the end of job command sent to the printer is expected
+to finish the job. The reason the filter does not work for the 4L is that these
+commands for starting and ending a job are not recognized by this model. As 
+for the other models, according to the PJL manual, all the PJL commands used
+in the filter are recognised.
+
+	The status of the printer is checked every SLEEPTIME seconds. The
+TIMED variable is set so that the printer sends back its status every SLEEPTIME
+seconds so that the filter can check it. Also if anything else goes wrong in
+the meantime and printer sends an error message this gets parsed as well.
+All problems are reported in the spooler error log file.
+
+	The end of job command causes the printer to notify the filter when
+the job completes and report the count of pages printed during the job in
+question. When this is done job accounting takes place and the job terminates.
+
+	The printer status response handling is based on the responses
+returned by the HP4m+ printer. According to the PJL manual there is no
+variation. Therefore the filter should work for all the other models except
+the 4L. I rely on the manual's sayings for that but I have not tested that
+myself as we did not have the other models.

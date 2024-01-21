@@ -1,0 +1,1306 @@
+.\" Hey, Emacs! This is -*-nroff-*- you know...
+.\"
+.\" psplpr.1: manual page for the psplpr printing frontend
+.\"
+.\" Copyright (C) 1995, 1996, Yves Arrouye <Yves.Arrouye@marin.fdn.fr>
+.\"
+.\" This package and its included files may be redistributed under the
+.\" terms of the GNU General Public License, a copy of which can be
+.\" found in the file GPL.
+.\" 
+.\" I ask you to email me (preferrably in the form of context diffs)
+.\" any changes you make to this code. This is a wish, not an obligation,
+.\" but it will make maintaining the tools easier. Thanks!
+.\"
+.if n .ds PS PostScript
+.if t .ds PS P\s-2OST\s+2S\s-2CRIPT\s+2
+.TH PSPLPR 1 "@psplpr_date@" "Psptools @psptools_version@" \" -*- nroff -*-
+.SH NAME
+.B psplpr
+\- printing frontend and filter for \*(PS files
+.SH SYNOPSIS
+.B psplpr
+[
+.BI \-x " opt-prefix"
+]
+[
+.B \-\-version
+]
+[
+.B "\-\-help"
+]
+[
+.B \-\-ppdpath
+]
+[
+.B "\-\-lpr
+]
+[
+.B "\-\-lp
+]
+[
+.B "\-z\fR,\fP \-\-show"
+[
+.B all
+]
+[
+.B "list\fR | \fPlong"
+]
+[
+.B constraints
+]
+[
+.B "\-\-verbose"
+]
+[
+.B "\-q\fR,\fP \-\-quiet"
+]
+[
+.B "\-\-silent"
+]
+[
+.B "\-\-warn"
+]
+[
+.B "\-\-nodsc"
+]
+[
+.B "\-\-stripdsc"
+]
+[
+.B "\-\-stripcomments"
+]
+[
+.B \-\-globps
+]
+[
+.B \-\-dontglobps
+]
+[
+.B \-\-standard
+]
+[
+.B \-\-conformant
+]
+[
+.B "\-\-safer"
+]
+[
+.B "\-\-special"
+]
+[
+.BI "\-o\fR,\fP \-\-output" " filename"
+]
+[
+.B \-\-prepend
+]
+[
+.BI "\-k\fR,\fP \-\-kind\fR,\fP \-\-type" " type"
+]
+[
+.B "\-\-dontincfeatures"
+]
+[
+.B "\-\-dontchgfeatures"
+]
+[
+.B "\-\-delfeatures"
+[
+.B totally
+]
+]
+[
+.B "\-a\fR,\fP \-\-dftfeatures"
+]
+[
+.B \-\-nodftfeatures
+]
+[
+.BI "\-u\fR,\fP \-\-feature" " keyword\fR[\fP\fB=\fPvalue\fR]"
+[
+.IR param\fR=\fPvalue " .\|.\|."
+]
+]
+[
+\fIspooler-options\fP
+]
+[
+.IR file " .\|.\|."
+]
+.SH DESCRIPTION
+.B psplpr
+is a program that acts as a frontend to the system printer spooler or as
+a filter for printing \*(PS files on \*(PS aware printers.
+Its main task is to preprocess input files in order to add code for accessing
+various printer features as described in a \*(PS Printer Description
+(also known as PPD) file.
+.PP
+The program accepts the options of the available system printer spoolers.
+.B psplpr
+recognizes some of these options and parses them.
+Unknown options are passed directly to the system printer spooler.
+If both
+.BR lpr (1)
+and
+.BR lp (1)
+were available on the system when
+.B psplpr
+was configured, it looks in the nevironment for a
+.BR PSPLPR_PRINTER ,
+.BR PSPLPR_LPDEST ,
+.BR PRINTER
+or
+.BR LPDEST
+variable to determine which one to use, choosing
+.BR lpr (1)
+by default.
+(But note that if the
+.B \-P
+option of the
+.BR lpr (1)
+spooler is used, this spooler will be automatically selected, even if it
+is not installed on the system.)
+If the system printer spooler selected by
+.B psplpr
+is invalid,
+.BR cat (1)
+is used instead.
+.PP
+Because PPD files are mostly useful to modify \*(PS files before
+printing them,
+.B psplpr
+handles the filtering options of the BSD 
+.BR lpr (1)
+printer spooler.
+All filters except the input filter (specified by the
+.B if
+capacity in the printcap file) are first run by
+.B psplpr
+which then works on their output, which must be \*(PS code.
+This output must also conform to Adobe's Document Structuring
+Conventions (DSC).
+If it does not, then
+.B psplr
+will handle it as if the
+.B \-\-prepend
+option had been used.
+.PP
+.B psplpr
+looks for the printer name on the command line (by looking at the
+.I printer
+in the
+.B \-P\fIprinter\fP
+option of 
+.BR lpr (1)
+or in the
+.BI \-d " printer"
+option of
+.BR lp (1))
+or in the
+.BR PSPLPR_PRINTER ,
+.B PRINTER
+or
+.B LPDEST
+environment variables if necessary (see
+.B ENVIRONMENT
+section below).
+Once the name of the printer is known it looks for the printer entry in the
+printcap file and extracts the
+.B ty
+string property which yields the type of the printer
+(see section
+.B PRINTCAP CAPABILITIES
+below).
+For example a printcap entry for one of the printers on the author's
+machine is:
+
+.na
+.nf
+    bjc600|bjc|Canon BJC-600 printer using Ghostscript:\\
+        :lp=/dev/lp1:\\
+        :sd=/var/spool/bjc600:\\
+        :lf=/var/spool/bjc600/logfile:\\
+        :af=/var/spool/bjc600/acct:\\
+        :if=/usr/local/lib/ghostscript/filt/gsif:\\
+        :df=/usr/local/bin/psdvi:\\
+        :ty=Canon BubbleJet Color 600:
+.fi
+.ad
+
+and gives
+.B Canon BubbleJet Color 600
+for the printer type.
+.B psplpr
+uses the given type to find a PPD file for the printer.
+If the
+.B ty
+capability is not found but the
+.B PRINTER_TYPE
+or
+.B PPD
+environment variables are set,
+.B psplpr
+will use their content as the printer type (or as the path of the PPD file
+to use if the variable value is an absolute path).
+If no type can be determined,
+.B psplpr
+will consider this an error unless a PPD file is not needed (i.e. if no
+option requiring looking at a PPD has been used), in which case it
+will simply pass its input to the system spooler if it is not given a
+specific type.
+.PP
+The type of the printer is used to look for a PPD file along the path
+specified by the
+.B PPDPATH
+environment variable, which is a list of colon-separated directories
+(see
+.B ENVIRONMENT
+section below).
+The PPD file will be looked in each of these directories (and the
+loale directories that may be found under them) under the name
+made by concatenating the type of the printer (with slash characters
+translated to percents) and the
+.B .ppd
+suffix.
+If no file is found, then other lookups will be made with different
+names: the second try is made after having changed all spaces to
+underscores in the printer type, and a third try is made after having
+changed all underscores to spaces.
+If the printer type name is less than 8 characters long, then a
+case-insensitive lookup with the original name will be done too.
+For each lookup, if the name exist in a
+.B @ppd_dir@
+file, the alternate name will be tried too.
+If all lookups fail,
+.B psplpr
+will complain about not being able to find a PPD file for the given
+printer type.
+.PP
+Once a PPD file has been found,
+.B psplpr
+parses it and extracts the features supported by the printer.
+Then it inserts the code appropriate for selected features in the input
+files.
+The resulting code is then sent to the system printer spooler.
+.SH OPTIONS
+.TP
+.BI \-x " opt-prefix"
+Change
+.B psplpr
+option names by prefixing them with
+.I opt-prefix
+(which should be a single character) for short options and with
+.IB opt-prefix -
+for long options.
+For example if
+.I opt-prefix
+is the
+.B x
+character then the
+.B \-u
+and
+.B \-\-feature
+options are changed to
+.B \-xu
+and
+.B \-\-x\-feature
+respectively.
+The
+.B \-x
+option itself is changed too.
+This option should not be used except if the
+.B psplpr
+options conflict with the ones of your system printer spooler.
+.TP
+.BI \-\-version
+Print a version string on standard output and exit.
+.TP
+.BI "\-\-help"
+Give help for calling
+.BR psplpr ,
+including usage and meaning of options.
+.TP
+.BI \-\-ppdpath
+Print the path used to find PPD files and exit.
+.TP
+.BI "\-\-lpr"
+Use the
+.BR lpr (1)
+system printer spooler or
+.BR cat (1)
+if it is not installed.
+Also get the default printer from the
+.B PRINTER
+environment variable.
+.TP
+.BI "\-\-lp"
+Use the
+.BR lp (1)
+system printer spooler or
+.BR cat (1)
+if it is not installed.
+Also get the default printer from the
+.B LPDEST
+environment variable.
+.TP
+.BI "\-z\fR,\fP \-\-show\fR [ \fPall\fR ] [ \fPlist\fR | \fPlong\fR ] [ \fPconstraints\fR ]\fP"
+Print the name of the PPD file used followed by
+a lexically sorted list of the printer features along with
+informations like their type and default values, then exit (all other
+.B psplpr
+options are ignored).
+If the
+.B all
+optional argument is not given, do not list features from sections that
+are not currently handled (see section
+.B CAVEATS AND BUGS
+below).
+The list looks like this:
+
+.na
+.nf
+    *BitsPerPixel
+        PickOne, *BitsPerPixel=24
+        16, 24, 32, 8, None
+    *ManualFeed
+        Boolean, *ManualFeed=False
+        False, True
+    *Resolution
+        PickOne, *Resolution=360x360dpi
+        180x180dpi, 360x360dpi, 90x90dpi
+.fi
+.ad
+
+The name of the feature is indicated on the first (non indented) line.
+The second line gives all valid values for the feature.
+The third line gives the type of the feature (where
+.B PickOne
+means that the values are mutually exclusive and
+.B Boolean
+that the feature is a boolean indicator) and the default value of the
+feature.
+
+If the
+.B list
+optional argument is given, print a list in a form that may be
+easily parsed, for example to build an interface for selecting
+features.
+The list gives for each feature, in that order, the name of the
+feature, its type, its default value, and then a list of values,
+one per line. The feature and values may have alternate names
+shown in parenthesis (in such a case the alternate name is the
+one that should be presented to the user).
+Each feature entry is terminated by a dot on a line by itself.
+This list looks like this:
+
+.na
+.nf
+    *BitsPerPixel (Print Depth), PickOne, 24,
+        16 (16bpp)
+        24 (24bpp)
+        32 (32bpp)
+        8 (8bpp)
+        None (1bpp)
+    .
+    *ManualFeed (Manual Feed), Boolean, False,
+        False (No)
+        True (Yes)
+    .
+    *Resolution (Resolution), PickOne, 360x360dpi,
+        180x180dpi (180dpi)
+        360x360dpi (360dpi)
+        90x90dpi (90dpi)
+    .
+.fi
+.ad
+
+If the
+.B long
+optional argument is given instead, print a longer list including alternate
+names for the options and informations about the order and precedence of
+the features.
+This long list looks like this:
+
+.na
+.nf
+    *BitsPerPixel (Print Depth)
+        Type
+            PickOne
+        Order Dependency
+            AnySetup 50
+        Valid Values
+            16 (16bpp)
+            24 (24bpp)
+            32 (32bpp)
+            8 (8bpp)
+            None (1bpp)
+        Default
+            24
+    *ManualFeed (Manual Feed)
+        Type
+            Boolean
+        Order Dependency
+            AnySetup 50
+        Valid Values
+            False (No)
+            True (Yes)
+        Default
+            False
+    *Resolution (Resolution)
+        Type
+            PickOne
+        Order Dependency
+            AnySetup 50
+        Valid Values
+            180x180dpi (180dpi)
+            360x360dpi (360dpi)
+            90x90dpi (90dpi)
+        Default
+            360x360dpi
+.fi
+.ad
+
+The
+.B "Order Dependency"
+heading indicates when the code for the feature should be
+output, and its precedence (a lower precedence means the code will be
+output before code with greater precedence). It is got from an
+.B *OrderDependency
+entry in the PPD file or from a guess.
+The
+.B "Valid Values"
+heading gives alternate names for the features values
+in parenthesis. These names are accepted by
+.B psplpr
+n addition to the regular names.
+
+Except with the
+.B list
+option, some fields may be marked with
+.B (Unspecified)
+which means that the value was not given in the PPD file but rather
+guessed by
+.BR psplpr .
+It is up to the user to decide whether to trust this guess or not.
+
+If the
+.B constraints
+keyword is given, constraints for each feature are listed too.
+.TP
+.BI "\-\-verbose"
+Print informations about the actions of
+.B psplpr
+while it does its work.
+The informations are printed on the standard output or on the standard
+error if the standard output is used to print the \*(PS document.
+.TP
+.B "\-q\fR,\fP \-\-quiet"
+Do not complain while producing the output.
+This means that warning about ignored features will not appear
+anymore.
+.TP
+.BI "\-\-silent"
+Do not print anything, even warning or error messages.
+Also negate the effect of any previous
+.B "\-\-verbose" option.
+.TP
+.BI "\-\-warn"
+Do not exit on error but continue after issuing the error message as a
+warning to the user.
+.TP
+.BI "\-\-nodsc"
+Do not put DSC comments in the output.
+The code will still be output, of course, but without the DSC
+.B %%Begin(End)Feature:
+comments.
+Generation of
+.B %%IncludeFeature:
+comments is suppressed too.
+.TP
+.BI "\-\-stripdsc"
+Strip DSC comments so that they do not appear in the output.
+DSC comments are also not output by
+.BR psplpr .
+This option is useful if the system printer spooler does have problem
+with DSC comments but the file was generated with such comments so that
+.B psplpr
+could take advantage of them.
+This option should not be used if later processing of the document is
+expected.
+.TP
+.BI "\-\-stripcomments"
+Strip all comments so that they do not appear in the output.
+This option should not be used if later processing of the document is
+expected.
+.TP
+.B \-\-globps
+Read the entirety of a section (like the setup, or a page) before
+handling it and reoutputing its code.
+This means that if DSC comments setting or requesting features that
+are embedded anywhere in the section will correctly be output in the
+correct order at the beginning of the section, before the other code.
+If the input does not appear to be DSC conformant this option is
+automatically turned on.
+.TP
+.B \-\-dontglobps
+Prevent the automatic setting of the
+.B \-\-globps
+option for input that does not appear to be DSC conformant.
+This option can be used to save memory (remember that the whole section,
+for example a page that may be several megabytes long, is stored in
+memory) when one knows that no features do appear anywhere in sections.
+.TP
+.B \-\-standard
+Refrain from producing DSC comments that are not part of the DSC
+specification.
+(See section
+.B DOCUMENT STRUCTURING CONVENTIONS
+below.)
+.TP
+.B \-\-conformant
+Do not handle non-conformant DSC comments in the document, nor do
+produce these comments even if the
+.B \-\-standard
+option is not used.
+(See section
+.B DOCUMENT STRUCTURING CONVENTIONS
+below.)
+.TP
+.BI "\-\-safer"
+Bracket code generated from the PPD file within code handling eventual
+errors.
+.TP
+.BI "\-\-special"
+Do special treatment of some features. See section
+.B SPECIAL FEATURES HANDLING
+below.
+.TP
+.BI "\-o\fR,\fP \-\-output" " filename"
+Act as a filter, printing on the given file (or the standard output if
+.I filename
+is
+.BR - )
+instead of piping the
+document to the system printer spooler.
+.TP
+.B \-\-prepend
+Prepend the code for the features to the output, after a
+
+.na
+.nf
+    %!
+.fi
+.ad
+
+line indicating a \*(PS file.
+The code that is output tries to redefine the
+.B showpage
+\*(PS procedure to setup the printer correctly before printing a
+page.
+This option may be useful when handling input that do not conform to the
+DSC requirements (though it may not produce correct output for
+features which have an
+.B *OrderDependency
+of
+.BR PageSetup ")."
+It is strongly recommended not to use it in other cases, and it will
+effectively make a DSC conformant file look like a non-conformant one
+when used.
+Note that the input will still be normally processed after the code
+for the features have been output.
+.TP
+.BI "\-k\fR,\fP \-\-kind\fR,\fP \-\-type" " type"
+Set the printer type to use, or the path of the PPD file to read if
+.I type
+is an absolute path to a file.
+This option overrides the
+.B ty
+capability in the printcap file if it is present.
+.TP
+.BI "\-\-dontincfeatures"
+Do not process DSC comments
+.BI %%IncludeFeature:
+which are normally processed by replacing the requested feature by the
+appropriate code for the printer.
+.TP
+.BI "\-\-dontchgfeatures"
+Do not process DSC comments
+.BI %%Begin(End)Feature:
+which are normally processed
+by replacing the actual code for the feature by the appropriate code
+for the printer.
+.TP
+.B "\-\-delfeatures [ totally ]"
+Process DSC comments
+.BI %%Begin(End)Feature:
+by replacing them with a
+.BI %%IncludeFeature:
+comment (thus making the resulting \*(PS document portable) unless the
+.B totally
+optional argument is supplied or the
+.BI "\-\-nodsc"
+option is used.
+In addition to that, removes the
+.BI %%IncludeFeature:
+comments if the
+.B totally
+optional argument is supplied.
+Note that this option
+takes effect only if
+the
+.B "\-\-dontchgfeatures"
+option is used or if an unknown feature is found.
+.TP
+.BI "\-a\fR,\fP \-\-dftfeatures"
+Select all default printer features.
+This is the same as using the
+.B \-\-feature
+option asking for all default features.
+Features that are selected with this option are overriden by
+features specified on the command-line.
+(Be warned that if you do not use the
+.B "\-\-delfeatures"
+option your selected features may be overriden by some features already
+selected in a non-portable document.)
+.TP
+.BI "\-\-nodftfeatures"
+Suppress the selection of default printer features.
+Useful to override the
+.B _nxfinalform
+printer capability on the command line.
+.TP
+.BI "\-u\fR,\fP \-\-feature \fP\fIkeyword\fP\fR[\fP=\fIvalue\fP\fR] [\fP \fIparam\fP=\fIvalue\fP \fR.\|.\|.\fP ]"
+Select one of the printer features.
+The
+.I value
+is optional only for
+.B boolean
+features, in which case the feature is defined to be
+.BR True .
+Case is significant in
+.I keyword
+and
+.IR value .
+The
+.I keyword
+may be specified with or without its leading star:
+.B *MediaType
+and
+.B MediaType
+control the same feature.
+It is an error to specify unknown values for
+.I keyword
+or
+.I value
+and it is an error too to request features that are conflicting, as
+defined by the
+.B *UIConstraints:
+declarations in the PPD file.
+
+If the keyword starts with
+.B *Default
+(or just
+.BR Default )
+then it means to select code for the indicated default value.
+In this case, no
+.I value
+can be given.
+This form of feature selection is especially useful when the PPD file gives
+default values which do not correspond to the default printer state.
+Though this should not be the case, it may be used for example to choose
+a default transfer function.
+
+Some features take user-defined parameters, which can be supplied in
+the 
+.I param\fR=\fPvalue
+arguments, as in
+
+.na
+.nf
+    \fB\-\-feature\fP *CustomPageSize Width=12cm
+.fi
+.ad
+
+If a parameter is not supplied, then its minimal legal value (as
+specified in the PPD file) is used.
+Parameters of type
+.B points
+can be expressed as a number followed by a measurement unit
+specification, which can be one of
+.B in
+(inches),
+.B cm
+(centimeters),
+.B mm
+(millimeters)
+or
+.B pt
+(points, default measurement unit).
+.SH RETURN CODES
+.B psplpr
+exits with a status code of
+.B 0
+if it succeeded.
+In case of problem,
+it prints one or more error messages and, if the
+.B \-\-warn
+option is not used,
+exit with one of the following codes:
+.TP 5
+.B 1
+The invokation of
+.B psplpr
+is incorrect, options are not given with the expected syntax.
+.TP 5
+.B 2
+The PPD file (even under an alternate name as explained above) cannot be
+located in one of the directories specified by the
+.B PPDPATH
+environment variable.
+.TP 5
+.B 3
+The PPD file cannot be parsed sucessfully.
+.TP 5
+.B 4
+Some features that were requested are not provided by the printer,
+incorrect values for existing features are specified, or correct values
+for different features conflict.
+.TP 5
+.B 5
+The processing of the input files (and their piping to the system
+printer spooler) cannot be done.
+.SH PRINTCAP CAPABILITIES
+The following printcap capabilities are used by
+.BR psplpr :
+.TP
+.B ty=\fItype\fP
+The 
+.I type
+of the printer which is used to find the corresponding PPD file (see
+.B DESCRIPTION
+above for the rules used to find this file).
+Please note that the
+.I type
+must not start with a leading slash or dot character.
+.TP
+.B _nxfinalform
+Output for this printer should contain code for all features. Same as
+using the
+.B \-\-dftfeatures
+option on the command line.
+.SH SPECIAL FEATURES HANDLING
+First of all, if a feature has no
+.B *OrderDependency:
+associated with it then it will be associated to the
+.B @ppd_def_section@
+section with a precedence of
+.BR @ppd_def_order@ .
+.PP
+Most features are handled by simply getting the corresponding code
+from the PPD file and outputing it as is, eventually enclosed by DSC
+comments.
+Some features however get a special treatment, which is explained here.
+.TP
+.B *ManualFeed \fRand\fP *InputSlot
+These features are considered mutually exclusive, meaning that if
+.B *ManualFeed
+is selected then
+.B *InputSlot
+will be automatically undefined by
+.BR psplpr .
+.TP
+.B *Transfer
+After the transfer function has been set, the page is erased to make
+sure that the new transfer function will be used starting with the
+current page (which is normally empty at the point where the code
+inserted).
+If we call the transfer function code
+.I newtransfer
+then the code that is output is:
+
+.na
+.nf
+    \fInewtransfer\fP erasepage
+.fi
+.ad
+
+If the
+.B \-\-special
+option has been specified, the new transfer function is instead
+concatenated to the existing one, with code like the following example:
+
+.na
+.nf
+    [
+        \fInewtranfer\fP /exec load
+        currenttransfer /exec load
+    ] cvx settransfer erasepage
+.fi
+.ad
+.TP
+.B *ScreenProc
+If a
+.I screenproc
+code is specified,
+.I screenfreq
+and
+.I screenangle
+values must also be obtained from
+.B *ScreenFreq
+and
+.B *ScreenAngle
+keywords in the PPD file.
+The code that is output is then:
+
+.na
+.nf
+    \fIscreenfreq screenangle screenproc\fP setscreen
+.fi
+.ad
+.SH DOCUMENT STRUCTURING CONVENTIONS
+The following comments of the DSC are used by
+.BR psplpr :
+.TP
+.BI "%%IncludeFeature: " "keyword option"
+If the
+.B "\-\-dontincfeatures"
+option is not used, this comment is replaced by the code enabling the correct
+.I option
+of the desired
+.I feature
+if it is defined for the printer.
+.TP
+.BI "%%Begin(End)Feature: " "keyword option"
+If the
+.B "\-\-dontchgfeatures"
+option is not used, the code corresponding to this comment is replaced by
+code for the printer or by an appropriate
+.B %%IncludeFeature:
+comment if the printer does not support the requested
+.I option
+for
+.I feature
+or
+.I feature
+itself.
+If the
+.B "\-\-delfeatures"
+option is used, this comment and the corresponding code are either replaced
+by the corresponding
+.B %%IncludeFeature:
+comment or simply suppressed.
+.TP
+.B %%EndProlog
+Indicate the end of the file prolog.
+Features with an
+.B *OrderDependency
+of
+.B Prolog
+will be issued before this line.
+.TP
+.B %%BeginSetup
+Indicate the beginning of the document setup.
+Features with an
+.B *OrderDependency
+of
+.B DocumentSetup
+or
+.B AnySetup
+will be issued right after this line.
+.TP
+.B %%BeginPageSetup
+Indicate the beginning of the setup of a specific page of the document.
+Features with an
+.B *OrderDependency
+of
+.B PageSetup
+will be issued right after this line for every page.
+.PP
+When a document is not DSC conformant,
+.B psplpr
+will try to guess where to issue code for the different parts of the
+setup.
+It may fail and produce an incorrect document, and it will in no case
+convert a non-conformant document into a conformant one.
+.PP
+As a special feature,
+.B psplpr
+will produce a small \*(PS document when getting no input. This
+document looks like:
+
+.na
+.nf
+    %!PS-Adobe-3.0
+    %%Title: Dummy \*(PS Document
+    %%Creator: psplpr version @psplpr_version@
+    %%CreationDate: Sun Mar  3 23:14:21 MET 1996
+    %%For: Yves Arrouye
+    %%BoundingBox: 0 0 0 0
+    %%Pages: 0
+    %%EndComments
+    %%BeginProlog
+        \fIProlog features.\|.\|.\fP
+    %%EndProlog
+    %%BeginSetup
+        \fIDocumentSetup features.\|.\|.\fP
+    %
+        \fIAnySetup features.\|.\|.\fP
+    %%EndSetup
+    %%Page: 0 0
+    %%BeginPageSetup
+        \fIPageSetup features.\|.\|.\fP
+    %%EndPageSetup
+    %%EOF
+.fi
+.ad
+
+if DSC comments are not disabled. If they are, then the features are
+still output in the order above, but without comments, and the first
+line of the output does not indicate conformance with the DSC.
+.PP
+.B psplpr
+extends the DSC specification with the following comment, produced unless
+the
+.B \-\-standard
+option is used:
+.TP
+.BI %%Begin(End)Param: " keyword param"
+The \*(PS code enclosed by this comment supplies the value to use for
+the
+.I param
+parameter of
+.IR keyword .
+(Actually, the \*(PS code must be a single value of the type specified
+by the
+.I "keyword param"
+entry in the PPD file.)
+Supposing that the used PPD file contains the following entries:
+
+.na
+.nf
+    *CustomPrintColors True: "
+      1 dict dup /PrintColors
+      3 -1 roll put setpagedevice"
+    *End
+    *ParamCustomPrintColors Colors: 1 int 0 15
+.fi
+.ad
+
+then some code setting up the use of
+.B *CustomPrintColors
+may look like:
+
+.na
+.nf
+    %%BeginFeature: *CustomPrintColors True
+    %%BeginParam: *ParamCustomPrintColors Colors
+    7
+    %%EndParam
+      1 dict dup /PrintColors
+      3 -1 roll put setpagedevice
+    %%EndFeature
+.fi
+.ad
+
+When
+.B psplpr
+will parse a file containing such comments, it will use them to supply
+the correct values to the replacement code for the printer actually
+used.
+(Note: this is
+.I not
+done at the moment!)
+.PP
+Unless the
+.B \-\-conformant
+option is used,
+.B psplpr
+will recognize
+.BI %%Begin(End)PaperSize: " papersize"
+or
+.BI %%PaperSize: papersize
+comments and treat them as if it found
+.BI "%%Begin(End)Feature: *PageSize" " papersize"
+or
+.BI "%%IncludeFeature: *PageSize" " papersize"
+instead.
+Such comments, which are not part of the DSC, are generated and or
+recognized by a number of tools.
+.SH CAVEATS AND BUGS
+The encoding of the PPD files is actually treated as native encoding,
+which means that hexadecimal substrings should be used to specify
+ISO Latin 1 characters on systems where this not the default.
+.PP
+The PPD files are not entirely parsed, and there is absolutely no guarantee
+that the actual parsing is correct for all the valid PPD files one can
+produce.
+Parsing fully compliant with Adobe recommendations will be added as soon as
+possible. (One can use the 
+.B \-\-show
+option to get an indication of features actually recognized by
+.BR psplpr 
+in a PPD file.)
+.PP
+The
+.B JCLSetup
+and
+.B ExitServer
+types of
+.B *OrderDependency
+are not handled.
+The first one should be handled by the printing system because it does
+not specify \*(PS code.
+The second one may eventually be handled by
+.B psplpr
+by preparing a separate job to print.
+.PP
+The input is changed in a single pass, so
+.B psplpr
+is not able to enforce constraints when processing DSC comments for
+feature inclusion or definition.
+.PP
+Features with parameters are not correctly transformed because there is no
+way to tell which values were used for the parameters.
+Such features will thus get default values for their parameters.
+.PP
+The
+.B psplpr
+program is not a Document Manager (in Adobe's terminology).
+It simply adds \*(PS code for the use of the some of the printer features but
+does not control its correct initialization, does not try to optimize
+the printer's memory or printing time, does not manage resources by
+itself (but instead calls
+.BR includeres (1)
+if it can access it), etc....
+Such additions would be useful but in a bigger tool.
+.PP
+It should be possible to use
+.B psplpr
+as a simple filter (with the
+.B "\-\-stdout"
+option) in a printcap-specified print filter on a system that supports
+passing extraneous informations to its filters, but this has not been
+tested yet.
+.PP
+The exit status of the system printer spooler is not trapped and handed
+to the user in case of error.
+This should be done for better handling of problems.
+.PP
+Because the program is somewhat simplistic and may eventually output
+wrong code, it should provide a
+.B \-\-secure
+option to bracket code it outputs in order to guarantee that the operand
+and dictionaries stack are not changed when setting a feature.
+.PP
+If you print files in formats other than \*(PS, then the filters must be
+described in the local printcap file, and accessible on the local host.
+(I do not know whether this is a requirement for the system spooler
+too.)
+.PP
+On a NEXTSTEP system one should have a
+.B PRINTER
+variable defined even if the system does not manage printers this way.
+The
+.B /etc/printcap
+must also be synchronized when changes to the printers definitions are made
+in NetInfo. This can be done by deleting the file and then issuing a
+command like
+
+.na
+.nf
+    \fBnidump printcap \fIdomain\fP >>/etc/printcap\fR
+.fi
+.ad
+
+for all
+.I domain
+where the
+.B /printers
+directory is not empty.
+.PP
+.B psplpr
+should be able to parse filtering options for the
+.BR lp (1)
+printer spooler and to call the appropriate filters as it does for
+.BR lpr (1).
+(Please email the author sources for such a spooler if you want
+that to be taken care of.)
+.SH ENVIRONMENT
+(Note: environment variables like
+.B PRINTER_TYPE
+and
+.B PPD
+with the uppercase name of the printer prepended are always preferred to
+the default names for this variables.
+For instance, the
+.B LP_PRINTER_TYPE
+variable will be preferred to
+.B PRINTER_TYPE
+for the
+.B lp
+printer.)
+.PP
+.TP 20
+.B PPDPATH
+Colon-separated list of directories under which to look for PPD files
+(locale subdirectories under these directories will be seached too).
+If an entry in this list is empty, it will be replaced by the default
+path.
+On a NEXTSTEP system (determined by looking for its system library directory)
+the default path comprises the directories
+.BR ~/Library/PrinterTypes ,
+.BR /LocalLibrary/PrinterTypes
+and
+.BR /NextLibrary/PrinterTypes ;
+on other systems it comprises all
+.BR share/ppd ,
+.BR share/postscript/ppd ,
+.BR share/ghostscript/ppd ,
+.BR lib/ppd ,
+.BR lib/postscript/ppd ,
+.BR lib/ghostscript/ppd
+and
+.B ppd
+directories found under
+.BR ~ ,
+.B /usr/local
+and
+.BR /usr ,
+followed by the
+.B /lib/ppd
+and
+.B /lib/postscript/ppd
+in that order, where
+.B ~
+is the home directory of the user invoking
+.BR psplpr .
+.TP 20
+.B PPD
+Older name for the
+.B PRINTER_TYPE
+environment variable.
+If this variable is kept, it should only be used to give a path to a
+PPD file.
+.TP 20
+.B PRINTER_TYPE
+Default type of printer, or path to a PPD file.
+This will be used if the printer has no
+.B ty
+capability defined in its entry in the printcap file
+.TP 20
+.B PRINTCAP
+Printer capabilities entry (not recommended) or path to the printer
+capabilities database.
+On systems with NetInfo, this variable should not be set.
+.TP 20
+.B PRINTCAP_NIDOMAIN
+On systems with NetInfo, indicate the domain that should be queried to
+get the printers capabilities.
+Defaults to
+.B .
+(local domain) if unset.
+.TP 20
+.B PPD
+Type to use when looking for a PPD file, or path to the PPD file to use.
+If this variable is set to a non-null value its value is used even if a
+.B ty
+capability exists for the printer in the printcap file.
+.TP 20
+.B PSPLPR_OPTIONS
+Options for
+.B psplpr
+that are used as if they were at the start of the list of options
+supplied on the command line.
+.TP 20
+.B PRINTER
+Printer name for
+.BR lpr (1).
+It must correspond to an entry in the printcap file.
+If not set, defaults to
+.BR lp .
+.TP 20
+.B PSPLPR_PRINTER
+Preferred printer name for
+.BR lpr (1).
+If set, then
+.B psplpr
+will set the
+.B PRINTER
+environment variable to its value before calling the system printer
+spooler.
+.TP 20
+.B LPDEST
+Printer name for
+.BR lp (1).
+It must correspond to an entry in the printcap file.
+If not set, defaults to
+.BR lp .
+.TP 20
+.B PSPLPR_LPDEST
+Preferred printer name
+for
+.BR lp (1).
+If set, then
+.B psplpr
+will set the
+.B LPDEST
+environment variable to its value before calling the system printer
+spooler.
+.TP 20
+.B LINGUAS
+A space-separated list of locales to be tried in order.
+If this variable exists, it overrides any choice made by one of
+the standard locale variables.
+(On a NEXTSTEP system, this variable is ignored, the order of languages
+to try being set with 
+.BR Preferences .)
+.TP 20
+.TP 20
+.B LANGUAGE\fP,\fB LC_ALL\fP,\fB LC_MESSAGES\fP,\fBLANG
+Preferred locale to use.
+These variables are read in the order given until a non-null value is
+found for one of them.
+(On a NEXTSTEP system, these variables are ignored, the preferred language
+being set with 
+.BR Preferences .)
+.SH FILES
+.TP 20
+.B @PRINTCAP@
+Printer capabilities database.
+On systems with NetInfo, the contents of this file are supersed by the
+output of the
+.BR nidump (8)
+command (see section
+.B ENVIRONMENT
+above).
+.SH AUTHOR
+Yves Arrouye <Yves.Arrouye@marin.fdn.fr>
+.SH VERSION
+Version @psplpr_version@, @psplpr_date@.
+.SH HISTORY
+.B psplpr
+was formerly known as
+.BR plpr (1),
+his name having been changed to better indicate it working on \*(PS
+files.
+.SH SEE ALSO
+.TP 20
+PPD 4.2
+\*(PS Printer Description File Format Specifications Version 4.2,
+Technical Note #5003, Adobe Systems Incorporated.
+.TP 20
+DSC 3.0
+\*(PS Language Documentation Structuring Conventions Version 3.0,
+Technical Note #5001, Adobe Systems Incorporated.
+.LP
+.BR lpr (1),
+.BR lp (1)
+.br
+.BR mkppddir (1)
+.br
+.BR includeres (1)
+.LP
+.BR printcap (5)
+.SH NOTES
+\*(PS is a registered trademark of Adobe Systems Incorporated.
+

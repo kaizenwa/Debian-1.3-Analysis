@@ -1,0 +1,93 @@
+# Makefile for libpaper.
+# Copyright (C) 1995 Yves Arrouye <Yves.Arrouye@imag.fr>
+ 
+#### Start of system configuration section. ####
+ 
+srcdir = @srcdir@/..
+VPATH = @srcdir@
+
+@SET_MAKE@
+
+INSTALL = @INSTALL@
+INSTALL_MAN = @INSTALL@ -m 644 $(INSTALL_GROUP) $(INSTALL_OWNER)
+INSTALL_BIN = @INSTALL@ -m 755 $(INSTALL_GROUP) $(INSTALL_OWNER)
+
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+
+bindir = $(exec_prefix)/bin
+sbindir = $(exec_prefix)/sbin
+
+# Directory in which to install library files.
+datadir = @datadir@
+
+ifeq ($(datadir),/)
+etcdir = /etc
+else
+etcdir = $(datadir)/etc
+endif
+
+# Other configuration
+
+PAPERCONF=letter
+
+PAPERVAR=PAPERCONF
+PAPERSIZEVAR=PAPERSIZE
+
+PAPERSIZE=$(etcdir)/papersize
+
+CC = @CC@
+CFLAGS = -O2 -I../lib -DPAPERCONF=\"$(PAPERCONF)\" -DPAPERVAR=\"$(PAPERVAR)\" -DPAPERSIZE=\"$(PAPERSIZE)\" -DPAPERSIZEVAR=\"$(PAPERSIZEVAR)\"
+
+#### End of system configuration section. ####
+
+SRC = paperconf.c
+OBJ = $(SRC:.c=.o)
+
+INSTALLEDFILES = $(bindir)/paperconf $(sbindir)/paperconfig
+
+all: paperconf paperconfig
+
+install: all installdirs installall
+
+installall: $(INSTALLEDFILES)
+
+uninstall:
+	$(RM) $(INSTALLEDFILES) $(INSTALLEDOTHERFILES)
+
+$(bindir)/paperconf: paperconf
+	$(INSTALL_BIN) $< $(bindir)
+
+$(sbindir)/paperconfig: paperconfig
+	$(INSTALL_BIN) $< $(sbindir)
+
+paperconfig: paperconfig.in Makefile
+	sed 's,@PAPERSIZE@,$(PAPERSIZE),g' paperconfig.in >$@
+
+installdirs:
+	${srcdir}/mkinstalldirs $(bindir) $(sbindir)
+
+$(LIB): $(LIB)($(OBJ))
+	$(RANLIB) $@
+
+$(LIBSO).$(LIBSOMAJOR).$(LIBSOMINOR): $(OBJ)
+	$(CC) -shared -Wl,-soname,$(LIBSO).$(LIBSOMAJOR) -o $@ $(OBJ)
+
+paperconf: $(OBJ)
+	$(CC) -o $@ $(LDFLAGS) $(OBJ) -L../lib -lpaper
+
+paper.o: paper.c
+
+$(srcdir)/configure: $(srcdir)/configure.in $(M4FILES)
+	cd $(srcdir); rm -f configure && autoconf && chmod +x configure
+Makefile: Makefile.in $(srcdir)/config.status
+	cd $(srcdir); ./config.status
+$(srcdir)/config.status: $(srcdir)/configure
+	cd $(srcdir); ./config.status --recheck
+
+clean:
+	$(RM) $(OBJ)
+
+distclean: clean
+	$(RM) Makefile paperconf paperconfig
+

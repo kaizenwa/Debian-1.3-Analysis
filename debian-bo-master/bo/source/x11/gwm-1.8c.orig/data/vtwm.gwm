@@ -1,0 +1,580 @@
+;; vtwm.gwm --- VTWM profile for GWM
+;;
+;; Author: Anders Holst  (aho@sans.kth.se)  
+;; Copyright (C) 1995  Anders Holst
+;; Version: vtwm-1.0
+;; Last change: 17/6 1995
+;;
+;; This file is copyrighted under the same terms as the rest of GWM
+;; (see the X Inc license for details). There is no warranty that it
+;; works. 
+;;
+;; --------------------------------------------------------------------- 
+;;
+;; This file is the main file of the VTWM profile for gwm.
+;;
+;; This profile is highly inspired by, and in large parts stolen
+;; directly from, the TWM profile by Arup Mukherjee
+;; (arup@grasp.cis.upenn.edu). Thus much of the credit go to him.
+;; However, bug reports (and complaints) go to me:  aho@nada.kth.se
+;;
+;; All normal user customization of the profile (colors, original
+;; positions and sizes, behaviors, menus, etc.) can be done in
+;; "vtwmrc.gwm".
+;; 
+
+(load "trace-func")
+(stack-print-level 5)
+(setq display-name-radix (match "\\([^:]*:[0-9][0-9]*\\)" display-name 1))
+(defname 'x-screen-name screen. '(+ display-name-radix "." (itoa screen)))
+
+(if (= gwm-quiet 0)
+  (progn
+    (for screen (list-of-screens)
+      (? x-screen-name " " screen-width " x " screen-height " x " 
+	screen-depth "\n"))
+    (print "reading")
+    (: original-load load)
+    (defun load (file) (? ".")(original-load file))
+))
+
+(load "std-func")
+
+
+;; General appearance
+;; ------------------
+
+(: move-grid-style 3)
+(: move-meter 0)
+(: resize-grid-style 4)
+(: resize-meter 0)
+(: property ())
+(: borderwidth 2)
+(: border-on-shaped 1)
+
+
+;; Some nice names for use later in the profile
+;; --------------------------------------
+
+(set-color black Black)
+(set-color white White)
+(set-color grey Grey)
+(set-color darkgrey DarkSlateGrey)
+
+(: name-font (font-make "9x15"))
+(: small-font (font-make "6x10"))
+
+(: any-button (button any any))
+(: any-key (key any any))
+
+(: select-button 1)
+(: action-button 2)
+(: menu-button 3)
+
+
+(for screen (list-of-screens)
+    (: invert-color (bitwise-xor black white))
+)
+
+
+;;=============================================================================
+;;          Load and define several useful functions
+;;=============================================================================
+
+(load "utils")
+(load "deltabutton")
+
+(defun matches-token (token)
+  (if (not token)                 ; True and false are literary
+         ()
+      (= token t)
+         t
+      (= (type token) 'atom)      ; Atom is client class
+         (= window-client-class token)
+      (= (type token) 'string)    ; String is regexp matching name
+         (match token window-name)
+      (and (= (type token) 'list) ; Lisp expression
+           (or (and (= (type (# 0 token)) 'atom)
+                    (boundp (# 0 token))
+                    (member (type (eval (# 0 token)))
+                            '(subr fsubr expr fexpr)))
+               (= (type (# 0 token)) 'active)))
+         (eval token)
+      (and (= (type token) 'list) ; Windowspec
+           (= (type (# 0 token)) 'atom))
+         (match-windowspec token)
+         ()))                     ; Else no match
+
+(defun matches-list (lst)
+  (tag return
+    (for ele lst
+       (if (matches-token ele)
+           (exit return t)))
+    ()))
+
+(defun matches-cond (condlst)
+  (tag return
+    (for lst condlst
+       (if (matches-token (# 0 lst))
+           (exit return 
+                 (sublist 1 (length lst) lst))))
+    ()))
+
+
+; default placement make title bar in screen
+(defun default-placement (flag)
+    (if flag
+	(if (< window-y 0) (move-window window-x 0))))
+
+(setq place-x-offset 23)
+(setq place-y-offset 19)
+(setq place-x-wrap 1031)
+(setq place-y-wrap 871)
+(setq place-last-x 0)
+(setq place-last-y 100)
+
+(defun random-placement (flag)
+  (if flag
+      (if (not (or window-was-on-screen
+                   ;; window-starts-iconic
+                   ;; window-is-transient-for
+                   (not (= window-status 'window))))
+          (with (left (+ place-last-x place-x-offset)
+                 right (+ left window-width)
+                 top (+ place-last-y place-y-offset)
+                 bottom (+ top window-height))
+            (if (> right 1024)
+                (setq place-last-x (with (neg (- left place-x-wrap))
+                                         (+ neg (* (/ (- place-x-offset neg 1)
+                                                      place-x-offset)
+                                                   place-x-offset))))
+              (setq place-last-x left))
+            (if (> bottom 864)
+                (setq place-last-y (with (neg (- top place-y-wrap))
+                                         (+ neg (* (/ (- place-y-offset neg 1)
+                                                      place-y-offset)
+                                                   place-y-offset))))
+              (setq place-last-y top))
+            (move-window place-last-x place-last-y)))))
+                   
+(defun vtwm-user-placement (flag)
+  (if flag
+      (if (not (or window-was-on-screen
+                   ;; window-starts-iconic
+                   ;; window-is-transient-for
+                   (not (= window-status 'window))))
+          (with (pos (current-mouse-position)
+                 cursor (cursor-make 130))
+            (move-window (# 0 pos) (# 1 pos))
+            (process-exposes)
+            (move-window)
+            (setq pos (current-mouse-position))
+            (if (> (# 2 pos) 0)
+                (progn
+                  (warp-pointer 10 10)
+                  (twm-resize-window)))))))
+
+(defun vtwm-placement (flag)
+  (if flag
+      (if (or window-was-on-screen
+              ;; window-starts-iconic
+              ;; window-is-transient-for
+              (= window-client-class 'Gwm)
+              (not (= window-status 'window))
+              ;; (virtual-nailed)
+              )
+             ()
+          (or (not (or window-program-set-position
+                       window-user-set-position))
+              (and (= window-x 0)
+                   (= window-y 0)))
+             (if place-randomly
+                 (random-placement flag)
+               (vtwm-user-placement flag))
+          window-user-set-position
+             (virtual-placement flag)
+          window-program-set-position
+             (with (left window-x
+                    right (+ left window-width)
+                    top window-y
+                    bottom (+ top window-height))
+               (if (not (and (> left -1) 
+                             (< right 1024)
+                             (> top -1)
+                             (< bottom 864)))
+                   (if place-randomly
+                       (random-placement flag)
+                     (vtwm-user-placement flag)))))))
+                    
+      
+(load "placements")
+
+;;=============================================================================
+;;               Wrappers for some primitive functions
+;;=============================================================================
+
+
+(if (not (boundp 'raise-window-orig))
+    (progn
+
+      (: raise-window-orig raise-window)
+
+      (defun raise-window arg
+        (if (and arg (# 0 arg))
+            (raise-window-orig (# 0 arg))
+          (raise-window-orig))
+        (if (not autofocus) 
+            (if arg
+                (set-focus (# 0 arg))
+              (set-focus)))
+        (virtual-update))
+))
+
+(if (not (boundp 'lower-window-orig))
+    (progn
+
+      (: lower-window-orig lower-window)
+
+      (defun lower-window arg
+        (if (and arg (# 0 arg))
+            (lower-window-orig (# 0 arg))
+          (lower-window-orig))
+        (virtual-update))
+))
+
+(if (not (boundp 'move-window-orig))
+    (progn
+
+      (: move-window-orig move-window)
+
+      (defun move-window args
+        (if (and raise-on-move (< (length args) 2))
+            (if (= (length args) 1)
+                (raise-window-orig (# 0 args))
+              (raise-window-orig)))
+        (if args
+            (eval (+ (list 'move-window-orig) args))
+          (move-window-orig))
+        (if (window-is-mapped)
+            (virtual-update)))
+))
+
+(if (not (boundp 'resize-window-orig))
+    (progn
+
+      (: resize-window-orig resize-window)
+
+      (defun resize-window args
+        (if (and raise-on-resize (< (length args) 2))
+            (if (= (length args) 1)
+                (raise-window-orig (# 0 args))
+              (raise-window-orig)))
+        (if args
+            (eval (+ (list 'resize-window-orig) args))
+          (resize-window-orig))
+        (if (window-is-mapped)
+            (virtual-update)))
+))
+
+;; This one is done in vtwm-icon-mgr.gwm instead
+;;(if (not (boundp 'iconify-window-orig))
+;;    (progn
+;;
+;;      (: iconify-window-orig iconify-window)
+;;
+;;      (defun iconify-window ()
+;;        (if raise-on-iconify 
+;;            (raise-window-orig))
+;;        (iconify-window-orig)
+;;        (virtual-update))
+;;))
+
+          
+(defun twm-resize-window ()
+  (with (resize-style 1
+         mwm-resize-style-corner-size 1
+         mwm-resize-style-catch-corners 1
+         cursor (cursor-make 52)
+         cursor-NW cursor
+         cursor-NE cursor
+         cursor-SW cursor
+         cursor-SE cursor
+         cursor-N cursor
+         cursor-W cursor
+         cursor-S cursor
+         cursor-E cursor)
+    (resize-window)))
+
+; (load "twm-resize-old")
+
+;;=============================================================================
+;;                 Some more useful functions
+;;=============================================================================
+
+(defun backquote-eval (ele)
+  (if (= (type ele) 'list)
+      (if (= (# 0 ele) ',)
+          (eval (# 1 ele))
+        (mapfor subele ele 
+                (backquote-eval subele)))
+    ele))
+
+(defunq ` (body)
+  (backquote-eval body))
+
+(defun apply (func lst)
+  (eval (+ (list func) (mapfor ele lst (list 'quote ele)))))
+
+(defun windows-overlap (w1 w2)
+    (with (window w1
+         w1l window-x
+         w1t window-y
+         w1r (+ window-width w1l)
+         w1b (+ window-height w1t)
+         window w2
+         w2l window-x
+         w2t window-y
+         w2r (+ window-width w2l)
+         w2b (+ window-height w2t))
+       (and (< w2l w1r)
+          (< w2t w1b)
+          (> w2b w1t)
+          (> w2r w1l))))
+
+(defun window-obscured ()
+  (with (unobscured t
+         might-obscure ())
+    (for w (list-of-windows 'stacking-order 'mapped)
+         (if (and might-obscure
+                  (not (= (# 'float w) 'up)) ; ignore floating windows
+                  (windows-overlap window w))
+              (: unobscured ()))
+          (if (= w window) (: might-obscure t)))
+    (not unobscured)))
+
+(defun raiselower-window ()
+  (if (window-obscured)
+      (raise-window)
+    (lower-window)))
+
+(defun raise-lower-move-window ()
+  (if (not autofocus)
+      (set-focus))
+  (if (deltabutton)
+      (move-window)
+    (raiselower-window)))
+
+(defun pop-to-window ()
+  (if (and (wob-is-valid window)
+           (not (= window root-window)))
+      (with (wob window-window)
+        (virtual-make-window-visible)
+        (de-iconify-window)
+        (raise-window))))
+
+(defun focus-window ()
+  (if (= window root-window)
+      (progn
+        (setq autofocus t)
+        (set-focus ()))
+    (progn
+      (setq autofocus ())
+      (set-focus window))))
+
+(defun sleep-now ()
+  (set-screen-saver 1 0 1 1)
+  (with (ct (+ 2000 (elapsed-time)))
+    (while (> ct (elapsed-time))))
+  (process-events)
+  (set-screen-saver 300 0 1 1))
+
+(defun deiconify-all ()
+  (for wob (list-of-windows)
+       (de-iconify-window)))
+
+(defun redecorate-all ()
+  (with (show-icon-mgr ()
+         iconify-unmanaged-by-icon ()
+         show-virtual ())
+    (wob root-window)
+    (for wob (list-of-windows 'window)
+         (if (not (= window-client-class 'Gwm))
+             (re-decorate-window))))
+  (icon-mgr-show)
+  (virtual-show))
+
+(defun virtual-coord-string (x y)
+  (+ "+" (itoa (virtual-x x))
+     "+" (itoa (virtual-y y))))
+
+(defun place-window (flag)
+  (with (func (if (= window-status 'icon)
+                  (std-resource-get 'GwmIconPlacement)
+                (= window-status 'window)
+                  (or (std-resource-get 'GwmPlacement)
+                      'vtwm-placement)))
+    (eval (list func flag))))
+  
+;;=============================================================================
+;;           Openings and Closings
+;;=============================================================================
+
+(: opening 
+   '(progn
+      (place-window t)
+      (icon-mgr-add)
+      (virtual-add)))
+
+(: closing 
+  '(progn
+     (place-window ())
+     (virtual-remove)
+     (icon-mgr-remove)))
+
+(: screen-opening 
+   '(progn
+      (: setup-done t)
+      (virtual-show)
+      (if show-pan-lists
+          (install-pan-lists))
+      (icon-mgr-show)))
+
+(: screen-closing
+   '(progn
+      (virtual-move-home)
+      (for wob (list-of-windows 'window)
+           (map-window))))       ; Dont lose unmapped windows on restart
+
+
+;;=============================================================================
+;;                    User Profile
+;;=============================================================================
+
+(declare-screen-dependent
+  screen-tile
+  root-cursor
+  setup-done
+  autoraise
+  autocolormap
+  autofocus
+  raise-on-move
+  raise-on-resize
+  raise-on-iconify
+  to-be-done-after-setup
+)
+
+;;
+;;    USER CUSTOMIZABLE VARIABLES
+;;    ---------------------------  
+;;    Adjust these in your own profile
+;;
+(for screen (list-of-screens)
+     (defaults-to
+       screen-tile ()         ; Pixmap for screen background tiling     
+       root-cursor ()         ; Form of root cursor                     
+       autoraise ()           ; Raise windows when entered              
+       autocolormap t         ; Change colormap to that of the entered window
+       autofocus t            ; Set focus to entered window             
+       place-randomly t       ; Place windows pseudo randomly, and not by user
+       raise-on-move ()       ; Raise windows when they are moved       
+       raise-on-resize ()     ; Raise windows when they are resized     
+       raise-on-iconify ()    ; Raise windows (or icons) when iconifying
+       to-be-done-after-setup '(progn)    ; good for user setup
+       )
+)
+
+
+(for screen (list-of-screens)
+    (: setup-done ())
+)
+
+(load "vtwm-window")
+(load "vtwm-zoom")
+(load "vtwm-icon-mgr")
+(load "vtwm-menu")
+
+(load "virtual")
+(load "virtual-door")
+(load "virtual-pan")
+
+(load "pick")
+
+;; Here comes the user settings:
+(if (= 0 gwm-quiet) (? "["))
+(for screen (list-of-screens) 
+    (load "vtwmrc"))
+(if (= 0 gwm-quiet) (? "]"))
+    
+;; Some reasonable defaults if the user failed to give these:
+(defaults-to root-pop
+  (construct-menu
+   "Root Options"
+   '("Refresh" (refresh))
+   '("Exec cut" 
+     (execute-string (+ "(? " cut-buffer ")")))
+   '("Restart" (restart))
+   '("Quit" (end)))
+)
+(defaults-to root-behavior
+  (state-make
+    (on (buttonpress 3 any) (vtwm-pop-menu root-pop)))
+)
+(defaults-to vtwm-grabs ())
+
+;; Add "virtual" behavior (scrolling on arrows)
+(: standard-behavior (state-make standard-behavior (virtual-behavior)))
+(: root-behavior (state-make root-behavior (virtual-behavior)))
+(: vtwm-grabs (+ (virtual-grabs) vtwm-grabs))
+
+;; Let root behavior and grabs have effect
+(: root-fsm (fsm-make root-behavior))
+(: grabs (: root-grabs (: window-grabs (: icon-grabs vtwm-grabs))))
+
+;; The virtual door manager needs a special decoration - nothing at all.
+(defun no-border-window ()
+  (with (inner-borderwidth 0
+         borderwidth 0
+         fsm (vtwm-simple-window-fsm))
+    (window-make () () () () ())))
+(set-window Gwm.menu.door-mgr no-border-window)
+
+
+;;=============================================================================
+;;                    DESCRIBE-SCREEN & DESCRIBE-WINDOW
+;;=============================================================================
+
+(de describe-screen ()
+  (with (fsm root-fsm
+         cursor root-cursor
+         menu root-pop
+         tile screen-tile
+         grabs root-grabs
+         opening '(progn 
+                    (eval to-be-done-after-setup)
+                    (eval screen-opening)
+                    (if (= 0 gwm-quiet) 
+                        (? "Screen #" screen " ready.\n")))
+         closing '(eval screen-closing))
+    (window-make () () () () ())))
+
+(de describe-window ()
+  (list
+   (autoload-description
+    (or (std-resource-get 'GwmWindow)
+        vtwm-window))
+   '(autoload-description
+     (or (std-resource-get 'GwmIconWindow)
+         vtwm-simple-icon))))
+
+
+;; That's all, folks
+;; -----------------
+
+(if (= 0 gwm-quiet)
+  (progn
+    (setq load original-load)
+    (print "done\n")
+  )
+  (bell)
+)
+

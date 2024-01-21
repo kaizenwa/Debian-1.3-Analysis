@@ -1,0 +1,379 @@
+;; vtwm-menu.gwm --- Menu constructors for the VTWM profile
+;;
+;; Author: Anders Holst  (aho@sans.kth.se)  
+;; Copyright (C) 1995  Anders Holst
+;; Version: vtwm-1.0
+;; Last change: 17/6 1995
+;;
+;; This file is copyrighted under the same terms as the rest of GWM
+;; (see the X Inc license for details). There is no warranty that it
+;; works. 
+;;
+;; --------------------------------------------------------------------- 
+;;
+;; This file defines how the pop-up menus behave and look. It also
+;; defines a set of convenient menu constructors. To customize your
+;; menus, don't change this file. Instead set the variables and call
+;; the constructors from vtwmrc.gwm .
+;;
+;; To define a menu, you can use the following constructors:
+;; 
+;;   (construct-menu ENTRY ...)
+;;     where ENTRY can be a string denoting a menu label, a list
+;;     with a string and an action denoting a menu item, or the
+;;     output from the functions 'construct-machine-menu-items' or
+;;     'construct-window-menu-items' below.
+;;     
+;;   (construct-window-menu NAME ACTION)
+;;     This constructs a menu with all current windows (except GWM
+;;     menu windows), which when invoked runs the ACTION on the
+;;     selected window.
+;;
+;;   (construct-machine-menu NAME MACHINE-LIST ACTION)
+;;     Constructs a menu with entries for each of the machines in 
+;;     MACHINE-LIST plus the local host, which when invoked runs
+;;     the ACTION with 'host' bound to the corresponding element
+;;     from MACHINE-LIST and 'name' bound to the capitalized first
+;;     part of the host name.
+;;
+;;   (construct-xrsh-menu MACHINE-LIST COMMAND)
+;;     Constructs a menu with entries for each of the machines in 
+;;     MACHINE-LIST plus the local host, which when invoked runs
+;;     "xrsh" on the selected host and COMMAND. COMMAND can be a
+;;     list of command tokens, or the command tokens can all be
+;;     inserted directly at COMMAND. The first command token will
+;;     be used as the name of the menu.
+;;
+;;   (construct-window-menu-items WINDOW-TYPE ACTION)
+;;     Returns a list of menu items to be used by 'construct-menu'.
+;;     There is one item for each window matching WINDOW-TYPE, which
+;;     can be an atom denoting a client class, a string denoting a
+;;     window name regexp, or an arbitrary wool expression.
+;;
+;;   (construct-machine-menu-items MACHINE-LIST ACTION)
+;;     Returns a list of menu items to be used by 'construct-menu'.
+;;     There is one item for each machine in MACHINE-LIST, and the
+;;     ACTION will be run with 'host' and 'name' bound as for
+;;     'construct-machine-menu' above.
+;;
+;; To pop a menu, use 'vtwm-pop-menu'.
+;; 
+
+
+(declare-screen-dependent
+  vtwm-menu-foreground 
+  vtwm-menu-background
+  vtwm-menu-label-foreground
+  vtwm-menu-label-background
+  vtwm-menu-hilite-border
+  vtwm-menu-hilite-color
+  vtwm-menu-shadow
+  vtwm-menu-shadow-color
+  vtwm-menu-shadow-offset
+  vtwm-menu-border-color
+  vtwm-menu-font
+  vtwm-menu-label-font
+  vtwm-menu-item-height
+  vtwm-menu-min-width
+)
+
+;;
+;;    USER CUSTOMIZABLE VARIABLES
+;;    ---------------------------  
+;;    Adjust these in your own profile
+;;
+(for screen (list-of-screens)
+     (defaults-to
+       vtwm-menu-foreground black     ; Foreground of menus  
+       vtwm-menu-background white     ; Background of menus  
+       vtwm-menu-border-color black   ; Border color of menus
+       vtwm-menu-label-foreground ()
+       vtwm-menu-label-background ()
+       vtwm-menu-hilite-border black  ; Border of the current menu item
+       vtwm-menu-hilite-color white   ;  THIS ONE DOES NOT WORK
+       vtwm-menu-shadow t             ; Whether the menu has a shadow
+       vtwm-menu-shadow-color black   ; Color of shadow
+       vtwm-menu-shadow-offset 6      ; Offset of shadow from menu
+       vtwm-menu-font (font-make "8x13") ; Menu item font
+       vtwm-menu-label-font ()           ; Menu label font (defaults to above)
+       vtwm-menu-item-height 10       ; Minimum height of an item
+       vtwm-menu-min-width 100        ; Minimum width of menu
+       )
+)
+
+
+(setq vtwm-menu-item-fsm
+      (fsm-make
+       (state-make
+        (on (buttonrelease any any)
+            (with (calling-wob (with (wob wob-parent)
+                                     wob-parent)
+                   action (# 'action wob-property))
+              (wob-borderpixel vtwm-menu-background)
+              (wob wob-parent)
+              (if vtwm-menu-shadow
+                  (unpop-menu 
+                   (# 'shadow wob-property)))
+              (if (and autofocus
+                       autocolormap
+                       (not (eq root-window calling-wob)))
+                  (set-colormap-focus calling-wob))
+              (unpop-menu wob)
+              (wob calling-wob)
+              (eval action)
+              ))
+        (on enter-window 
+            (progn
+              (wob-borderpixel vtwm-menu-hilite-border)
+              ))
+        (on leave-window 
+            (progn
+              (wob-borderpixel vtwm-menu-background)
+              )))))
+
+(defun vtwm-menu-item-make (label action)
+  (list 
+     (with (borderwidth 1 ;vtwm-borderwidth
+            borderpixel vtwm-menu-background
+            background vtwm-menu-background
+            foreground vtwm-menu-foreground
+            fsm vtwm-menu-item-fsm
+            bar-min-width vtwm-menu-item-height
+            property (+ (list 'action action) property))
+       (bar-make
+        ()
+        (with (borderwidth 0
+               fsm ()
+               font vtwm-menu-font)
+          (plug-make (label-make label)))
+        ()))
+     (if vtwm-menu-shadow
+         (with (borderwidth 1 ;vtwm-borderwidth
+                borderpixel vtwm-menu-shadow-color
+                foreground vtwm-menu-shadow-color
+                background vtwm-menu-shadow-color
+                fsm ()
+                bar-min-width vtwm-menu-item-height
+                property ())
+           (bar-make
+            ()
+            (with (borderwidth 0
+                   fsm ()
+                   font vtwm-menu-font)
+              (plug-make (label-make label)))
+            ())))))
+     
+(defun vtwm-menu-label-make (label)
+  (list 
+    (with (borderwidth 1 ;vtwm-borderwidth 
+           borderpixel vtwm-menu-border-color
+           background (or vtwm-menu-label-background vtwm-menu-background)
+           foreground (or vtwm-menu-label-foreground vtwm-menu-foreground)
+           fsm ())
+      (bar-make
+       ()
+       (with (borderwidth 0
+              font (or vtwm-menu-label-font vtwm-menu-font))
+         (plug-make (label-make label)))
+       ()))
+    (if vtwm-menu-shadow
+        (with (borderwidth 1 ;vtwm-borderwidth 
+               borderpixel vtwm-menu-shadow-color
+               background vtwm-menu-shadow-color
+               foreground vtwm-menu-shadow-color
+               fsm ())
+           (bar-make
+            ()
+            (with (borderwidth 0
+                   font (or vtwm-menu-label-font vtwm-menu-font))
+              (plug-make (label-make label)))
+            ())))))
+
+(: vtwm-menu-fsm
+   (fsm-make 
+    (state-make
+     (on (buttonrelease any any) 
+         (progn
+           (if vtwm-menu-shadow
+               (unpop-menu (# 'shadow wob-property)))
+           (if (and autofocus
+                    autocolormap
+                    (not (eq root-window wob-parent)))
+               (set-colormap-focus wob-parent))
+           (unpop-menu)))
+     )))
+
+(defun vtwm-menu-make args
+  (if args
+      (with (bar-list (list menu-make)
+             back-list (list menu-make) 
+             fsm ()
+             menu-min-width vtwm-menu-min-width
+             borderwidth vtwm-borderwidth
+             bar-separator 0
+             direction vertical)
+        (for item args
+             (setq bar-list (+ bar-list (list (# 0 item))))
+             (setq back-list (+ back-list (list (# 1 item)))))
+        (with (shadow (if vtwm-menu-shadow (eval back-list))
+               fsm vtwm-menu-fsm
+               borderpixel vtwm-menu-border-color
+               property (+ (list 'shadow shadow) property))
+          (eval bar-list)))))
+
+(defunq vtwm-pop-menu args
+  (with (pmenu (if (= (length args) 0)
+                   (wob-menu)
+                 (eval (# 0 args)))
+         pos (if (= (length args) 2)
+                 (eval (# 1 args))
+               0)
+         calling-wob wob
+         wob (menu-wob pmenu)
+         shadow (# 'shadow wob-property)
+         bw wob-borderwidth
+         wdt wob-width
+         hgt wob-height
+         wob calling-wob
+         xm (current-event-x)
+         ym (current-event-y)
+         xpos (- xm (/ wdt 2) bw)
+         ypos (- ym (/ vtwm-menu-item-height 2) bw))
+    (if (< xpos 0)
+        (setq xpos 0)
+        (> (+ xpos wdt) screen-width)
+        (setq xpos (- screen-width wdt)))
+    (if (< ypos 0)
+        (setq ypos 0)
+        (> (+ ypos hgt) screen-height)
+        (setq ypos (max 0 (- screen-height hgt))))
+    (if (and vtwm-menu-shadow shadow)
+        (progn
+          (move-window (menu-wob shadow)
+                       (+ xpos vtwm-menu-shadow-offset)
+                       (+ ypos vtwm-menu-shadow-offset))
+          (pop-menu shadow 'here)
+          (ungrab-server (menu-wob shadow))))
+    (move-window (menu-wob pmenu) xpos ypos)
+    (if (and autofocus
+             autocolormap
+             (not (eq root-window calling-wob)))
+        (set-colormap-focus ()))
+    (pop-menu pmenu 'here)
+))
+      
+
+;;
+;; Some useful routines
+;;
+
+(defun append-sublists (lists)
+  (eval (+ '(+) (mapfor lst lists (list 'quote lst)))))
+
+(defun remove-nil (lst)
+  (with (ele ())
+    (while (setq ele (member () lst))
+      (delete-nth ele lst))
+    lst))
+
+(defun upchar (char)
+  (or (# (atom char) '(a "A" b "B" c "C" d "D" e "E" f "F" g "G"
+                       h "H" i "I" j "J" k "K" l "L" m "M" n "N"
+                       o "O" p "P" q "Q" r "R" s "S" t "T" u "U"
+                       v "V" w "W" x "X" y "Y" z "Z"))
+      char))
+
+(defun capitalize (str)
+  (if (= (length str) 0)
+      " "
+    (with (pair (match "^\\(.\\)\\(.*\\)" str 1 2))
+      (+ (upchar (# 0 pair)) (# 1 pair)))))
+
+(defun is-menu-item (obj)
+  (and (= (type obj) 'list)
+       (= (length obj) 2)
+       (= (type (# 0 obj)) 'bar)
+       (= (type (# 1 obj)) 'bar)))
+
+;;
+;; Remote machine command menus
+;;
+
+(defun machine-name (host)
+  (capitalize (match "^\\([^.]*\\)" host 1)))
+
+(setq xrsh-program "xrsh")
+
+(defun xrsh-command (host command)
+  (if (equal host ".")
+      (eval (+ '(!) command))
+    (eval (+ (list '! xrsh-program host) command))))
+
+(defun do-command (command)
+  (eval (+ '(!) command)))
+
+(defun construct-machine-menu (name machine-list expr)
+  (apply 'vtwm-menu-make
+         (+ (list (vtwm-menu-label-make name))
+            (with (name (machine-name hostname))
+              (list (vtwm-menu-item-make name 
+                                         (` (with (host "." name (, name))
+                                                  (, expr))))))
+            (mapfor host machine-list
+              (with (name (machine-name host))
+                (vtwm-menu-item-make name 
+                                     (` (with (host (, host) name (, name))
+                                              (, expr)))))))))
+
+(defun construct-xrsh-menu args
+  (with (machine-list (# 0 args)
+         command (if (= (type (# 1 args)) 'list)
+                     (# 1 args)
+                   (sublist 1 (length args) args)))
+    (construct-machine-menu (capitalize (# 0 command))
+                            machine-list
+                            (` (xrsh-command host (quote (, command)))))))
+
+(defun construct-machine-menu-items (machine-list expr)
+  (mapfor host machine-list
+    (with (name (machine-name host))
+      (vtwm-menu-item-make name 
+                           (` (with (host (, host) name (, name))
+                                    (, expr)))))))
+
+(defun construct-window-menu (name expr)
+  (apply 'vtwm-menu-make
+         (+ (list (vtwm-menu-label-make name))
+            (remove-nil
+             (mapfor wob (list-of-windows 'window) 
+               (if (not (= window-client-class 'Gwm))
+                   (vtwm-menu-item-make window-name
+                                        (` (if (wob-is-valid (, wob))
+                                               (with (wob (, wob))
+                                                 (, expr)))))))))))
+
+(defun construct-window-menu-items (wlst expr)
+  (remove-nil
+   (mapfor wob (list-of-windows 'window) 
+     (if (matches-token wlst)
+         (vtwm-menu-item-make window-name
+                              (` (if (wob-is-valid (, wob))
+                                     (with (wob (, wob))
+                                           (, expr)))))))))
+
+(defun construct-menu item-lists
+  (apply 'vtwm-menu-make
+         (apply '+
+                (mapfor items item-lists
+                  (if (= (type items) 'string)
+                      (list (vtwm-menu-label-make items))
+                      (is-menu-item items)
+                      (list items)
+                      (and (= (type items) 'list)
+                           (is-menu-item (# 0 items)))
+                      items
+                      (and (= (type items) 'list)
+                           (= (type (# 0 items)) 'string))
+                      (list (vtwm-menu-item-make (# 0 items) (# 1 items)))
+                      ())))))
+  

@@ -1,0 +1,59 @@
+#! /bin/sh
+# expov - expire obsolete overview entries
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/nov:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+lock LOCKoverview $$
+trap "unlock LOCKoverview ; rm -f $NEWSCTL/active.ovt ; trap 0 ; exit" 0 1 2 15
+
+cd $NEWSCTL
+lock LOCK $$
+cp active active.ovt
+unlock LOCK
+
+# the sort is an attempt to maximise locality of reference in the file system
+sort active.ovt | tr . / |
+	while read d max min rest
+	do
+		cd $NEWSARTS
+		if test ! -d $d
+		then
+			continue
+		fi
+		cd $d
+		o=$NEWSOV/$d
+		if test ! -r $o/.overview
+		then
+			if test ! -d $o
+			then
+				case "$rest" in
+				x*|=*)	;;	# not worth complaining
+				*)	echo "$0: directory \`$o' does not exist" >&2 ;;
+				esac
+				continue
+			fi
+			touch $o/.overview
+		fi
+		if ls -f | expovguts $max $min $o/.overview
+		then
+			: okay
+		else
+			echo "$0: expovguts failed in $d" >&2
+			echo "	...using fallback code" >&2
+
+			# fallback
+			# could use one less temporary if GNU sort didn't
+			# have bugs in -o
+			sort $o/.overview >$o/.sov
+			ls | egrep '^[0-9]+$' | join -t'	' - $o/.sov |
+							sort -n >$o/.nov
+			mv $o/.nov $o/.overview
+			rm -f $o/.sov
+		fi
+	done
+
+# and the trap handles cleanup

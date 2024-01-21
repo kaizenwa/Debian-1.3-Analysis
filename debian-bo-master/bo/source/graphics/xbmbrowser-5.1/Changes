@@ -1,0 +1,302 @@
+Future posibilities
+
+  * FUTURE -- remove the directory menu popup ????
+
+  * Resource setting for the background stipple pattern of the iconbox,
+    defaulting to the normal stipple pattern, if the iconbox resource
+    is currently set to None or XtUnspecifiedPixmap.
+
+  * figure out a Print Function. (external commands) Anyone?
+
+  * Add seperate color resources for the label part within IconLabel widget.
+    Currently it uses the same color as the icons background or transparency
+    color.
+
+  * BUG -- Xpm's may show a incorrect color count due to the funny handling
+    of colors by the Xpm Library. (See Version 4.4 changes)
+
+------------------------------------------------------------------------------
+
+Version 5.1
+
+  * Imakefile modified according to suggestions from Richard Lloyd
+    <R.K.Lloyd@csc.liv.ac.uk>. This includes the default library directory
+    location BROWSERDIR.
+
+  * New RC substition variable     %D   initial startup directory
+    and the appropriate changes to the system RC files.
+    This was suggested by Michael Meissner <meissner@cygnus.com>
+
+  * Two people suggested the addition of "sys/types.h" in misc.c for
+    different machines neededing different types in "sys/stat.h"
+        Jim Spath <jspath@mail.bcpl.lib.md.us>
+        Peter Klingebiel <klin@mlap-bb.uni-paderborn.de>
+
+
+Version 5.0
+
+  * A new widget ``IconLabel'' was created to solve a number of problems
+    this program has with using the Xaw Label Widget. This new widget
+    features...
+        1/ Pixmaps displayed correctly on ALL monocrome displays.
+        2/ Shaped Windows for pixmaps with the None color
+        3/ Labels centered under the displayed bitmap or pixmap
+        4/ A info pointer for fast information lookup on icon selections
+           and menu actions, and the information line.
+
+  * Modification of the fix started in release 4.4 (see below)
+    This problem is just getting more complex as time goes on.
+
+  * Renaming of some functions and resources to better suit the programs
+    current methods and goals, which have changed to some extent.
+
+  * Ability to add and remove the Stipple Pattern in the iconbox as required
+    including the color resources involved.
+
+  * Addition of display options. Eg: labels on/off, solid background
+    and shaped windows as desired.
+
+  * Limit tests for dir_list[], so that it doesn't overflow the stack
+    and crash the program. -- Michael Weller <eowmob@exp-math.uni-essen.de>
+
+  * Addition of a menu option to hide the UNIX hidden `dot' files.
+    This option overrides the other options such as directory and others.
+    and will hide icons which are hidden! -- Should it do this?
+
+  * New menu from the main button box at the top (Main Menu).
+    For General program control, and a directory jump table.
+    This also contains a QUIT item as this menu replaces the old
+    QUIT button.
+
+  * Allow "global" menu to popup anywhere within the icon display area
+    This allows that menu to be available even on a empty display without
+    any icons or file symbols being shown.  Special thanks to Michael
+    Weller <eowmob@exp-math.uni-essen.de> who provided a fix to make this
+    work correctly.
+
+  * Add a new menu command  seleted()  which pops up a notice and aborts
+    if the action is not being performed on a selected file. This is only
+    useful in the global menu where a file may not be pointed to by the
+    user.  (DONE, but waiting for global popup of "global" menu)
+
+------------------------------------------------------------------------------
+
+Version 4.4
+
+  * Kludge Fix for the cause of XFreeColor Bug.  (long)
+
+    The cause of this problem is that the pixel we allocated for the
+    transparent `None' color is included in the returned pixels array but
+    was not allocated by the Xpixmap library (we supplied it). Thus when
+    we later free the "pixels used by the pixmap" the `None' color being
+    free'd when it should have been.
+
+    This is not a bug according to the Xpixmap librarys author...
+
+    `` This has been discussed on the list (xpm-talk) some time ago and
+       I've explained that the returned list is not the list of allocated
+       pixels but the list of *used* pixels as the documentation states
+       clearly. I've been pushed to change this and I was about to do so,
+       when I realized that the code related to the old XpmInfo stuff
+       relies on this and changing the behavior of the lib would break old
+       code. So I left the code unchanged and then to have the list of
+       allocated pixels you need to compute it yourself by removing from
+       the returned list the pixels you had allocated yourself.  '' --
+       Arnaud Le Hors <lehors@x.org>
+
+    Of course if the None color is used more than once in the xpixmap it
+    will be included in the returned pixels array more then once, and to
+    top it all off there is no real way to determine just which pixels
+    were added because they represent the `None' color or if they were
+    added because the pixmap actually really uses that color (or one very
+    close to it).
+
+    The result it difficult to determine just what colors need to be
+    free'd when we are finished with a specific pixmap. And of course you
+    only need to even bother if you use a Color Symbols table AND want to
+    free the pixmap completely later. Both of which are in themselves
+    pretty rare and thus not of real concern to Arnaud Le Hors.
+
+    The only solutions to this is either...
+      1/ Remove all occurances of the given `None' pixel value we suppled
+	 from the returned pixels array, regardless of if the color is a
+	 real color used by the pixmap.  Which of course results in the
+	 transparent pixel being allocated again and again if the pixmap
+         REALLY uses that particular color (You never free it).
+      2/ Forget using a Color Symbols table entirely and either use shaped
+	 windows or have the `None' color represented by pixel 0 which
+	 could be white or black (or some other color) depending on how
+	 your X server works. (The original problem again!)
+      3/ Get Arnaud to allocate the given pixel if it is used, however
+         many times it is needed. Of course the X server protocal does
+         provide an easy way to do this. this makes the returned pixels
+         array both the colors used by the pixmap and the colors allocated,
+         no matter what happens.
+      4/ Get Arnaud to provide some mechism to return the actual pixels
+	 returned, either in the pixels array itself or in another seperate
+         pixel array returned in the attributes structure.
+
+    Obviously the last two are out, and of the first two the first is the
+    lesser of two evilsu. What X server would make of over allocating pixels
+    is something I'll have to explore sometime. 
+
+    See images.c immediately after the XpmReadPixmapFile() call for the
+    actual code to remove the transparent pixels from those returned.
+
+
+Version 4.3
+
+  WARNING: the ``icon_transparent'' color below discovered a bug in the X
+  pixmap library which causes xbmbrowser to bomb with ``XFreeColor'' X
+  server errors when changing directory.  See next release above.
+
+  * Double Clicking was found to crash the program. Seems that the second
+    click happens before the widgets have properly settled. Solution
+    is to stop double clicks via resources, and and code to insure that
+    such an event will just abort and not crash the program.
+
+  * Small Imakefile problem with linux (m4 does not remove extra spaces)
+    changed the Imakefile to avoid problem.
+
+  * Some systems required the "ctype.h" include file in "user-menu.c"
+
+  * Added a new color resource to application ``icon_transparent'' to
+    allow the setting of what color the ``None'' X pixmap tranparent color
+    should set to. Before this whatever color pixel 0 happened to be set
+    to was used for the transparent color.
+                                   Detlef Schmier <detlef@mfr.dec.com>
+
+  * added reading of the mask bitmap of read Xpixmap files. This is in
+    preperation to the next release of XbmBrowser which will replace
+    the label widget with a custom designed widget to fix labels problems
+    on some monocrome displays and to allow the display of masked pixmaps
+    in shaped windows (option) and file labels (option).
+
+  * On monocrome displays, the label widget can tell the difference between
+    a pixmap which has the colors assigned to it, and a bitmap which
+    needs to be assigned the foreground and background colors. As such
+    on some monocrome displays (such as NCDs and Linix machines) pixmaps
+    are inverted when displayed by the label widget.  :-(
+
+    I KLUDGED a fix by inverting the pixmap (1 bit depth) before using
+    the label widget on such displays. This is a temporary measure until
+    a custom widget can be created to replace this use of the label widget.
+    Thanks to everyone who told me of this long running problem
+    IT IS NOW FIXED  yes!  :-)
+
+
+Version 4.2
+
+  * Change in the loading of the file symbols due to the library function
+    XCreatePixmapFromBitmapData() inverting the symbols on displays which
+    have the black and white pixels (0 and 1) inverted (NCD xterminals).
+    See version 4.3 above for the reason for this.
+
+  * Bad load of Pixmaps (no bitmap assigned) for Text files.  Fixed.
+
+  * Bug fix for directory listings when number of sub-directories changes
+    The default columns used in widget being updated BEFORE the new list
+    had been added  -- solution and patch by   Heiko Schroeder  -- Thanks
+
+  * Addition of a Full Rescan button on the main window.
+
+  * Symlink test macro for SVR4 by John Polstra <jdp@polstra.com>
+
+
+Version 4.1
+
+  * Bug fixes and suggestions made by the current list of Beta Testers.
+
+  * Changed file symbol bitmap to pixmaps of correct depth to attempt
+    to fix a problem with xbmbrowser on Linix and other systems. This
+    also makes files symbols standout over normal bitmaps on color displays.
+
+  * Added a shorthand "-cf" option for "-config"
+
+
+Version 4.0   Changes by Anthony Thyssen
+
+  * New RC file format which allows better control of user menu actions
+
+  * Seperate user menus for major file types
+
+  * Expanded Default User Menu (assuming pbmplus is available)
+
+  * Rescursive Scan of directories option.
+    This was suggested by Steve Kinzler <kinzler@cs.indiana.edu> to
+    allow better handling of his own faces library.
+
+  * Don't recurse into sym-linked directories (show them as links instead)
+
+
+Version 3.3 (internal)   Changes by Anthony Thyssen
+
+  * Provide symbol icons to the non-displayed files and directories.
+
+  * Deletion of the Help Button and Help File to be replaced with..
+
+  * A Options Menu to interactivly turn Program options on and off.
+
+  * Resources and Command Line Options to control initial setting of 
+    the options menu.
+
+
+------------------------------------------------------------------------------
+Ashley Roll releases control of XbmBrowser to Anthony Thyssen
+------------------------------------------------------------------------------
+
+Verson 3.2   Changes by  Ashley Roll and Anthony Thyssen
+
+  * Pixmaps now free their colors correctly when deleted or xbmbrowser
+    changes directory.
+
+  * Current directory text widget, move cursour to end and append '/' 
+    automatically, to allow easier modification by the user.
+
+  * Color Resources added which matchs the AIcons Library Colormap.
+
+  * Now checks if the file it is trying to load is a binary file and ignores 
+    it if it is. This was done because the procedures that load and create a 
+    Pixmap from a file had a nasty habit of crashing when given a binary file.
+
+
+Verson 3.1   Changes by  Ashley Roll
+
+  * Minor corrections from users on the network.
+
+
+Verson 3.0   Changes by  Anthony Thyssen
+
+  * Complete rewrite of data structures and routines for reading and 
+    displaying the icons from a directory.
+
+  * Addition of X Pixmaps and color
+
+  * File type enumeration (Bad, Dir, File (unknown), Xbm, Xpm, BadXpm...)
+
+  * Minor changes to get_files() in misc.c for determining file type
+    and recording the last modified time.
+
+  * Change to method used to display icon details when pointer inside
+    a displayed icon. Avoid scanning the data structure for the icons name
+    by setting the name into the widget used.
+      Their should be a way of attaching a general pointer to any widget.
+    You would think that givening a structure pointer instead of a string
+    for a widgets label would work but it doesn't. XtSetValues it seems
+    makes a new copy of any string passed to it for use by the widget.
+
+  * Made two global strings for information labels for information on the
+    number of bitmaps, pixmaps, unknown files and directories present in
+    the current directory to be displayed. Very handy.
+
+  * Removed the Scan directory completely method for a rescan changes
+    method. This method is equivelent to the original if the old file_list
+    is destroyed before it is called.
+
+
+------------------------------------------------------------------------------
+Original Coding to Version 2.3    Ashley Roll    A.Roll@cit.gu.edu.au
+
+Original Idea   Anthony Thyssen     anthony@cit.gu.edu.au
+
+

@@ -1,0 +1,255 @@
+#
+# CNIDR Isite
+#
+# Make sure these settings are correct for you platform.  In particular,
+# check the CFLAGS value.
+#
+# This makefile results in:
+#
+#	libsapi.a	- CNIDR search api
+#	libz3950.a	- Z39.50 version 2/3 library
+#	libIsearch.a	- CNIDR Isearch library
+#	izclient	- Simple, interactive Z39.50 client
+#	zserver		- Z39.50 server
+#	zcon		- Z39.50 stateful gateway utility
+#	zgate		- Z39.50 stateful gateway utility
+#	Iindex		- Isearch Text indexer
+#	Isearch		- Search tool for Iindexed databases
+#	Iutil		- Tool for manipulating Iindexed databases
+#
+
+#
+# Compiler and Compiler flags
+#
+
+!IFDEF WIN32
+!include <ntwin32.mak>
+CFLAGS=$(cflags) $(cvarsmt) $(cdebug) -Dstrcasecmp=stricmp -Dstrncasecmp=strnicmp -DNO_MMAP -DUNISOCK_WINSOCK
+!ELSE
+CFLAGS=-Alfw -F 4000 -G3 -Oceglot -W3 -Zi -Dstrcasecmp=stricmp -Dstrncasecmp=strnicmp -DNO_MMAP -DUNISOCK_WINSOCK -DFAR=_far
+!ENDIF
+
+#
+# Binary directory
+#
+# Where should I store binaries?
+#
+BIN_DIR=bin
+
+#
+# STOP!!
+#
+# For the default Isite operation, that should be all you need to change!
+# Save this file and type 'make'
+#
+
+#
+# Search Engines
+#
+# Isite comes with the following engines precompiled into the Search API:
+#
+#	SAPI_SCRIPT	- simple shell script search engine
+#	SAPI_ISEARCH	- CNIDR Isearch engine.
+#
+# To link in other databases, refer to the Search API (sapi) documentation.
+#
+
+#
+# Library directory
+#
+# Where should I store libraries (*.a)?
+#
+LIB_DIR=$(BIN_DIR)
+
+#
+# libz3950
+#
+# Where is libz3950 code?
+#
+ZDIST_DIR=zdist
+
+#
+# Isearch
+#
+# Where is Isearch code?
+#
+ISEARCH_DIR=Isearch
+
+#
+# Isearch-cgi
+#
+# Where is Isearch code?
+#
+CGI_DIR=Isearch-cgi
+
+#
+# Doctype-specific libs (e.g., -lgdbm)
+#
+DOCLIB=
+
+#
+# libsapi
+#
+# Where is libsapi code?
+#
+SAPI_DIR=sapi
+
+#
+# That should be all you need to change
+#
+#
+VER=1.07
+LDFLAGS=
+RM=del
+DIST=Isite-$(VER)
+all: isearch isearch-cgi libsapi zdist done
+OSNAME=`uname -s`
+OSVER=`uname -r`
+OS=$(OSNAME)_$(OSVER)
+
+isearch::
+	@echo "*** ISEARCH ***"
+	cd $(ISEARCH_DIR)
+	$(MAKE) "CC=$(CC)" \
+	"CFLAGS=$(CFLAGS)" \
+	"BIN_DIR=..\$(BIN_DIR)" \
+	"DOCLIB=$(DOCLIB)" "LDFLAGS=$(LDFLAGS)"
+	cd ..
+
+isearchb::
+	@echo "*** ISEARCH ***"
+	cd $(ISEARCH_DIR)
+	$(MAKE) build "CC=$(CC)" \
+	"CFLAGS=$(CFLAGS)" \
+	"BIN_DIR=..\$(BIN_DIR)" \
+	"DOCLIB=$(DOCLIB)" "LDFLAGS=$(LDFLAGS)"
+	cd ..
+
+isearch-cgi::
+	@echo "*** ISEARCH-CGI ***"
+	cd $(CGI_DIR)
+	$(MAKE) "CC=$(CC)" \
+	"CFLAGS=$(CFLAGS)" \
+	"BIN_DIR=..\$(BIN_DIR)" \
+	"ISEARCH_DIR=../$(ISEARCH_DIR)" \
+	"LIB_DIR=..\$(LIB_DIR)" \
+	"DOCLIB=$(DOCLIB)" "LDFLAGS=$(LDFLAGS)"
+	cd ..
+
+libsapi::
+	@echo "*** LIBSAPI ***"
+	cd $(SAPI_DIR)
+	$(MAKE) "CC=$(CC)" \
+	"CFLAGS=$(CFLAGS)" \
+	"LIB_DIR=..\$(LIB_DIR)" \
+	"DBASE_OBJ=$(DBASE_OBJ)" \
+	"ZDIST_DIR=../$(ZDIST_DIR)" \
+	"ISEARCH_INC=-I../$(ISEARCH_DIR)/src -I../$(ISEARCH_DIR)/doctype"
+	cd ..
+
+zdist::
+	@echo "*** ZDIST ***"
+	cd $(ZDIST_DIR)
+	$(MAKE) "CC=$(CC)" \
+	"CFLAGS=$(CFLAGS)" \
+	"LIB_DIR=..\$(LIB_DIR)" \
+	"BIN_DIR=..\$(BIN_DIR)" \
+	"ISEARCH_DIR=../$(ISEARCH_DIR)" \
+	"SAPI_DIR=../$(SAPI_DIR)" \
+	"LS=../$(SAPI_DIR)" \
+	"DOCLIB=$(DOCLIB)" "LDFLAGS=$(LDFLAGS)"
+	cd ..
+
+build:
+	$(MAKE) -i realclean
+	cd $(ISEARCH_DIR)
+	$(MAKE) "CC=$(CC)" \
+	"CFLAGS=$(CFLAGS)" \
+	"BIN_DIR=..\$(BIN_DIR)" \
+	"DOCLIB=$(DOCLIB)" "LDFLAGS=$(LDFLAGS)"
+	cd ..
+	$(MAKE) libsapi
+	$(MAKE) zdist
+	$(MAKE) isearch-cgi
+	$(MAKE) done
+
+srcdist:
+	$(MAKE) -i distclean;cd ..;tar cvf $(DIST).tar $(DIST);gzip $(DIST).tar
+
+bindist:
+	cd ..; \
+	tar cvf $(DIST)_$(OS).tar \
+		$(DIST)/bin/Iindex \
+		$(DIST)/bin/Isearch \
+		$(DIST)/bin/Iutil \
+		$(DIST)/bin/bib1.map \
+		$(DIST)/bin/my.map \
+		$(DIST)/bin/build_test_db.sh \
+		$(DIST)/bin/izclient \
+		$(DIST)/bin/sapi.ini \
+		$(DIST)/bin/zclient \
+		$(DIST)/bin/zcon \
+		$(DIST)/bin/zgate \
+		$(DIST)/bin/zserver \
+		$(DIST)/bin/zserver.ini \
+		$(DIST)/Isearch-cgi/Configure \
+		$(DIST)/Isearch-cgi/README \
+		$(DIST)/Isearch-cgi/isrch_fetch \
+		$(DIST)/Isearch-cgi/isrch_srch \
+		$(DIST)/Isearch-cgi/search_form \
+		$(DIST)/doc \
+		$(DIST)/README \
+		$(DIST)/RELEASE \
+		$(DIST)/html  \
+		$(DIST)/COPYRIGHT; \
+		gzip $(DIST)_$(OS).tar
+
+pcdist:
+	@echo "Creating directory 'PC'..."
+	@mkdir PC;
+	@cp "Copying all source needed for PC version..."
+	@cp $(ISEARCH_DIR)/src/*.[c,h] PC/.;
+	@cp $(ISEARCH_DIR)/src/*.cxx PC/.;
+	@cp $(ISEARCH_DIR)/src/*.hxx PC/.;
+	@cp $(ZDIST_DIR)/*.[c,h] PC/.;
+	@cp $(ZDIST_DIR)/*.cxx PC/.;
+	@cp $(ZDIST_DIR)/*.hxx PC/.;
+	@echo "Done.  You're on your own;-)"
+
+done:
+	@echo ""
+	@echo "Welcome to CNIDR $(DIST)!"
+	@echo ""
+	@echo "All executables have been placed in the $(BIN_DIR) directory."
+	@echo ""
+	@echo "Please read all docs (doc/*) for usage instructions."
+	@echo ""
+
+clean:
+	cd $(ISEARCH_DIR)
+	$(MAKE) -i clean
+	cd ..
+	cd $(SAPI_DIR)
+	$(MAKE) -i clean
+	cd ..
+	cd $(ZDIST_DIR)
+	$(MAKE) -i clean
+	cd ..
+	cd $(CGI_DIR)
+	$(MAKE) -i clean
+	cd ..
+	cd bin
+	$(RM) *.lib
+	$(RM) zclient.exe
+	$(RM) zserver.exe
+	$(RM) Iindex.exe
+	$(RM) Isearch.exe
+	$(RM) Iutil.exe
+	$(RM) TESTHTML*
+	$(RM) core
+	$(RM) *.log
+	$(RM) izclient.exe
+	$(RM) zcon.exe
+	$(RM) zgate.exe
+	cd ..
+

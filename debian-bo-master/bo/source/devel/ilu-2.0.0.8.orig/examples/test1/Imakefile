@@ -1,0 +1,94 @@
+/* $Id: Imakefile,v 1.26 1996/06/06 00:44:32 spreitze Exp $ */
+/* Last edited by Mike Spreitzer June 5, 1996 5:44 pm PDT */
+
+all:: load-lisp-example.lisp
+
+load-lisp-example.lisp : load-lisp-example.lisp.dist
+	-rm -f load-lisp-example.lisp
+	sed 's;ILUHOME;$(ILUHOME);' <load-lisp-example.lisp.dist >load-lisp-example.lisp
+
+CleanTarget(load-lisp-example.lisp)
+
+MkdirTarget($(DESTDIR)/examples)
+MkdirTarget($(DESTDIR)/examples/test1)
+
+InstallRO(Test1.isl Test2.isl Test3.isl, $(DESTDIR)/examples/test1)
+InstallRO(clnt.c clnt.h clntu.c clntw.c srvrw.c srvr.c srvr.h srvru.c test1srv.key test1srv.crt, $(DESTDIR)/examples/test1)
+InstallRO(clnt.mak cplntw16.mak cppsrvr.mak ilunt35.mak srvrw.mak clntw.mak cppclnt.mak cppsrvrw.mak iluwin31.mak srvrw16.mak clntw16.mak cppclntw.mak cpsvrw16.mak srvr.mak, $(DESTDIR)/examples/test1)
+InstallRO(clntw16.def cplntw16.def cpsvrw16.def srvrw16.def, $(DESTDIR)/examples/test1)
+InstallRO(clnconsl.ico clntw.rc srvrw.ico srvrw16.rc clntw.ico clntw16.rc srvrw.rc svrconsl.ico, $(DESTDIR)/examples/test1)
+InstallRO(cppclnt.cpp cppclntw.cpp cppsrvr.cpp cppsrvrw.cpp, $(DESTDIR)/examples/test1)
+InstallRO(tstcpw16.bat tstcw16.bat, $(DESTDIR)/examples/test1)
+InstallRO(TestServer.m3 TestClient.m3, $(DESTDIR)/examples/test1)
+InstallRO(pyClient.py pyServer.py, $(DESTDIR)/examples/test1)
+InstallRO(client.lisp server.lisp load-lisp-example.lisp, $(DESTDIR)/examples/test1)
+InstallRO(README, $(DESTDIR)/examples/test1)
+InstallFileToFile(runImakefile, $(INSTINCFLAGS), $(DESTDIR)/examples/test1/Imakefile)
+
+all::
+	$(RM) testserver
+
+#ifdef ILU_BINDING_DIRECTORY
+
+all::
+	$(CP) testserver.sbfile testserver
+
+#endif
+
+#ifdef ILU_BINDING_HOST
+
+all::
+	$(CP) testserver.sbilu testserver
+
+#endif
+
+CleanTarget(testserver)
+InstallRO(testserver, $(DESTDIR)/examples/test1)
+
+######################################################################
+######################################################################
+######################################################################
+##
+##  The following rules are included to test the build with...
+##
+
+#ifdef ADD_SECURE_TRANSPORT
+#ifdef INCLUDE_SSL_SECMECH
+SSL=../../GSS/ssl/libgss-ssl.a
+SSLINCL=-I../../GSS/ssl $(RSAINCL) $(DESINCL)
+#endif
+SECURITYLIBS = $(SSL) ../../GSS/kernel/libgss.a $(RSALIBS) $(DESLIBS)
+SECURITYINCLUDES = -I../../GSS/kernel $(SSLINCL)
+#endif
+
+ILUCINCLUDES = -I../../runtime/c -I../../runtime/kernel $(SECURITYINCLUDES)
+TESTCLIBS = ../../runtime/c/libilu-c.a ../../runtime/kernel/libilu.a $(SECURITYLIBS)
+C_STUBBER = ../../stubbers/c/c-stubber
+
+NormalObjectRule()
+
+Test1.h Test1-true.c Test1-surrogate.c Test1-common.c : Test1.isl ../../stubbers/c/c-stubber ../../stubbers/parser/ilu.isl
+	../../stubbers/c/c-stubber -I ../../stubbers/parser Test1.isl
+
+Test2.h Test2-true.c Test2-surrogate.c Test2-common.c : Test2.isl ../../stubbers/c/c-stubber ../../stubbers/parser/ilu.isl
+	../../stubbers/c/c-stubber -I ../../stubbers/parser Test2.isl
+
+Test3.h Test3-true.c Test3-surrogate.c Test3-common.c : Test3.isl ../../stubbers/c/c-stubber ../../stubbers/parser/ilu.isl
+	../../stubbers/c/c-stubber -I ../../stubbers/parser Test3.isl
+
+CleanTarget(Test1.h Test1-true.c Test1-surrogate.c Test1-common.c)
+CleanTarget(Test2.h Test2-true.c Test2-surrogate.c Test2-common.c)
+CleanTarget(Test3.h Test3-true.c Test3-surrogate.c Test3-common.c)
+
+clnt.o : Test1.h Test2.h Test3.h clnt.c clnt.h ../../runtime/kernel/iluxport.h ../../runtime/c/iluchdrs.h
+srvr.o : Test1.h Test2.h Test3.h srvr.c srvr.h ../../runtime/c/iluchdrs.h
+clntu.o : clntu.c clnt.h
+srvru.o : srvru.c srvr.h ../../runtime/kernel/iluxport.h 
+
+TestProgramTarget(client, clnt.o clntu.o Test1-surrogate.o Test1-common.o Test2-surrogate.o Test2-common.o Test3-surrogate.o Test3-common.o, $(TESTCLIBS),)
+
+TestProgramTarget(server, srvr.o srvru.o Test1-common.o Test1-true.o Test2-common.o Test3-common.o Test3-true.o, $(TESTCLIBS),)
+
+test::
+	./testserver
+

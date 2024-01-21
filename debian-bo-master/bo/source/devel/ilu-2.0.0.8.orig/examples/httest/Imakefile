@@ -1,0 +1,53 @@
+/* $Id: Imakefile,v 1.6 1996/06/28 21:27:31 larner Exp $ */
+
+
+MkdirTarget($(DESTDIR)/examples)
+MkdirTarget($(DESTDIR)/examples/httest)
+
+InstallRO(httest.isl, $(DESTDIR)/examples/httest)
+InstallRO(htclient.c, $(DESTDIR)/examples/httest)
+InstallRO(htserver.c, $(DESTDIR)/examples/httest)
+InstallRO(webserver.c, $(DESTDIR)/examples/httest)
+InstallRO(README, $(DESTDIR)/examples/httest)
+InstallFileToFile(runImakefile, $(INSTINCFLAGS), $(DESTDIR)/examples/httest/Imakefile)
+
+
+######################################################################
+######################################################################
+######################################################################
+##
+##  The following rules are included to test the build with...
+##
+
+#ifdef ADD_SECURE_TRANSPORT
+#ifdef INCLUDE_SSL_SECMECH
+SSL=../../GSS/ssl/libgss-ssl.a
+SSLINCL=-I../../GSS/ssl $(RSAINCL) $(DESINCL)
+#endif
+SECURITYLIBS = $(SSL) ../../GSS/kernel/libgss.a $(RSALIBS) $(DESLIBS)
+SECURITYINCLUDES = -I../../GSS/kernel $(SSLINCL)
+#endif
+
+ILUCINCLUDES = -I../../runtime/c -I../../runtime/kernel $(SECURITYINCLUDES)
+TESTCLIBS = ../../runtime/c/libilu-c.a ../../runtime/kernel/libilu.a $(SECURITYLIBS)
+C_STUBBER = ../../stubbers/c/c-stubber
+
+NormalObjectRule()
+
+http.h http-true.c http-surrogate.c http-common.c :  ../../stubbers/parser/http.isl ../../stubbers/c/c-stubber ../../stubbers/parser/ilu.isl
+	../../stubbers/c/c-stubber -I ../../stubbers/parser  ../../stubbers/parser/http.isl
+
+httest.h httest-true.c httest-surrogate.c httest-common.c : http.h httest.isl ../../stubbers/c/c-stubber ../../stubbers/parser/ilu.isl
+	../../stubbers/c/c-stubber -I ../../stubbers/parser httest.isl
+
+
+CleanTarget(httest.h httest-true.c httest-surrogate.c httest-common.c)
+CleanTarget(http.h http-true.c http-surrogate.c http-common.c)
+
+htclient.o : htclient.c http.h httest.h ../../runtime/kernel/iluxport.h ../../runtime/c/iluchdrs.h
+htserver.o : htserver.c http.h httest.h ../../runtime/kernel/iluxport.h ../../runtime/c/iluchdrs.h
+webserver.o : webserver.c http.h ../../runtime/kernel/iluxport.h ../../runtime/c/iluchdrs.h
+
+TestProgramTarget(htclient, htclient.o http-surrogate.o http-common.o httest-surrogate.o httest-common.o, $(TESTCLIBS),)
+TestProgramTarget(htserver, htserver.o http-true.o http-common.o httest-true.o httest-common.o, $(TESTCLIBS),)
+TestProgramTarget(webserver, webserver.o http-true.o http-common.o, $(TESTCLIBS),)

@@ -1,0 +1,214 @@
+.\" Hey Emacs! This file is -*- nroff -*- source.
+.\"
+.\" This manpage is Copyright (C) 1992 Drew Eckhardt;
+.\"                               1993 Michael Haardt, Ian Jackson.
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\"
+.\" Modified Sat Jul 24 13:39:26 1993 by Rik Faith (faith@cs.unc.edu)
+.\" Modified Tue Sep 26 21:47:21 1995 by Andries Brouwer (aeb@cwi.nl)
+.\"
+.\" 
+.\" Traduction 11/10/1996 Christophe BLAESS (ccb@club-internet.fr)
+.\" 
+.TH FCNTL 2 "11 Octobre 1996" Linux "Manuel du programmeur Linux"
+.SH NOM
+fcntl \- Manipuler un descripteur de fichier.
+.SH SYNOPSIS
+.nf
+.B #include <unistd.h>
+.B #include <fcntl.h>
+.sp
+.BI "int fcntl(int " fd ", int " cmd );
+.BI "int fcntl(int " fd ", int " cmd ", long " arg );
+.fi
+.SH DESCRIPTION
+La fonction
+.B fcntl
+permet de se livrer a diverses operations sur le descripteur de fichier
+.IR fd .
+L'operation en question est determinee par la valeur de l'argument
+.IR cmd " :"
+.TP 0.9i
+F_DUPFD
+effectue une copie de
+.IR fd ,
+dans
+.IR arg
+en fermant d'abord
+.I arg
+si besoin est.
+.sp
+On peut effectuer la meme chose plus aisement en utilisant
+.BR dup2 (2).
+.sp
+Le nouveau descripteur et l'ancien peuvent etre utilises de maniere
+interchangeable. Ils partagent le meme verrou, le meme position de
+tete de lecture/ecriture, et les memes attributs. Par exemple si la 
+tete de lecture/ecriture est deplacee en utilisant
+.B lseek
+sur l'un des deux descripteurs, la position sera modifiee egalement
+pour l'autre.
+.sp
+Les deux descripteurs ne partagent toutefois pas l'attribut Close\-on\-exec.
+.sp
+En cas de reussite, le nouveau descripteur est renvoye par la fonction
+.BR fcntl.
+.TP
+F_GETFD
+retourne la valeur de l'attribut Close\-on\-exec. Si le bit de poid faible
+est 0, le fichier restera ouvert meme au travers d'un
+.BR exec,
+autrement il sera ferme.
+.TP
+F_SETFD
+positionne l'attribut Close\-on\-Exec avec la valeur precisee par
+.I arg
+(seul le bit de poid le plus faible est utilise).
+
+.TP
+F_GETFL
+retourne l'ensemble des attributs positionnes lors de
+.BR open (2)
+pour le descripteur de fichier.
+.TP
+F_SETFL
+fixe de nouveaux attributs pour le descripteur de fichier
+.IR fd .
+Les nouveaux attributs sont contenus dans
+.IR arg .
+Seuls
+.BR O_APPEND " et " O_NONBLOCK
+peuvent etre modifies ainsi.
+.sp
+A noter, les attributs sont partages entre les differentes
+copies (faites avec
+.B dup
+etc...) d'un meme descripteur de fichier.
+.sp
+Les attributs et leurs semantiques sont decrits dans la page
+de manuel de 
+.BR open (2).
+.TP
+F_GETLK, F_SETLK, et F_SETLKW
+Gere les verrouillages de fichiers.
+Le troisieme argument
+.I arg
+est un pointeur sur une structure flock (qui peut etre
+ecrasee par l'appel)
+.TP
+F_GETLK
+renvoie la structure flock qui nous empeche d'acceder au verrou,
+ou positionne le champ
+.B l_type
+du verrou a la valeur
+.B F_UNLCK
+si c'est possible.
+.TP
+F_SETLK
+active le verrou (si
+.B l_type
+vaut
+.B F_RDLCK
+ou
+.BR F_WRLCK )
+ou efface le verrou (si
+.B l_type
+vaut
+.BR F_UNLCK ).
+Si le verrou est tenu par quelqu'un d'autre,
+cet appel renvoie \-1 et positionne
+.I errno
+aux valeurs
+.B EACCES
+ou
+.BR EAGAIN .
+.TP
+F_SETLKW
+Comme
+.BR F_SETLK,
+mais attend la liberation du verrou au lieu de retourner une erreur.
+.TP
+F_GETOWN
+obtient le PID (ou l'ID du groupe de processus) du proprietaire d'une
+socket.
+.sp
+Les numeros de groupes de processus sont renvoyes sous forme de valeur
+negative.
+.TP
+F_SETOWN
+etablit la possession en tant que processus ou groupe de processus d'une
+socket.
+.sp
+Pour ces commandes, la notion de possession correspond a la reception
+les signaux
+.B SIGIO
+et
+.B SIGURG.
+.sp
+Les numeros de groupes de processus sont formules en tant que valeurs
+negatives.
+.SH "VALEUR RENVOYEE"
+La valeur renvoyee par fcntl varie suivant le type d'operation :
+.TP 0.9i
+F_DUPFD
+renvoie le nouveau descripteur.
+.TP
+F_GETFD
+revoie l'etat de l'attribut.
+.TP
+F_GETFL
+renvoie l'etat des attributs.
+.TP
+F_GETOWN
+renvoie le proprietaire du fichier.
+.PP
+En cas d'echec \-1 est retourne, auquel cas
+.I errno
+contient le code d'erreur.
+.SH ERREURS
+.TP 0.9i
+.B EBADF
+.I fs
+n'est pas un descripteur de fichier ouvert.
+.TP
+.B EINVAL
+Pour
+.BR F_DUPFD,
+.I arg
+est soit negatif, soit trop grand.
+.TP
+.B EMFILE
+Pour
+.BR F_DUPFD,
+le processus a deja ouvert le nombre maximal de descripteurs de fichiers.
+.SH NOTES
+Les erreurs renvoyees par
+.B dup2
+ne sont pas les memes que celles renvoyees par
+.BR fcntl
+avec la commande
+.BR F_DUPFD .
+.SH "CONFORME A"
+SVID, AT&T, POSIX, X/OPEN, BSD 4.3
+.SH "VOIR AUSSI"
+.BR open "(2), "
+.BR socket "(2). "

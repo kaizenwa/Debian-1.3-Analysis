@@ -1,0 +1,619 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(src/base/misc/dosio.c)
+
+AC_CONFIG_HEADER(src/include/config.h)
+
+AC_CANONICAL_SYSTEM
+
+dnl Checks for programs.
+AC_PROG_CC
+AC_PROG_GCC_TRADITIONAL
+dnl AC_PROG_AWK
+dnl AC_PROG_INSTALL
+AC_PROG_LEX
+AC_PROG_LN_S
+AC_PROG_MAKE_SET
+AC_PROG_RANLIB
+AC_PROG_YACC
+AC_CHECK_PROG(AS86,as86,as86,echo)
+AC_CHECK_PROG(LD86,ld86,ld86,echo)
+
+dnl Checks for libraries.
+
+dnl Checks for header files.
+AC_HEADER_DIRENT
+AC_HEADER_MAJOR
+AC_HEADER_STDC
+AC_HEADER_SYS_WAIT
+AC_HEADER_TIME
+AC_CHECK_HEADERS(fcntl.h limits.h syslog.h sys/file.h sys/ioctl.h sys/time.h unistd.h)
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_C_INLINE
+AC_TYPE_OFF_T
+AC_TYPE_PID_T
+AC_TYPE_SIGNAL
+AC_TYPE_SIZE_T
+AC_TYPE_UID_T
+AC_STRUCT_ST_RDEV
+AC_STRUCT_TM
+
+AC_CACHE_CHECK(if C compiler has \"__FILE__\" macro,
+ac_cv_c_has_file_macro,
+[AC_TRY_COMPILE([#include <stdio.h>],[printf("%s", __FILE__);],
+  ac_cv_c_has_file_macro=yes,
+  ac_cv_c_has_file_macro=no) ] )
+if test "$ac_cv_c_has_file_macro" = "no" ; then
+  AC_DEFINE(__FILE__, "")
+fi
+
+AC_CACHE_CHECK(if C compiler has \"__LINE__\" macro,
+ac_cv_c_has_line_macro,
+[AC_TRY_COMPILE([#include <stdio.h>],[printf("%s", __LINE__);],
+  ac_cv_c_has_line_macro=yes,
+  ac_cv_c_has_line_macro=no) ] )
+if test "$ac_cv_c_has_line_macro" = "no" ; then
+  AC_DEFINE(__LINE__, "")
+fi
+
+AC_CACHE_CHECK(if C compiler has \"__FUNCTION__\" macro,
+ac_cv_c_has_function_macro,
+[AC_TRY_COMPILE([#include <stdio.h>],[printf("%s", __FUNCTION__);],
+  ac_cv_c_has_function_macro=yes,
+  ac_cv_c_has_function_macro=no) ] )
+if test "$ac_cv_c_has_function_macro" = "no" ; then
+  AC_DEFINE(__FUNCTION__, "")
+fi
+
+
+dnl Checks for library functions.
+AC_FUNC_ALLOCA
+AC_FUNC_MEMCMP
+AC_FUNC_MMAP
+AC_FUNC_UTIME_NULL
+AC_FUNC_VPRINTF
+AC_CHECK_FUNCS(getcwd gethostname gettimeofday mkdir mkfifo mktime rmdir select socket strdup strerror strstr strtol strtoul uname)
+
+dnl Here is where we do our stuff
+
+CONFIG_HOST=`uname -s`
+if test "$CONFIG_HOST" = "Linux"; then
+  CONFIG_HOST='linux'
+  if test ! -f /usr/include/linux/version.h ; then
+    echo ''
+    echo '*** error:'
+    echo '*** Your system has no complete /usr/include/linux,'
+    echo '*** (version.h missing) ... giving up'
+    echo ''
+    exit 1
+  fi
+  force_vm86plus="1"
+else
+  force_vm86plus="0"
+fi
+AC_SUBST(CONFIG_HOST)
+
+dnl Do ELF if possible
+
+ if ! $CC -v 2>&1|grep specs >/dev/null 2>&1; then
+   AC_MSG_WARN(Your GCC installation is incomplete: specs file is missing.)
+   AC_MSG_WARN(We assume your GCC compiles for ELF.)
+   AC_MSG_WARN( )
+   ELF="ELF=1"
+ else
+   if grep __ELF__ `$CC -v 2>&1|head -n1|cut -d' ' -f4` /dev/null 1>/dev/null 2>&1; then 
+    ELF="ELF=1"
+   else
+     if test "$CONFIG_HOST" = "linux"; then
+      echo "------------------------------------------------------------"
+      echo "Sorry, a.out system detected, but we do no longer support it"
+      echo "------------------------------------------------------------"
+      exit 1
+     else
+      # DON'T CHANGE THIS: this makes libdosemu start high enough to be safe.
+      # should be okay at...0x20000000 for .5 GB mark.
+      LIBSTART="LIBSTART = 0x20000000"
+     fi
+   fi
+ fi
+ AC_SUBST(LIBSTART)
+ AC_SUBST(ELF)
+
+
+dnl Do check wether we we shall force use of supplied Slanglib.
+ AC_ARG_ENABLE(force-slang,
+               [  --enable-force-slang    force use of dosemu supplied Slang-lib],
+               [force_slang="yes"],[force_slang="no"])
+
+dnl Check for slang and if not found use the supplied version
+dnl I'm not really sure which slang function to choose
+dnl So I picked one at random, perhaps there is a better one?
+
+if test "$force_slang" = "no"; then
+  AC_CHECK_LIB(slang, SLkm_define_key, , force_slang="yes")
+fi
+
+if test "$force_slang" = "no"; then
+  if test -d "$oldincludedir/slang"; then
+    SLANGINC="-I$oldincludedir/slang"
+  else
+    if test -f "$oldincludedir/slang.h"; then
+      SLANGINC=""
+    else
+      if test -f "/usr/local/include/slang.h"; then
+        SLANGINC="-I/usr/local/include"
+      else
+        AC_CHECKING("no system supplied slang.h found -- forceing dosemu slang")
+        force_slang="yes"
+      fi
+    fi
+  fi
+fi
+
+if test "$force_slang" = "no"; then
+  SLANGLIB="-lslang -lm"
+  AC_CHECKING("using system supplied libslang.a")
+else
+ if test "$ELF" = "ELF=1"; then
+   SLANGLIB="-larch_${CONFIG_HOST}_slang-elf -lm"
+   AC_CHECKING("using dosemu supplied libarch_${CONFIG_HOST}_slang-elf.a")
+ else
+   SLANGLIB="-larch_${CONFIG_HOST}_slang"
+   AC_CHECKING("using dosemu supplied libarch_${CONFIG_HOST}_slang.a")
+ fi
+fi
+AC_SUBST(SLANGLIB)
+
+dnl check for X. This was reproduced from TKined
+
+AC_CHECK_PROG(x_ok, xmkmf, 1, 0)
+if test $x_ok = 1 -a "${with_x+set}" != set; then
+    AC_PATH_X
+fi
+if test "$XINCLUDE_DIR" != ""; then
+    x_includes="$XINCLUDE_DIR"
+fi
+if test "$x_includes" = /usr/include; then
+    XINCLUDES="# no special path needed"
+elif test "$x_includes" != "NONE"; then
+    XINCLUDES=" -I$x_includes"
+else
+    AC_CHECKING(for X11 header files)
+    XINCLUDES="# no special path needed"
+    AC_TRY_CPP([#include <X11/Intrinsic.h>], , XINCLUDES="nope")
+    if test "$XINCLUDES" = nope; then
+        dirs="/usr/unsupported/include /usr/local/include /usr/X386/include /usr/include/X11R4 /usr/X11R5/include /usr/include/X11R5 /usr/openwin/include /usr/X11/include"
+        for i in $dirs ; do
+	    if test -r $i/X11/Intrinsic.h; then
+	        XINCLUDES=" -I$i"
+	    fi
+        done
+    fi
+fi
+if test "$XINCLUDES" = nope; then
+  AC_WARN(Couldn't find any X11 include files)
+  XINCLUDES="# no include files found"
+fi
+if test "$XINCLUDES" = "-I"; then
+  XINCLUDES =""
+fi
+AC_SUBST(XINCLUDES)
+
+if test "$XLIBRARY_DIR" != ""; then
+    x_libraries="$XLIBRARY_DIR"
+fi
+if test "$x_libraries" = /usr/lib; then
+    XLIBSWL=-lX11
+elif test "$x_libraries" != "NONE"; then
+    XLIBSWL="-lX11"
+    XLIBSWD="-L$x_libraries"
+else
+    AC_CHECKING(for X11 library archive)
+    AC_CHECK_LIB(X11, main, XLIBSWL="-lX11", XLIBSWL=nope)
+    if test "$XLIBSWL" = nope; then
+	dirs="/usr/unsupported/lib /usr/local/lib /usr/X386/lib /usr/lib/X11R4 /usr/X11R5/lib /usr/lib/X11R5 /usr/openwin/lib /usr/X11/lib"
+	for i in $dirs ; do
+	    if test -r $i/libX11.a; then
+		XLIBSWL="-lX11"
+		XLIBSWD="-L$i"
+	    fi
+	done
+    fi
+fi
+if test "$XLIBSWL" = nope ; then
+    AC_CHECK_LIB(Xwindow, main, XLIBSWL=-lXwindow)
+fi
+if test "$with_x" = "no"; then
+  XLIBSWL=nope
+fi
+if test "$XLIBSWL" = nope ; then
+    AC_WARN(Couldn't find the X11 library archive.)
+    AC_CHECKING(Compiling without X support)
+    XLIBSWL=""
+    XLIBSWD=""
+    X_SUPPORT=""
+    AC_SUBST(X_SUPPORT)
+    X_GRAPHICS=""
+    AC_SUBST(X_GRAPHICS)
+    X2CFILES=""
+    AC_SUBST(X2CFILES)
+    X2CEXE=""
+    AC_SUBST(X2CEXE)
+else
+    AC_CHECKING(Compiling with X support)
+    X_SUPPORT="X_SUPPORT=1"
+    AC_DEFINE_UNQUOTED(X_SUPPORT) 
+    AC_SUBST(X_SUPPORT)
+    X_GRAPHICS="X_GRAPHICS=1"
+    AC_DEFINE_UNQUOTED(X_GRAPHICS)
+    AC_SUBST(X_GRAPHICS)
+    
+
+dnl All the X2 specs
+    AC_DEFINE_UNQUOTED(X2_SUPPORT) 
+    X2CFILES="x2dos.c"
+    AC_SUBST(X2CFILES)
+    X2CEXE="x2dos ../etc/xtermdos ../etc/xinstallvgafont"
+    AC_SUBST(X2CEXE)
+
+dnl the -u forces the X11 shared library to be linked into ./dos
+
+    x_libraries=`echo $XLIBSWD | sed 's/^-L//'`
+    if test "$ELF" != "" ; then
+#      XLIBSWL="-lX11"
+      XLIBSWD="-Wl,-rpath,$x_libraries -L$x_libraries"
+    else
+#      XLIBSWL="-lX11"
+      XLIBSWD="-L$x_libraries -u _XOpenDisplay"
+    fi
+fi
+
+
+dnl Check for the MITSHM extention to speed up VGAemu
+
+AC_ARG_ENABLE(mitshm,
+              [  --enable-mitshm         force use of MITSHM X extension],
+              [forced_mitshm="yes"],[forced_mitshm="no"])
+
+AC_ARG_ENABLE(nomitshm,
+              [  --enable-nomitshm       do NOT use the MITSHM X extension],
+              [forced_nomitshm="yes"],[forced_nomitshm="no"])
+
+if test "$forced_mitshm" = "no" -a "$forced_nomitshm" = "no" ; then
+  AC_CHECK_HEADER(X11/extensions/XShm.h,have_mitshm="yes",have_mitshm="no")
+else
+  if test "$forced_mitshm" = "yes" -a "$forced_nomitshm" = "no" ; then
+    have_mitshm="yes"
+  fi
+
+  if test "$forced_mitshm" = "no" -a "$forced_nomitshm" = "yes" ; then
+    have_mitshm="no"
+  fi
+
+  if test "$forced_mitshm" = "yes" -a "$forced_nomitshm" = "yes" ; then
+    AC_MSG_ERROR(Can't use --enable-mitshm and --enable-nomitshm at the same time)
+  fi
+fi
+
+if test "$have_mitshm" = "yes" -a "$X_SUPPORT" = "X_SUPPORT=1"; then
+  XLIBSWL="-lXext $XLIBSWL"
+  AC_DEFINE(HAVE_MITSHM,1)
+fi
+
+XLIBSW="$XLIBSWD $XLIBSWL"
+
+AC_SUBST(XLIBSW)
+AC_SUBST(x_libraries)
+
+REALTOPDIR=`nolinks=1; pwd`
+VERSION="0"
+SUBLEVEL="66"
+PATCHLEVEL="3.0"
+THISVERSION="$VERSION.$SUBLEVEL.$PATCHLEVEL"
+EMUVER="VERSION.$SUBLEVEL"
+RELEASE_DATE=`head -n1 $REALTOPDIR/ChangeLog | cut '-d ' -f1`
+AC_DEFINE_UNQUOTED(EMUVER, "$EMUVER")
+AC_SUBST(EMUVER)
+CONFIG_TIME=`date`
+AC_SUBST(REALTOPDIR)
+AC_SUBST(SUBLEVEL)
+AC_SUBST(PATCHLEVEL)
+AC_SUBST(THISVERSION)
+AC_SUBST(VERSION)
+BINPATH="$REALTOPDIR/$THISVERSION"
+AC_SUBST(BINPATH)
+SRCPATH="$REALTOPDIR/src"
+AC_SUBST(SRCPATH)
+AC_DEFINE_UNQUOTED(CONFIG_HOST, "$CONFIG_HOST")
+AC_DEFINE_UNQUOTED(CONFIG_TIME, "$CONFIG_TIME")
+AC_DEFINE_UNQUOTED(VERSION, $VERSION)
+AC_DEFINE_UNQUOTED(SUBLEVEL, $SUBLEVEL)
+AC_DEFINE_UNQUOTED(PATCHLEVEL, $PATCHLEVEL)
+AC_DEFINE_UNQUOTED(VERSTR, "$THISVERSION")
+AC_DEFINE_UNQUOTED(VERDATE, "$RELEASE_DATE")
+
+OPTIONALSUBDIRS="dosext/net/v-net"
+REQUIRED="tools commands tools/periph"
+
+if test "$CONFIG_HOST" = "linux"; then
+ AC_CHECKING("Linux Specific Stuff")
+
+dnl BOCHS
+dnl   AC_DEFINE_UNQUOTED(X86_EMULATOR_FLAGS)
+
+dnl Do vm86plus 
+ AC_ARG_ENABLE(novm86plus,
+               [  --enable-novm86plus     do NOT use VM86 enhancement],
+               [novm86plus="yes"],[novm86plus="no"])
+  vm86plus="yes"
+  if test "$novm86plus" = "yes"; then
+    vm86plus="no"
+  fi
+
+  if test "$vm86plus" = "yes"; then
+   AC_DEFINE_UNQUOTED(BUILTIN_VM86PLUS)
+   BUILTIN_VM86PLUS="-DBUILTIN_VM86PLUS"
+   AC_SUBST(BUILTIN_VM86PLUS)
+   AC_CHECKING("Compiling for vm86plus support");
+   AC_DEFINE_UNQUOTED(REQUIRES_VM86PLUS)
+   AC_DEFINE_UNQUOTED(USE_MHPDBG)
+   USE_MHPDBG="-DUSE_MHPDBG"
+   AC_SUBST(USE_MHPDBG)
+   DEBUGGER="arch/$CONFIG_HOST/debugger"
+   REQUIRES_VM86PLUS="YES"
+   OPTIONALSUBDIRS="dosext/net/v-net"
+   REQUIRED="tools commands tools/periph"
+  else
+   AC_CHECKING("Compiling without vm86plus support");
+   DEBUGGER=""
+   REQUIRED="tools commands tools/periph"
+  fi
+fi
+AC_SUBST(DEBUGGER)
+
+dnl Do compilation for GDB
+ AC_ARG_ENABLE(dodebug,
+               [  --enable-dodebug        do compile for with debug info],
+               [dodebug="yes"],[dodebug="no"])
+  if test "$dodebug" = "yes"; then
+   AC_CHECKING("Compiling with debug info");
+  else
+   AC_CHECKING("Compiling without debug info");
+  fi
+
+dnl Use new keyboard code
+ AC_ARG_ENABLE(new-kbd,
+               [  --enable-new-kbd        use the new keyboard code],
+	       [newkeyboard="yes"],[newkeyboard="no"])
+  if test "$newkeyboard" = "yes"; then
+   AC_CHECKING("Compiling with new keyboard code");
+   NEW_KBD_CODE="NEW_KBD_CODE=1"
+   AC_DEFINE_UNQUOTED(NEW_KBD_CODE)
+   AC_SUBST(NEW_KBD_CODE)
+  else
+   AC_CHECKING("Compiling with old keyboard code");
+  fi
+ 
+dnl Do SB emulation
+ AC_ARG_ENABLE(nosbemu,
+               [  --enable-nosbemu        do NOT use SoundBlaster emulator],
+               [AC_CHECKING("Compiling without SB Emulation")],
+               [AC_CHECKING("Compiling with SB Emulation")
+                AC_DEFINE(USE_SBEMU)
+                USE_SBEMU="USE_SBEMU=1"
+                AC_SUBST(USE_SBEMU)])
+
+AC_ARG_ENABLE(monoton-timing,
+              [  --enable-monoton-timing use monoton micro timing, some games don't like that],
+              [AC_CHECKING("Compiling with monoton micro timing")
+               AC_DEFINE(MONOTON_MICRO_TIMING)
+	       AC_SUBST(MONOTON_MICRO_TIMING)],
+	      [AC_CHECKING("Compiling with normal timing code")])
+
+AC_ARG_ENABLE(runasroot,
+              [  --enable-runasroot       dosemu sould run as root mostly],
+              [AC_CHECKING("Compiling for dosemu mostly running as root")
+               AC_DEFINE(RUN_AS_ROOT)
+	       AC_SUBST(RUN_AS_ROOT)],
+	      [AC_CHECKING("Compiling for dosemu mostly running as user")])
+
+dnl DPMI requirements
+
+  if test "$vm86plus" = "yes"; then
+AC_DEFINE_UNQUOTED(WANT_WINDOWS)
+WANT_WINDOWS="WANT_WINDOWS=-DWANT_WINDOWS"
+  else
+WANT_WINDOWS=""
+  fi
+AC_SUBST(WANT_WINDOWS)
+
+AC_SUBST(OPTIONALSUBDIRS)
+AC_SUBST(REQUIRED)
+AC_SUBST(REQUIRES_VM86PLUS)
+
+dnl Now CFLAGS and INCLUDES
+
+# does this work if you do make -C <some dir>
+TOPDIR=`nolinks=1;pwd`
+AC_SUBST(TOPDIR)
+
+if test "$force_slang" != "no"; then
+ SLANGINC="-I${SRCPATH}/include/slang"
+fi
+
+# BIG NOTE: XINCLUDES _must_ come last, because some joker did preset
+# it with a comment line (such as: XINCLUDES="# no special path needed")
+# We need to fix this, because this is a time bomb. --HL
+
+INCDIR="-I${SRCPATH}/include -I${SRCPATH}/base/dev/pic -I${SRCPATH}/dosext/dpmi ${SLANGINC} ${XINCLUDES}"
+AC_SUBST(INCDIR)
+
+if test "$dodebug" = "yes"; then
+  COPTFLAGS=" -g -Wall"
+  OPT="-O"
+else
+  COPTFLAGS=" -Wall"
+  OPT="-O2"   # BIG NOTE: do _not_ use -O3,
+              # because in forces _inline_ at places where we don't want it !
+              # If we want _inline_, well then we 'code' it.
+  OPT="$OPT -fomit-frame-pointer"  # never omit the frame pointer when debugging!
+fi
+
+# -m486 is usually in the specs for the compiler
+case "$host_cpu" in
+  i[[456]]86)
+    OPT="$OPT -m486 -malign-loops=2 -malign-jumps=2 -malign-functions=2"
+    ;;
+  i386)
+    OPT="$OPT -m386"
+    ;;
+  *)
+    ;;
+esac
+
+OPT="$OPT -MD" # this should give painless dependencies
+
+# OPT=-fno-inline
+if test "$CONFIG_HOST" = "linux"; then
+ AC_CHECKING("Linux Specific build options")
+ PIPE=-pipe
+ USING_NET="-DUSING_NET"
+fi
+
+CFLAGS="${OPT} ${PIPE} ${USING_NET} ${CDEBUGOPTS} ${COPTFLAGS} ${INCDIR}"
+
+# set for DPMI want windows
+# ifdef REQUIRES_VM86PLUS
+#  LDTPATCH=2
+#else
+#  LDTPATCH=`grep -c useable /usr/include/linux/ldt.h`
+#endif
+#ifeq ($(LDTPATCH),2)
+#  WIN31=1
+#else
+#  WIN31=0
+#endif
+
+# set to use a simpler fork for unix command
+# CFLAGS+=-DSIMPLE_FORK
+# set to debug fork with environment
+# CFLAGS+=-DFORK_DEBUG
+
+# We need to use the C_RUN_IRQS with -fno-inline (TBD why)
+# this is in pic/pic.c
+#CFLAGS+=-DC_RUN_IRQS
+
+# use fd3 for soft errors, stderr for hard error, don't ope
+# stderr to /dev/null
+# CFLAGS+=-DUSE_FD3_FOR_ERRORS
+
+LDFLAGS="${LNKOPTS}" # exclude symbol information
+
+dnl Create output files. If you add new ones, please do it in order.
+
+AC_OUTPUT([
+Makefile
+doc/Makefile
+src/Makefile
+src/Makefile.common
+src/arch/linux/Makefile.main
+src/arch/linux/async/Makefile
+src/arch/linux/debugger/Makefile
+src/arch/linux/dosext/sound/Makefile
+src/arch/linux/dosext/sound/midid/Makefile
+src/base/async/Makefile
+src/base/bios/Makefile
+src/base/dev/dma/Makefile
+src/base/dev/misc/Makefile
+src/base/dev/pic/Makefile
+src/base/init/Makefile
+src/base/keyboard/Makefile
+src/base/misc/Makefile
+src/base/mouse/Makefile
+src/base/serial/Makefile
+src/commands/Makefile
+src/dosext/dpmi/Makefile
+src/dosext/drivers/Makefile
+src/dosext/mfs/Makefile
+src/dosext/misc/Makefile
+src/dosext/net/net/Makefile
+src/dosext/net/v-net/Makefile
+src/dosext/sound/Makefile
+src/emu-i386/Makefile
+src/env/Makefile
+src/env/video/Makefile
+src/include/Makefile
+src/doc/Makefile
+src/doc/DANG/Makefile
+src/doc/HOWTO/Makefile
+src/doc/info/Makefile
+src/tools/Makefile
+src/tools/periph/Makefile ])
+
+dnl Print some warnings (if neccessary)
+
+if test "$GCC" != "yes" ; then
+  AC_MSG_WARN( )
+  AC_MSG_WARN(Your system doesn't seem to have the GNU C compiler (gcc).)
+  AC_MSG_WARN(Trying to compile with $CC.)
+  AC_MSG_WARN(If you are sure you have gcc, set the environment variable)
+  AC_MSG_WARN(CC to the complete name of gcc. Examples:)
+  AC_MSG_WARN(csh/tcsh: setenv CC /usr/local/bin/gcc)
+  AC_MSG_WARN(sh/ksh/bash: CC=/usr/local/bin/gcc ; export CC)
+  AC_MSG_WARN(Of course you could also include the gcc bin directory in)
+  AC_MSG_WARN(your path.)
+fi
+
+dnl as86 and ld86
+if test ! "$AS86" = "as86" -a ! "$LD86" = "ld86" ; then
+  AC_MSG_WARN( )
+  AC_MSG_WARN(Your system doesn't seem to have as86 and/or ld86.)
+  AC_MSG_WARN(These programs are required to assemble the Dosemu)
+  AC_MSG_WARN(BIOS. Please install them.)
+  AC_MSG_WARN( )
+fi
+
+dnl The bison problem
+if test -z "`echo $YACC | grep bison`" ; then
+  AC_MSG_WARN( )
+  AC_MSG_WARN(Your system doesn't seem to have bison available.)
+  AC_MSG_WARN(There have been reports that bison is really required to)
+  AC_MSG_WARN(compile Dosemu. You may try to use $YACC instead, your)
+  AC_MSG_WARN(mileage may vary. If you want to be sure, install bison.)
+  AC_MSG_WARN( )
+fi
+
+dnl Tell the user about MITSHM
+if test "$have_mitshm" = "yes" ; then
+  AC_MSG_WARN( )
+  AC_MSG_WARN(The use of MITSHM is enabled. This means that Xdos can)
+  AC_MSG_WARN(only run on a machine with a local X server. Use)
+  AC_MSG_WARN(configure --enable-nomitshm to disable the use of MITSHM.)
+  AC_MSG_WARN( )
+else
+  AC_MSG_WARN( )
+  AC_MSG_WARN(The use of MITSHM is disabled. This means that Xdos can)
+  AC_MSG_WARN(run on any X server. Use  configure --enable-mitshm)
+  AC_MSG_WARN(to force the use of MITSHM.)
+  AC_MSG_WARN( )
+fi
+
+dnl Warn the user about SMP
+if test "$SMPmodules" = "yes" ; then
+  if ! grep cpu_data /proc/ksyms >/dev/null 2>&1; then
+    AC_MSG_WARN( )
+    AC_MSG_WARN(You choose to compile for SMP, but your kernel is uniprocessor)
+    AC_MSG_WARN( )
+  fi
+else
+  if grep cpu_data /proc/ksyms >/dev/null 2>&1; then
+    AC_MSG_WARN( )
+    AC_MSG_WARN(Your kernel is SMP, but you did not set --enable-SMPmodules)
+    AC_MSG_WARN( )
+  fi
+fi
+
+echo ""
+echo "Configure finished. Do 'make' to compile Dosemu."
+echo ""

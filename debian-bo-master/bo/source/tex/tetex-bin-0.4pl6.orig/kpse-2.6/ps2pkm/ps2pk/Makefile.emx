@@ -1,0 +1,77 @@
+#
+# Makefile for EMX/gcc (dmake)
+#
+# Version 1.4: Jan. 1994
+#
+
+# Here we install the binaries:
+BINDIR = c:\emtex
+
+# Here we install the manual pages:
+MANDIR = c:\emtex\doc
+
+# This are the built in paths
+T1INPUTS = .;c:\\emtex\\ps
+
+# Compiler directives and other goodies
+CC = gcc
+SYSTEM = MSDOS
+EMX = c:\emx\bin\emxl.exe
+CFLAGS = -D$(SYSTEM) -O
+CLIB = -lc
+OLIBS = $(CLIB) -lm
+T1LIBRARY = type1.a
+T1HDR =  -I..\type1
+T1LIB = -L..\type1 -ltype1
+T1-LIB = ..\type1\$(T1LIBRARY)
+
+all: ps2pk.exe pk2bm.exe
+
+.c.o:
+	$(CC) -o $*.o $(CFLAGS) -c $<
+
+ps2pk.exe: ps2pk.o encoding.o pkout.o filenames.o $(T1-LIB)
+	$(CC) -o ps2pk encoding.o ps2pk.o pkout.o filenames.o $(T1LIB) $(CLIB)
+	emxbind -b $(EMX) ps2pk
+
+ps2pk.o: ps2pk.c pkout.h filenames.h
+	$(CC) -o ps2pk.o -DT1INPUTS=\"$(T1INPUTS)\" $(CFLAGS) \
+	    $(T1HDR) -c ps2pk.c
+
+pk2bm.exe: pk2bm.o pkin.o
+	$(CC) -o pk2bm  pk2bm.o pkin.o $(CLIB)
+	emxbind -b $(EMX) pk2bm
+
+mag.exe: mag.o
+	$(CC) -o mag.exe mag.o $(OLIBS)
+	emxbind -b $(EMX) mag
+
+pfb2pfa.exe: pfb2pfa.o filenames.o
+	$(CC) -o pfb2pfa pfb2pfa.o filenames.o $(CLIB)
+	emxbind -b $(EMX) pfb2pfa
+
+pktest.exe: pktest.o pkout.o
+	$(CC) -o pktest pktest.o pkout.o $(OLIBS)
+	emxbind -b $(EMX) pktest
+
+$(T1-LIB)::
+[
+	cd ..\type1
+	$(MAKE) -f Makefile.emx $(T1LIBRARY)
+]
+
+install: ps2pk.exe pk2bm.exe
+	copy ps2pk.exe   $(BINDIR)
+	copy pk2bm.exe   $(BINDIR)
+
+install.man:
+	copy ..\man\ps2pk.1   $(MANDIR)
+	copy ..\man\pk2bm.1   $(MANDIR)
+
+clean:
+[
+	rm -f *.exe *.o
+	rm -f mag pfb2pfa pktest ps2pk pk2bm
+	cd ..\type1
+	$(MAKE) -f Makefile.emx clean
+]

@@ -1,0 +1,812 @@
+
+{
+
+#
+# ppd.pl: parsing routines for PPD files. This is ppd.pl v1.1.
+#
+# Copyright (C) 1995, 1996, Yves Arrouye <Yves.Arrouye@marin.fdn.fr>
+# 
+# This package and its included files may be redistributed under the
+# terms of the GNU General Public License, a copy of which can be
+# found in the file GPL.
+#
+# I ask you to email me (preferrably in the form of context diffs)
+# any changes you make to this code. This is a wish, not an obligation,
+# but it will make maintaining the tools easier. Thanks!
+#
+
+package ppd;
+
+#
+
+$main::PPD_NotInvocationValue{'*PaperDimension'} = '';
+$main::PPD_NotInvocationValue{'*ImageableArea'} = '';
+$main::PPD_NotInvocationValue{'*Font'} = '';
+
+#
+# ppdparamvalue(type, val)
+#
+# Check that val is correct for type type, and return the converted
+# value and a success indicator.
+#
+
+sub unitfactor {
+    local($unit) = @_;
+    local($mult) = 0;
+
+    if ($unit eq 'in') {
+	$mult = 72;
+    } elsif ($unit eq 'cm') {
+	$mult = 72 / 2.54;
+    } elsif ($unit eq 'mm') {
+	$mult = .01 * 72 / 2.54;
+    } elsif ($unit eq 'pt' || $2 eq '') {
+	$mult = 1;
+    }
+
+    return $mult;
+}
+
+sub ppdparamvalue {
+    local($type, $val) = @_;
+
+    local($realre) = '(?:(?:\d+(?:\.\d*)?)|(?:\.\d+))(?:[eE][+-]\d+)?';
+
+    if ($type eq 'string') {
+	return ("(" . ($val =~ s/\(/\\\(/g) . ")", 1);
+    } elsif ($type eq 'int') {
+	return ($val, ($val =~ /^\d+/));
+    } elsif ($type eq 'real') {
+	return ($val, ($val =~ /^$realre$/));
+    } elsif ($type eq 'points') {
+	if ($val =~ /^($realre)\s*([a-z]*)$/) {
+	    local($real, $unit) = ($1, $2);
+	    local($mult) = unitfactor($unit);
+
+	    if ($mult) {
+	        return ($real * $mult, 1, $unit);
+	    } else {
+		return ($val, 0, $unit);
+	    }
+	} else {
+	    return ($val, 0);
+	}
+    } else {
+	return ($val, 0);
+    }
+}
+
+sub ppdunitvalue {
+    local($val, $unit) = @_;
+    local($mult) = unitfactor($unit);
+
+    return $mult ? ($val / $mult) : 0;
+}
+
+#
+# ppdfile(printer-type, ppd-path)
+#
+# Return the first filename in ppd-path giving the PPD file for the
+# given printer-type. Filenames are tried both as given by
+# printer-types and under two alternate form (with spaces instead of
+# underscores and with underscores instead of spaces).
+#
+
+sub _locateppdfile {
+    local($dir, $ptype, $ext) = @_;
+    local($ppd) = "$dir/$ptype$ext";
+
+    if (-f $ppd) {
+	return "$ppd";
+    }
+
+    if (!exists($PPD_Directories{$dir}) && -f "$dir/@ppd_dir@") {
+	if (open(PPDDIR, "$dir/@ppd_dir@")) {
+	    while (<PPDDIR>) {
+		chop;
+
+		local($pc, $unix, @file) = split;
+		local($file) = join(' ', @file);
+
+		$PPD_Directories{$dir}{$pc}{'name'} = $unix;
+		$PPD_Directories{$dir}{$pc}{'file'} = $file;
+
+		$PPD_Directories{$dir}{$unix}{'name'} = $pc;
+		$PPD_Directories{$dir}{$unix}{'file'} = $file;
+	    }
+
+	    close PPDDIR;
+	}
+    }
+
+    if ($ppd = $PPD_Directories{$dir}{$ptype}{'name'}) {
+	$ppd = "$dir/$PPD_Directories{$dir}{$ptype}{'file'}";
+	return $ppd if -f $ppd;
+	$ppd = "$dir/$PPD_Directories{$dir}{$ptype}{'name'}$ext";
+	return $ppd if -f $ppd;
+    }
+}
+
+sub _findppdfile {
+    local($ptype, $ext, $lang, @ppdlocs) = @_;
+
+    foreach $dir (@ppdlocs) {
+	local($ppd);
+
+	if (($ppd = &_locateppdfile("$dir/$lang", $ptype, $ext)) ne '') {
+	    $ppd =~ s,//,/,g;
+	    return $ppd;
+	}
+    }
+}
+
+sub ppdpath {
+    local($ppdpath) = @_;
+
+    if (!$ppdpath) {
+	if (defined($main::PPDPATH)) {
+	    $ppdpath = $main::PPDPATH;
+	} else {
+	    $ppdpath = $main::__PPDPATH;
+	}
+    }
+
+    if ($ppdpath =~ /^:/) {
+	$ppdpath = "${main::__PPDPATH}${ppdpath}";
+    }
+    if ($ppdpath =~ /:$/) {
+	$ppdpath = "${ppdpath}${main::__PPDPATH}";
+    }
+
+    $ppdpath =~ s,::,:${main::__PPDPATH}:,;
+
+    return $ppdpath;
+}
+
+sub ppdfile {
+    local($ptype, $ppdpath) = @_;
+
+    if ($ptype =~ /^\//) {
+	return $ptype;
+    }
+
+    $ppdpath = ppdpath($ppdpath);
+
+    local($lang);
+
+    if ($#locales < 0) {
+        if ($ppd::nextstep) {
+	    $lang = `2>/dev/null dread System Language`;
+	    chop($lang);
+
+	    @locales = split(/;/, $lang);
+
+	    local($i);
+
+	    for ($i = 0; $i <= $#locales; ++$i) {
+	        $locales[$i] .= ".lproj";
+	    }
+        } else {
+	    local(@thelocales);
+	    local($loc);
+    
+	    if (exists($ENV{'LINGUAS'})) {
+	        @thelocales = (split(' ', $ENV{'LINGUAS'}), '');
+	    } else {
+	        $lang = $ENV{'LANGUAGE'};
+	        $lang = $ENV{'LC_ALL'} unless $lang;
+	        $lang = $ENV{'LC_MESSAGES'} unless $lang;
+	        $lang = $ENV{'LANG'} unless $lang;
+	        $lang = 'en' unless $lang;
+
+	        @thelocales = ($lang);
+
+	        local(@syslocales) = `2>/dev/null locale -a`;
+
+	        for $loc (@syslocales) {
+		    chop($loc) if $loc =~ /\n$/;
+    
+		    if ($loc ne $lang && $loc ne 'POSIX' && $loc ne 'C') {
+		        $thelocales[$#thelocales + 1] = $loc;
+		    }
+	        }
+	    }
+    
+   	    local($have_en) = 0;
+
+	    for $loc (@thelocales) {
+	        $locales[$#locales + 1] = $loc;
+
+	        if ($loc =~ /(.*),..*$/) {
+		    $locales[$#locales + 1] = $loc = $1;
+	        }
+    
+	        if ($loc =~ /(.*)\...*$/) {
+		    $locales[$#locales + 1] = $loc = $1;
+	        }
+
+	        if ($loc =~ /(.*)_[A-Z][A-Z]$/) {
+		    $locales[$#locales + 1] = $loc = $1;
+	        }
+
+		if ($loc =~ /^en/) {
+		    $have_en = 1;
+		}
+	    }
+    
+	    $locales[$#locales + 1] = 'en' unless $have_en;
+	    $locales[$#locales + 1] = '';
+        }
+    }
+
+    local(@pathp) = split(/:/, $ppdpath);
+    local($ppdfile);
+
+    local($typep) = $ptype;
+
+    $typep =~ s/\//\%/g;
+    $ptype = $typep;
+
+    # Try to find the PPD file under diverse names, within each locale
+    # subdirectory in each path directory.
+
+    foreach $lang (@locales) {
+	$typep = $ptype;
+
+        if (($ppdfile = &_findppdfile($typep, '.ppd', $lang, @pathp)) ne '') {
+	    return $ppdfile;
+    	}
+	
+	$typep =~ s/\s/_/g;
+	if ($typep ne $ptype) {
+	    if ($ppdfile = &_findppdfile($typep, '.ppd', $lang, @pathp)) {
+		return $ppdfile;
+	    }
+	}
+
+	$typep =~ s/_/ /g;
+	if ($typep ne $ptype) {
+	    if ($ppdfile = &_findppdfile($typep, '.ppd', $lang, @pathp)) {
+	        return $ppdfile;
+	    }
+    	}
+
+	if (length($ptype) <= 8) {	# Try DOS-like name?
+	    $typep = $ptype;
+
+	    $typep =~ tr/[A-Z]/[a-z]/;
+	    if ($ppdfile = &_findppdfile($typep, '.ppd', $lang, @pathp)) {
+	        return $ppdfile;
+	    }
+
+	    $typep =~ tr/[a-z]/[A-Z]/;
+	    if ($ppdfile = &_findppdfile($typep, '.PPD', $lang, @pathp)) {
+	        return $ppdfile;
+	    }
+	}
+    }
+}
+
+#
+# parseppd(file)
+#
+# Parse a PPD file and fill various structures giving the informations
+# in this file.
+#   Also automatically include any file referenced in a *Include: "filename"
+# line in the PPD file.
+#   Print warnings when things are wrong, in the form 'name: warning: msg'
+# where name is the basename of the program using this package and msg
+# is the warning message.
+#
+# The %PPD_Defaults hash contains default values for keywords.
+#   The %PPD_AltNames and %PPD_NatNames hashes provide a way to get
+# alternate names for the keywords.
+#
+# The %PPD_Features{keyword} contains PS code associated to various options
+# of a given keyword.
+#   Alternates names for the options are mapped by the two hashes
+# %PPD_AltNames{keyword} and %PPD_NatNames{altkeyword}.
+#
+# The %PPD_Constraints hash contains user interface constraints. When a
+# line
+#
+#   *UIConstraints: keyword1 option1 keyword2 option2
+#
+# is encoutered we enter
+#
+#   $PPD_Constraints{'ns_keyword1=option1'} .= ' ns_keyword2=option2'
+#
+# The %PPD_Dep{section} contains order dependencies, where section
+# is the DSC section where the code should be submitted. When a line
+#
+#   *OrderDependency: real section mainKeyword optionKeyword
+#
+# is encountered we enter
+#
+#   $PPD_Dep{'section'}{'mainKeyword=optionKeyword'} = real;
+#   $PPD_RevDep{'section'}{'real'}{'mainKeyword=optionKeyword'} = '';
+#
+# or
+#
+#   $PPD_Dep{'section'}{'mainKeyword'} = real;
+#   $PPD_RevDep{'section'}{'real'}{'mainKeyword'} = '';
+#
+# depending on the presence of optionKeyword on the line or not.
+#
+
+sub regstring {
+    local($str) = @_;
+    local($reg);
+
+    while ($str =~ /(.*)(?:<([\da-zA-Z][\da-zA-Z])+>)(.*)/) {
+	$reg .= $1 . pack("H*", $2);
+	$str = $3;
+    }
+
+    $reg .= $str;
+
+    return $reg;
+}
+
+sub sectionguess {
+    local($feature) = @_;
+
+    if ($feature =~ /\*(JCL)/) {
+	return 'JCLSetup';
+    } else {
+	return '@ppd_def_section@';
+    }
+}
+
+sub adddependency {
+    local($section, $key, $dep, $real) = @_;
+    local($guessed);
+
+    if (exists($main::PPD_Section{$key})) {
+	return;
+    }
+
+    $main::PPD_Dependencies{$section} = '';
+
+    if (($guessed = $main::PPD_GuessedDep{$key})
+	|| !exists($main::PPD_Dep{$section}{$key})) {
+
+	if ($guessed) {
+	    local ($order);
+
+	    foreach $order (keys %{$main::PPD_RevDep{$guessed}}) {
+		delete $main::PPD_RevDep{$guessed}{$order}{$key};
+	    }
+
+	    delete $main::PPD_Dep{$guessed}{$key};
+	}
+
+	$main::PPD_Dep{$section}{$key} = $dep;
+	$main::PPD_RevDep{$section}{$dep}{$key} = '';
+
+	if ($real) {
+	    delete $main::PPD_GuessedDep{$key};
+	    $main::PPD_Section{$key} = $section;
+	} elsif (!$guessed) {
+	    $main::PPD_GuessedDep{$key} = $section;
+	}
+    }
+}
+
+sub _completeps {
+    local($ppd, $file, $lineno, $what, $ps) = @_;
+
+    if ($ps !~ /"\s*$/) {
+  	$ps .= "\n" if $ps;
+        while (<$ppd>) {
+	    ++$lineno;
+            last if /^\*End\s*$/;
+
+	    if (/^\*/) {
+		chop;
+		return ($lineno, $ps,
+		    "$file:$lineno: parse error, `*End' expected,"
+		    . " while reading code for $what");
+	    }
+
+	    s/\r\n$/\n/;
+
+            $ps .= $_;
+        }
+    }
+
+    $ps =~ s/"\s*$//;
+    while (chomp($ps)) { ; }
+
+    return ($lineno, $ps, "");
+}
+
+sub _parseppdfile {
+    local($file, $ppd) = @_;
+    
+    $file =~ s#^(\s)#./$1#;
+
+    open($ppd, "<$file\0") || return "cannot open $file";
+
+    # Check whether the file is a PPD file or not. We allow for some
+    # degenerated strings like "3" instead of "3.0".
+    
+    if (<$ppd> !~ /^\*PPD-Adobe:\s+"\d+(?:\.\d+)?"/) {
+	return "$file is not a PPD file";
+    }
+
+    # Parse things that interest us.
+
+    local($lineno) = 1;
+
+    while (<$ppd>) {
+	++$lineno;
+
+	chomp;
+	if (/\r$/) { chop; }
+
+        if (/^\*%/) {
+	    next;
+	} elsif (/^\*Include:\s+"(.*)"$/) {
+	    local($ppdfile) = ppdfile($1);
+	    if ($ppdfile) {
+		local($error) = &_parseppdfile($ppdfile, $ppd + 1);
+		if ($error) {
+		    return $error;
+		}
+	    } else {
+		return "cannot find \`$1' PPD file";
+	    }
+	} elsif (/^(\*(?:ScreenFreq|ScreenAngle)):\s+"(.+)"/) {
+	    $main::PPD_Defaults{$1} = $2;
+	} elsif (/\*UIConstraints:/) {
+	    if (s/\*.*(\*[\041-\176]+)\s+([\041-\176]+)\s+(\*[\041-\176]+)\s+([\041-\176]+)/$1=$2 $3=$4/ ||
+		s/\*.*(\*[\041-\176]+)\s+([\041-\176]+)\s+(\*[\041-\176]+)/$1=$2 $3/ ||
+		s/\*.*(\*[\041-\176]+)\s+(\*[\041-\176]+)\s+([\041-\176]+)/$1 $2=$3/ ||
+		s/\*.*(\*[\041-\176]+)\s+(\*[\041-\176]+)/$1 $2/) {
+	    	local($constraint, $no) = split(/ /);
+	    	$main::PPD_Constraints{$constraint} .= " $no";
+	    }
+        } elsif (/^\*OrderDependency:\s+(\d+)\s+([\041-\176]+)\s+(\*[\041-\176]+)(?:\s+([\041-\176]+))?/) {
+	    local($dep, $section, $key) = ($1, $2, $3);
+
+	    if ($section !~ /^(ExitServer)|(Prolog)|(DocumentSetup)|(PageSetup)|(JCLSetup)|(AnySetup)$/) {
+		print STDERR "$main::progname: warning: incorrect *OrderDepency value $2, using AnySetup\n";
+		$section = sectionguess($key);
+	    }
+
+	    adddependency($section, $key, $dep, 1);
+        } elsif (/^\*OpenUI\s+(\*[\041-\176]+)(?:\/(.*)):\s+([\041-\176]+)/) {
+	    local($altname) = regstring($2);
+
+            $main::PPD_Types{$1} = $3;
+            $main::PPD_AlternateNames{$1} = $altname;
+            $main::PPD_NaturalNames{$altname} = $1;
+        } elsif (/^\*Default([\041-\176]+):/) {
+	    if ($1 eq 'ColorSpace') { next; }
+            /\*Default([\041-\176]+):\s*(?:(?:"([^"]*)")|(.*\S)\s*)/;
+            local($feature, $val) = ($1, "$2$3");
+	    $feature = "*$feature";
+            if (!exists($main::PPD_Defaults{"$feature"})) {
+	    	$main::PPD_Defaults{$feature} = $val;
+		adddependency(sectionguess($feature),
+		    "$feature", @ppd_def_order@);
+	    }
+	} elsif (/^\*Param([\041-\176]+)\s+([^\s\/]+)(?:\/(.+))?:\s*(\d+)\s+(\w+)\s+([\041-\176]+)\s+([\041-\176]+)/) {
+	    local($feature) = "*$1";
+	    local($param, $altparam) = ($2, $3);
+	    local($order, $type, $min, $max) = ($4, $5, $6, $7);
+
+	    $main::PPD_ParamsOrder{$feature}[$order - 1] = $param;
+
+	    $main::PPD_Params{$feature}{$param}{Type} = $type;
+	    $main::PPD_Params{$feature}{$param}{Min} = $min;
+	    $main::PPD_Params{$feature}{$param}{Max} = $max;
+
+	    if ($altparam) {
+		$altparam = regstring($altparam);
+
+	        $main::PPD_ParamsAltNames{$feature}{$param} =
+	    	    $altparam;
+		$main::PPD_ParamsNatNames{$feature}{$altparam} =
+		    $param;
+	    }
+	} elsif (/^\*\?([\041-\176]+)\s*:\s*"(.*)$/) {
+	    local($feature) = "*$1";
+            local($ps) = $2;
+
+	    ($lineno, $ps, $err) = _completeps($ppd, $file, $lineno,
+		$feature, $ps);
+	    return $err if $err;
+
+	    $main::PPD_Query{$feature} = $ps;
+	} elsif (/^(\*[\041-\176]+)\s+([^\/]+)(?:\/(.+))?:\s*"(.*)$/) {
+	    local($feature) = $1;
+            local($name, $altname) = ($2, $3);
+            local($ps) = $4;
+          
+	    local($err);
+
+	    ($lineno, $ps, $err) = _completeps($ppd, $file, $lineno,
+		$feature, $ps);
+	    return $err if $err;
+
+	    if (!exists($main::PPD_Features{$feature}{$name})) {
+		$main::PPD_Features{$feature}{$name} = $ps;
+
+		adddependency(sectionguess($feature),
+		    "$feature", @ppd_def_order@);
+
+	    	if ($altname) {
+		    $altname = regstring($altname);
+
+		    $main::PPD_AltNames{$feature}{$name} = $altname;
+		    $main::PPD_NatNames{$feature}{$altname} = $name;
+		}
+	    }
+	}
+    }
+
+    close($ppd);
+
+    return '';
+}
+
+sub parseppd {
+    local($file) = @_;
+
+    _parseppdfile($file, 'ppd0000');
+}
+
+#
+# outputppdfeature(key, option, nocomment, safer)
+#
+# Output code for a feature, leaving out DSC comments if nocomment is
+# given.
+#   If the feature is an alternate name (that is, it does not start
+# with a star and is referenced in the PPD_NatNames array) use the
+# regular feature name instead.
+#   Return '' in case of success, a message in case of warning or error
+# (warning messages all begin with 'warning: '.
+#
+
+sub outputppdfeature {
+    local($key, $option, $nocomment, $safer, $nonstd,
+        $nonconf, $special) = @_;
+
+    if ($key !~ /^\*/ && $main::PPD_NatNames{$key}) {
+        $key = $main::PPD_NatNames{$key};
+    }
+
+    if (!exists($main::PPD_Features{$key})) {
+	return "warning: unknown feature $key, ignoring";
+    }
+    if (!exists($main::PPD_Features{$key}{$option})) {
+	return "warning: incorrect value $option for feature $key, ignoring";
+    }
+
+    local($featurecode) = $main::PPD_Features{$key}{$option};
+
+    if ($key eq '*ScreenProc') {
+	if (!exists($main::PPD_Defaults{'*ScreenFreq'})) {
+	    return "warning: missing *ScreenFreq, ignoring *ScreenProc";
+	}
+	if (!exists($main::PPD_Defaults{'*ScreenAngle'})) {
+	    return "warning: missing *ScreenAngle, ignoring *ScreenProc";
+	}
+    }
+
+    if ($nonconf && $nonstd && !$nocomment && $key eq '*PageSize') {
+	print "%%PaperSize: $option\n%%BeginPaperSize: $option\n";
+    }
+
+    print "%%BeginFeature: $key $option\n" unless $nocomment;
+
+    if ($safer) {
+	print "mark {\n";
+    }
+
+    if (exists($main::PPD_Params{$key})) {	# Put params on stack.
+	local($param);
+
+	foreach $param (@{$main::PPD_ParamsOrder{$key}}) {
+	    local($feature) = $key;
+
+	    $feature =~ s/\*/*Param/;
+
+	    if (!$nonstd || $nocomments) {
+		print "  ";
+	    } else {
+    	        print "%%BeginParameter: $feature $param\n" if $nonstd;
+	    }
+
+	    if (exists($main::PPD_ParamsSet{$key}{$param})) {
+		print $main::PPD_ParamsSet{$key}{$param};
+	    } else {
+		print $main::PPD_Params{$key}{$param}{'Min'};
+	    }
+
+	    print "\n";
+    	    print "%%EndParam\n" unless (!$nonstd || $nocomments);
+	}
+    }
+
+    if ($key eq '*Transfer') {
+	if ($special) {
+	    print "[\n";
+	}
+	print "$featurecode\n";
+	if ($special) {
+	    print "/exec load currenttransfer /exec load\n";
+	    print "] cvx settransfer\n";
+	}
+	print "erasepage\n";
+    } elsif ($key eq '*ScreenProc') {
+	print "$main::PPD_Defaults{'*ScreenFreq'}"
+	    . " $main::PPD_Defaults{'*ScreenAngle'}\n";
+        print "$featurecode\n";
+	print "setscreen\n";
+    }else {
+	print "$featurecode\n";
+    }
+
+    if ($safer) {
+	print "} stopped cleartomark\n";
+    }
+
+    print "%%EndFeature\n" unless $nocomment;
+
+    if ($nonconf && $nonstd && !$nocomment && $key eq '*PageSize') {
+	print "%%EndPaperSize\n";
+    }
+
+    return ('', $key, $option);
+}
+
+# 
+# checkfeature(feature, value, usealt)
+#
+#  Check the validity of something in the given options, eventually
+# looking for natural names.
+#
+
+sub checkfeature {
+    local($opt, $userval, $usealt) = @_;
+
+    if ($usealt && $main::PPD_NaturalNames{$opt}) {
+	$opt = $main::PPD_NaturalNames{$opt};
+    }
+
+    if (exists($main::PPD_NotInvocationValue{$opt})) {
+	return ('', "unknown feature $opt");
+    }
+
+    local(@keys) = keys %{$main::PPD_Features{$opt}};
+
+    if (!@keys) {
+	return ('', "unknown feature $opt");
+    } else {
+
+	# Check the values.
+
+	local($val, $found);
+       
+	foreach $val (@keys) {
+	    if ($found = ($val eq $userval)) {
+		last;
+	    } elsif ($usealt) {
+		local($altname) = $main::PPD_AltNames{$opt}{$val};
+
+		if ($found = ($userval eq $altname)) {
+		    $userval = $val;
+		    last;
+		}
+	    }
+	}
+
+	if (!$found) {
+	    return ("incorrect value $userval for feature $opt", '');
+	}
+    }
+
+    return ($opt, $userval);
+}
+
+#
+
+sub checkconstraints {
+    local($fullopt, %all_options) = @_;
+    local($miniopt, $theopt);
+    
+    local(@msgs);
+
+    ($miniopt = $fullopt) =~ s/=.*//;
+
+    foreach $theopt ($miniopt, $fullopt) {
+	local($retheopt, $constraint);
+
+	$retheopt = quotemeta($theopt);
+
+	foreach $constraint (split(/ /, $main::PPD_Constraints{$theopt})) {
+	    local($conf, $reconstraint, $option) = 0;
+
+	    if (!$constraint) { next; }
+
+	    $reconstraint = quotemeta($constraint);
+
+	    foreach $option (keys %all_options) {
+		local($opt) = "$option=$all_options{$option}";
+
+		if ($constraint !~ /=/) {
+		    if ($opt =~ "$reconstraint=([^ \t]+)") {
+			if ($1 ne 'None' && $1 ne 'False') {
+			    $conf = 1;
+			}
+		    }
+		} elsif ($opt eq "$constraint") {
+		    $conf = 1;
+		}
+		last if $conf;
+	    }
+
+	    if ($conf && $conflicts{$constraint} !~ " $retheopt ") {
+		$conflicts{$theopt} .= " $constraint ";
+		$msgs[$#msgs + 1] = "$constraint is incompatible with $theopt";
+	    }
+	}
+    }
+
+    return @msgs;
+}
+
+#
+
+}
+
+# Initialize the environment.
+
+($progname = $0) =~ s,^.*/,,;
+
+$ppd::nextstep = @nextstep@;
+
+if (!defined($__PPDPATH)) {
+    local($h, $p, $u, $g, $q, $c, $g, $home) = getpwuid($>);
+    if ($ppd::nextstep) {
+	local($bdir);
+
+	foreach $bdir ("$home/Library", "/LocalLibrary", "/NextLibrary") {
+	    if ($__PPDPATH) {
+	        $__PPDPATH .= ":$bdir/PrinterTypes"
+	    } else {
+		$__PPDPATH = "$bdir/PrinterTypes";
+	    }
+	}
+    } else {
+	local($dir);
+
+	foreach $dir ($home, '/usr/local', '/usr') {
+	    $__PPDPATH .= "$dir/share/ppd:$dir/share/postscript/ppd"
+		. ":$dir/share/ghostscript/ppd"
+		. ":$dir/lib/ppd:$dir/lib/postscript/ppd"
+		. ":$dir/lib/ghostscript/ppd:$dir/ppd:";
+	}
+	$__PPDPATH .= "/lib/ppd:/lib/postscript/ppd";
+    }
+}
+
+if (!defined($PPDPATH)) {
+    if (exists($ENV{'PPDPATH'})) {
+        $PPDPATH = $ENV{'PPDPATH'};
+    } elsif ($__PPDPATH) {
+	$PPDPATH = $__PPDPATH;
+    }
+}
+
+@locales = ();
+
+1;
+
+# Local Variables:
+# mode: perl
+# End:
+

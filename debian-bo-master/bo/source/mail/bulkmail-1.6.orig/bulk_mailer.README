@@ -1,0 +1,125 @@
+This is a C program to do "bulk" mailing.  For input, it takes a file
+of recipient addresses (one address per line) and a message (with
+headers already attached) to be sent to the recipients.  It sorts the
+recipient list by reversed domain (so similar ones sort together),
+splits up the recipients into several groups containing no more than N
+domains each, creates an SMTP envelope for each group of recipients,
+and feeds that envelope to "/usr/lib/sendmail -bs".
+
+Splitting the envelopes up allows sendmail to perform delivery in parallel,
+so instead of having one large queue entry (for which sendmail might take
+awhile to get around to attempting delivery for some recipients), it has
+several smaller queue entries.  Depending on your point-of-view, this can
+still be considered "cluttering up your mail queue", but it does seem to
+deliver messages more quickly to most recipients.
+
+The core of this program was extracted from a somewhat strange mailing
+list manager called na-net; it was designed to efficiently send out
+mail to 5000 people at a time.  I have used this program to attempt
+delivery of a message to over 12000 recipients around the world,
+within a few hours.  I'm currently using bulk_mailer as a back-end for
+several mailing lists of modest size.
+
+However, the program is not extensively tested, and may not work well
+in all environments.  (In particular, if your system has per-user
+process quotas, or a small number of process table entries, you will
+want to modify this program to recover gracefully.)
+
+There's no warranty on this, but you're welcome to use it if you want.
+
+Installation:
+
+a) edit the Makefile as necessary
+b) type "make"
+c) copy bulk_mailer to whereever you want it to live.
+
+Usage:
+
+bulk_mailer [options] envelope_from recipient_list_file
+
+The message is then fed to standard input.
+
+'envelope_from' is the envelope return address for the mailing list.
+
+This should either be the address of a human list maintainer, or 
+the address of a robot that tries to recognize bounced mail messages
+and grok it, forwarding anything it doesn't understand to a human.
+
+'recipient_list_file' is a filename of a list of recipients, one
+recipient per line.  bulk_mailer's address prefrobnicator tries to
+understand several forms of address, e.g.:
+
+	Keith Moore <moore@cs.utk.edu>
+	moore@cs.utk.edu (Keith Moore)
+	"Keith Moore" <"keith.moore"@cs.utk.edu>  (Moore, Keith)
+
+should all do the right thing.
+
+
+Options:
+
+-debug			don't actually mail the stuff.  instead, spit SMTP
+			to stdout
+
+-domain dom.ain		Set the local domain name.  if not set, bulk_mailer
+			will try to figure out the name on its own.
+			Note: This should be a fully-qualified domain name --
+			not just the first component (aka the "hostname").
+			If the domain name doesn't have a '.' it's rejected.
+
+-maxdomains ###		set the maximum number of domains per envelope to ###. 
+			if not explicitly set, 20 is the default.
+
+-maxsize #####		reject any message larger than ##### bytes.
+
+-precedence xxx		add a 'Precedence: xxx' header.  'xxx' should be a
+			keyword recognized by sendmail.  NOT RECOMMENDED.
+
+			WARNING: some mailers will bounce the mail if they
+			see a Precedence header with a keyword they don't
+			understand; some list managers will silently drop
+			the mail if they see a Precedence header with a
+			keyword they do understand.  There is NO safe value
+			for the Precedence header that won't cause some 
+			mailer to mishandle the message.  This option is
+			therefore not recommended.
+
+-reply-to xxx		add a 'Reply-to: xxx' header to the resent message
+			if there wasn't one in the input.  
+
+			Use of the reply-to header by lists is questionable;
+			see http://www.unicom.com/FAQ/reply-to-evil.html
+			for some of the reasons why.
+
++reply-to yyy		add a 'Reply-to: xxx' header to the resent message,
+			overriding any reply-to header in the input.
+			NOT RECOMMENDED.
+			
+			If having a list use reply-to is questionable, 
+			overriding the sender's reply-to header is even 
+			worse.  This option should be used only in very
+			unusual cases.
+
+-sendmail zzz		Add the following flags to the sendmail command-line.
+			For instance, "-sendmail -Odq" would have bulk_mailer
+			pass the "-Odq" flag to sendmail, which tells it:
+			"just queue the message, don't attempt to deliver it
+			immediately".
+
+-v			Be verbose.
+
+Use with sendmail:
+
+To have bulk_mailer distributed mail to a list, add the following
+lines to /etc/aliases:
+
+{FOO}-request: whoever-maintains-foo
+owner-{FOO}: whoever-maintains-foo
+{FOO}: "|{BULK_MAILER} owner-{FOO}@{YOUR.DOMAIN} {ADDRESS_LIST}"
+
+where {FOO} is the name of the list, {YOUR.DOMAIN} is your
+fully-qualified domain, {BULK_MAILER} is a full path name of the
+bulk_mailer program, and {ADDRESS_LIST} is a full path name of the
+file containing the list of addresses. 
+
+

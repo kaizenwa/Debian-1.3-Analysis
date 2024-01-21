@@ -1,0 +1,138 @@
+#! /usr/local/bin/scotty -nf
+## -*- tcl -*-
+##
+## Copyright (c) 1995
+##
+## J. Schoenwaelder
+## TU Braunschweig, Germany
+## Institute for Operating Systems and Computer Networks
+##
+## Permission to use, copy, modify, and distribute this
+## software and its documentation for any purpose and without
+## fee is hereby granted, provided that the above copyright
+## notice appear in all copies.  The University of Braunschweig
+## makes no representations about the suitability of this
+## software for any purpose.  It is provided "as is" without
+## express or implied warranty.
+##
+
+proc BogartError {msg} {
+    syslog info "bogart: $msg"
+}
+
+proc BogartResult {query} {
+    set f [open /usr/tmp/bogart.sql a+]
+    puts $f "$query\n\\g"
+    close $f
+}
+
+proc BogartSubmit {url} {
+    if {[catch {http put $url /usr/tmp/bogart.sql} msg]} {
+	BogartError $msg
+	return
+    }
+    catch {exec rm -f /usr/tmp/bogart.sql}
+}
+
+proc BogartGetIp {host} {
+    if {[regexp "^\[0-9\]+\.\[0-9\]+\.\[0-9\]+\.\[0-9\]+$" $host]} {
+	return $host
+    }
+    set code [catch {netdb hosts address $host} ip]
+    if $code {
+	set ip [dns a $host]
+    }
+    return $ip
+}
+
+##
+## SNMP monitoring scripts.
+##
+
+proc SnmpScalarsProc {s group} {
+
+    set list [SNMP_Scalars $s $group value]
+
+    set fields ""
+    set values ""
+    foreach name $list {
+	lappend fields [lindex [split $name .] 0]
+	set syntax [mib syntax $name]
+	set tc [mib tc $name]
+	if {$tc != ""} {
+	    set syntax [lindex $tc 1]
+	}
+	switch $syntax {
+	    TimeTicks -
+	    INTEGER {
+		lappend values [mib scan $name $value($name)]
+	    }
+	    "OCTET STRING" {
+		lappend values '$value($name)'
+	    }
+	    "OBJECT IDENTIFIER" {
+		if {[catch {mib oid $value($name)} oid]} {
+		    lappend values '$value($name)'
+		} else {
+		    lappend values '$oid'
+		}
+	    }
+	    default {
+		lappend values $value($name)
+	    }
+	}
+    }
+
+    set query "insert into $group (Target,TimeStamp,[join $fields ,]) \
+	    values ('[SNMPGetIP $s]',[getclock],[join $values ,])"
+    BogartResult $query
+}
+
+proc MonitorSnmpScalars {group alias interval} {
+    set s [snmp session -alias $alias]
+    job create "SnmpScalarsProc $s $group" [expr $interval * 1000]
+}
+
+##
+## Monitor the network time protocol information.
+##
+
+proc NtpProc {ip} {
+    if {[catch {ntp $ip values} msg]} {
+	BogartError "$ip: $msg"
+	return
+    }
+}
+
+proc MonitorNtp {host interval} {
+    set ip [BogartGetIp $host]
+    job create "NtpProc $ip" [expr $interval * 1000]
+}
+
+##
+## Monitor round trip time via ICMP echo messages.
+##
+
+proc IcmpRttProc {ip} {
+    set rtt [lindex [lindex [icmp echo $ip] 0] 1]
+    set query "insert into IcmpRtt (Target,TimeStamp,rtt) \
+	    values ('$ip',[getclock],$rtt)"
+    BogartResult $query
+}
+
+proc MonitorIcmpRtt {host interval} {
+    set ip [BogartGetIp $host]
+    job create "IcmpRttProc $ip" [expr $interval * 1000]
+}
+
+##
+## And here is the main program. Simply source all configuration 
+## files and start monitoring. That's it.
+##
+
+foreach f $argv {
+    if {[file readable $f]} {
+	source $f
+    }
+}
+

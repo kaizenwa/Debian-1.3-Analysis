@@ -1,0 +1,138 @@
+#! /bin/sh
+# checkactive - check an active file for worrisome signs
+# checkactive file
+
+
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+
+
+PATH=$NEWSCTL/bin:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+quick=n
+numok=n
+complete=y
+for dummy
+do
+	case "$1" in
+	-q)	quick=y		;;
+	-n)	numok=y		;;
+	-i)	complete=n	;;
+	--)	shift ; break	;;
+	-*)	echo "$0: unknown option \`$1'" >&2 ; exit 2	;;
+	*)	break		;;
+	esac
+	shift
+done
+case $# in
+0)	file=$NEWSCTL/active	;;
+1)	file=$1			;;
+*)	echo "Usage: $0 file" >&2 ; exit 2	;;
+esac
+
+tmp=/tmp/ca$$
+tmpb=/tmp/cb$$
+status=1
+trap 'rm -f $tmp $tmpb ; trap 0 ; exit $status' 0 1 2 15
+
+if test ! -s $file
+then
+	echo "input is empty"
+	exit
+fi
+
+case "$numok" in
+y)	numcheck=	;;
+n)	numcheck='0+$3 == 0 { print where, "field 3 is zero" ; status = 1 }
+		1+$2 < 0+$3 { print where, q $2 q, "<", q $3 q ; status = 1 }'
+	;;
+esac
+awk 'BEGIN { status = 0 ; q = "\"" }
+{ where = "line " NR ":" }
+NF != 4 { print where, "has", NF, "not 4 fields" ; status = 1 }
+$1 !~ /^[a-z][a-z0-9+_-]*(\.([a-z0-9+_-]+|=\?([a-zA-Z0-9=.?+_-]|\/)*\?=))*$/ {
+	# not fully rigorous, but a good first cut
+	print where, "newsgroup name", q $1 q, "invalid" ; status = 1
+}
+$2 !~ /^[0-9]+$/ { print where, q $2 q, "is non-numeric" ; status = 1 }
+$3 !~ /^[0-9]+$/ { print where, q $3 q, "is non-numeric" ; status = 1 }
+$4 !~ /^([ynmx]|=.*)$/ {
+	print where, "field 4 (" q $4 q ") invalid" ; status = 1
+}
+'"$numcheck"'
+END { exit status }' $file || exit
+
+awk '{print $1}' $file | sort | uniq -d >$tmp
+if test -s $tmp
+then
+	echo `wc -l <$tmp` "duplicate newsgroup name(s):"
+	cat $tmp
+	exit
+fi
+
+awk '$4 ~ /^=/ { print substr($4, 2) }' $file | sort -u >$tmp
+awk '{ print $1 }' $file | sort -u | comm -13 - $tmp >$tmpb
+if test -s $tmpb
+then
+	echo `wc -l <$tmpb` "newsgroup(s) are =ed to nonexistent groups:"
+	cat $tmpb
+	exit
+fi
+
+me="`newshostname`"
+gngppat=`awk -f $NEWSBIN/canonsys.awk $NEWSCTL/sys |
+	egrep "^($me|ME)[:/]" |
+	awk -F: '
+{
+	fields = split($2, field2, "/")		# split ngs/dists
+	nngs = split(field2[1], ngs, ",")	# split ng,ng,ng
+	for (i = 1; i < nngs; i++)		# print field2[1] robustly
+		printf "%s,", ngs[i]
+	printf "%s\n", ngs[nngs]
+	exit
+}' `
+awk '$1 !~ /^(control|junk)$/ { print $1 }' $file | gngp -a -v "$gngppat" >$tmp
+if test -s $tmp
+then
+	echo `wc -l <$tmp` "newsgroup(s) are disallowed by ME line of sys file:"
+	cat $tmp
+	exit
+fi
+
+if test " $complete" = " y"
+then
+	if egrep '^control ' $file >/dev/null
+	then
+		: okay
+	else
+		echo "no \`control' pseudo-newsgroup present"
+		exit
+	fi
+	if egrep '^junk ' $file >/dev/null
+	then
+		: okay
+	else
+		echo "no \`junk' pseudo-newsgroup present"
+		exit
+	fi
+fi
+
+case "$quick" in
+y)	status=0 ; exit	;;
+esac
+
+# this is pretty slow
+while read newsgroup rest
+do
+	echo "$newsgroup" | awk -f $NEWSBIN/namecheck.awk |
+							sed "s/^/$newsgroup: /"
+done <$file | tee $tmp
+if test -s $tmp
+then
+	exit
+fi
+
+status=0		# and the trap does the actual exit

@@ -1,0 +1,64 @@
+#!/bin/sh
+# Tcl sees the next lines as an assignment to variable `kludge'.
+# For sh, the two shifts cancel the effect of the set, and then we
+# run scotty on this script.
+
+set kludge { $*
+    shift
+    shift
+    if test -f ../scotty ; then
+      exec ../scotty -nf $0 $*
+    else
+      exec scotty -nf $0 $*
+    fi
+}
+
+##
+## Walk a MIB subtree starting by label. We try to use the host argument
+## as an SNMP alias. This allows us to talk with the correct parameters
+## needed to various SNMPv1/SNMPv2 agents.
+##
+
+proc walk { host label } {
+
+    if {[lsearch [snmp alias] $host] >= 0} {
+	set s [snmp session -alias $host]
+    } else {
+	puts stderr \
+	    "no snmp alias for \"$host\": using SNMPv1 community public"
+	if {[catch {snmp session -address $host} s]} {
+	    puts stderr $s
+	    exit
+	}
+    }
+
+    if {[catch {
+	$s walk vbl $label {
+	    set vb    [lindex $vbl 0]
+	    set oid   [lindex $vb  0]
+	    set type  [lindex $vb  1]
+	    set value [lindex $vb  2]
+	    puts [format "%-16s : %s" [mib name $oid] $value]
+	}
+    } err]} {
+	puts stderr $err
+	exit
+    }
+
+    $s destroy
+}
+
+##
+## Check the command line and start the MIB walk.
+##
+
+proc usage {} {
+    puts stderr "usage: snmpwalk host subtree"
+    exit
+}
+
+if {[llength $argv] != 2} { usage } else {
+    walk [lindex $argv 0] [lindex $argv 1]
+}
+
+exit

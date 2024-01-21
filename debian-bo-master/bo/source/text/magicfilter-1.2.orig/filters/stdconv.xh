@@ -1,0 +1,289 @@
+/*
+ * Generic conversions for magicfilters
+ */
+# PostScript
+%ifdef HANDLE_PS
+%define PS_OK 1
+%define PSACT	pipe
+%define FPSACT	fpipe
+%else
+%ifdef NATIVE_PS
+%define HANDLE_PS	postscript
+%define PS_OK 1
+%define PSACT	filter
+%define FPSACT	ffilter
+%else
+%define HANDLE_PS	reject	Cannot print PostScript on this printer.
+%endif
+%endif
+0	%!		HANDLE_PS
+0	\004%!		HANDLE_PS
+/* Check out a couple of common data types; if we can't handle them, see
+   if we can find something that can; also define _OK entries and appropriate
+   rejects. */
+/* ASCII/Latin1 text */
+%if !defined(HANDLE_TEXT) && defined(PS_OK)
+%if defined(HAVE_NENSCRIPT)
+%define	HANDLE_TEXT	pipe	PATH_NENSCRIPT -B -p-
+%define LATIN1_OK 1
+%elif defined(HAVE_A2X)
+%define HANDLE_TEXT	pipe	PATH_A2X -p -dps -man
+%define LATIN1_OK 1
+%elif defined(HAVE_A2PS)
+%define HANDLE_TEXT	pipe	PATH_A2PS -p -nh -nn -f12 -b
+%define LATIN1_OK 1
+%endif
+%endif
+%ifdef HANDLE_TEXT
+%define ASCII_OK 1
+%else
+%define HANDLE_TEXT	reject	Cannot print text files on this printer.
+%endif
+/* HP PCL */
+%ifdef HANDLE_PCL5E
+%define PCL5E_OK 1
+%define PCL_OK 1
+%ifndef HANDLE_PCL
+%define HANDLE_PCL HANDLE_PCL5E
+%endif
+%else
+%define HANDLE_PCL5E	reject	Cannot print PCL5E files on this printer.
+%ifdef HANDLE_PCL
+%define PCL_OK 1
+%else
+%define HANDLE_PCL	reject	Cannot print PCL files on this printer.
+%endif
+%endif
+/* HP PJL */
+%ifdef HANDLE_PJL
+%define PJL_OK 1
+%else
+%define HANDLE_PJL	reject	Cannot print PJL files on this printer.
+%endif
+/* TeX DVI */
+%ifndef HANDLE_DVI
+%if defined(HAVE_DVIPS) && defined(PS_OK)
+%ifdef NATIVE_PS
+%ifdef XDPI
+%define HANDLE_DVI	ffilter	PATH_DVIPS -X XDPI -Y YDPI -R -q -F -f
+%else
+%define HANDLE_DVI	ffilter	PATH_DVIPS -D DPI -R -q -F -f
+%endif
+%else
+%ifdef XDPI
+%define HANDLE_DVI	fpipe	PATH_DVIPS -X XDPI -Y YDPI -R -q -f
+%else
+%define HANDLE_DVI	fpipe	PATH_DVIPS -D DPI -R -q -f
+%endif
+%endif
+%endif
+%endif
+%ifdef HANDLE_DVI
+%define DVI_OK 1
+%else
+%define HANDLE_DVI	reject	Cannot print DVI files on this printer.
+%endif
+/* troff */
+%ifndef HANDLE_TROFF
+%ifdef HAVE_GROG
+%if defined(HAVE_GROLJ4) && defined(PCL5E_OK)
+%define HANDLE_TROFF	ffilter	`PATH_GROG -Tlj4 $FILE`
+%elif defined(HAVE_GROPS) && defined(PS_OK)
+%define HANDLE_TROFF	FPSACT	`PATH_GROG -Tps $FILE`
+%elif defined(HAVE_GRODVI) && defined(DVI_OK)
+%define HANDLE_TROFF	fpipe	`PATH_GROG -Tdvi $FILE`
+%elif defined(HAVE_GROTTY) && defined(LATIN1_OK)
+%define HANDLE_TROFF	fpipe	`PATH_GROG -Tlatin1 $FILE`
+%elif defined(HAVE_GROTTY) && defined(ASCII_OK)
+%define HANDLE_TROFF	fpipe	`PATH_GROG -Tascii $FILE`
+%endif
+%elif defined(HAVE_GROFF)
+/* We don't have grog -- use options seemingly appropriate for man pages */
+%if defined(HAVE_GROLJ4) && defined(PCL5E_OK)
+%define HANDLE_TROFF	filter	PATH_GROFF -Tlj4 -t -mandoc
+%elif defined(HAVE_GROPS) && defined(PS_OK)
+%define HANDLE_TROFF	PSACT	PATH_GROFF -Tps -t -mandoc
+%elif defined(HAVE_GRODVI) && defined(DVI_OK)
+%define HANDLE_TROFF	pipe	PATH_GROFF -Tdvi -t -mandoc
+%elif defined(HAVE_GROTTY) && defined(LATIN1_OK)
+%define HANDLE_TROFF	pipe	PATH_GROFF -Tlatin1 -t -mandoc
+%elif defined(HAVE_GROTTY) && defined(ASCII_OK)
+%define HANDLE_TROFF	pipe	PATH_GROFF -Tascii -t -mandoc
+%endif
+%endif
+%endif
+%ifdef HANDLE_TROFF
+%define TROFF_OK 1
+%else
+%define HANDLE_TROFF	reject	Cannot print troff files on this printer.
+%endif
+
+# TeX DVI
+0	\367\002	HANDLE_DVI
+
+# compress'd data
+%ifdef ZCAT
+0	\037\235	pipe	ZCAT
+%else
+0	\037\235	reject	Cannot print compressed files on this printer.
+%endif
+
+# packed, gzipped, frozen and SCO LZH data
+%ifdef GZCAT
+0	\037\036	pipe	GZCAT
+0	\037\213	pipe	GZCAT
+0	\037\236	pipe	GZCAT
+0	\037\240	pipe	GZCAT
+%else
+0	\037\036	reject	Cannot print packed files on this printer.
+0	\037\213	reject	Cannot print gzipped files on this printer.
+0	\037\236	reject	Cannot print frozen files on this printer.
+0	\037\240	reject	Cannot print SCO LZH files on this printer.
+%endif
+
+# troff documents
+0	.\?\?\040	HANDLE_TROFF
+0	.\\\"		HANDLE_TROFF
+0	'\\\"		HANDLE_TROFF
+0	'.\\\"		HANDLE_TROFF
+0	\\\"		HANDLE_TROFF
+
+# ditroff
+%if defined(HAVE_GROPS) && defined(PS_OK)
+0	"x T ps"	PSACT	PATH_GROPS
+%else
+0	"x T ps"	reject	Cannot print PostScript ditroff files.
+%endif
+%if defined(HAVE_GRODVI) && defined(DVI_OK)
+0	"x T dvi"	pipe	PATH_GRODVI
+%else
+0	"x T dvi"	reject	Cannot print DVI ditroff files.
+%endif
+%if defined(HAVE_GROTTY) && defined(ASCII_OK)
+0	"x T ascii"	pipe	PATH_GROTTY
+0	"x T latin1"	pipe	PATH_GROTTY
+%else
+0	"x T ascii"	reject	Cannot print ASCII ditroff files.
+0	"x T latin1"	reject	Cannot print Latin-1 ditroff files.
+%endif
+%if defined(HAVE_GROLJ4) && defined(PCL5E_OK)
+0	"x T lj4"	filter	PATH_GROLJ4
+%else
+0	"x T lj4"	reject	Cannot print LaserJet 4 ditroff files.
+%endif
+
+# Portable bit-, grey- and pixmaps
+%ifdef HANDLE_PNM
+%define PNM_OK 1
+%else
+%if defined(HAVE_PNMTOPS) && defined(PS_OK)
+%define HANDLE_PNM	PSACT	PATH_PNMTOPS -scale 1000 -dpi DPI 2>/dev/null
+%define PNM_OK 1
+%else
+%define	HANDLE_PNM	reject	Cannot print PBM/PGM/PPM files on this printer.
+%endif
+%endif
+0	P1\n		HANDLE_PNM
+0	P2\n		HANDLE_PNM
+0	P3\n		HANDLE_PNM
+0	P4\n		HANDLE_PNM
+0	P5\n		HANDLE_PNM
+0	P6\n		HANDLE_PNM
+
+# HP Printer Control Language (PCL) -- assume start with reset code
+0	\033E\033	HANDLE_PCL
+
+# HP Printer Job Language (PJL)
+0	\033%-12345X	HANDLE_PJL
+0	"@PJL "		HANDLE_PJL
+0	@PJL\t		HANDLE_PJL
+0	@PJL\r		HANDLE_PJL
+0	@PJL\n		HANDLE_PJL
+
+# GIF files
+%if defined(HAVE_GIFTOPPM) && defined(PNM_OK)
+0	GIF87a		pipe	PATH_GIFTOPPM 2>/dev/null
+0	GIF89a		pipe	PATH_GIFTOPPM 2>/dev/null
+%else
+0	GIF87a		reject	Cannot print GIF images on this printer.
+0	GIF89a		reject	Cannot print GIF images on this printer.
+%endif
+
+# JFIF (JPEG) files
+%if defined(HAVE_DJPEG) && defined(PNM_OK)
+0	\377\330\377\340\?\?JFIF\0	pipe	PATH_DJPEG -pnm
+%else
+0	\377\330\377\340\?\?JFIF\0	reject	Cannot print JPEG images \
+	on this printer.
+%endif
+
+# TIFF files (the last two bytes of the "magic" is really a version number;
+# but the magic is really lame and as far as I have understood the version
+# number has never changed and never will, so we include it.)
+%if defined(HAVE_TIFFTOPNM) && defined(PNM_OK)
+0	MM\0\x2a	pipe	PATH_TIFFTOPNM 2>/dev/null
+0	II\x2a\0	pipe	PATH_TIFFTOPNM 2>/dev/null
+%else
+0	MM\0\x2a	pipe	Cannot print TIFF images on this printer.
+0	II\x2a\0	pipe	Cannot print TIFF images on this printer.
+%endif
+
+# BMP files (even lousier magic -- Microsoft strikes again!)
+%if defined(HAVE_BMPTOPPM) && defined(PNM_OK)
+0	BM\?\?\?\?\?\?\?\?\?\?\?\?\x0c	pipe	\
+	PATH_BMPTOPPM 2>/dev/null
+0	BM\?\?\?\?\?\?\?\?\?\?\?\?\x40	pipe	\
+	PATH_BMPTOPPM 2>/dev/null
+0	BM\?\?\?\?\?\?\?\?\?\?\?\?\x28	pipe	\
+	PATH_BMPTOPPM 2>/dev/null
+%else
+0	BM\?\?\?\?\?\?\?\?\?\?\?\?\x0c	reject	\
+	Cannot print BMP files on this printer.
+0	BM\?\?\?\?\?\?\?\?\?\?\?\?\x40	reject	\
+	Cannot print BMP files on this printer.
+0	BM\?\?\?\?\?\?\?\?\?\?\?\?\x28	reject	\
+	Cannot print BMP files on this printer.
+%endif
+
+# Sun rasterfiles
+%if defined(HAVE_RASTTOPNM) && defined(PNM_OK)
+0	\x59\xa6\x6a\x95 pipe	PATH_RASTTOPNM 2>/dev/null
+%else
+0	\x59\xa6\x6a\x95 reject	Cannot print Sun rasterfiles on this printer.
+%endif
+
+# SGI Imagelib (IRIS RGB) files
+%ifdef IS_COLOR
+%define SGITOPS_OPT	$FILE -cmyk
+%else
+%define	SGITOPS_OPT	$FILE
+%endif
+%if defined(HAVE_SGITOPNM) && defined(PNM_OK)
+0	\x1\xda		pipe	PATH_SGITOPNM 2>/dev/null
+0	\xda\x1		pipe	PATH_SGITOPNM 2>/dev/null
+%elif defined(HAVE_TOPS) && defined(sgi) && defined(PS_OK)
+0	\x1\xda		FPSACT	PATH_TOPS SGITOPS_OPT
+0	\xda\x1		FPSACT	PATH_TOPS SGITOPS_OPT
+%elif defined(HAVE_SGITOPS) && defined(PS_OK)
+0	\x1\xda		FPSACT	PATH_SGITOPS SGITOPS_OPT
+0	\xda\x1		FPSACT	PATH_SGITOPS SGITOPS_OPT
+%else
+0	\x1\xda		reject	Cannot print SGI RGB files on this printer.
+0	\xda\x1		reject	Cannot print SGI RGB files on this printer.
+%endif
+
+# FIG files; reported by Steven P. Hill <sph@uscbu.ih.att.com>
+%if defined(HAVE_FIG2DEV) && defined(PS_OK)
+0	#FIG		pipe	PATH_FIG2DEV -Lps -P -l dummy
+%else
+0	#FIG		reject	Cannot print FIG files on this printer.
+%endif
+
+%include <stdrejects.mh>
+
+%ifdef TROFF_OK
+# optimistic troff magic
+0	.		HANDLE_TROFF
+# wacko troff magic
+0	'''		HANDLE_TROFF
+%endif

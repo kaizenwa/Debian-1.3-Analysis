@@ -1,0 +1,77 @@
+Note: This document mainly deals with the Unix version of the S-Lang
+      library.  However, it may be applicable to other operating systems.
+
+Almost all non-trivial programs must worry about signals.  This is
+especially true for programs that use the S-Lang terminal input/output
+and screen management routines.  Unfortunately, there is no fixed way
+to handle signals; otherwise, the Unix kernel would take care of all
+issues regarding signals and the application programmer would never
+have to worry about them.  For this reason, none of the routines in
+the S-Lang library catch signals; however, some of the routines block
+the delivery of signals during crucial moments.  It is up to the
+application programmer to install handlers for the various signals of
+interest.
+
+For the interpreter, the most important signal to worry about is
+SIGINT.  This signal is usually generated when the user presses Ctrl-C
+at the keyboard.  The interpreter checks the value of the
+SLang_Error variable to determine whether or not it should abort the
+interpreting process and return control back to the application.  This
+means that if SIGINT is to be used to abort the interpreter, a signal
+handler for SIGINT should be installed.  The handler should set the
+value of SLang_Error to USER_BREAK.
+
+Applications that use the tty getkey routines or the screen management
+routines must worry about about signals such as:
+
+     SIGINT                interrupt
+     SIGTSTP               stop
+     SIGQUIT               quit
+     SIGTTOU               background write
+     SIGTTIN               background read
+     SIGWINCH              window resize
+     
+It is important that handlers be established for these signals while
+the either the SLsmg routines or the getkey routines are initialized.
+The SLang_init_tty, SLang_reset_tty, SLsmg_init_smg, and
+SLsmg_reset_smg functions block these signals from occuring while they
+are being called.  
+
+Since a signal can be delivered at any time, it is important for the
+signal handler to call only functions that can be called from a signal
+handler.  This usually means that such function must be re-entrant. In
+particular, the SLsmg routines are not re-entrant; hence, they should
+not be called when a signal is being processed unless the application
+can ensure that the signal was not delivered while an SLsmg function
+was called.  This statement applies to many other functions such as
+`malloc', or, more generally, any function that calls malloc.  The
+upshot is that the signal handler should not attempt to do too much
+except set a global variable for the application to look at while not
+in a signal handler.
+
+The S-Lang library provides two functions for blocking/unblocking the above
+signals:
+
+    int SLsig_block_signals (void);
+    int SLsig_unblock_signals (void);
+    
+It should be noted that for every call to SLsig_block_signals, a
+corresponding call should be made to SLsig_unblock_signals:
+
+    void update_screen ()
+    {
+       SLsig_block_signals ();
+       
+       /* Call SLsmg functions */
+           .
+	   .
+       SLsig_unblock_signals ();
+    }
+       
+See ../demo/pager.c for more examples.
+
+         
+
+
+
+

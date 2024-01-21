@@ -1,0 +1,244 @@
+# BEFORE editing this file, you should make sure that it is not linked to
+# the master version (../.etc/rc.submit) anymore (i.e. "delink rc.submit"
+# if you do not want your changes to affect all archive servers).
+#
+# New mails can be temporarily stalled by creating the file rc.lock (either in
+# ../.etc for all lists or in the current directory for this list only).
+
+#$Id: rc.submit,v 1.74 1994/10/26 19:37:20 berg Exp $
+
+INCLUDERC=$RC_INIT
+INCLUDERC=$RC_CUSTOM
+
+INCLUDERC=$RC_LOCAL_SUBMIT_00
+
+#
+# The following recipe makes sure that:
+#	The mail has a sane size (i.e. it is not inordinately big)
+#	It does not look like an administrative request.
+#	It wasn't sent by this list itself.
+#	It wasn't sent by a daemon (misdirected bounce message perhaps).
+#
+
+:0
+* < $size_limit
+* $$daemon_bias
+* !$^($X_COMMAND:|X-Loop: $listaddr)
+* -100^0 ^FROM_MAILER
+* 1^0
+{ }
+
+#
+# Does it look like a regular submission?
+# Or perhaps more like an administrative request?
+#
+
+:0 A
+* 9876543210^0 ^\
+      (Subject:(.*[^a-z])?(Re:|erro|change|problem|((can)?not|.*n't)\>)|\
+      X-Diagnostic:)
+* -100^0 ^\
+      Subject:([	 ]*(archive:?([	 ]+(\
+	  (send|get)(me)?|gimme|retrieve|mail|ls|dir(ectory)?|\
+	  list|show|search|[fe]?grep|find|maxfiles|version|help|info)\
+	 ([	 ]|$)|[	 ]*$)|\
+	(Could you )?(please )?\
+	(help|info|join|leave|cancel(( my)? subscription)?|add|\
+	 sign( [^ ]+ |-)?o(n|ff)|(un|de)?sub)[	 ]*$)|\
+       .*( (join|leave|add .* to|(delete|remove) .* from|\
+	 (take|sign) .* off|(put|sign) .* on) .* [a-z-]*list|\
+	 (un|de|sub?)s(cr|c|r)i(be|ption))\>)
+* -50^0 ^Subject:[	 ]*[(<]none[>)]$
+*  50^0 ^Subject:.*[a-z]
+*  25^2 >2048
+{
+
+#
+# Look at the start of the body, and see if this could be an administrative
+# request, pass it on to rc.request in that case.
+#
+
+:0 B
+* $$=^0
+* -25^0 ^^([	 ]*$)*\
+      ([	 ]*(archive:?([	 ]+(\
+	  (send|get)(me)?|gimme|retrieve|mail|ls|dir(ectory)?|\
+	  list|show|search|[fe]?grep|find|maxfiles|version|help|info)\
+	 ([	 ]|$)|[	 ]*$)|\
+	(help|info)[	 ]*$|\
+	(add|join|leave|sign( [^ ]+ |-)?o(n|ff)|(un|de)?sub)\>)|\
+       .*( (join|leave|add .* to|(delete|remove) .* from|\
+	 (take|sign) .* off|(put|sign) .* on) .* [a-z-]*list|\
+	 (un|de|sub?)scri(be|ption))\>)
+{
+  #
+  # Then check to see if the sender is on the accept list (if foreign_submit
+  # is not set).
+  #
+
+  :0
+  * 1^1 !$${foreign_submit:+!}
+  * 2^0 ? formail -X"From " -xFrom: -xReply-To: -xSender: -xResent-From: \
+	   -xResent-Reply-To: -xResent-Sender: -xReturn-Path: | \
+	   multigram -b1 -m -l$submit_threshold -L$domain \
+	    -x$listaddr -x$listreq accept accept2
+   {
+
+     INCLUDERC=$RC_LOCAL_SUBMIT_10
+
+     :0
+     * $!${moderated_flag:+!}
+     * !^Approved:
+     * !? formail -xApproved: | \
+	   multigram -b1 -m -l$reject_threshold moderators
+     | formail -R"From X-Envelope-From:" -uDate: -iReturn-Receipt-To: \
+	-iAcknowledge-To: | $SENDMAIL $sendmailOPT `cat moderators`
+
+     #
+     # Eliminate duplicate submissions by checking the Message-ID: field.
+     #
+
+     :0 Wh :msgid.lock
+     | formail -D $idcache_size msgid.cache
+
+     #
+     # Check if we need to autosubscribe anyone not on the dist list.
+     #
+
+     :0
+     * $!${force_subscribe:+!}
+     * !? formail -X"From " -xFrom: -xReply-To: -xSender: -xResent-From: \
+	   -xResent-Reply-To: -xResent-Sender: -xReturn-Path: | \
+	    multigram -b1 -m -l$submit_threshold -L$domain \
+	     -x$listaddr -x$listreq dist
+     {
+       LOCKFILE=tmp.lock
+
+       :0 whc
+       | formail -rtz -xTo: >tmp.from
+
+       :0 Wc :dist.lock
+       | sed -e '/^$/,/^-- $/ d' | formail -I "Subject: auto subscribe" \
+	  >tmp.request; subscribe <tmp.request && test ! -z "$subscribe_log" \
+	   && echo "rc.submit: auto subscribed" >>$subscribe_log
+
+       LOCKFILE
+     }
+
+     #
+     # Check if this is a digested mailinglist.	 If yes, processing stops
+     # here and the mail will be added to the digest.
+     #
+
+     :0
+     * $!${digest_flag:+!}
+      {
+	#
+	# Forward the article back to the undigested list, if it hasn't
+	# come from there.
+	#
+
+	:0 c
+	* $!${undigested_list:+!}
+	* $!^X-Loop: $undigested_list
+	! $sendmailOPT $undigested_list
+
+	#
+	# Finally digest the mail.
+	#
+
+	:0 w :tmp.lock
+	| digest
+      }
+
+     ARCHIVE				# Wipe ARCHIVE from the environment
+
+     #
+     # Check if we are the first mailinglist to distribute this message, if so
+     # archive the message.
+     #
+
+     :0
+     * $$archive_hist^0
+     * !^X-Mailing-List:
+      {
+	:0 c
+	archive/latest/.
+
+	ARCHIVE=$LASTFOLDER		# Remember where it was archived
+
+	#
+	# Truncate the archive to the correct number of files (and
+	# possibly other housekeeping chores to keep the archive
+	# current).
+	#
+
+	:0 c hi
+	| arch_trunc
+      }
+
+     #
+     # Main header munger for submissions passing through this list.
+     #
+
+     oldshellmetas="$SHELLMETAS" SHELLMETAS	# Save a shell, procmail can
+						# do this one by itself.
+     :0 wfh
+     | formail -b -IFrom\  -IReceived: -IReturn-Receipt-To: -IErrors-To: \
+	-IX-Pmrqc: -IAcknowledge-To: -IX-Diagnostic: -iStatus: \
+	-iReturn-Path: -iX-Envelope-To: -iX-Envelope-From: \
+	-I"Precedence: list" -I"Resent-Sender: $listreq" \
+	-uDate: -aMessage-ID: -aResent-Message-ID: \
+	-a"To: $listaddr" -a"Resent-From: $listaddr" -A"X-Loop: $listaddr" \
+	-a"Subject: Unidentified subject!" ${reply_to:+"-a$reply_to"} \
+	-a"X-Mailing-List: <$listaddr> $ARCHIVE"
+
+     SHELLMETAS="$oldshellmetas" oldshellmetas
+
+     INCLUDERC=$RC_LOCAL_SUBMIT_20
+
+     #
+     # The following recipe will distribute the message to the subscribers
+     # using the native $SENDMAIL, but only if you disabled the alternative
+     # sendmail (choplist).
+     #
+
+     :0 w: dist.lock
+     * $${alt_sendmail:+!}
+     ! $sendmailOPT $listdist
+
+     #
+     # Alternate sendmail call (used by default), does not use the file-
+     # including -dist alias.
+     #
+
+     :0 Ew: dist.lock
+     | $alt_sendmail $SENDMAIL $sendmailOPT
+
+     :0 wfh
+     | formail -A "X-Diagnostic: $SENDMAIL $listdist failed"
+
+     HOST=continue_with_rc.request
+   }
+
+  :0 E wfh
+  | formail -A "X-Diagnostic: Not on the accept list"
+
+  :0 A c
+  * ? test -f accept.txt
+  {
+    :0 fh
+    | formail -i"From: $listreq" -kbrtA"X-Loop: $listaddr" ; cat accept.txt
+
+    :0
+    ! $sendmailOPT -t
+  }
+
+} }
+
+:0 fhw
+* $!${pass_diverts:+!}
+* !^X-Diagnostic:
+| formail -A "X-Diagnostic: Diverted & unprocessed"
+
+HOST=continue_with_rc.request

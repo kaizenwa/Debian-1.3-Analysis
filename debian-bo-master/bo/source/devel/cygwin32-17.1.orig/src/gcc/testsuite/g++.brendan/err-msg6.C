@@ -1,0 +1,5 @@
+class foo {
+public:
+  ~bar () {}
+};
+

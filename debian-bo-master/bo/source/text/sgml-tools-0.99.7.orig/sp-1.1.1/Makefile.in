@@ -1,0 +1,127 @@
+# Makefile template for sp-1.1.1	-*-Makefile-*-
+# Makefile.in Copyright (C) 1996 Henry S. Thompson
+# Original SP Makefile Copyright (c) 1994, 1995, 1996 James Clark
+# See the file COPYING for copying permission.
+
+# configure uses this to build a Makefile
+
+# I've tried to remove all necessity for editing this file directly --
+# Please send me e-mail (ht@cogsci.ed.ac.uk) if you discover you need to.
+# Try configure --help if unsure of how to set switches, directories, etc.
+
+# DEBUG, XDEFINES, XLIBDIRS and XLIBS are here for you to set on the 'make'
+# command line if necessary
+
+# Executables will be *very* large if you use -g.
+DEBUG=
+XDEFINES=
+# -L/usr/local/lib may be needed on the RS/6000
+XLIBS=
+XLIBDIRS=
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+srcdir=@srcdir@
+# Where to install the binaries
+bindir=@bindir@
+INSTALL=@INSTALL@
+
+CXX=@CXX@
+WARN=@WARN@
+
+DEFINES=@DEFS@ $(XDEFINES)
+CXXFLAGS= @CXXFLAGS@ $(DEBUG) $(WARN)
+LDFLAGS=@LDFLAGS@
+CC=@CC@
+CFLAGS=-O $(DEBUG)
+# Missing library functions
+LIBOBJS=@LIBOBJS@
+
+LIBS=@LIBS@ $(XLIBS)
+AR=ar
+RANLIB=@RANLIB@
+M4=m4
+# perl is needed if you change or add messages
+PERL=perl
+# Suffix for executables.
+EXE=
+# Uncomment this for OS/2.
+#EXE=.exe
+
+LIBDIRS=lib $(XLIBDIRS)
+PROGDIRS=nsgmls spam sgmlnorm spent $(XPROGDIRS)
+dodirs=$(LIBDIRS) $(PROGDIRS)
+PURIFYFLAGS=
+PURIFY=purify $(PURIFYFLAGS) -g++=yes -collector=`dirname \`gcc -print-libgcc-file-name\``/ld
+
+MDEFINES='CXX=$(CXX)' 'CC=$(CC)' 'LIBOBJS=$(LIBOBJS)' 'CXXFLAGS=$(CXXFLAGS)' \
+ 'CFLAGS=$(CFLAGS)' 'LDFLAGS=$(LDFLAGS)' 'DEFINES=$(DEFINES)' \
+ 'srcdir=$(srcdir)' 'AR=$(AR)' 'RANLIB=$(RANLIB)' \
+ 'M4=$(M4)' 'PERL=$(PERL)' 'LIBS=$(LIBS)' 'PURIFY=$(PURIFY)' \
+ 'PIC_FLAG=$(PIC_FLAG)' 'XPROGDIRS=$(XPROGDIRS)' 'XLIBDIRS=$(XLIBDIRS)' \
+ 'libMakefile=$(libMakefile)' 'EXE=$(EXE)' 'bindir=$(bindir)' \
+ 'INSTALL=$(INSTALL)'
+
+# Automatic template instantiation can cause compilers to generate
+# various extra files; the clean target won't delete these.
+TARGETS=all install depend gen clean pure
+libMakefile=Makefile.lib
+do=all
+
+$(TARGETS): FORCE
+	@$(MAKE) -f Makefile $(MDEFINES) do=$@ $(dodirs)
+
+
+$(LIBDIRS): FORCE
+	@if test $(srcdir) = .; \
+	then srcdir=.; \
+	else srcdir=`cd $(srcdir); pwd`/$@; \
+	fi; \
+	test -d $@ || mkdir $@; \
+	cd $@; \
+	test -f $$srcdir/Makefile.dep || touch $$srcdir/Makefile.dep; \
+	$(MAKE) $(MDEFINES) srcdir=$$srcdir VPATH=$$srcdir \
+		-f $$srcdir/../Makefile.comm -f $$srcdir/Makefile.sub \
+	        -f ../$(libMakefile) -f $$srcdir/Makefile.dep $(do)
+
+$(PROGDIRS): FORCE
+	@if test $(srcdir) = .; \
+	then srcdir=.; \
+	else srcdir=`cd $(srcdir); pwd`/$@; \
+	fi; \
+	test -d $@ || mkdir $@; \
+	cd $@; \
+	test -f $$srcdir/Makefile.dep || touch $$srcdir/Makefile.dep; \
+	$(MAKE) $(MDEFINES) srcdir=$$srcdir VPATH=$$srcdir \
+		-f $$srcdir/../Makefile.comm -f $$srcdir/Makefile.sub \
+	        -f $$srcdir/../Makefile.prog -f $$srcdir/Makefile.dep $(do)
+
+$(PROGDIRS): lib
+
+# GNU tar
+TAR=tar
+
+dist: FORCE
+	cd test; ./CLEAN
+	version=`cat VERSION`; \
+	rm -fr sp-$$version; \
+	mkdir sp-$$version; \
+	cd sp-$$version; \
+	ln -s ../* .; \
+	rm sp-$$version; \
+	rm SP.mak ; \
+	sed -e '/^   CD /s/[A-Z]:\\.*\\//' -e "s/$$/`echo @ | tr @ \\\\015`/" \
+	  ../SP.mak >SP.mak; \
+	cd ..; \
+	ln -s `pwd` sp-$$version; \
+	$(TAR) -c -f sp-$$version.tar.gz -h -z \
+	  --exclude sp-$$version/test/cap \
+	  --exclude sp-$$version/test/out \
+	  --exclude sp-$$version/test/err \
+	  `sed -e "s|.*|sp-$$version/&|" FILES`; \
+	rm -fr sp-$$version
+
+check: FORCE
+	NSGMLS=`pwd`/nsgmls/nsgmls; export NSGMLS; cd $(srcdir); ./dotest
+
+FORCE:

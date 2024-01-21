@@ -1,0 +1,52 @@
+#! /bin/sh
+# compare files to those in a directory
+# -i means don't get upset about mismatches
+# -e means strip .eg suffix off filenames
+# -x means don't get upset if the file doesn't exist, but do if mismatch
+ignore=n
+strip=n
+mustexist=y
+for dummy
+do
+	case "$1" in
+	-i)	ignore=y	;;
+	-e)	strip=y		;;
+	-x)	mustexist=n	;;
+	--)	shift ; break	;;
+	-*)	echo "$0: unknown option \`$1'" >&2 ; exit 2	;;
+	*)	break		;;
+	esac
+	shift
+done
+case "$#" in
+0|1)	echo "Usage: $0 [-i] dir file ..." >&2 ; exit 2	;;
+esac
+
+dest="$1"
+shift
+if test ! -d "$dest"
+then
+	echo "$0: directory \`$dest' does not exist" >&2
+	exit 1
+fi
+
+status=0
+for f
+do
+	case "$f" in
+	*/*)	echo "$0: can't handle / in \`$f'" >&2 ; exit 1	;;
+	esac
+	case "$strip:$f" in
+	y:*.eg)	d="$dest/`expr $f : '\(.*\)\.eg'`"	;;
+	*)	d="$dest/$f"				;;
+	esac
+	if test -f $d
+	then
+		cmp $f $d || test " $ignore" = " y" || status=1
+	elif test " $mustexist" = " y"
+	then
+		echo "$0: \`$d' does not exist!" >&2
+		status=1
+	fi
+done
+exit $status

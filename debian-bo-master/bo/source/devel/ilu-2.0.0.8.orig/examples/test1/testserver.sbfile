@@ -1,0 +1,37 @@
+#!/bin/sh
+
+logfile=/tmp/ilutestlog$$
+bindingdir=/tmp/bindingdir$$
+mkdir $bindingdir
+if test -d $bindingdir ; then
+  :
+else
+  echo "Couldn't make a temporary binding directory $bindingdir"
+  exit 1
+fi
+ILU_BINDING_DIRECTORY=$bindingdir
+export ILU_BINDING_DIRECTORY
+if test -x ./server ; then
+  echo "Starting server (and waiting a bit for it to start up)..."
+  ./server >${logfile}-server 2>&1 &
+  serverPID=$!
+  sleep 10
+else
+  echo "No server executable.  Failed test."
+  rm -rf $bindingdir
+  exit 1
+fi
+echo "Running client against server..."
+./client >${logfile}-client 2>&1
+clientstatus=$?
+if test $clientstatus != 0; then
+  echo "*** Client program reports errors:  logfiles are ${logfile}-{client,server}, bindingdir is $bindingdir"
+else
+  echo "Client run successful."
+  rm -f ${logfile}-server ${logfile}-client
+  rm -rf $bindingdir
+fi
+echo "Killing server..."
+kill $serverPID
+echo "Exiting with status $clientstatus."
+exit $clientstatus

@@ -1,0 +1,100 @@
+#================ JED makefile for DMAKE 3.8 ======================
+# This makefile is for DMAKE, either under DOS or OS/2
+# The following OS/Compiler combinations are supported:
+#
+# Target       Compiler    Command                Compiler
+# Operating    Mnemoic     Line
+# System                   
+#-----------------------------------------------------------------------
+# OS2            MSC       OS=OS2 COMP=MSC        Microsoft C
+# OS2            EMX       OS=OS2 COMP=EMX        emx/gcc
+#-----------------------------------------------------------------------
+MODEL = L
+#-----------------------------------------------------------------------
+# default setup for MSC under OS/2, optimized version
+# change values below or override with -e switch on command line
+#-----------------------------------------------------------------------
+OS=OS2
+COMP=EMX
+OPT=Y
+#-----------------------------------------------------------------------
+.IF $(TOS) == $(NULL)
+    TOS = $(OS)
+.END
+.IF $(OS) == OS2
+#========================================================================
+#========================= OS2 - MSC ====================================
+#========================================================================
+    .IF $(COMP) == MSC
+        CC        = cl -nologo -MT
+        LIB_CMD   = lib
+        .IF $(OPT) == N
+            CDBUG = -Od -Zi -W2
+            LDEBUG = -Zi
+        .ELSE
+            CDBUG = 
+            LDEBUG =
+        .END
+	CDEBUG = $(CDBUG) -D__os2_16__
+        O = .obj
+	L = .lib 
+	LIB_OBJS = $(LOBJS);
+	SLANG = slang
+	LFLAGS2 = setargv.obj slang.lib os2sl16.def -link /NOE
+#========================================================================
+#========================= OS2 - EMX ====================================
+#========================================================================
+    .ELIF $(COMP) == EMX
+        CC        = gcc -Zmtd -DEMX_VIDEO
+        LIB_CMD   = ar rcv
+        .IF $(OPT) == N
+            CDEBUG =-g
+            LDEBUG =
+        .ELSE
+            CDEBUG = -O
+            LDEBUG = 
+        .END
+	O = .o
+	L = .a
+        LIB_OBJS = $(OBJS)
+	SLANG = slang
+	LFLAGS2 = os2sl.def -L. -lslang -lvideo
+    .ENDIF
+.ENDIF
+
+LOBJS = -+slang$O -+slparse$O -+slmath$O -+slfile$O -+slstd$O -+slarray$O \
+	-+slregexp$O -+slmatrix$O -+slrline$O -+slkeymap$O -+sltoken$O \
+	-+slmemcpy$O -+slmemcmp$O -+slmemset$O -+slmemchr$O \
+	-+slxstrng$O -+slgetkey$O -+slos2tty$O -+slvideo$O -+slsmg$O \
+	-+slerr$O -+slsearch$O -+slcmd$O -+slmalloc$O -+slclass$O \
+	-+slmisc$O -+slprepr$O -+sltypes$O
+
+OBJS = $(LOBJS:s/-+//)
+
+EXEC = calc.exe
+
+CFLAGS = $(CDEBUG) -DOS2 -D__os2__ -DFLOAT_TYPE -I.
+LFLAGS = $(LDEBUG)
+
+$(SLANG)$L: $(OBJS)
+	$(LIB_CMD) $@ $(LIB_OBJS)
+
+.c$O:
+	$(CC) -c $(CFLAGS) $*.c
+
+all : calc worm
+
+calc : calc.exe
+
+calc.exe: calc$O $(SLANG)$L
+	$(CC) $(LFLAGS) -o $(EXEC) calc$O $(LFLAGS2)
+
+worm$O: worm.c
+	$(CC) -c $(CFLAGS) -DSLANG $*.c
+
+worm : worm.exe
+
+worm.exe: worm$O $(SLANG)$L
+	$(CC) $(LFLAGS) -o $@ worm$O $(LFLAGS2)
+
+

@@ -1,0 +1,362 @@
+BeroList v2.3.5
+===============
+(c) 1996-97 by Bernhard Rosenkraenzer <root@startrek.in-trier.de>
+
+ 
+====================
+1. WHAT IS BEROLIST?
+====================
+
+BeroList is an easy-to-use, easy-to-install mailing list server. Unlike many
+other mailing list servers, BeroList does not require perl to be installed
+on your system.
+
+
+===============
+2. INSTALLATION
+===============
+
+IF YOU ARE UPDATING FROM A VERSION < 2.2.0, IT IS RECOMMENDED TO CHANGE THE
+ALIASES FILE TO THE NEW FORMAT. PLEASE READ ON, AND DON'T FORGET TO RUN
+newaliases AFTER MAKING THE CHANGES.
+
+To install BeroList, edit the list.h file according to your needs, computer,
+and operating system (The options are commented in the file).
+Though BeroList can determine the hostname itself, I strongly recommend to
+set the hostname in the list.h. The hostname determination is probably not
+protable to all unix systems, and will not work correctly with some Linux
+beta kernels.
+Since some servers are (still) sending error messages from a user different
+from MAILER-DAEMON, it has become necessary to add the possibility to
+prevent certain users from posting to lists. If you need this, #define
+KILLFILE in list.h as the name of a file containing a list of addresses that
+may not post to any list.
+As of version 2.3.0, we're using GNU autoconf to determine the basic
+settings needed for your machine. Run configure, then run make.
+The program has been tested on a Pentium/133 running Linux kernel versions
+1.3.95 up to 2.1.15, a 386 running Linux 1.3.84, and a 486 using Linux 2.0.0
+and 2.0.21.
+(compilers: gcc 2.7.0, 2.7.2, 2.7.2.l3 and 2.7.2.1, PCG-gcc), using libcs
+from 5.3.12 to 5.4.18, but it should work on other systems, as well.
+Minor changes may be necessary, especially for non-Linux Unix derivates.
+
+If you wish to use send sendmail for mail transmission (USE_SENDMAIL in
+list.h), it is recommended to add the line 'Tbin' to your sendmail.cf file,
+which makes 'bin' (which is normally used as the sender of mails) a 'trusted'
+user, who may send messages with other user names in the From: field.
+
+
+==========================
+3. CREATING A MAILING LIST
+==========================
+
+
+3.1. ASSIGNING THE ADDRESS
+--------------------------
+3.1.1. If you have root access
+------------------------------
+  ENTRY IN /etc/aliases
+  --------------------------
+
+  To create a mailing list, add the list to your /etc/aliases file. Create a
+  pipe to BeroList's 'list' program. The list program will need to know the
+  name of the list - it is strongly recommended to pass the list name as
+  parameter to the program. If you don't, it will try to determine the name
+  for itself, which causes problems if a message is sent to multiple
+  recipients, or just Cc:'ed to the list.
+  An entry for the mailing list test-list with BeroList installed in
+  /usr/inet/lists should, for example, look like this:
+
+  test-list:"|/usr/inet/lists/list test-list"
+
+  If you want BeroList to be more compatible with other mailing list
+  servers, duplicate the entry to
+
+  test-list-request:"|/usr/inet/lists/list test-list"
+
+  BeroList will handle subscribe and unsubscribe orders to that address just
+  like normal ones.
+
+  Run newaliases after making the change.
+
+  Since BeroList determines by the message header's To: field which list is
+  addressed, you can run several mailing lists using the same copy of
+  BeroList. An alias entry like
+
+  test-list:"|/usr/inet/lists/list test-list"
+  startrek:"|/usr/inet/lists/list startrek"
+  linux:"|/usr/inet/lists/list linux"
+
+  would be exactly what the program is meant for. (If the lists are configured
+  accordingly, of course. :) )
+  
+  It's also possible to have several entries for the same list, like
+
+  test:"|/usr/inet/lists/list test-list"
+  test-list:"|/usr/inet/lists/list test-list"
+
+  though I don't see any real sense in that.
+
+
+3.1.2. If you don't have root access
+------------------------------------
+
+  Get a second e-mail account from your system administration.
+
+  In the new user's home directory, create a file called
+  .forward, which forwards incoming mails to the program.
+  If you want to run the list "testlist" with the "list" program in
+  /home/user1/, the .forward file would have to say
+
+  "|/home/user1/list testlist"
+
+  The mail address for the list is, in that case, user1@your.server, not
+  testlist@your.server.
+
+
+3.2. CONFIG FILE
+----------------
+
+Next, create a file in your mailing list directory, called listname.config
+(in our example: test-list.config).
+All list-related filenames have to be lowercase, to prevent the program from
+trying to use case-sensitive e-mail addresses.
+You can define the following options in the config file:
+
+newusers=yes/no	If set to yes, new users can subscribe to the list by
+		sending a message with subject 'subscribe' to the list
+		address (default). If no, new users must be subscribed
+		by a list operator. (see 3.4)
+closed=yes/no/operators
+		If yes, only members of the list may send messages to the
+		list. If operators, only list operators may send messages
+		to the list (i.e. announcement lists).
+		If no, everyone may send messages. (default)
+contact=address	Address of a list operator (for newusers=no lists only).
+		Users trying to subscribe will get a message like
+		"You may not subscribe to the list by yourself. Contact
+		the list operator, (address specified here)."
+		(defaults to root@(Host specified in list.h))
+sender=address/original/list
+		Specifies the sender of messages generated by the list.
+		If set to original (default), the sender will be copied
+		from the incoming message's header.
+		If an address is specified, all list messages have
+		From: (specified address)
+		in the header.
+		If set to list, BeroList will determine the list address
+		and use it. (Enables replies to the entire list.)
+replyto=address/sender/list
+		Sents a Reply-To value in the list header - that way, you
+		can direct replies to a sender=original list to the list
+		rather than just the person posting the message,
+		(sender=original, replyto=sender) or you can direct replies
+		to an announcement list (closed=operators, sender=list,
+		replyto=sender) to the sender, or even to another mailing
+		list (replyto=other.list@wherever.org)
+		If replyto is not specified, there will be no Reply-To field
+		in message headers; replies will go to the address specified
+		in sender=.
+errors-to=address
+		If a message from mailer-daemon@somewhere arrives to the
+		list (normally an error message; caused mail loops if
+		sender was = listname@listhost in early versions),
+		it is sent to this address instead.
+		If not specified, the error message is sent to the
+		address specified as contact.
+newsgroup=group.name
+		If defined, a copy of every message will be posted to
+		the newsgroup group.name. This is primarily meant for
+		keeping messages in local newsgroups.
+		It will only work if you have defined HAS_NNTP in the
+		list.h file.
+nntp-server=address
+		If you're copying list messages to a newsgroup, you can
+		specify the nntp server here. By default, the one defined
+		in list.h will be used.
+		As the feature is meant primarily for local newsgroups,
+		I think it makes sense to be able to specify different
+		news servers for every list.
+distribution=local/world
+		Distribution header for NNTP messages. By default, the
+		one defined in list.h will be used.
+
+Example:
+Our test-list.config might look like this:
+
+newusers=no
+closed=no
+contact=roomcleaner@whitehouse.gov
+sender=test-list@windows-sucks.linux.org
+errors-to=too-high-charges@dtag.de
+newsgroup=local.test-messages
+nntp-server=news.here.com
+distribution=local
+
+It would result in a list that does not accept new users. Users trying to
+subscribe would be told to contact roomcleaner@whitehouse.gov.
+It would accept messages from people not in the list. All outgoing messages
+would be sent from test-list@windows-sucks.linux.org
+Errors would be sent to too-high-charges@dtag.de.
+Copies of all messages would go to the local.test-messages newsgroup on the
+news.here.com server.
+
+The config file must be readable by the user as which BeroList is running -
+if you're running it from the aliases file, that's 'bin' (unless defined
+otherwise in the sendmail configuration), if you're running it from the
+.forward file, it's the user who owns the list.
+
+
+3.3. MEMBERS FILE (optional)
+----------------------------
+Next, create a file called listname.members.
+Its format is:
+
+User1@Host1
+User2@Host2
+...
+
+or
+
+Realname 1 <User1@Host1>
+Realname 2 <User2@Host2>
+...
+
+or any other valid format of e-mail addresses.
+
+All people listed in the listname.members file are subscribed to the list.
+If you do not create the listname.members file, it will be automatically
+created when a user sends a 'subscribe' message to the list.
+
+The file must be read-writeable by user 'bin' (or whatever user the list
+program is running as. (Do 'chown bin.bin listname.members')
+
+
+3.4. OPERATORS FILE (optional)
+------------------------------
+Next, create a file called listname.operators. (And again, replace
+'listname' by the name of your mailing list. ;) )
+
+Its format is exactly like the MEMBERS FILE (see 3.3.)
+
+All people listed here are list operators, meaning they can subscribe and
+unsubscribe users by sending messages with subjects like 'subscribe
+root@startrek.in-trier.de' or 'unsubscribe billg@microsoft.com' to the list.
+
+The file must be readable by the user as which list is running.
+
+
+3.5. FOOTER FILE (optional)
+---------------------------
+Next, create a file called listname.footer. (optional)
+If the file exists, it will be appended to every message that passes the
+list.
+
+The file must be readable by the user as which list is running.
+
+
+3.6. WELCOME FILE (optional)
+----------------------------
+Last, create a file called listname.welcome. (optional)
+If the file exists, it will be sent to new subscribers.
+If the first line starts with 'Subject: ', it will be used as subject of the
+message.
+
+The file must be readable by the user as which list is running.
+
+
+==================================================
+4. UPDATING FROM 0.x.x AND 1.x.x VERSIONS TO 2.x.x
+==================================================
+Version 2.0.0 implements a completely new way of sending messages by
+connecting to a SMTP server without using an external program.
+The advantage is that mail to lists is processed significantly faster
+(especially for large lists), and it uses less system resources.
+If you insist on using the old way (it might be more reliable on some
+systems), #define USE_SENDMAIL in the list.h file.
+
+
+======================================
+5. ACCESSING THE GDBM ARCHIVES VIA WWW
+======================================
+BeroList comes with two CGI programs to make message archives accessible
+over the world wide web: messages and display.
+messages displays a list of all messages posted to the list, display
+displays a single message. As the scripts provide links to each other,
+they will need to know where they reside. Check the file cgipath.h.
+
+You must pass one parameter to the messages script: list=listname
+
+For example, if you want to make the list test-list accessible over the www,
+put a link on your www page pointing to
+<A HREF=/cgi-bin/messages?list=test-list>test list</A>.
+The messages script will take care of the rest.
+
+If you wish to use the display script directly (it's primarily intended to
+be called from the messages script), you need to pass two parameters to it:
+list=listname and msg=number of message, beginning with 0.
+
+For example, to link directly to the first message in the archive for
+test-list, use <A HREF=/cgi-bin/display?list=test-list&msg=0>message</A>.
+
+
+===========
+6. PROBLEMS
+===========
+If you have problems with the program, read the PROBLEMS file. It describes
+the most common mistakes people make in installing, and the solutions.
+If nothing seems to help, drop a message to the mailing list
+(berolist@startrek.in-trier.de), or contact me directly
+(root@startrek.in-trier.de).
+If you're receiving MAILER-DAEMON messages from the list program, please
+include them.
+
+
+==========
+7. UPDATES
+==========
+Whenever I make changes to the program, a new version can be found in the
+ftp://ftp.startrek.in-trier.de/pub/progs/unix/net/mail-list
+directory.
+If you wish to be notified of updates, subscribe to the list
+berolist@startrek.in-trier.de.
+
+
+====================
+8. CHANGING THE CODE
+====================
+You are permitted to change the program code. If you make any improvements,
+please help improving the product, and send me a copy of your version.
+You can contact my by e-mail at root@startrek.in-trier.de, or upload the
+file to ftp://ftp.startrek.in-trier.de/incoming/progs/unix
+Or, drop a message to the BeroList mailing list,
+berolist@startrek.in-trier.de
+
+Ok, ok... The code is mostly uncommented...
+I want it to be a challenge for hackers... (err...) ;)
+
+
+============================
+9. THE BEROLIST MAILING LIST
+============================
+I have created a mailing list for discussion of BeroList which is running on
+berolist@startrek.in-trier.de (guess which program I used... ;) ). If you're
+interested in improving the program, subscribe.
+
+
+===========
+10. COPYING
+===========
+The program may be freely distributed in any way as long as the copyright
+notice is not removed.
+Programs based on this program MUST have a reference to BeroList in
+the documentation and (if possible) the program itself.
+
+
+BBBBB   EEEEE  RRRRR     OOO       Bernhard Rosenkraenzer
+B    B E       R    R   O   O      Auf der Hard 3
+B    B E       R    R  O     O     54456 Tawern, Germany
+BBBBB  EEEEEE  RRRRR   O     O     e-mail:  root@startrek.in-trier.de
+B    B E       R  R    O     O     FidoNet: 2:2452/300.46
+B    B E       R   R    O   O      Phone +49-6501-99609
+BBBBB   EEEEE  R    R    OOO       Fax +49-2561-913711919

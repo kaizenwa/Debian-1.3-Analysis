@@ -1,0 +1,209 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!                                                               !!!! 
+!!!!   NOTE: The ET4000 register layout changed stepping from      !!!!
+!!!!         svgalib 0.98 to 0.99. See  8. Problems  below first   !!!!
+!!!!                                                               !!!! 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+[this README for the ET4000 registers was provided by Hartmut Schirmer]
+
+1. Basics of ET4000 cards 
+2. How to configure SVGALIB
+3. Creating card dependent register values
+4. Defining new modes
+5. Redefining standard modes
+6. Available examples
+7. ET4000/W32 support
+8. Problems
+9. Using dynamic loading with other cards
+
+
+1. Basics of ET4000 cards 
+-------------------------
+
+Basicly all ET4000 cards are equal, some are even more equal ...
+
+The Chipset is well documented (by Tseng Labs and eg. the vgadoc2.zip)
+and all graphics functions can be used the same way on different cards
+(including the ET4000/W32 based ones). There are three important points
+to be kept in mind :
+
+  a.) amount of available, the organisation and timing of video memory
+  b.) type and capabilities of the DAC
+  c.) available oscillator frequencies
+
+SVGALIB will check the available video memory during startup. This
+should work on all DRAM cards. If there are any problems concerning
+VRAM equipped cards, please tell us about.
+
+By now we found is no reliable way to detect the memory organisation/
+timing and the DAC type/capabilities. Most modern card use a frequency
+synthizier and provide the following pixel frequencies (in MHz):
+
+	50.350 56.644 65.0 72.0 80.0 89.8 63.0 75.0
+
+Checking older ET4000 cards we found a wide spread range of available
+frequencies. Since the video timing is based on the pixel frequency,
+the required register values are card dependent.
+
+2. How to configure SVGALIB
+---------------------------
+ 
+SVGALIB has a somewhat 'standard' registers set that may work with
+modern ET4000 cards. If SVGALIB fails on your machine or you have
+a HiColor dac, you need to configure your SVGALIB.
+ 
+The SVGALIB may use hard linked or dynamical linked register values.
+If you use hard linked values, the binary will be smaller and start
+up faster but might fail on other machines.
+
+Compiling the SVGALIB with DYNAMIC defined (see config.h) will set 
+up dynamic register loading. Otherwise the value from 
+           svgalib/et4000.regs 
+will be hard linked.
+
+The dynamic configuration will be read from 
+		/etc/vga/libvga.et4000
+which is an ASCII file (see config.h for exact naming). If you have
+a working et4000.regs for your system just copy this file to
+/etc/vga/libvga.et4000 or link /etc/vga/libvga.et4000 
+to your svgalib/et4000.regs file.
+
+The actual scanner/parser will handle the following entries:
+
+  #define DAC_TYPE <integer>      /* Overwrite the DAC detection        */
+  #define <MODE1>  <MODE2>        /* Enable MODE1 using MODE2 registers */
+				  /* eg. 64K modes like 32K modes       */
+  #define <MODE>   DISABLE_MODE   /* do not use MODE (eg. from vgadrv)  */
+  char <MODE><strg>[..] = { <integer>,<integer>,... }; /* register definition */
+
+with
+
+  <MODE>    ::= 'g'<decimal>x<decimal>x<color><ignored>
+  <integer> ::= <decimal>|<hex>
+  <hex>     ::= '0x'<hexdigit>{<hexdigit>}
+  <decimal> ::= ['+'|'-']<digit>{<digit>}
+  <hexdigit>::= <digit>|'a..f'|'A..F'
+  <digit>   ::= '0..9'
+  <color>   ::= '2'|'16'|'256'|'32k'|'32K'|'64k'|'64K'|'16M'
+  <strg>    ::= <empty>|[(<aplha>|'_'){<digit>|<alpha>|'_'}]
+  <alpha>   ::= 'a..z'|'A..Z'
+
+C style comments will be skipped. See et4000 subdirectory for
+examples.
+
+
+3. Creating card dependent register values
+------------------------------------------
+
+You may create a et4000.regs on your own with the tseng3.exe.
+Just boot MS-DOG and start
+
+  tseng3 et4000.reg
+
+The tseng3.exe will measure the video timing for each available mode.
+Check the et4000.regs file against your monitor documentation and
+disable all non conformant modes, eg.
+
+    #define g1024x768x256_regs DISABLE_MODE
+    /*
+    static unsigned char g1024x768x256_regs[71] = {
+      ...
+    };
+    */
+
+will disable the 1024x768x256 mode. You *mustn't* disable the
+640x480x256 mode!
+
+Your et4000.regs must define the following symbols (register values
+or #define ... DISABLE_MODE) for hard linking :
+
+  g320x200x32K_regs,  g640x400x256_regs, g640x480x256_regs,
+  g640x480x32K_regs,  g640x480x16M_regs, g800x600x16_regs,
+  g800x600x256_regs,  g800x600x32K_regs, g1024x768x16_regs,
+  g1024x768x256_regs, g1280x1024x16_regs
+
+and all 64K modes handled like 32K modes by the driver :
+
+  #define g320x200x64K_regs g320x200x32K_regs
+  #define g640x480x64K_regs g640x480x32K_regs
+  #define g800x600x64K_regs g800x600x32K_regs
+
+You may omit every unusable mode in  /usr/lib/libvga.et4000 .
+
+
+4. Defining new modes
+---------------------
+
+All standard SVGALIB modes may be selected by the mode constants 
+defined in vga.h (eg. G320x200x16). You may define new modes on
+your own. Just use dynamic register loading and add the register
+definition of the new mode. Your program may determine the related 
+modenumber by checking the vga_getmodeinfo(1..vga_lastmodenumber()).
+
+Most ET4000 cards provide 640x350 and 640x400 graphics modes. The
+tseng3.exe generates the related register sets. You may also use
+dumpreg from an X window to grab you favourite X graphics mode.
+The X mode normaly isn't usable directly. See cardex.w32 for an
+example and et4000.c for a brief description of et4000 registers.
+  
+
+5. Redefining standard modes
+----------------------------
+
+Using dynamic register loading you may redefine any standard VGA 
+mode except of TEXT and 640x480x16. Just add the ET4000 specific
+register set to /etc/vga/et4000.regs.
+
+
+6. Available examples
+---------------------
+
+In the et4000 subdir you'll find some sample register sets :
+
+  cardex.w32    Cardex ET4000/W32 card, Music TrueColor DAC
+  speedstar+	SpeedSTAR PLUS card, Normal DAC
+  morse.kp1024	Morse KP1024 card, Normal DAC
+  et4000.old1	unknown older et4000 card, normal DAC
+  boca		BOCA register set from svgalib 0.81
+
+
+7. ET4000/W32 support
+---------------------
+
+The actual driver seems to be ET4000/W32 compatible. Tell us about
+any problems (and solutions). If you've got any information about
+the ET4000/W32 blitter, we would be pleased to receive it.
+
+
+8. Problems
+-----------
+
+As mentioned before, the DAC detection isn't very reliable. vgatest
+should print equal screens in 256 color and HiColor/TrueColor modes.
+You may have to edit your libvga.et4000 register file by hand to setup
+the correct DAC.
+The tseng3 may fail due to incompatible mode numbering. You might use
+a VESA driver (eg. tlivesa.com from VPIC 6.0) or edit and recompile
+the tseng3.exe.
+Newer ET4000 chipsets (eg. W32 and W32i) allow up to 32 clock 
+frequencies. Two additional register values were added just before the
+old extened register value. The new registers are CRTC/30h and CRTC/31h.
+The old register set had 71 values, the new growed to 73.
+You may update your old register set by hand :
+   - run the dumpreg program, remember the first two values from last
+     data line.
+   - edit your libvga :
+       for each mode 
+         change the number of register values from 71 to 73
+         add the values from dumreg output at front of last data line
+   - run vgatest to check the new register set
+
+
+9. Using dynamic loading with other cards
+-----------------------------------------
+
+The dynamical register loading may be used in other drivers.
+Since hard linked register values work fine for Cirrus and Trident
+cards, we didn't include this feature.
+

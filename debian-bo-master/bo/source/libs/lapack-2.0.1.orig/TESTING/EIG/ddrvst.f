@@ -1,0 +1,2210 @@
+      SUBROUTINE DDRVST( NSIZES, NN, NTYPES, DOTYPE, ISEED, THRESH,
+     $                   NOUNIT, A, LDA, D1, D2, D3, D4, WA1, WA2, WA3,
+     $                   U, LDU, V, TAU, Z, WORK, NWORK, IWORK, RESULT,
+     $                   INFO )
+*
+*  -- LAPACK test routine (version 2.0) --
+*     Univ. of Tennessee, Univ. of California Berkeley, NAG Ltd.,
+*     Courant Institute, Argonne National Lab, and Rice University
+*     September 30, 1994
+*
+*     .. Scalar Arguments ..
+      INTEGER            INFO, LDA, LDU, NOUNIT, NSIZES, NTYPES, NWORK
+      DOUBLE PRECISION   THRESH
+*     ..
+*     .. Array Arguments ..
+      LOGICAL            DOTYPE( * )
+      INTEGER            ISEED( 4 ), IWORK( * ), NN( * )
+      DOUBLE PRECISION   A( LDA, * ), D1( * ), D2( * ), D3( * ),
+     $                   D4( * ), RESULT( * ), TAU( * ), U( LDU, * ),
+     $                   V( LDU, * ), WA1( * ), WA2( * ), WA3( * ),
+     $                   WORK( * ), Z( LDU, * )
+*     ..
+*
+*  Purpose
+*  =======
+*
+*       DDRVST  checks the symmetric eigenvalue problem drivers.
+*
+*               DSTEV computes all eigenvalues and, optionally,
+*               eigenvectors of a real symmetric tridiagonal matrix.
+*
+*               DSTEVX computes selected eigenvalues and, optionally,
+*               eigenvectors of a real symmetric tridiagonal matrix.
+*
+*               DSYEV computes all eigenvalues and, optionally,
+*               eigenvectors of a real symmetric matrix.
+*
+*               DSYEVX computes selected eigenvalues and, optionally,
+*               eigenvectors of a real symmetric matrix.
+*
+*               DSPEV computes all eigenvalues and, optionally,
+*               eigenvectors of a real symmetric matrix in packed
+*               storage.
+*
+*               DSPEVX computes selected eigenvalues and, optionally,
+*               eigenvectors of a real symmetric matrix in packed
+*               storage.
+*
+*               DSBEV computes all eigenvalues and, optionally,
+*               eigenvectors of a real symmetric band matrix.
+*
+*               DSBEVX computes selected eigenvalues and, optionally,
+*               eigenvectors of a real symmetric band matrix.
+*
+*               DSYEVD computes all eigenvalues and, optionally,
+*               eigenvectors of a real symmetric matrix using
+*               a divide and conquer algorithm.
+*
+*               DSPEVD computes all eigenvalues and, optionally,
+*               eigenvectors of a real symmetric matrix in packed
+*               storage, using a divide and conquer algorithm.
+*
+*               DSBEVD computes all eigenvalues and, optionally,
+*               eigenvectors of a real symmetric band matrix,
+*               using a divide and conquer algorithm.
+*
+*       When DDRVST is called, a number of matrix "sizes" ("n's") and a
+*       number of matrix "types" are specified.  For each size ("n")
+*       and each type of matrix, one matrix will be generated and used
+*       to test the appropriate drivers.  For each matrix and each
+*       driver routine called, the following tests will be performed:
+*
+*       (1)     | A - Z D Z' | / ( |A| n ulp )
+*
+*       (2)     | I - Z Z' | / ( n ulp )
+*
+*       (3)     | D1 - D2 | / ( |D1| ulp )
+*
+*       where Z is the matrix of eigenvectors returned when the
+*       eigenvector option is given and D1 and D2 are the eigenvalues
+*       returned with and without the eigenvector option.
+*
+*       The "sizes" are specified by an array NN(1:NSIZES); the value of
+*       each element NN(j) specifies one size.
+*       The "types" are specified by a logical array DOTYPE( 1:NTYPES );
+*       if DOTYPE(j) is .TRUE., then matrix type "j" will be generated.
+*       Currently, the list of possible types is:
+*
+*       (1)  The zero matrix.
+*       (2)  The identity matrix.
+*
+*       (3)  A diagonal matrix with evenly spaced eigenvalues
+*            1, ..., ULP  and random signs.
+*            (ULP = (first number larger than 1) - 1 )
+*       (4)  A diagonal matrix with geometrically spaced eigenvalues
+*            1, ..., ULP  and random signs.
+*       (5)  A diagonal matrix with "clustered" eigenvalues
+*            1, ULP, ..., ULP and random signs.
+*
+*       (6)  Same as (4), but multiplied by SQRT( overflow threshold )
+*       (7)  Same as (4), but multiplied by SQRT( underflow threshold )
+*
+*       (8)  A matrix of the form  U' D U, where U is orthogonal and
+*            D has evenly spaced entries 1, ..., ULP with random signs
+*            on the diagonal.
+*
+*       (9)  A matrix of the form  U' D U, where U is orthogonal and
+*            D has geometrically spaced entries 1, ..., ULP with random
+*            signs on the diagonal.
+*
+*       (10) A matrix of the form  U' D U, where U is orthogonal and
+*            D has "clustered" entries 1, ULP,..., ULP with random
+*            signs on the diagonal.
+*
+*       (11) Same as (8), but multiplied by SQRT( overflow threshold )
+*       (12) Same as (8), but multiplied by SQRT( underflow threshold )
+*
+*       (13) Symmetric matrix with random entries chosen from (-1,1).
+*       (14) Same as (13), but multiplied by SQRT( overflow threshold )
+*       (15) Same as (13), but multiplied by SQRT( underflow threshold )
+*       (16) A band matrix with half bandwidth randomly chosen between
+*            0 and N-1, with evenly spaced eigenvalues 1, ..., ULP
+*            with random signs.
+*       (17) Same as (16), but multiplied by SQRT( overflow threshold )
+*       (18) Same as (16), but multiplied by SQRT( underflow threshold )
+*
+*  Arguments
+*  =========
+*
+*  NSIZES  INTEGER
+*          The number of sizes of matrices to use.  If it is zero,
+*          DDRVST does nothing.  It must be at least zero.
+*          Not modified.
+*
+*  NN      INTEGER array, dimension (NSIZES)
+*          An array containing the sizes to be used for the matrices.
+*          Zero values will be skipped.  The values must be at least
+*          zero.
+*          Not modified.
+*
+*  NTYPES  INTEGER
+*          The number of elements in DOTYPE.   If it is zero, DDRVST
+*          does nothing.  It must be at least zero.  If it is MAXTYP+1
+*          and NSIZES is 1, then an additional type, MAXTYP+1 is
+*          defined, which is to use whatever matrix is in A.  This
+*          is only useful if DOTYPE(1:MAXTYP) is .FALSE. and
+*          DOTYPE(MAXTYP+1) is .TRUE. .
+*          Not modified.
+*
+*  DOTYPE  LOGICAL array, dimension (NTYPES)
+*          If DOTYPE(j) is .TRUE., then for each size in NN a
+*          matrix of that size and of type j will be generated.
+*          If NTYPES is smaller than the maximum number of types
+*          defined (PARAMETER MAXTYP), then types NTYPES+1 through
+*          MAXTYP will not be generated.  If NTYPES is larger
+*          than MAXTYP, DOTYPE(MAXTYP+1) through DOTYPE(NTYPES)
+*          will be ignored.
+*          Not modified.
+*
+*  ISEED   INTEGER array, dimension (4)
+*          On entry ISEED specifies the seed of the random number
+*          generator. The array elements should be between 0 and 4095;
+*          if not they will be reduced mod 4096.  Also, ISEED(4) must
+*          be odd.  The random number generator uses a linear
+*          congruential sequence limited to small integers, and so
+*          should produce machine independent random numbers. The
+*          values of ISEED are changed on exit, and can be used in the
+*          next call to DDRVST to continue the same random number
+*          sequence.
+*          Modified.
+*
+*  THRESH  DOUBLE PRECISION
+*          A test will count as "failed" if the "error", computed as
+*          described above, exceeds THRESH.  Note that the error
+*          is scaled to be O(1), so THRESH should be a reasonably
+*          small multiple of 1, e.g., 10 or 100.  In particular,
+*          it should not depend on the precision (single vs. double)
+*          or the size of the matrix.  It must be at least zero.
+*          Not modified.
+*
+*  NOUNIT  INTEGER
+*          The FORTRAN unit number for printing out error messages
+*          (e.g., if a routine returns IINFO not equal to 0.)
+*          Not modified.
+*
+*  A       DOUBLE PRECISION array, dimension (LDA , max(NN))
+*          Used to hold the matrix whose eigenvalues are to be
+*          computed.  On exit, A contains the last matrix actually
+*          used.
+*          Modified.
+*
+*  LDA     INTEGER
+*          The leading dimension of A.  It must be at
+*          least 1 and at least max( NN ).
+*          Not modified.
+*
+*  D1      DOUBLE PRECISION array, dimension (max(NN))
+*          The eigenvalues of A, as computed by DSTEQR simlutaneously
+*          with Z.  On exit, the eigenvalues in D1 correspond with the
+*          matrix in A.
+*          Modified.
+*
+*  D2      DOUBLE PRECISION array, dimension (max(NN))
+*          The eigenvalues of A, as computed by DSTEQR if Z is not
+*          computed.  On exit, the eigenvalues in D2 correspond with
+*          the matrix in A.
+*          Modified.
+*
+*  D3      DOUBLE PRECISION array, dimension (max(NN))
+*          The eigenvalues of A, as computed by DSTERF.  On exit, the
+*          eigenvalues in D3 correspond with the matrix in A.
+*          Modified.
+*
+*  D4      DOUBLE PRECISION array, dimension
+*
+*  WA1     DOUBLE PRECISION array, dimension
+*
+*  WA2     DOUBLE PRECISION array, dimension
+*
+*  WA3     DOUBLE PRECISION array, dimension
+*
+*  U       DOUBLE PRECISION array, dimension (LDU, max(NN))
+*          The orthogonal matrix computed by DSYTRD + DORGTR.
+*          Modified.
+*
+*  LDU     INTEGER
+*          The leading dimension of U, Z, and V.  It must be at
+*          least 1 and at least max( NN ).
+*          Not modified.
+*
+*  V       DOUBLE PRECISION array, dimension (LDU, max(NN))
+*          The Housholder vectors computed by DSYTRD in reducing A to
+*          tridiagonal form.
+*          Modified.
+*
+*  TAU     DOUBLE PRECISION array, dimension (max(NN))
+*          The Householder factors computed by DSYTRD in reducing A
+*          to tridiagonal form.
+*          Modified.
+*
+*  Z       DOUBLE PRECISION array, dimension (LDU, max(NN))
+*          The orthogonal matrix of eigenvectors computed by DSTEQR,
+*          DPTEQR, and DSTEIN.
+*          Modified.
+*
+*  WORK    DOUBLE PRECISION array, dimension (NWORK)
+*          Workspace.
+*          Modified.
+*
+*  NWORK   INTEGER
+*          The number of entries in WORK.  This must be at least
+*          1 + 4 * Nmax + 2 * Nmax * lg Nmax + 4 * Nmax**2
+*          where Nmax = max( NN(j), 2 ) and lg = log base 2.
+*          Not modified.
+*
+*  IWORK   INTEGER array,
+*             dimension (6 + 6*Nmax + 5 * Nmax * lg Nmax )
+*          where Nmax = max( NN(j), 2 ) and lg = log base 2.
+*          Workspace.
+*          Modified.
+*
+*  RESULT  DOUBLE PRECISION array, dimension (105)
+*          The values computed by the tests described above.
+*          The values are currently limited to 1/ulp, to avoid
+*          overflow.
+*          Modified.
+*
+*  INFO    INTEGER
+*          If 0, then everything ran OK.
+*           -1: NSIZES < 0
+*           -2: Some NN(j) < 0
+*           -3: NTYPES < 0
+*           -5: THRESH < 0
+*           -9: LDA < 1 or LDA < NMAX, where NMAX is max( NN(j) ).
+*          -16: LDU < 1 or LDU < NMAX.
+*          -21: NWORK too small.
+*          If  DLATMR, SLATMS, DSYTRD, DORGTR, DSTEQR, SSTERF,
+*              or DORMTR returns an error code, the
+*              absolute value of it is returned.
+*          Modified.
+*
+*-----------------------------------------------------------------------
+*
+*       Some Local Variables and Parameters:
+*       ---- ----- --------- --- ----------
+*       ZERO, ONE       Real 0 and 1.
+*       MAXTYP          The number of types defined.
+*       NTEST           The number of tests performed, or which can
+*                       be performed so far, for the current matrix.
+*       NTESTT          The total number of tests performed so far.
+*       NMAX            Largest value in NN.
+*       NMATS           The number of matrices generated so far.
+*       NERRS           The number of tests which have exceeded THRESH
+*                       so far (computed by DLAFTS).
+*       COND, IMODE     Values to be passed to the matrix generators.
+*       ANORM           Norm of A; passed to matrix generators.
+*
+*       OVFL, UNFL      Overflow and underflow thresholds.
+*       ULP, ULPINV     Finest relative precision and its inverse.
+*       RTOVFL, RTUNFL  Square roots of the previous 2 values.
+*               The following four arrays decode JTYPE:
+*       KTYPE(j)        The general type (1-10) for type "j".
+*       KMODE(j)        The MODE value to be passed to the matrix
+*                       generator for type "j".
+*       KMAGN(j)        The order of magnitude ( O(1),
+*                       O(overflow^(1/2) ), O(underflow^(1/2) )
+*
+*  =====================================================================
+*
+*     .. Parameters ..
+      DOUBLE PRECISION   ZERO, ONE, TWO, TEN
+      PARAMETER          ( ZERO = 0.0D0, ONE = 1.0D0, TWO = 2.0D0,
+     $                   TEN = 10.0D0 )
+      DOUBLE PRECISION   HALF
+      PARAMETER          ( HALF = 0.5D0 )
+      INTEGER            MAXTYP
+      PARAMETER          ( MAXTYP = 18 )
+*     ..
+*     .. Local Scalars ..
+      LOGICAL            BADNN
+      CHARACTER          UPLO
+      INTEGER            I, IDIAG, IHBW, IINFO, IL, IMODE, INDX, IROW,
+     $                   ITEMP, ITYPE, IU, IUPLO, J, J1, J2, JCOL,
+     $                   JSIZE, JTYPE, KD, LGN, LIWEDC, LWEDC, M, M2,
+     $                   M3, MTYPES, N, NERRS, NMATS, NMAX, NTEST,
+     $                   NTESTT
+      DOUBLE PRECISION   ABSTOL, ANINV, ANORM, COND, OVFL, RTOVFL,
+     $                   RTUNFL, TEMP1, TEMP2, TEMP3, ULP, ULPINV, UNFL,
+     $                   VL, VU
+*     ..
+*     .. Local Arrays ..
+      INTEGER            IDUMMA( 1 ), IOLDSD( 4 ), ISEED2( 4 ),
+     $                   ISEED3( 4 ), KMAGN( MAXTYP ), KMODE( MAXTYP ),
+     $                   KTYPE( MAXTYP )
+*     ..
+*     .. External Functions ..
+      DOUBLE PRECISION   DLAMCH, DLARND, DSXT1
+      EXTERNAL           DLAMCH, DLARND, DSXT1
+*     ..
+*     .. External Subroutines ..
+      EXTERNAL           ALASVM, DLABAD, DLACPY, DLAFTS, DLASET, DLATMR,
+     $                   DLATMS, DSBEV, DSBEVD, DSBEVX, DSPEV, DSPEVD,
+     $                   DSPEVX, DSTEV, DSTEVD, DSTEVX, DSTT21, DSTT22,
+     $                   DSYEV, DSYEVD, DSYEVX, DSYT21, DSYT22, XERBLA
+*     ..
+*     .. Intrinsic Functions ..
+      INTRINSIC          ABS, DBLE, INT, LOG, MAX, MIN, SQRT
+*     ..
+*     .. Data statements ..
+      DATA               KTYPE / 1, 2, 5*4, 5*5, 3*8, 3*9 /
+      DATA               KMAGN / 2*1, 1, 1, 1, 2, 3, 1, 1, 1, 2, 3, 1,
+     $                   2, 3, 1, 2, 3 /
+      DATA               KMODE / 2*0, 4, 3, 1, 4, 4, 4, 3, 1, 4, 4, 0,
+     $                   0, 0, 4, 4, 4 /
+*     ..
+*     .. Executable Statements ..
+*
+*     1)      Check for errors
+*
+      NTESTT = 0
+      INFO = 0
+*
+      BADNN = .FALSE.
+      NMAX = 1
+      DO 10 J = 1, NSIZES
+         NMAX = MAX( NMAX, NN( J ) )
+         IF( NN( J ).LT.0 )
+     $      BADNN = .TRUE.
+   10 CONTINUE
+*
+*     Check for errors
+*
+      IF( NSIZES.LT.0 ) THEN
+         INFO = -1
+      ELSE IF( BADNN ) THEN
+         INFO = -2
+      ELSE IF( NTYPES.LT.0 ) THEN
+         INFO = -3
+      ELSE IF( LDA.LT.NMAX ) THEN
+         INFO = -9
+      ELSE IF( LDU.LT.NMAX ) THEN
+         INFO = -16
+      ELSE IF( 2*MAX( 2, NMAX )**2.GT.NWORK ) THEN
+         INFO = -21
+      END IF
+*
+      IF( INFO.NE.0 ) THEN
+         CALL XERBLA( 'DDRVST', -INFO )
+         RETURN
+      END IF
+*
+*     Quick return if nothing to do
+*
+      IF( NSIZES.EQ.0 .OR. NTYPES.EQ.0 )
+     $   RETURN
+*
+*     More Important constants
+*
+      UNFL = DLAMCH( 'Safe minimum' )
+      OVFL = DLAMCH( 'Overflow' )
+      CALL DLABAD( UNFL, OVFL )
+      ULP = DLAMCH( 'Epsilon' )*DLAMCH( 'Base' )
+      ULPINV = ONE / ULP
+      RTUNFL = SQRT( UNFL )
+      RTOVFL = SQRT( OVFL )
+*
+*     Loop over sizes, types
+*
+      DO 20 I = 1, 4
+         ISEED2( I ) = ISEED( I )
+         ISEED3( I ) = ISEED( I )
+   20 CONTINUE
+*
+      NERRS = 0
+      NMATS = 0
+*
+      DO 1520 JSIZE = 1, NSIZES
+         N = NN( JSIZE )
+         IF( N.GT.0 ) THEN
+            LGN = INT( LOG( DBLE( N ) ) / LOG( TWO ) )
+            IF( 2**LGN.LT.N )
+     $         LGN = LGN + 1
+            IF( 2**LGN.LT.N )
+     $         LGN = LGN + 1
+            LWEDC = 1 + 4*N + 2*N*LGN + 4*N**2
+            LIWEDC = 6 + 6*N + 5*N*LGN
+         ELSE
+            LWEDC = 9
+            LIWEDC = 12
+         END IF
+         ANINV = ONE / DBLE( MAX( 1, N ) )
+*
+         IF( NSIZES.NE.1 ) THEN
+            MTYPES = MIN( MAXTYP, NTYPES )
+         ELSE
+            MTYPES = MIN( MAXTYP+1, NTYPES )
+         END IF
+*
+         DO 1510 JTYPE = 1, MTYPES
+            IF( .NOT.DOTYPE( JTYPE ) )
+     $         GO TO 1510
+            NMATS = NMATS + 1
+            NTEST = 0
+*
+            DO 30 J = 1, 4
+               IOLDSD( J ) = ISEED( J )
+   30       CONTINUE
+*
+*           2)      Compute "A"
+*
+*                   Control parameters:
+*
+*               KMAGN  KMODE        KTYPE
+*           =1  O(1)   clustered 1  zero
+*           =2  large  clustered 2  identity
+*           =3  small  exponential  (none)
+*           =4         arithmetic   diagonal, (w/ eigenvalues)
+*           =5         random log   symmetric, w/ eigenvalues
+*           =6         random       (none)
+*           =7                      random diagonal
+*           =8                      random symmetric
+*           =9                      band symmetric, w/ eigenvalues
+*
+            IF( MTYPES.GT.MAXTYP )
+     $         GO TO 110
+*
+            ITYPE = KTYPE( JTYPE )
+            IMODE = KMODE( JTYPE )
+*
+*           Compute norm
+*
+            GO TO ( 40, 50, 60 )KMAGN( JTYPE )
+*
+   40       CONTINUE
+            ANORM = ONE
+            GO TO 70
+*
+   50       CONTINUE
+            ANORM = ( RTOVFL*ULP )*ANINV
+            GO TO 70
+*
+   60       CONTINUE
+            ANORM = RTUNFL*N*ULPINV
+            GO TO 70
+*
+   70       CONTINUE
+*
+            CALL DLASET( 'Full', LDA, N, ZERO, ZERO, A, LDA )
+            IINFO = 0
+            COND = ULPINV
+*
+*           Special Matrices -- Identity & Jordan block
+*
+*                   Zero
+*
+            IF( ITYPE.EQ.1 ) THEN
+               IINFO = 0
+*
+            ELSE IF( ITYPE.EQ.2 ) THEN
+*
+*              Identity
+*
+               DO 80 JCOL = 1, N
+                  A( JCOL, JCOL ) = ANORM
+   80          CONTINUE
+*
+            ELSE IF( ITYPE.EQ.4 ) THEN
+*
+*              Diagonal Matrix, [Eigen]values Specified
+*
+               CALL DLATMS( N, N, 'S', ISEED, 'S', WORK, IMODE, COND,
+     $                      ANORM, 0, 0, 'N', A, LDA, WORK( N+1 ),
+     $                      IINFO )
+*
+            ELSE IF( ITYPE.EQ.5 ) THEN
+*
+*              Symmetric, eigenvalues specified
+*
+               CALL DLATMS( N, N, 'S', ISEED, 'S', WORK, IMODE, COND,
+     $                      ANORM, N, N, 'N', A, LDA, WORK( N+1 ),
+     $                      IINFO )
+*
+            ELSE IF( ITYPE.EQ.7 ) THEN
+*
+*              Diagonal, random eigenvalues
+*
+               CALL DLATMR( N, N, 'S', ISEED, 'S', WORK, 6, ONE, ONE,
+     $                      'T', 'N', WORK( N+1 ), 1, ONE,
+     $                      WORK( 2*N+1 ), 1, ONE, 'N', IDUMMA, 0, 0,
+     $                      ZERO, ANORM, 'NO', A, LDA, IWORK, IINFO )
+*
+            ELSE IF( ITYPE.EQ.8 ) THEN
+*
+*              Symmetric, random eigenvalues
+*
+               CALL DLATMR( N, N, 'S', ISEED, 'S', WORK, 6, ONE, ONE,
+     $                      'T', 'N', WORK( N+1 ), 1, ONE,
+     $                      WORK( 2*N+1 ), 1, ONE, 'N', IDUMMA, N, N,
+     $                      ZERO, ANORM, 'NO', A, LDA, IWORK, IINFO )
+*
+            ELSE IF( ITYPE.EQ.9 ) THEN
+*
+*              Symmetric banded, eigenvalues specified
+*
+               IHBW = ( N-1 )*DLARND( 1, ISEED3 )
+               CALL DLATMS( N, N, 'S', ISEED, 'S', WORK, IMODE, COND,
+     $                      ANORM, IHBW, IHBW, 'Z', U, LDU, WORK( N+1 ),
+     $                      IINFO )
+*
+*              Store as dense matrix for most routines.
+*
+               CALL DLASET( 'Full', LDA, N, ZERO, ZERO, A, LDA )
+               DO 100 IDIAG = -IHBW, IHBW
+                  IROW = IHBW - IDIAG + 1
+                  J1 = MAX( 1, IDIAG )
+                  J2 = MIN( N, N+IDIAG )
+                  DO 90 J = J1, J2
+                     I = J - IDIAG
+                     A( I, J ) = U( IROW, J )
+   90             CONTINUE
+  100          CONTINUE
+            ELSE
+               IINFO = 1
+            END IF
+*
+            IF( IINFO.NE.0 ) THEN
+               WRITE( NOUNIT, FMT = 9999 )'Generator', IINFO, N, JTYPE,
+     $            IOLDSD
+               INFO = ABS( IINFO )
+               RETURN
+            END IF
+*
+  110       CONTINUE
+*
+            ABSTOL = UNFL + UNFL
+            IF( N.LE.1 ) THEN
+               IL = 1
+               IU = N
+            ELSE
+               IL = 1 + ( N-1 )*DLARND( 1, ISEED2 )
+               IU = 1 + ( N-1 )*DLARND( 1, ISEED2 )
+               IF( IL.GT.IU ) THEN
+                  ITEMP = IL
+                  IL = IU
+                  IU = ITEMP
+               END IF
+            END IF
+*
+*           3)      If matrix is tridiagonal, call DSTEV and SSTEVX.
+*
+            IF( JTYPE.LE.7 ) THEN
+               NTEST = 1
+               DO 120 I = 1, N
+                  D1( I ) = A( I, I )
+  120          CONTINUE
+               DO 130 I = 1, N - 1
+                  D2( I ) = A( I+1, I )
+  130          CONTINUE
+               CALL DSTEV( 'V', N, D1, D2, Z, LDU, WORK, IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSTEV(V)', IINFO, N,
+     $               JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( 1 ) = ULPINV
+                     RESULT( 2 ) = ULPINV
+                     RESULT( 3 ) = ULPINV
+                     GO TO 180
+                  END IF
+               END IF
+*
+*              Do tests 1 and 2.
+*
+               DO 140 I = 1, N
+                  D3( I ) = A( I, I )
+  140          CONTINUE
+               DO 150 I = 1, N - 1
+                  D4( I ) = A( I+1, I )
+  150          CONTINUE
+               CALL DSTT21( N, 0, D3, D4, D1, D2, Z, LDU, WORK,
+     $                      RESULT( 1 ) )
+*
+               NTEST = 3
+               DO 160 I = 1, N - 1
+                  D4( I ) = A( I+1, I )
+  160          CONTINUE
+               CALL DSTEV( 'N', N, D3, D4, Z, LDU, WORK, IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSTEV(N)', IINFO, N,
+     $               JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( 3 ) = ULPINV
+                     GO TO 180
+                  END IF
+               END IF
+*
+*              Do test 3.
+*
+               TEMP1 = ZERO
+               TEMP2 = ZERO
+               DO 170 J = 1, N
+                  TEMP1 = MAX( TEMP1, ABS( D1( J ) ), ABS( D3( J ) ) )
+                  TEMP2 = MAX( TEMP2, ABS( D1( J )-D3( J ) ) )
+  170          CONTINUE
+               RESULT( 3 ) = TEMP2 / MAX( UNFL,
+     $                       ULP*MAX( TEMP1, TEMP2 ) )
+*
+  180          CONTINUE
+*
+               NTEST = 4
+               DO 190 I = 1, N
+                  D1( I ) = A( I, I )
+  190          CONTINUE
+               DO 200 I = 1, N - 1
+                  D2( I ) = A( I+1, I )
+  200          CONTINUE
+               CALL DSTEVX( 'V', 'A', N, D1, D2, VL, VU, IL, IU, ABSTOL,
+     $                      M, WA1, Z, LDU, WORK, IWORK, IWORK( 5*N+1 ),
+     $                      IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSTEVX(V,A)', IINFO, N,
+     $               JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( 4 ) = ULPINV
+                     RESULT( 5 ) = ULPINV
+                     RESULT( 6 ) = ULPINV
+                     GO TO 250
+                  END IF
+               END IF
+               IF( N.GT.0 ) THEN
+                  TEMP3 = MAX( ABS( WA1( 1 ) ), ABS( WA1( N ) ) )
+               ELSE
+                  TEMP3 = ZERO
+               END IF
+*
+*              Do tests 4 and 5.
+*
+               DO 210 I = 1, N
+                  D3( I ) = A( I, I )
+  210          CONTINUE
+               DO 220 I = 1, N - 1
+                  D4( I ) = A( I+1, I )
+  220          CONTINUE
+               CALL DSTT21( N, 0, D3, D4, WA1, D2, Z, LDU, WORK,
+     $                      RESULT( 4 ) )
+*
+               NTEST = 6
+               DO 230 I = 1, N - 1
+                  D4( I ) = A( I+1, I )
+  230          CONTINUE
+               CALL DSTEVX( 'N', 'A', N, D3, D4, VL, VU, IL, IU, ABSTOL,
+     $                      M2, WA2, Z, LDU, WORK, IWORK,
+     $                      IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSTEVX(N,A)', IINFO, N,
+     $               JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( 6 ) = ULPINV
+                     GO TO 250
+                  END IF
+               END IF
+*
+*              Do test 6.
+*
+               TEMP1 = ZERO
+               TEMP2 = ZERO
+               DO 240 J = 1, N
+                  TEMP1 = MAX( TEMP1, ABS( WA1( J ) ), ABS( WA2( J ) ) )
+                  TEMP2 = MAX( TEMP2, ABS( WA1( J )-WA2( J ) ) )
+  240          CONTINUE
+               RESULT( 6 ) = TEMP2 / MAX( UNFL,
+     $                       ULP*MAX( TEMP1, TEMP2 ) )
+*
+  250          CONTINUE
+*
+               NTEST = 7
+               DO 260 I = 1, N
+                  D1( I ) = A( I, I )
+  260          CONTINUE
+               DO 270 I = 1, N - 1
+                  D2( I ) = A( I+1, I )
+  270          CONTINUE
+               CALL DSTEVX( 'V', 'I', N, D1, D2, VL, VU, IL, IU, ABSTOL,
+     $                      M2, WA2, Z, LDU, WORK, IWORK,
+     $                      IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSTEVX(V,I)', IINFO, N,
+     $               JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( 7 ) = ULPINV
+                     RESULT( 8 ) = ULPINV
+                     RESULT( 9 ) = ULPINV
+                     GO TO 310
+                  END IF
+               END IF
+*
+*              Do tests 7 and 8.
+*
+               DO 280 I = 1, N
+                  D3( I ) = A( I, I )
+  280          CONTINUE
+               DO 290 I = 1, N - 1
+                  D4( I ) = A( I+1, I )
+  290          CONTINUE
+               CALL DSTT22( N, M2, 0, D3, D4, WA2, D2, Z, LDU, WORK,
+     $                      MAX( 1, M2 ), RESULT( 7 ) )
+*
+               NTEST = 9
+               DO 300 I = 1, N - 1
+                  D4( I ) = A( I+1, I )
+  300          CONTINUE
+               CALL DSTEVX( 'N', 'I', N, D3, D4, VL, VU, IL, IU, ABSTOL,
+     $                      M3, WA3, Z, LDU, WORK, IWORK,
+     $                      IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSTEVX(N,I)', IINFO, N,
+     $               JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( 9 ) = ULPINV
+                     GO TO 310
+                  END IF
+               END IF
+*
+*              Do test 9.
+*
+               TEMP1 = DSXT1( 1, WA2, M2, WA3, M3, ABSTOL, ULP, UNFL )
+               TEMP2 = DSXT1( 1, WA3, M3, WA2, M2, ABSTOL, ULP, UNFL )
+               RESULT( 9 ) = ( TEMP1+TEMP2 ) / MAX( UNFL, ULP*TEMP3 )
+*
+  310          CONTINUE
+*
+               NTEST = 10
+               IF( N.GT.0 ) THEN
+                  IF( IL.NE.1 ) THEN
+                     VL = WA1( IL ) - MAX( HALF*
+     $                    ( WA1( IL )-WA1( IL-1 ) ), TEN*ULP*TEMP3,
+     $                    TEN*RTUNFL )
+                  ELSE
+                     VL = WA1( 1 ) - MAX( HALF*( WA1( N )-WA1( 1 ) ),
+     $                    TEN*ULP*TEMP3, TEN*RTUNFL )
+                  END IF
+                  IF( IU.NE.N ) THEN
+                     VU = WA1( IU ) + MAX( HALF*
+     $                    ( WA1( IU+1 )-WA1( IU ) ), TEN*ULP*TEMP3,
+     $                    TEN*RTUNFL )
+                  ELSE
+                     VU = WA1( N ) + MAX( HALF*( WA1( N )-WA1( 1 ) ),
+     $                    TEN*ULP*TEMP3, TEN*RTUNFL )
+                  END IF
+               ELSE
+                  VL = ZERO
+                  VU = ONE
+               END IF
+*
+               DO 320 I = 1, N
+                  D1( I ) = A( I, I )
+  320          CONTINUE
+               DO 330 I = 1, N - 1
+                  D2( I ) = A( I+1, I )
+  330          CONTINUE
+*
+               CALL DSTEVX( 'V', 'V', N, D1, D2, VL, VU, IL, IU, ABSTOL,
+     $                      M2, WA2, Z, LDU, WORK, IWORK,
+     $                      IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSTEVX(V,V)', IINFO, N,
+     $               JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( 10 ) = ULPINV
+                     RESULT( 11 ) = ULPINV
+                     RESULT( 12 ) = ULPINV
+                     GO TO 370
+                  END IF
+               END IF
+*
+               IF( M2.EQ.0 .AND. N.GT.0 ) THEN
+                  RESULT( 10 ) = ULPINV
+                  RESULT( 11 ) = ULPINV
+                  RESULT( 12 ) = ULPINV
+                  GO TO 370
+               END IF
+*
+*              Do tests 10 and 11.
+*
+               DO 340 I = 1, N
+                  D3( I ) = A( I, I )
+  340          CONTINUE
+               DO 350 I = 1, N - 1
+                  D4( I ) = A( I+1, I )
+  350          CONTINUE
+               CALL DSTT22( N, M2, 0, D3, D4, WA2, D2, Z, LDU, WORK,
+     $                      MAX( 1, M2 ), RESULT( 10 ) )
+*
+               NTEST = 12
+               DO 360 I = 1, N - 1
+                  D4( I ) = A( I+1, I )
+  360          CONTINUE
+               CALL DSTEVX( 'N', 'V', N, D3, D4, VL, VU, IL, IU, ABSTOL,
+     $                      M3, WA3, Z, LDU, WORK, IWORK,
+     $                      IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSTEVX(N,V)', IINFO, N,
+     $               JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( 12 ) = ULPINV
+                     GO TO 370
+                  END IF
+               END IF
+*
+*              Do test 12.
+*
+               TEMP1 = DSXT1( 1, WA2, M2, WA3, M3, ABSTOL, ULP, UNFL )
+               TEMP2 = DSXT1( 1, WA3, M3, WA2, M2, ABSTOL, ULP, UNFL )
+               RESULT( 12 ) = ( TEMP1+TEMP2 ) / MAX( UNFL, TEMP3*ULP )
+*
+  370          CONTINUE
+*
+               NTEST = 13
+               DO 380 I = 1, N
+                  D1( I ) = A( I, I )
+  380          CONTINUE
+               DO 390 I = 1, N - 1
+                  D2( I ) = A( I+1, I )
+  390          CONTINUE
+               CALL DSTEVD( 'V', N, D1, D2, Z, LDU, WORK, LWEDC, IWORK,
+     $                      LIWEDC, IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSTEVD(V)', IINFO, N,
+     $               JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( 13 ) = ULPINV
+                     RESULT( 14 ) = ULPINV
+                     RESULT( 15 ) = ULPINV
+                     GO TO 440
+                  END IF
+               END IF
+*
+*              Do tests 13 and 14.
+*
+               DO 400 I = 1, N
+                  D3( I ) = A( I, I )
+  400          CONTINUE
+               DO 410 I = 1, N - 1
+                  D4( I ) = A( I+1, I )
+  410          CONTINUE
+               CALL DSTT21( N, 0, D3, D4, D1, D2, Z, LDU, WORK,
+     $                      RESULT( 13 ) )
+*
+               NTEST = 15
+               DO 420 I = 1, N - 1
+                  D4( I ) = A( I+1, I )
+  420          CONTINUE
+               CALL DSTEVD( 'N', N, D3, D4, Z, LDU, WORK, LWEDC, IWORK,
+     $                      LIWEDC, IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSTEVD(N)', IINFO, N,
+     $               JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( 15 ) = ULPINV
+                     GO TO 440
+                  END IF
+               END IF
+*
+*              Do test 15.
+*
+               TEMP1 = ZERO
+               TEMP2 = ZERO
+               DO 430 J = 1, N
+                  TEMP1 = MAX( TEMP1, ABS( D1( J ) ), ABS( D3( J ) ) )
+                  TEMP2 = MAX( TEMP2, ABS( D1( J )-D3( J ) ) )
+  430          CONTINUE
+               RESULT( 15 ) = TEMP2 / MAX( UNFL,
+     $                        ULP*MAX( TEMP1, TEMP2 ) )
+*
+  440          CONTINUE
+*
+            ELSE
+*
+               DO 450 I = 1, 15
+                  RESULT( I ) = ZERO
+  450          CONTINUE
+               NTEST = 15
+            END IF
+*
+*           Perform remaining tests storing upper or lower triangular
+*           part of matrix.
+*
+            DO 1500 IUPLO = 0, 1
+               IF( IUPLO.EQ.0 ) THEN
+                  UPLO = 'L'
+               ELSE
+                  UPLO = 'U'
+               END IF
+*
+*              4)      Call DSYEV and SSYEVX.
+*
+               CALL DLACPY( ' ', N, N, A, LDA, V, LDU )
+*
+               NTEST = NTEST + 1
+               CALL DSYEV( 'V', UPLO, N, A, LDU, D1, WORK, NWORK,
+     $                     IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSYEV(V,' // UPLO // ')',
+     $               IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     RESULT( NTEST+1 ) = ULPINV
+                     RESULT( NTEST+2 ) = ULPINV
+                     GO TO 470
+                  END IF
+               END IF
+*
+*              Do tests 16 and 17 (or 61 and 62).
+*
+               CALL DSYT21( 1, UPLO, N, 0, V, LDU, D1, D2, A, LDU, Z,
+     $                      LDU, TAU, WORK, RESULT( NTEST ) )
+*
+               CALL DLACPY( ' ', N, N, V, LDU, A, LDA )
+*
+               NTEST = NTEST + 2
+               CALL DSYEV( 'N', UPLO, N, A, LDU, D3, WORK, NWORK,
+     $                     IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSYEV(N,' // UPLO // ')',
+     $               IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     GO TO 470
+                  END IF
+               END IF
+*
+*              Do test 18 (or 63).
+*
+               TEMP1 = ZERO
+               TEMP2 = ZERO
+               DO 460 J = 1, N
+                  TEMP1 = MAX( TEMP1, ABS( D1( J ) ), ABS( D3( J ) ) )
+                  TEMP2 = MAX( TEMP2, ABS( D1( J )-D3( J ) ) )
+  460          CONTINUE
+               RESULT( NTEST ) = TEMP2 / MAX( UNFL,
+     $                           ULP*MAX( TEMP1, TEMP2 ) )
+*
+  470          CONTINUE
+               CALL DLACPY( ' ', N, N, V, LDU, A, LDA )
+*
+               NTEST = NTEST + 1
+*
+               IF( N.GT.0 ) THEN
+                  TEMP3 = MAX( ABS( D1( 1 ) ), ABS( D1( N ) ) )
+                  IF( IL.NE.1 ) THEN
+                     VL = D1( IL ) - MAX( HALF*( D1( IL )-D1( IL-1 ) ),
+     $                    TEN*ULP*TEMP3, TEN*RTUNFL )
+                  ELSE IF( N.GT.0 ) THEN
+                     VL = D1( 1 ) - MAX( HALF*( D1( N )-D1( 1 ) ),
+     $                    TEN*ULP*TEMP3, TEN*RTUNFL )
+                  END IF
+                  IF( IU.NE.N ) THEN
+                     VU = D1( IU ) + MAX( HALF*( D1( IU+1 )-D1( IU ) ),
+     $                    TEN*ULP*TEMP3, TEN*RTUNFL )
+                  ELSE IF( N.GT.0 ) THEN
+                     VU = D1( N ) + MAX( HALF*( D1( N )-D1( 1 ) ),
+     $                    TEN*ULP*TEMP3, TEN*RTUNFL )
+                  END IF
+               ELSE
+                  TEMP3 = ZERO
+                  VL = ZERO
+                  VU = ONE
+               END IF
+*
+               CALL DSYEVX( 'V', 'A', UPLO, N, A, LDU, VL, VU, IL, IU,
+     $                      ABSTOL, M, WA1, Z, LDU, WORK, NWORK, IWORK,
+     $                      IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSYEVX(V,A,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     RESULT( NTEST+1 ) = ULPINV
+                     RESULT( NTEST+2 ) = ULPINV
+                     GO TO 490
+                  END IF
+               END IF
+*
+*              Do tests 19 and 20 (or 64 and 65).
+*
+               CALL DLACPY( ' ', N, N, V, LDU, A, LDA )
+*
+               CALL DSYT21( 1, UPLO, N, 0, A, LDU, D1, D2, Z, LDU, V,
+     $                      LDU, TAU, WORK, RESULT( NTEST ) )
+*
+               NTEST = NTEST + 2
+               CALL DSYEVX( 'N', 'A', UPLO, N, A, LDU, VL, VU, IL, IU,
+     $                      ABSTOL, M2, WA2, Z, LDU, WORK, NWORK, IWORK,
+     $                      IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSYEVX(N,A,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     GO TO 490
+                  END IF
+               END IF
+*
+*              Do test 21 (or 66).
+*
+               TEMP1 = ZERO
+               TEMP2 = ZERO
+               DO 480 J = 1, N
+                  TEMP1 = MAX( TEMP1, ABS( WA1( J ) ), ABS( WA2( J ) ) )
+                  TEMP2 = MAX( TEMP2, ABS( WA1( J )-WA2( J ) ) )
+  480          CONTINUE
+               RESULT( NTEST ) = TEMP2 / MAX( UNFL,
+     $                           ULP*MAX( TEMP1, TEMP2 ) )
+*
+  490          CONTINUE
+*
+               NTEST = NTEST + 1
+               CALL DLACPY( ' ', N, N, V, LDU, A, LDA )
+               CALL DSYEVX( 'V', 'I', UPLO, N, A, LDU, VL, VU, IL, IU,
+     $                      ABSTOL, M2, WA2, Z, LDU, WORK, NWORK, IWORK,
+     $                      IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSYEVX(V,I,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     RESULT( NTEST+1 ) = ULPINV
+                     RESULT( NTEST+2 ) = ULPINV
+                     GO TO 500
+                  END IF
+               END IF
+*
+*              Do tests 22 and 23 (or 67 and 68)
+*
+               CALL DLACPY( ' ', N, N, V, LDU, A, LDA )
+*
+               CALL DSYT22( 1, UPLO, N, M2, 0, A, LDU, WA2, D2, Z, LDU,
+     $                      V, LDU, TAU, WORK, RESULT( NTEST ) )
+*
+               NTEST = NTEST + 2
+               CALL DLACPY( ' ', N, N, V, LDU, A, LDA )
+               CALL DSYEVX( 'N', 'I', UPLO, N, A, LDU, VL, VU, IL, IU,
+     $                      ABSTOL, M3, WA3, Z, LDU, WORK, NWORK, IWORK,
+     $                      IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSYEVX(N,I,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     GO TO 500
+                  END IF
+               END IF
+*
+*              Do test 24 (or 69)
+*
+               TEMP1 = DSXT1( 1, WA2, M2, WA3, M3, ABSTOL, ULP, UNFL )
+               TEMP2 = DSXT1( 1, WA3, M3, WA2, M2, ABSTOL, ULP, UNFL )
+               RESULT( NTEST ) = ( TEMP1+TEMP2 ) /
+     $                           MAX( UNFL, ULP*TEMP3 )
+  500          CONTINUE
+*
+               NTEST = NTEST + 1
+               CALL DLACPY( ' ', N, N, V, LDU, A, LDA )
+               CALL DSYEVX( 'V', 'V', UPLO, N, A, LDU, VL, VU, IL, IU,
+     $                      ABSTOL, M2, WA2, Z, LDU, WORK, NWORK, IWORK,
+     $                      IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSYEVX(V,V,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     RESULT( NTEST+1 ) = ULPINV
+                     RESULT( NTEST+2 ) = ULPINV
+                     GO TO 510
+                  END IF
+               END IF
+*
+*              Do tests 25 and 26 (or 70 and 71).
+*
+               CALL DLACPY( ' ', N, N, V, LDU, A, LDA )
+*
+               CALL DSYT22( 1, UPLO, N, M2, 0, A, LDU, WA2, D2, Z, LDU,
+     $                      V, LDU, TAU, WORK, RESULT( NTEST ) )
+*
+               NTEST = NTEST + 2
+               CALL DLACPY( ' ', N, N, V, LDU, A, LDA )
+               CALL DSYEVX( 'N', 'V', UPLO, N, A, LDU, VL, VU, IL, IU,
+     $                      ABSTOL, M3, WA3, Z, LDU, WORK, NWORK, IWORK,
+     $                      IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSYEVX(N,V,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     GO TO 510
+                  END IF
+               END IF
+*
+               IF( M3.EQ.0 .AND. N.GT.0 ) THEN
+                  RESULT( NTEST ) = ULPINV
+                  GO TO 510
+               END IF
+*
+*              Do test 27 (or 72).
+*
+               TEMP1 = DSXT1( 1, WA2, M2, WA3, M3, ABSTOL, ULP, UNFL )
+               TEMP2 = DSXT1( 1, WA3, M3, WA2, M2, ABSTOL, ULP, UNFL )
+               IF( N.GT.0 ) THEN
+                  TEMP3 = MAX( ABS( WA1( 1 ) ), ABS( WA1( N ) ) )
+               ELSE
+                  TEMP3 = ZERO
+               END IF
+               RESULT( NTEST ) = ( TEMP1+TEMP2 ) /
+     $                           MAX( UNFL, TEMP3*ULP )
+*
+  510          CONTINUE
+*
+*              5)      Call DSPEV and SSPEVX.
+*
+               CALL DLACPY( ' ', N, N, V, LDU, A, LDA )
+*
+*              Load array WORK with the upper or lower triangular
+*              part of the matrix in packed form.
+*
+               IF( IUPLO.EQ.1 ) THEN
+                  INDX = 1
+                  DO 530 J = 1, N
+                     DO 520 I = 1, J
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+  520                CONTINUE
+  530             CONTINUE
+               ELSE
+                  INDX = 1
+                  DO 550 J = 1, N
+                     DO 540 I = J, N
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+  540                CONTINUE
+  550             CONTINUE
+               END IF
+*
+               NTEST = NTEST + 1
+               CALL DSPEV( 'V', UPLO, N, WORK, D1, Z, LDU, V, IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSPEV(V,' // UPLO // ')',
+     $               IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     RESULT( NTEST+1 ) = ULPINV
+                     RESULT( NTEST+2 ) = ULPINV
+                     GO TO 610
+                  END IF
+               END IF
+*
+*              Do tests 28 and 29 (or 73 and 74).
+*
+               CALL DSYT21( 1, UPLO, N, 0, A, LDA, D1, D2, Z, LDU, V,
+     $                      LDU, TAU, WORK, RESULT( NTEST ) )
+*
+               IF( IUPLO.EQ.1 ) THEN
+                  INDX = 1
+                  DO 570 J = 1, N
+                     DO 560 I = 1, J
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+  560                CONTINUE
+  570             CONTINUE
+               ELSE
+                  INDX = 1
+                  DO 590 J = 1, N
+                     DO 580 I = J, N
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+  580                CONTINUE
+  590             CONTINUE
+               END IF
+*
+               NTEST = NTEST + 2
+               CALL DSPEV( 'N', UPLO, N, WORK, D3, Z, LDU, V, IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSPEV(N,' // UPLO // ')',
+     $               IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     GO TO 610
+                  END IF
+               END IF
+*
+*              Do test 30 (or 75)
+*
+               TEMP1 = ZERO
+               TEMP2 = ZERO
+               DO 600 J = 1, N
+                  TEMP1 = MAX( TEMP1, ABS( D1( J ) ), ABS( D3( J ) ) )
+                  TEMP2 = MAX( TEMP2, ABS( D1( J )-D3( J ) ) )
+  600          CONTINUE
+               RESULT( NTEST ) = TEMP2 / MAX( UNFL,
+     $                           ULP*MAX( TEMP1, TEMP2 ) )
+*
+*              Load array WORK with the upper or lower triangular part
+*              of the matrix in packed form.
+*
+  610          CONTINUE
+               IF( IUPLO.EQ.1 ) THEN
+                  INDX = 1
+                  DO 630 J = 1, N
+                     DO 620 I = 1, J
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+  620                CONTINUE
+  630             CONTINUE
+               ELSE
+                  INDX = 1
+                  DO 650 J = 1, N
+                     DO 640 I = J, N
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+  640                CONTINUE
+  650             CONTINUE
+               END IF
+*
+               NTEST = NTEST + 1
+*
+               IF( N.GT.0 ) THEN
+                  TEMP3 = MAX( ABS( D1( 1 ) ), ABS( D1( N ) ) )
+                  IF( IL.NE.1 ) THEN
+                     VL = D1( IL ) - MAX( HALF*( D1( IL )-D1( IL-1 ) ),
+     $                    TEN*ULP*TEMP3, TEN*RTUNFL )
+                  ELSE IF( N.GT.0 ) THEN
+                     VL = D1( 1 ) - MAX( HALF*( D1( N )-D1( 1 ) ),
+     $                    TEN*ULP*TEMP3, TEN*RTUNFL )
+                  END IF
+                  IF( IU.NE.N ) THEN
+                     VU = D1( IU ) + MAX( HALF*( D1( IU+1 )-D1( IU ) ),
+     $                    TEN*ULP*TEMP3, TEN*RTUNFL )
+                  ELSE IF( N.GT.0 ) THEN
+                     VU = D1( N ) + MAX( HALF*( D1( N )-D1( 1 ) ),
+     $                    TEN*ULP*TEMP3, TEN*RTUNFL )
+                  END IF
+               ELSE
+                  TEMP3 = ZERO
+                  VL = ZERO
+                  VU = ONE
+               END IF
+*
+               CALL DSPEVX( 'V', 'A', UPLO, N, WORK, VL, VU, IL, IU,
+     $                      ABSTOL, M, WA1, Z, LDU, V, IWORK,
+     $                      IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSPEVX(V,A,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     RESULT( NTEST+1 ) = ULPINV
+                     RESULT( NTEST+2 ) = ULPINV
+                     GO TO 710
+                  END IF
+               END IF
+*
+*              Do tests 31 and 32 (or 76 and 77).
+*
+               CALL DSYT21( 1, UPLO, N, 0, A, LDU, WA1, D2, Z, LDU, V,
+     $                      LDU, TAU, WORK, RESULT( NTEST ) )
+*
+               NTEST = NTEST + 2
+*
+               IF( IUPLO.EQ.1 ) THEN
+                  INDX = 1
+                  DO 670 J = 1, N
+                     DO 660 I = 1, J
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+  660                CONTINUE
+  670             CONTINUE
+               ELSE
+                  INDX = 1
+                  DO 690 J = 1, N
+                     DO 680 I = J, N
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+  680                CONTINUE
+  690             CONTINUE
+               END IF
+*
+               CALL DSPEVX( 'N', 'A', UPLO, N, WORK, VL, VU, IL, IU,
+     $                      ABSTOL, M2, WA2, Z, LDU, V, IWORK,
+     $                      IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSPEVX(N,A,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     GO TO 710
+                  END IF
+               END IF
+*
+*              Do test 33 (or 78).
+*
+               TEMP1 = ZERO
+               TEMP2 = ZERO
+               DO 700 J = 1, N
+                  TEMP1 = MAX( TEMP1, ABS( WA1( J ) ), ABS( WA2( J ) ) )
+                  TEMP2 = MAX( TEMP2, ABS( WA1( J )-WA2( J ) ) )
+  700          CONTINUE
+               RESULT( NTEST ) = TEMP2 / MAX( UNFL,
+     $                           ULP*MAX( TEMP1, TEMP2 ) )
+*
+  710          CONTINUE
+               IF( IUPLO.EQ.1 ) THEN
+                  INDX = 1
+                  DO 730 J = 1, N
+                     DO 720 I = 1, J
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+  720                CONTINUE
+  730             CONTINUE
+               ELSE
+                  INDX = 1
+                  DO 750 J = 1, N
+                     DO 740 I = J, N
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+  740                CONTINUE
+  750             CONTINUE
+               END IF
+*
+               NTEST = NTEST + 1
+*
+               CALL DSPEVX( 'V', 'I', UPLO, N, WORK, VL, VU, IL, IU,
+     $                      ABSTOL, M2, WA2, Z, LDU, V, IWORK,
+     $                      IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSPEVX(V,I,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     RESULT( NTEST+1 ) = ULPINV
+                     RESULT( NTEST+2 ) = ULPINV
+                     GO TO 800
+                  END IF
+               END IF
+*
+*              Do tests 34 and 35 (or 79 and 80).
+*
+               CALL DSYT22( 1, UPLO, N, M2, 0, A, LDU, WA2, D2, Z, LDU,
+     $                      V, LDU, TAU, WORK, RESULT( NTEST ) )
+*
+               NTEST = NTEST + 2
+*
+               IF( IUPLO.EQ.1 ) THEN
+                  INDX = 1
+                  DO 770 J = 1, N
+                     DO 760 I = 1, J
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+  760                CONTINUE
+  770             CONTINUE
+               ELSE
+                  INDX = 1
+                  DO 790 J = 1, N
+                     DO 780 I = J, N
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+  780                CONTINUE
+  790             CONTINUE
+               END IF
+*
+               CALL DSPEVX( 'N', 'I', UPLO, N, WORK, VL, VU, IL, IU,
+     $                      ABSTOL, M3, WA3, Z, LDU, V, IWORK,
+     $                      IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSPEVX(N,I,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     GO TO 800
+                  END IF
+               END IF
+*
+               IF( M3.EQ.0 .AND. N.GT.0 ) THEN
+                  RESULT( NTEST ) = ULPINV
+                  GO TO 800
+               END IF
+*
+*              Do test 36 (or 81).
+*
+               TEMP1 = DSXT1( 1, WA2, M2, WA3, M3, ABSTOL, ULP, UNFL )
+               TEMP2 = DSXT1( 1, WA3, M3, WA2, M2, ABSTOL, ULP, UNFL )
+               IF( N.GT.0 ) THEN
+                  TEMP3 = MAX( ABS( WA1( 1 ) ), ABS( WA1( N ) ) )
+               ELSE
+                  TEMP3 = ZERO
+               END IF
+               RESULT( NTEST ) = ( TEMP1+TEMP2 ) /
+     $                           MAX( UNFL, TEMP3*ULP )
+*
+  800          CONTINUE
+               IF( IUPLO.EQ.1 ) THEN
+                  INDX = 1
+                  DO 820 J = 1, N
+                     DO 810 I = 1, J
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+  810                CONTINUE
+  820             CONTINUE
+               ELSE
+                  INDX = 1
+                  DO 840 J = 1, N
+                     DO 830 I = J, N
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+  830                CONTINUE
+  840             CONTINUE
+               END IF
+*
+               NTEST = NTEST + 1
+*
+               CALL DSPEVX( 'V', 'V', UPLO, N, WORK, VL, VU, IL, IU,
+     $                      ABSTOL, M2, WA2, Z, LDU, V, IWORK,
+     $                      IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSPEVX(V,V,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     RESULT( NTEST+1 ) = ULPINV
+                     RESULT( NTEST+2 ) = ULPINV
+                     GO TO 890
+                  END IF
+               END IF
+*
+*              Do tests 37 and 38 (or 82 and 83).
+*
+               CALL DSYT22( 1, UPLO, N, M2, 0, A, LDU, WA2, D2, Z, LDU,
+     $                      V, LDU, TAU, WORK, RESULT( NTEST ) )
+*
+               NTEST = NTEST + 2
+*
+               IF( IUPLO.EQ.1 ) THEN
+                  INDX = 1
+                  DO 860 J = 1, N
+                     DO 850 I = 1, J
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+  850                CONTINUE
+  860             CONTINUE
+               ELSE
+                  INDX = 1
+                  DO 880 J = 1, N
+                     DO 870 I = J, N
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+  870                CONTINUE
+  880             CONTINUE
+               END IF
+*
+               CALL DSPEVX( 'N', 'V', UPLO, N, WORK, VL, VU, IL, IU,
+     $                      ABSTOL, M3, WA3, Z, LDU, V, IWORK,
+     $                      IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSPEVX(N,V,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     GO TO 890
+                  END IF
+               END IF
+*
+               IF( M3.EQ.0 .AND. N.GT.0 ) THEN
+                  RESULT( NTEST ) = ULPINV
+                  GO TO 890
+               END IF
+*
+*              Do test 39 (or 84).
+*
+               TEMP1 = DSXT1( 1, WA2, M2, WA3, M3, ABSTOL, ULP, UNFL )
+               TEMP2 = DSXT1( 1, WA3, M3, WA2, M2, ABSTOL, ULP, UNFL )
+               IF( N.GT.0 ) THEN
+                  TEMP3 = MAX( ABS( WA1( 1 ) ), ABS( WA1( N ) ) )
+               ELSE
+                  TEMP3 = ZERO
+               END IF
+               RESULT( NTEST ) = ( TEMP1+TEMP2 ) /
+     $                           MAX( UNFL, TEMP3*ULP )
+*
+  890          CONTINUE
+*
+*              6)      Call DSBEV and SSBEVX.
+*
+               IF( JTYPE.LE.7 ) THEN
+                  KD = 1
+               ELSE IF( JTYPE.GE.8 .AND. JTYPE.LE.15 ) THEN
+                  KD = MAX( N-1, 0 )
+               ELSE
+                  KD = IHBW
+               END IF
+*
+*              Load array V with the upper or lower triangular part
+*              of the matrix in band form.
+*
+               IF( IUPLO.EQ.1 ) THEN
+                  DO 910 J = 1, N
+                     DO 900 I = MAX( 1, J-KD ), J
+                        V( KD+1+I-J, J ) = A( I, J )
+  900                CONTINUE
+  910             CONTINUE
+               ELSE
+                  DO 930 J = 1, N
+                     DO 920 I = J, MIN( N, J+KD )
+                        V( 1+I-J, J ) = A( I, J )
+  920                CONTINUE
+  930             CONTINUE
+               END IF
+*
+               NTEST = NTEST + 1
+               CALL DSBEV( 'V', UPLO, N, KD, V, LDU, D1, Z, LDU, WORK,
+     $                     IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSBEV(V,' // UPLO // ')',
+     $               IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     RESULT( NTEST+1 ) = ULPINV
+                     RESULT( NTEST+2 ) = ULPINV
+                     GO TO 990
+                  END IF
+               END IF
+*
+*              Do tests 40 and 41 (or 85 and 86).
+*
+               CALL DSYT21( 1, UPLO, N, 0, A, LDA, D1, D2, Z, LDU, V,
+     $                      LDU, TAU, WORK, RESULT( NTEST ) )
+*
+               IF( IUPLO.EQ.1 ) THEN
+                  DO 950 J = 1, N
+                     DO 940 I = MAX( 1, J-KD ), J
+                        V( KD+1+I-J, J ) = A( I, J )
+  940                CONTINUE
+  950             CONTINUE
+               ELSE
+                  DO 970 J = 1, N
+                     DO 960 I = J, MIN( N, J+KD )
+                        V( 1+I-J, J ) = A( I, J )
+  960                CONTINUE
+  970             CONTINUE
+               END IF
+*
+               NTEST = NTEST + 2
+               CALL DSBEV( 'N', UPLO, N, KD, V, LDU, D3, Z, LDU, WORK,
+     $                     IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSBEV(N,' // UPLO // ')',
+     $               IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     GO TO 990
+                  END IF
+               END IF
+*
+*              Do test 42 (or 87).
+*
+               TEMP1 = ZERO
+               TEMP2 = ZERO
+               DO 980 J = 1, N
+                  TEMP1 = MAX( TEMP1, ABS( D1( J ) ), ABS( D3( J ) ) )
+                  TEMP2 = MAX( TEMP2, ABS( D1( J )-D3( J ) ) )
+  980          CONTINUE
+               RESULT( NTEST ) = TEMP2 / MAX( UNFL,
+     $                           ULP*MAX( TEMP1, TEMP2 ) )
+*
+*              Load array V with the upper or lower triangular part
+*              of the matrix in band form.
+*
+  990          CONTINUE
+               IF( IUPLO.EQ.1 ) THEN
+                  DO 1010 J = 1, N
+                     DO 1000 I = MAX( 1, J-KD ), J
+                        V( KD+1+I-J, J ) = A( I, J )
+ 1000                CONTINUE
+ 1010             CONTINUE
+               ELSE
+                  DO 1030 J = 1, N
+                     DO 1020 I = J, MIN( N, J+KD )
+                        V( 1+I-J, J ) = A( I, J )
+ 1020                CONTINUE
+ 1030             CONTINUE
+               END IF
+*
+               NTEST = NTEST + 1
+               CALL DSBEVX( 'V', 'A', UPLO, N, KD, V, LDU, U, LDU, VL,
+     $                      VU, IL, IU, ABSTOL, M, WA2, Z, LDU, WORK,
+     $                      IWORK, IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSBEVX(V,A,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     RESULT( NTEST+1 ) = ULPINV
+                     RESULT( NTEST+2 ) = ULPINV
+                     GO TO 1090
+                  END IF
+               END IF
+*
+*              Do tests 43 and 44 (or 88 and 89).
+*
+               CALL DSYT21( 1, UPLO, N, 0, A, LDU, WA2, D2, Z, LDU, V,
+     $                      LDU, TAU, WORK, RESULT( NTEST ) )
+*
+               NTEST = NTEST + 2
+*
+               IF( IUPLO.EQ.1 ) THEN
+                  DO 1050 J = 1, N
+                     DO 1040 I = MAX( 1, J-KD ), J
+                        V( KD+1+I-J, J ) = A( I, J )
+ 1040                CONTINUE
+ 1050             CONTINUE
+               ELSE
+                  DO 1070 J = 1, N
+                     DO 1060 I = J, MIN( N, J+KD )
+                        V( 1+I-J, J ) = A( I, J )
+ 1060                CONTINUE
+ 1070             CONTINUE
+               END IF
+*
+               CALL DSBEVX( 'N', 'A', UPLO, N, KD, V, LDU, U, LDU, VL,
+     $                      VU, IL, IU, ABSTOL, M3, WA3, Z, LDU, WORK,
+     $                      IWORK, IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSBEVX(N,A,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     GO TO 1090
+                  END IF
+               END IF
+*
+*              Do test 45 (or 90).
+*
+               TEMP1 = ZERO
+               TEMP2 = ZERO
+               DO 1080 J = 1, N
+                  TEMP1 = MAX( TEMP1, ABS( WA2( J ) ), ABS( WA3( J ) ) )
+                  TEMP2 = MAX( TEMP2, ABS( WA2( J )-WA3( J ) ) )
+ 1080          CONTINUE
+               RESULT( NTEST ) = TEMP2 / MAX( UNFL,
+     $                           ULP*MAX( TEMP1, TEMP2 ) )
+*
+ 1090          CONTINUE
+               NTEST = NTEST + 1
+               IF( IUPLO.EQ.1 ) THEN
+                  DO 1110 J = 1, N
+                     DO 1100 I = MAX( 1, J-KD ), J
+                        V( KD+1+I-J, J ) = A( I, J )
+ 1100                CONTINUE
+ 1110             CONTINUE
+               ELSE
+                  DO 1130 J = 1, N
+                     DO 1120 I = J, MIN( N, J+KD )
+                        V( 1+I-J, J ) = A( I, J )
+ 1120                CONTINUE
+ 1130             CONTINUE
+               END IF
+*
+               CALL DSBEVX( 'V', 'I', UPLO, N, KD, V, LDU, U, LDU, VL,
+     $                      VU, IL, IU, ABSTOL, M2, WA2, Z, LDU, WORK,
+     $                      IWORK, IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSBEVX(V,I,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     RESULT( NTEST+1 ) = ULPINV
+                     RESULT( NTEST+2 ) = ULPINV
+                     GO TO 1180
+                  END IF
+               END IF
+*
+*              Do tests 46 and 47 (or 91 and 92).
+*
+               CALL DSYT22( 1, UPLO, N, M2, 0, A, LDU, WA2, D2, Z, LDU,
+     $                      V, LDU, TAU, WORK, RESULT( NTEST ) )
+*
+               NTEST = NTEST + 2
+*
+               IF( IUPLO.EQ.1 ) THEN
+                  DO 1150 J = 1, N
+                     DO 1140 I = MAX( 1, J-KD ), J
+                        V( KD+1+I-J, J ) = A( I, J )
+ 1140                CONTINUE
+ 1150             CONTINUE
+               ELSE
+                  DO 1170 J = 1, N
+                     DO 1160 I = J, MIN( N, J+KD )
+                        V( 1+I-J, J ) = A( I, J )
+ 1160                CONTINUE
+ 1170             CONTINUE
+               END IF
+*
+               CALL DSBEVX( 'N', 'I', UPLO, N, KD, V, LDU, U, LDU, VL,
+     $                      VU, IL, IU, ABSTOL, M3, WA3, Z, LDU, WORK,
+     $                      IWORK, IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSBEVX(N,I,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     GO TO 1180
+                  END IF
+               END IF
+*
+*              Do test 48 (or 93).
+*
+               TEMP1 = DSXT1( 1, WA2, M2, WA3, M3, ABSTOL, ULP, UNFL )
+               TEMP2 = DSXT1( 1, WA3, M3, WA2, M2, ABSTOL, ULP, UNFL )
+               IF( N.GT.0 ) THEN
+                  TEMP3 = MAX( ABS( WA1( 1 ) ), ABS( WA1( N ) ) )
+               ELSE
+                  TEMP3 = ZERO
+               END IF
+               RESULT( NTEST ) = ( TEMP1+TEMP2 ) /
+     $                           MAX( UNFL, TEMP3*ULP )
+*
+ 1180          CONTINUE
+               NTEST = NTEST + 1
+               IF( IUPLO.EQ.1 ) THEN
+                  DO 1200 J = 1, N
+                     DO 1190 I = MAX( 1, J-KD ), J
+                        V( KD+1+I-J, J ) = A( I, J )
+ 1190                CONTINUE
+ 1200             CONTINUE
+               ELSE
+                  DO 1220 J = 1, N
+                     DO 1210 I = J, MIN( N, J+KD )
+                        V( 1+I-J, J ) = A( I, J )
+ 1210                CONTINUE
+ 1220             CONTINUE
+               END IF
+*
+               CALL DSBEVX( 'V', 'V', UPLO, N, KD, V, LDU, U, LDU, VL,
+     $                      VU, IL, IU, ABSTOL, M2, WA2, Z, LDU, WORK,
+     $                      IWORK, IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSBEVX(V,V,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     RESULT( NTEST+1 ) = ULPINV
+                     RESULT( NTEST+2 ) = ULPINV
+                     GO TO 1270
+                  END IF
+               END IF
+*
+*              Do tests 49 and 50 (or 94 and 95).
+*
+               CALL DSYT22( 1, UPLO, N, M2, 0, A, LDU, WA2, D2, Z, LDU,
+     $                      V, LDU, TAU, WORK, RESULT( NTEST ) )
+*
+               NTEST = NTEST + 2
+*
+               IF( IUPLO.EQ.1 ) THEN
+                  DO 1240 J = 1, N
+                     DO 1230 I = MAX( 1, J-KD ), J
+                        V( KD+1+I-J, J ) = A( I, J )
+ 1230                CONTINUE
+ 1240             CONTINUE
+               ELSE
+                  DO 1260 J = 1, N
+                     DO 1250 I = J, MIN( N, J+KD )
+                        V( 1+I-J, J ) = A( I, J )
+ 1250                CONTINUE
+ 1260             CONTINUE
+               END IF
+*
+               CALL DSBEVX( 'N', 'V', UPLO, N, KD, V, LDU, U, LDU, VL,
+     $                      VU, IL, IU, ABSTOL, M3, WA3, Z, LDU, WORK,
+     $                      IWORK, IWORK( 5*N+1 ), IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSBEVX(N,V,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     GO TO 1270
+                  END IF
+               END IF
+*
+               IF( M3.EQ.0 .AND. N.GT.0 ) THEN
+                  RESULT( NTEST ) = ULPINV
+                  GO TO 1270
+               END IF
+*
+*              Do test 51 (or 96).
+*
+               TEMP1 = DSXT1( 1, WA2, M2, WA3, M3, ABSTOL, ULP, UNFL )
+               TEMP2 = DSXT1( 1, WA3, M3, WA2, M2, ABSTOL, ULP, UNFL )
+               IF( N.GT.0 ) THEN
+                  TEMP3 = MAX( ABS( WA1( 1 ) ), ABS( WA1( N ) ) )
+               ELSE
+                  TEMP3 = ZERO
+               END IF
+               RESULT( NTEST ) = ( TEMP1+TEMP2 ) /
+     $                           MAX( UNFL, TEMP3*ULP )
+*
+ 1270          CONTINUE
+*
+*              7)      Call DSYEVD
+*
+               CALL DLACPY( ' ', N, N, A, LDA, V, LDU )
+*
+               NTEST = NTEST + 1
+               CALL DSYEVD( 'V', UPLO, N, A, LDU, D1, WORK, LWEDC,
+     $                      IWORK, LIWEDC, IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSYEVD(V,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     RESULT( NTEST+1 ) = ULPINV
+                     RESULT( NTEST+2 ) = ULPINV
+                     GO TO 1290
+                  END IF
+               END IF
+*
+*              Do tests 52 and 53 (or 97 and 98).
+*
+               CALL DSYT21( 1, UPLO, N, 0, V, LDU, D1, D2, A, LDU, Z,
+     $                      LDU, TAU, WORK, RESULT( NTEST ) )
+*
+               CALL DLACPY( ' ', N, N, V, LDU, A, LDA )
+*
+               NTEST = NTEST + 2
+               CALL DSYEVD( 'N', UPLO, N, A, LDU, D3, WORK, LWEDC,
+     $                      IWORK, LIWEDC, IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSYEVD(N,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     GO TO 1290
+                  END IF
+               END IF
+*
+*              Do test 54 (or 99).
+*
+               TEMP1 = ZERO
+               TEMP2 = ZERO
+               DO 1280 J = 1, N
+                  TEMP1 = MAX( TEMP1, ABS( D1( J ) ), ABS( D3( J ) ) )
+                  TEMP2 = MAX( TEMP2, ABS( D1( J )-D3( J ) ) )
+ 1280          CONTINUE
+               RESULT( NTEST ) = TEMP2 / MAX( UNFL,
+     $                           ULP*MAX( TEMP1, TEMP2 ) )
+*
+ 1290          CONTINUE
+*
+*              8)      Call DSPEVD.
+*
+               CALL DLACPY( ' ', N, N, V, LDU, A, LDA )
+*
+*              Load array WORK with the upper or lower triangular
+*              part of the matrix in packed form.
+*
+               IF( IUPLO.EQ.1 ) THEN
+                  INDX = 1
+                  DO 1310 J = 1, N
+                     DO 1300 I = 1, J
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+ 1300                CONTINUE
+ 1310             CONTINUE
+               ELSE
+                  INDX = 1
+                  DO 1330 J = 1, N
+                     DO 1320 I = J, N
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+ 1320                CONTINUE
+ 1330             CONTINUE
+               END IF
+*
+               NTEST = NTEST + 1
+               CALL DSPEVD( 'V', UPLO, N, WORK, D1, Z, LDU,
+     $                      WORK( INDX ), LWEDC-INDX+1, IWORK, LIWEDC,
+     $                      IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSPEVD(V,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     RESULT( NTEST+1 ) = ULPINV
+                     RESULT( NTEST+2 ) = ULPINV
+                     GO TO 1390
+                  END IF
+               END IF
+*
+*              Do tests 55 and 56 (or 100 and 101).
+*
+               CALL DSYT21( 1, UPLO, N, 0, A, LDA, D1, D2, Z, LDU, V,
+     $                      LDU, TAU, WORK, RESULT( NTEST ) )
+*
+               IF( IUPLO.EQ.1 ) THEN
+                  INDX = 1
+                  DO 1350 J = 1, N
+                     DO 1340 I = 1, J
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+ 1340                CONTINUE
+ 1350             CONTINUE
+               ELSE
+                  INDX = 1
+                  DO 1370 J = 1, N
+                     DO 1360 I = J, N
+                        WORK( INDX ) = A( I, J )
+                        INDX = INDX + 1
+ 1360                CONTINUE
+ 1370             CONTINUE
+               END IF
+*
+               NTEST = NTEST + 2
+               CALL DSPEVD( 'N', UPLO, N, WORK, D3, Z, LDU,
+     $                      WORK( INDX ), LWEDC-INDX+1, IWORK, LIWEDC,
+     $                      IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSPEVD(N,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     GO TO 1390
+                  END IF
+               END IF
+*
+*              Do test 57 (or 102).
+*
+               TEMP1 = ZERO
+               TEMP2 = ZERO
+               DO 1380 J = 1, N
+                  TEMP1 = MAX( TEMP1, ABS( D1( J ) ), ABS( D3( J ) ) )
+                  TEMP2 = MAX( TEMP2, ABS( D1( J )-D3( J ) ) )
+ 1380          CONTINUE
+               RESULT( NTEST ) = TEMP2 / MAX( UNFL,
+     $                           ULP*MAX( TEMP1, TEMP2 ) )
+ 1390          CONTINUE
+*
+*              9)      Call DSBEVD.
+*
+               IF( JTYPE.LE.7 ) THEN
+                  KD = 1
+               ELSE IF( JTYPE.GE.8 .AND. JTYPE.LE.15 ) THEN
+                  KD = MAX( N-1, 0 )
+               ELSE
+                  KD = IHBW
+               END IF
+*
+*              Load array V with the upper or lower triangular part
+*              of the matrix in band form.
+*
+               IF( IUPLO.EQ.1 ) THEN
+                  DO 1410 J = 1, N
+                     DO 1400 I = MAX( 1, J-KD ), J
+                        V( KD+1+I-J, J ) = A( I, J )
+ 1400                CONTINUE
+ 1410             CONTINUE
+               ELSE
+                  DO 1430 J = 1, N
+                     DO 1420 I = J, MIN( N, J+KD )
+                        V( 1+I-J, J ) = A( I, J )
+ 1420                CONTINUE
+ 1430             CONTINUE
+               END IF
+*
+               NTEST = NTEST + 1
+               CALL DSBEVD( 'V', UPLO, N, KD, V, LDU, D1, Z, LDU, WORK,
+     $                      LWEDC, IWORK, LIWEDC, IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSBEVD(V,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     RESULT( NTEST+1 ) = ULPINV
+                     RESULT( NTEST+2 ) = ULPINV
+                     GO TO 1490
+                  END IF
+               END IF
+*
+*              Do tests 58 and 59 (or 103 and 104).
+*
+               CALL DSYT21( 1, UPLO, N, 0, A, LDA, D1, D2, Z, LDU, V,
+     $                      LDU, TAU, WORK, RESULT( NTEST ) )
+*
+               IF( IUPLO.EQ.1 ) THEN
+                  DO 1450 J = 1, N
+                     DO 1440 I = MAX( 1, J-KD ), J
+                        V( KD+1+I-J, J ) = A( I, J )
+ 1440                CONTINUE
+ 1450             CONTINUE
+               ELSE
+                  DO 1470 J = 1, N
+                     DO 1460 I = J, MIN( N, J+KD )
+                        V( 1+I-J, J ) = A( I, J )
+ 1460                CONTINUE
+ 1470             CONTINUE
+               END IF
+*
+               NTEST = NTEST + 2
+               CALL DSBEVD( 'N', UPLO, N, KD, V, LDU, D3, Z, LDU, WORK,
+     $                      LWEDC, IWORK, LIWEDC, IINFO )
+               IF( IINFO.NE.0 ) THEN
+                  WRITE( NOUNIT, FMT = 9999 )'DSBEVD(N,' // UPLO //
+     $               ')', IINFO, N, JTYPE, IOLDSD
+                  INFO = ABS( IINFO )
+                  IF( IINFO.LT.0 ) THEN
+                     RETURN
+                  ELSE
+                     RESULT( NTEST ) = ULPINV
+                     GO TO 1490
+                  END IF
+               END IF
+*
+*              Do test 60 (or 105).
+*
+               TEMP1 = ZERO
+               TEMP2 = ZERO
+               DO 1480 J = 1, N
+                  TEMP1 = MAX( TEMP1, ABS( D1( J ) ), ABS( D3( J ) ) )
+                  TEMP2 = MAX( TEMP2, ABS( D1( J )-D3( J ) ) )
+ 1480          CONTINUE
+               RESULT( NTEST ) = TEMP2 / MAX( UNFL,
+     $                           ULP*MAX( TEMP1, TEMP2 ) )
+*
+ 1490          CONTINUE
+*
+ 1500       CONTINUE
+*
+*           End of Loop -- Check for RESULT(j) > THRESH
+*
+            NTESTT = NTESTT + NTEST
+            CALL DLAFTS( 'DST', N, N, JTYPE, NTEST, RESULT, IOLDSD,
+     $                   THRESH, NOUNIT, NERRS )
+*
+ 1510    CONTINUE
+ 1520 CONTINUE
+*
+*     Summary
+*
+      CALL ALASVM( 'DST', NOUNIT, NERRS, NTESTT, 0 )
+*
+ 9999 FORMAT( ' DDRVST: ', A, ' returned INFO=', I6, '.', / 9X, 'N=',
+     $      I6, ', JTYPE=', I6, ', ISEED=(', 3( I5, ',' ), I5, ')' )
+*
+      RETURN
+*
+*     End of DDRVST
+*
+      END

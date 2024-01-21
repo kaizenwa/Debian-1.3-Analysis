@@ -1,0 +1,121 @@
+#! /usr/bin/make -f
+############################ -*- Mode: Makefile -*- ###########################
+## rules ---
+## Author	    : Manoj Srivastava ( srivasta@pilgrim.umass.edu )
+## Created On	    : Sat Apr 27 06:36:31 1996
+## Created On Node  : melkor.pilgrim.umass.edu
+## Last Modified By : Manoj Srivastava
+## Last Modified On : Thu Feb 13 21:26:27 1997
+## Last Machine Used: tiamat.datasync.com
+## Update Count	    : 108
+## Status	    : Unknown, Use with caution!
+## HISTORY	    :
+## Description	    :
+##
+###############################################################################
+
+# Please change the maintainer information, as well as the debian version
+# below, (and maybe the priority as well, espescially if you are uploading
+# an official package)
+
+# The maintainer information.
+maintainer := Manoj Srivastava
+email := srivasta@debian.org
+
+# Priority of this version (or urgency, as dchanges would call it)
+priority := Low
+#  Package specific stuff
+
+# The name of the package (for example, `emacs').
+package = kernel-package
+
+
+FILES_TO_CLEAN = debian/files
+STAMPS_TO_CLEAN =  stamp-binary
+DIRS_TO_CLEAN  =
+
+CONFLOC:=/etc/kernel-pkg.conf
+LIBLOC:=/usr/lib/kernel-package
+MODULE_LOC := /usr/src/modules
+
+# Location of the source dir
+SRCTOP := $(shell if [ "$$PWD" != "" ]; then echo $$PWD; else pwd; fi)
+# where kernel-package files go to
+DEBDIR := $(LIBLOC)
+DEBDIR_NAME:= $(shell basename $(DEBDIR))
+
+# install commands
+install_file= install -o root -g root -m 644
+install_program= install -o root -g root -m 755
+make_directory= install -d -o root -g root -m 755
+
+
+all build:
+# Builds the binary package.
+
+clean:
+	rm -f $(FILES_TO_CLEAN) $(STAMPS_TO_CLEAN)
+	rm -f -r debian/tmp
+	rm -f core `find . \( -name '*.orig' -o -name '*.rej' -o -name '*~' \
+                -o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
+                -o -name '.*.rej' -o -name '.SUMS' -o -size 0 \) -print` TAGS
+
+binary: binary-arch binary-indep
+
+binary-arch: build
+# builds the architecture dependent part
+
+binary-indep: build stamp-binary
+
+stamp-binary:
+	@test root = "`whoami`" || (echo need root priviledges; exit 1)
+	$(checkdir)
+	rm -rf debian/tmp  debian/tmp.deb
+	$(make_directory)  debian/tmp/DEBIAN
+	$(make_directory)  debian/tmp/etc
+	$(make_directory)  debian/tmp/usr/sbin
+	$(make_directory)  debian/tmp/usr/man/man5
+	$(make_directory)  debian/tmp/usr/man/man8
+	$(make_directory)  debian/tmp/usr/lib/$(package)
+	$(make_directory)  debian/tmp/usr/doc/$(package)
+	$(make_directory)  debian/tmp/usr/doc/copyright
+	$(install_file)    debian/conffiles debian/tmp/DEBIAN/conffiles
+	$(install_program) debian/postinst debian/tmp/DEBIAN/postinst
+	$(install_file)    debian/copyright \
+		           debian/tmp/usr/doc/$(package)/copyright
+	$(install_file)    debian/changelog \
+                           debian/tmp/usr/doc/$(package)/changelog
+	gzip -9fq          debian/tmp/usr/doc/$(package)/changelog
+	$(install_file)    README debian/tmp/usr/doc/$(package)/README
+	gzip -9fq          debian/tmp/usr/doc/$(package)/README
+	$(install_file)    Problems debian/tmp/usr/doc/$(package)/Problems
+	gzip -9fq          debian/tmp/usr/doc/$(package)/Problems
+	$(install_file)    kernel-pkg.conf.5 \
+	                   debian/tmp/usr/man/man5/kernel-pkg.conf.5
+	gzip -9fq          debian/tmp/usr/man/man5/kernel-pkg.conf.5
+	$(install_file)    make-kpkg.8  \
+                           debian/tmp/usr/man/man8/make-kpkg.8
+	gzip -9fq          debian/tmp/usr/man/man8/make-kpkg.8
+	$(install_file)    kernel-packageconfig.8  debian/tmp/usr/man/man8/
+	gzip -9fq          debian/tmp/usr/man/man8/kernel-packageconfig.8
+	$(install_file)    kernel-pkg.conf debian/tmp/etc/kernel-pkg.conf
+	$(install_program) kernel-packageconfig \
+		           debian/tmp/usr/sbin/kernel-packageconfig
+	$(install_program) make-kpkg debian/tmp/usr/sbin/make-kpkg
+	(cd kernel;        tar cf - * | \
+           (cd $(SRCTOP)/debian/tmp/usr/lib/$(package);tar xf -))
+	dpkg-gencontrol
+	chown -R root.root debian/tmp
+	dpkg --build       debian/tmp ..
+	touch              stamp-binary
+
+define checkdir
+        test -f  make-kpkg -a -f debian/rules
+endef
+
+source diff:
+	@echo >&2 'source and diff are obsolete - use dpkg-source -b'; false
+
+
+.PHONY: binary binary-arch binary-indep clean
+

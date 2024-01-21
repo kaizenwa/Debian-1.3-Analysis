@@ -1,0 +1,96 @@
+#!/bin/sh
+# Tcl sees the next lines as an assignment to variable `kludge'.
+# For sh, the two shifts cancel the effect of the set, and then we
+# run scotty on this script.
+
+set kludge { $*
+    shift
+    shift
+    if test -f ../scotty ; then
+      exec ../scotty -nf $0 $*
+    else
+      exec scotty -nf $0 $*
+    fi
+}
+
+##
+## IfLoadEventProc is called whenever an ifLoad event is received.
+##
+
+proc IfLoadEventProc {ifIndex ifDescr ifOperStatus ifLoad} {
+    global out
+    puts $out [format "%s %3d %5.2f %% %6s (%s)" \
+	    [getclock] $ifIndex $ifLoad $ifOperStatus $ifDescr]
+    flush $out
+}
+
+##
+## The following proc takes samples of one day and writes them to
+## a file which contains the starting date of the sample.
+##
+
+proc MonitorIfLoadDaily { s interval } {
+
+    global scotty_version out
+
+    set clock [getclock]
+    set date [getdate $clock]
+    set file [format "%s-%s-%02d" \
+	    [$s cget -address] [lindex $date 1] [lindex $date 2]]
+    set out [open $file w+]
+    set secs [expr ((($clock / 86400) + 1) * 86400) - $clock]
+    set iterations [expr ($secs / $interval) + 1]
+    
+    puts $out "# Interface load (based on scotty $scotty_version)"
+    puts $out "#"
+    puts $out "# Agent:		[$s cget -address]"
+    puts $out "# Start:		[getdate]"
+    puts $out "# Interval:		$interval"
+    puts $out "# Iterations:		$iterations"
+    puts $out "#"
+    puts $out "# Description of the columns in this file:"
+    puts $out "#"
+    puts $out "# 1:	Seconds since 1970."
+    puts $out "# 2:	Interface index."
+    puts $out "# 3:	Interface load."
+    puts $out "# 4:	%"
+    puts $out "# 5:	Interface status (either up or down)."
+    puts $out "# 6:	Interface description."
+    puts $out ""
+
+    MonitorIfLoad $s $interval $iterations
+    event bind ifLoad IfLoadEventProc
+    job wait
+    close $out
+}
+
+##
+## Some examples to set up monitoring jobs. Make sure to use IP
+## addresses as this will make more readable output.
+##
+
+mib load rfc1213.mib
+
+if {$argc < 2 || $argc > 3} {
+    puts stderr {usage: ifload <ip> <seconds> [<community>]}
+    exit 1
+}
+
+set host [lindex $argv 0]
+set interval [lindex $argv 1]
+set community [expr {$argc == 3 ? [lindex $argv 2] : "public"}]
+
+set code [catch {snmp session -address $host -community $community} s]
+if $code {
+    puts stderr $s
+    exit 1
+}
+
+while 1 {
+    set code [catch {MonitorIfLoadDaily $s $interval} msg]
+    if $code {	
+	puts stderr $msg
+	exit 1
+    }
+}
+

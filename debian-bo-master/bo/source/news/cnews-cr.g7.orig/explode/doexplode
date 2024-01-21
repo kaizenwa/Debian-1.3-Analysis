@@ -1,0 +1,46 @@
+#! /bin/sh
+# explode master batch files into normal batch files
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/relay:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+lock LOCKexplode $$ || exit 1
+status=1
+trap "unlock LOCKexplode ; trap 0 ; exit \$status" 0 1 2 15
+
+cd $NEWSARTS
+for f in `ls out.master | egrep '^[0-9][^.]*$'`
+do
+	fsize=`sizeof out.master/$f`
+	roomfor=`spacefor $fsize batchfiles`
+	if test " $roomfor" -lt 10	# good general rule of thumb
+	then
+		echo "no room to explode out.master/$f" |
+					report -u 'exploder short of space'
+		exit
+	fi
+	work=$f.tmp
+	lock LOCK $$ || exit
+	mv out.master/$f out.master/$work
+	st=$?
+	unlock LOCK
+	if test " $st" -ne 0
+	then
+		echo "\`mv out.master/$f out.master/$work' gave status $st" |
+				report -u "explode unable to rename file"
+		exit
+	fi
+	if explode out.master/$work 2>/tmp/ex$$ && test ! -s /tmp/ex$$
+	then
+		rm -f out.master/$work
+	else
+		bad=$f.`now`
+		mv out.master/$work out.master/$bad
+		report -u "explode failed on out.master/$bad" </tmp/ex$$
+	fi
+	rm -f /tmp/ex$$
+done
+status=0

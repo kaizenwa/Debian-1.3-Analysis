@@ -1,0 +1,30 @@
+#! /bin/sh
+# lock the news system & arrange to unlock later
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+oldpath="${PATH-$NEWSPATH}"
+newpath=$NEWSCTL/bin:$NEWSBIN:$NEWSPATH
+PATH=$newpath
+export PATH
+
+umask $NEWSUMASK
+
+cd $NEWSCTL
+trap : 1 2 3 15			# kids can be killed, but not me
+if lock -v LOCK $$ 10			# try frequently
+then
+	NEWSHELD="$NEWSHELD LOCK"
+	PS1="newslocked${PS1-> }"
+	export NEWSHELD PS1
+	echo 'news system locked by you'
+	PATH="$oldpath"
+	${SHELL-/bin/sh}
+	PATH="$newpath"
+	unlock LOCK
+	echo 'news system unlocked now'
+	exit 0
+else
+	echo "$0: inadequate permissions, or some sort of lock failure" >&2
+	exit 1
+fi

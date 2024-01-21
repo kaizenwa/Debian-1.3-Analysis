@@ -1,0 +1,179 @@
+$Header: /home/geyer/cvs/procps/skill/README,v 1.1.1.1 1996/06/27 10:56:55 geyer Exp $
+
+	`skill' is a program which sends signals to processes given
+any combination of user names, ttys, commands, and pids.  `snice' is
+a program which changes the priority of processes (given the same).
+It's actually one program which examines argv to determine what action
+is to be taken on matching processes.  It is similar to kill(1) and
+renice(8), however the command line is completely order independent.
+There are also verbose, search, and interactive modes of operation.
+
+The name `skill' stems from `SuperKILL', but if you use it under `csh',
+you may discover another reason for calling it `skill' (hint "s!!").
+
+Both programs run under a variety of operating systems, including:
+
+	AT&T/DELL SysVR4
+	4.2BSD, 4.3BSD, 4.4BSD (and many PC variants)
+	Mach 2.6, 3.0
+	DEC Ultrix 2.2, 4.1-2
+	Encore UMAX 4.2
+	HP-UX 6.5, 7.0, 8.0, 9.0-1
+	IBM AIX 3.1-2
+	IBM AOS 4.3
+	MIPS UMIPS 2.1
+	NeXT OS 1.0, 2.1
+	Pyramid OSx 4.0
+	SGI Irix 3.3, 4.0, 5.2
+	Sequent Dynix 3.0-1
+	SunOS 2, 3, 4.0-1, 5.0-3
+
+Consult the Makefile for more information on what needs to be done
+to make this program run under the aforementioned operating systems.
+In general, given a particular OSTYPE, previous releases up to that
+OSTYPE should work as well.  For example, OSTYPE "sunos-3" should
+support "sunos-2" and "sunos-3", but not "sunos-40" or "sunos-41".
+If you find that an OSTYPE supports a later release of an operating
+system, please drop me a note so I can update the OSTYPE.
+
+On some SVR4 machines, you need to do "filepriv -f dacread skill" to
+allow skill/snice to safely read all processes from "/proc".  Support
+for this is provided in the Makefile, however you must uncomment the
+two "#SysV" lines yourself.  Do not worry if you don't have "filepriv",
+both programs will still function effectively without it.  At any
+rate, do not install either program setuid root unless you *really*
+trust your user community!
+
+Dale Wyttenbach <wytten@commissions.leg.state.mn.us> noted that with
+a slight modification (strcmp() -> strstr()), one can use this simple
+shell script to allow skill/snice to autoconfigure at run-time:
+	#!/bin/sh
+	exec $0-`uname -m` "$@"
+Where the actual executables/scripts might be named:
+	-rwxr-xr-x  [...]   195 Feb 23 09:44 skill*
+	-rwxr-sr-x  [...] 24576 Feb 23 09:34 skill-sun4*
+	-rwxr-sr-x  [...] 24576 Feb 23 09:34 skill-sun4c*
+	-rwxr-sr-x  [...] 24576 Feb 23 09:36 skill-sun4m*
+	lrwxrwxrwx  [...]     5 Feb 23 09:42 snice -> skill*
+	lrwxrwxrwx  [...]    10 Feb 23 09:28 snice-sun4 -> skill-sun4*
+	lrwxrwxrwx  [...]    11 Feb 23 09:28 snice-sun4c -> skill-sun4c*
+	lrwxrwxrwx  [...]    11 Feb 23 09:28 snice-sun4m -> skill-sun4
+To allow sites the option of doing this, machine-dependent code should
+be written to use strstr() when checking the program name; the cost in
+execution time is certainly minimal.  However, as not all C-libraries
+provide strstr(), you may be able to do this only on the more recent
+operating systems (or, pick up a free copy of strstr() from somewhere).
+
+Porting this program to other operating systems can be trivial, or
+seemingly impossible.  If you plan on porting skill to your machine,
+the machine-dependent directory (machdep) is a good place to start
+as you may find an operating system similar to what you are running.
+Another good source of information is the ps(1) source, however be
+sure that you do not include any proprietary code.  Also, more and
+more OS vendors are providing an easy-to-use library interface to
+retrieve process information from the kernel, or via "/proc".
+Finally, if none of this is applicable to your situation, you can
+often find out all you need to know by plowing through your include
+files, and using the "strings" program on binaries (e.g. to find any
+unique kernel variables that need to be nlist'd).
+
+In summary, the machine-independent code expects 5 things from the
+machine-dependent code:
+
+	SigMap[]      - Mapping of signal numbers to signal names.
+	NSig          - The total number of signals available.
+	MdepInit(pn)  - Declares/initializes global variables (MyPid,
+			MyUid, ProgName, Skill, PrioMin, PrioMax, SigPri),
+			changes working directory to tty dev dir, and
+			possibly raises priority of process.  This routine
+			can usually be copied intact from an existing
+			machine-dependent file.
+	MdepAction(p) - Carries out an action (kill or renice) on a
+			specific process id.  This is trivial and can
+			usually be copied as well.
+	GetProc()     - A routine that returns processes, one at-a-time
+			in the form of a "struct ProcInfo".  This is,
+			by far, where you will spend most of your time.
+
+On some operating systems, the machine-dependent module may be unable
+to examine processes belonging to other users.  This generally occurs
+on some SVR4 machines with a "/proc" file system; when executed without
+special privileges, skill/snice can only open(2) processes which belong
+to a particular user.  While not really a problem, the machine-dependent
+driver must keep track of these failed open(2)'s by incrementing the
+external integer "MissedProcCnt" (see the SysVR4 module for an example).
+
+After you have completed/tested the above (make sure you test for
+both in-core and swapped-out processes; see ps(1) for details), you
+need to come up with an OSTYPE (for the Makefile).  The scheme I
+chose was the catenation of the Operating System and Release, in
+the form "<os>-<release>".  Then, name your machine-dependent file
+"machdep/<os>-<release>.c".  Also, look at the "GuessOS" and "Config"
+scripts and figure out a clever way to discern your operating system
+from all the other ones.  Finally, when you feel you are finished,
+please send all your changes back to me!
+
+I helped Tom Christiansen shake out some of the bugs in a perl version
+of skill/snice.  While not included here, the perl version is easier
+to port to certain operating systems (i.e. those still lacking an easy
+means for gathering process information).  However, the perl version
+gives away a great deal in terms of size and speed; not only does it
+invoke "perl", but also "ps" before it can act on a process.  This will
+make it more difficult to catch run-away processes, and on some systems,
+launching a large program can cause "ps" to display invalid process
+information (since the OS may start paging process u-area's around).
+
+The latest release of skill/snice is available from jaguar.cs.utah.edu
+[155.99.212.101] via anonymous ftp, in "~ftp/pub/skill".
+
+					Jeff Forys
+					NEC Systems Laboratory, Inc.
+					+1 609 734 6074
+					jeff@forys.cranbury.nj.us
+
+===========================================================================
+The list of people who have contributed to this program continues to
+grow.  The following people have ported skill/snice to run on their
+operating system, or have otherwise helped in making this program what
+is is today.
+
+John LoVerso <john@loverso.southborough.ma.us>
+	- Asked me to make 4.2BSD talkd work between byte-mismatched
+	  machines; I then wrote skill to kill the talk daemon.
+
+Don Gworek <gworek@fa.disney.com>
+	- Kept telling me that skill was a useful program.
+
+George Howlett <gah@mhcnet.att.com>
+	- Originally designed for super-users, George explained that
+	  skill could be useful to any user.  He was right.
+
+Usenet <net.sources>
+	- Skill, Version 1.9, was posted on April 16, 1986.
+
+David Muir Sharnoff <muir@ucbvax.berkeley.edu>
+	- Added `snice'.
+
+Greg Earle <earle@isolar.Tujunga.CA.US>
+	- SunOS 4.0 and 4.1 support.
+
+Gorodecki Tom <tom@taux01.nsc.com>
+	- Dynix 3.0 support.
+
+Christos Zoulas <christos@deshaw.com>
+	- HP-UX 6.5 and 8.0/9.0 support.
+	- AOS4.3 (ibm-rt) support.
+	- Misc bug fixes.
+
+Mike Hibler <mike@cs.utah.edu>
+	- HP300/BSD support.
+
+Ric Anderson <ric@cs.arizona.edu>
+	- Ultrix 4 support.
+	- NeXT OS 2.x support.
+	- System-V support.
+	- Auto-configuration (GuessOS, Configure).
+	- Misc bug fixes.
+
+Jay Lepreau <lepreau@cs.utah.edu>
+	- Gave me 4 days to polish up Version 3.

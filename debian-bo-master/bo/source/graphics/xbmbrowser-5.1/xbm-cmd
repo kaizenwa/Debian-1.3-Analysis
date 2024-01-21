@@ -1,0 +1,59 @@
+#!/bin/sh
+#
+#  xbm-cmd  filename  pbmplus-command  args...
+#
+# An example filter for use in the xbmbrowser user menus to perform various
+# pbmplus commands directly on both Xbitmap and X pixmap files. This uses
+# the suffix of the icons filename to determine which
+#
+#  Anthony Thyssen         16 Dec 1993       anthony@cit.gu.edu.au
+#
+file="$1"   # get the filename
+shift    # any argument left is the pbmplus command
+
+exec </dev/null   # no stdard input please
+
+TMP1=/tmp/xbmcmd$$.1                   # temporary files
+TMP2=/tmp/xbmcmd$$.2
+trap "rm -f $TMP1 $TMP2; exit 0" 0     # remove temps on exit
+
+# on any failure exit
+set -e "$@"
+
+if [ ! -r "$file" ]; then
+  echo >&2 "xbm-cmd: Unable to read \"$i\""
+  exit 10;
+fi
+if [ ! -w "$file" ]; then
+  echo >&2 "xbm-cmd: Unable to write \"$i\""
+  exit 10;
+fi
+
+# --- extract the file suffix ---
+suffix="`basename $file`"
+suffix="`expr "$suffix" : '.*\.\([^.]*\)'`"
+
+# --- convert to PbmPlus format ---
+case "$suffix" in
+  xbm)  xbmtopbm > $TMP1 ;;
+  xpm)  xpmtoppm > $TMP1 ;;
+  *) echo >&2 "Unknown suffix for \"$file\""
+     exit 0 ;;
+esac
+
+# --- execute the command given ---
+"$@" < $TMP1 > $TMP2
+
+if [ ! -f $TMP2 -o ! -s $TMP2 ]; then
+  echo >&2 "Command failed for \"$file\""
+  exit 0;
+fi
+
+# --- convert back ---
+case "$suffix" in
+  xbm)  pbmtoxbm < $TMP2 > "$file" ;;
+  xpm)  ppmtoxpm < $TMP2 > "$file" 2>/dev/null ;;  # this command is noisy
+esac 2>/dev/null
+
+exit 0
+

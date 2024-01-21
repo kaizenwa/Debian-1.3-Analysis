@@ -1,0 +1,343 @@
+.DA "30 Nov 1994"
+.TL
+C News Makefiles
+.AU
+Henry Spencer
+.SH
+Introduction
+.PP
+The Cleanup Release,
+unlike earlier C Newses,
+does most of its configuration via makefiles
+rather than via complex shell files generated in the configuration
+process.
+A major objective of this exercise is to make it possible to say
+things like ``make'' in a particular source directory and have this
+do something useful,
+\fIwith all the right options\fR.
+.SH
+Makefile Inclusion
+.PP
+To do this, it is absolutely necessary to have some sort of
+header-file mechanism for makefiles.
+The new makefiles rely on the quasi-standard convention that
+a line along the lines of
+.DS
+include ../include/config.make
+.DE
+is replaced by the contents of the named file.
+Since the syntax of such a line annoyingly varies somewhat,
+the \fIsubst\fR mechanism is used to make it possible to modify
+the makefiles as desired.
+The full inclusion should therefore look like:
+.DS
+# =(\&)<@<INCLUDE>@>()=
+include ../include/config.make
+.DE
+.PP
+The (few, I hope) sites whose \fImake\fR does not have anything like this
+can use the \fImaker\fR program (supplied in \fIconf\fR),
+which simulates a \fImake\fR with such a facility
+(it essentially does the \fIsubst\fR INCLUDE on the fly).
+.PP
+While this arrangement was originally motivated by configuration needs,
+it's also possible to do rather a lot to shorten and simplify the makefiles
+by judicious use of header-provided facilities.
+The rest of this document is essentially a guide to writing makefiles
+with the new facilities.
+One or two makefiles deviate from this because they are doing
+specialized things;
+such deviations should be avoided unless there are good reasons.
+.PP
+The top-level makefile uses none of this machinery,
+so that it can be invoked before any of it is operational.
+To make this work,
+it and the \fIconf\fR makefile are intimately interrelated,
+so that the top-level one can punt to the \fIconf\fR one at times.
+.SH
+1. Preliminaries
+.PP
+The makefile may start with definitions intended to alter what goes on
+in the makefile header.
+Currently there are two variables that might be defined here:
+.IP MORECFLAGS \w'MORELINTFLAGS'u+1n
+things \fIspecific to this makefile\fR
+to be put into CFLAGS.
+Standard flags such as ``\-O'' are provided by the makefile header;
+MORECFLAGS should be defined only if something
+specific to \fIthis\fR makefile is needed.
+.IP MORELINTFLAGS
+things \fIspecific to this makefile\fR
+to be put into LINTFLAGS.
+Standard flags such as ``\-h'' are provided by the makefile header;
+MORELINTFLAGS should be defined only if something
+specific to \fIthis\fR makefile is needed.
+.SH
+2. The Makefile Header
+.PP
+Next, the makefile header file,
+which provides configuration variables and a variety of other services,
+should be included:
+.DS
+# =(\&)<@<INCLUDE>@>()=
+include ../include/config.make
+.DE
+To avoid problems with context during patches, these lines should
+preferably be followed by three blank lines
+(and likewise preceded by three blank lines,
+if there is anything before them).
+.PP
+Among the definitions in the makefile header
+are the standard C News pathname variables (NEWSARTS, NEWSOV, etc.).
+There are a number of others:
+.IP SHELL \w'LINTFLAGS'u+1n
+``/bin/sh'', a workaround for a System V \fImake\fR bug.
+.IP UIBIN
+directory where the user-interface programs are supposed to go,
+e.g. \fI/usr/bin\fR.
+.IP RBIN
+directory where the programs invoked by UUCP (e.g. \fIrnews\fR) are
+supposed to go.
+.IP LIB
+names of all the libraries needed for compilations
+(including \fIlibcnews.a\fR),
+in a form suitable for makefile dependency lists.
+.IP LIBS
+names of all the libraries needed for compilations
+(including \fIlibcnews.a\fR),
+in a form suitable for compiler arguments
+(this may include things like ``\-lcompat'',
+which are not legal in dependency lists).
+.IP CFLAGS
+C-compiler flags, including (e.g.) ``\-O'' and ``\-I../include'',
+needed to generate object files.
+Individual makefiles should not define their own CFLAGS.
+Anything defined in MORECFLAGS is included automatically in CFLAGS.
+.IP LDFLAGS
+C-compiler flags, including (e.g.) ``\-i'',
+needed to link object files into executable binaries.
+Individual makefiles should not define their own LDFLAGS.
+The contents of CFLAGS are included automatically in LDFLAGS.
+.IP LINTFLAGS
+C-compiler flags, including (e.g.) ``\-h'' and ``\-I../include'',
+needed to run \fIlint\fR.
+Individual makefiles should not define their own LINTFLAGS.
+Anything defined in MORELINTFLAGS is included automatically in LINTFLAGS.
+.IP MAKE
+the name of the make program, ``make'' by default.
+(The top-level makefile also has its own macro by this name.)
+.IP CONF
+the configuration directory (mostly as a utility definition for
+some of the things that come next).
+.IP TO
+command that installs its second and subsequent arguments
+in the directory identified by its first argument.
+If given the ``\-n'' flag, it installs only if the file to be
+installed is new, i.e. the installation would not overwrite an
+existing file.
+.IP IN
+command that compares its second and subsequent arguments
+to files of the same name in the directory identified by its first argument.
+If given the ``\-i'' flag,
+it reports differences but always yields a zero exit status,
+so that unimportant differences will not halt a \fImake\fR run.
+.IP MKDIR
+command that makes the directory(-ies) given as its arguments,
+if they do not already exist.
+Makefiles should assume that the directories identified by standard pathname
+variables are already present.
+.IP MX
+command that makes the files named as arguments executable.
+This is normally ``chmod\ +x'',
+but might be otherwise on strange systems.
+.IP UPDATE
+command that updates the C News library with the object modules
+named as arguments.
+This is normally ``ar\ ruv\ ../libcnews.a'',
+possibly with a ``ranlib'' run thrown in;
+there are two suitable shell files,
+\fIupdate.ran\fR (for systems which need \fIranlib\fR)
+and \fIupdate.sym\fR (for systems which don't,
+because they have the ``symdef'' feature in their archivers),
+in \fIconf\fR,
+and UPDATE will normally use one of them.
+.IP LIBCMP
+command that compares the object modules named as arguments with
+the C News library copies.
+.IP SPACEFOR
+which variant of the \fIspacefor\fR command is to be used.
+.IP DOSPACEFOR
+``dospacefor'' if one of the C variants of the \fIspacefor\fR command
+is to be used, empty otherwise.
+This arranges for the auxiliary C program to get built.
+.IP QUEUELEN
+which variant of the \fIqueuelen\fR command is to be used.
+.IP UID
+the user name under which the news software is to run.
+.IP GID
+the group name under which the news software is to run.
+.IP SIZE
+``big'' for a large (>16-bit) address space, ``small'' otherwise.
+Used to pick up the appropriate library routines.
+.IP DBZ
+``libdbz'' if the \fIdbz\fR package should be used, empty otherwise.
+.IP STDIO
+``ourstdio'' if our \fIstdio\fR enhancements should be used,
+``sysstdio'' otherwise.
+Actually, they will be used only if they compile and pass their regression
+test, but that won't even be tried if this is empty.
+.IP SERVER
+``server'' if a multi-host client-server setup is to be used,
+empty otherwise.
+.IP SERVERNAME
+name of the server host, if SERVER is non-empty.
+.IP REPORTTO
+mail address for non-urgent status reports from news system.
+.IP URGENTTO
+mail address for urgent problem reports from news system.
+.IP HERE
+a makefile command prefix suitable for use in testing,
+which defines all pathname variables to the current directory
+(except NEWSARTS and NEWSOV, which are defined to a subdirectory ``arts'' of
+the current directory) and generally sets things up for testing.
+.IP HFAKE
+list of the header files not present on the current machine that
+C News must supply fakes for.
+.IP OFAKE
+list of the library routines not present on the current machine that
+C News must supply fakes for.
+.SH
+3. Definitions
+.PP
+After the header inclusion, makefile-specific definitions should appear,
+e.g. definitions of any filename (etc.) that will appear more than once.
+Also here should be
+definitions of variables whose contents are makefile-specific
+but whose purposes are standard:
+.IP BINS \w'PROGS'u+1n
+a list of the binaries the makefile generates for installation.
+.IP PROGS
+a list of all the programs the makefile wants to install,
+typically beginning with ``$(BINS)'' to include the binaries.
+.IP DEST
+where the programs should be installed,
+typically a subdirectory of ``$(NEWSBIN)''.
+.IP OBJS
+a list of all the library-routine object files the makefile generates.
+.IP ALL
+a list of all files the makefile generates,
+typically beginning with ``$(PROGS)'' or ``$(OBJS)''
+and including any control files the makefile builds.
+.SH
+4. Standard Targets
+.PP
+After the definitions come makefile rules,
+including (and preferably starting with) rules with some standard targets.
+The set of standard targets depends somewhat on whether the makefile
+builds library routines or programs.
+(Makefiles that do both should be avoided.)
+For programs, the following standard targets should be defined;
+``all'' should be first.
+.IP all \w'install'u+1n
+build everything (normally depends on ``$(ALL)'')
+and make all programs executable using $(MX).
+(The latter insures that shell files are executable.)
+.IP install
+build all programs (normally depends on ``$(PROGS)'') and
+install them.
+Body normally consists of:
+.DS
+$(MKDIR) $(DEST)
+$(TO) $(DEST) $(PROGS)
+.DE
+.IP setup
+build any control files and install them;
+also make any news-owned directories needed by the programs.
+Body may be empty if no control files are built;
+otherwise it should be analogous to the one for ``install''.
+.PP
+If the
+makefile wishes to install user-interface programs
+in $(UIBIN),
+this should not be done by ``install'',
+but by a separate ``ui'' target.
+.PP
+The bodies of ``install'', ``setup'', and ``ui''
+should be written on the assumption that the source directory
+and files are not writable;
+the ``build'' part is only meant to verify that the files are indeed
+present.
+The actual building will be done by the ``all'' target.
+.PP
+For library routines, the following standard targets should be defined;
+``u'' should be first.
+The absence of an ``all'' or ``install'' rule is deliberate.
+.IP u \w'cmp'u+1n
+build everything (normally depends on ``$(ALL)'')
+and update the library using $(UPDATE).
+The body normally consists of:
+.DS
+$(UPDATE) $(OBJS)
+.DE
+.IP o
+build everything (normally depends on ``$(ALL)'')
+without updating the library.
+.PP
+Either form of makefile should also have
+some standard targets for common functions,
+including installation checking and cleanup:
+.IP cmp \w'clean'u+1n
+build all files (normally depends on ``$(ALL)'') and
+compare them to the installed copies.
+For programs, the body normally consists of:
+.DS
+@$(IN) $(DEST) $(PROGS)
+.DE
+plus any similar commands needed for control files.
+Everything installed by ``install'' or ``setup''
+should be checked.
+For libraries, the body normally consists of:
+.DS
+@$(LIBCMP) $(OBJS)
+.DE
+.IP clean
+remove all object files, core files, binaries, etc.
+.PP
+It is highly desirable for the makefile to include a regression test for
+the things it builds.
+Even a simple test that checks basic functioning can be quite helpful.
+If the makefile includes a regression test,
+this should be done by defining two more targets:
+.IP r \w'rclean'u+2n
+build any necessary test rigs and run the regression test.
+This should depend first on any programs/routines needed and
+second on ``rclean'',
+so that the test rigs are built on a clean foundation.
+``$(HERE)'' may be useful for the test runs.
+.IP rclean
+remove all test rigs and other detritus from the regression test.
+``clean'' should depend on
+``rclean'',
+so that there don't have to be two copies of the regression-cleanup code.
+.SH
+5. Misc. Rules
+.PP
+Somewhere there should be a dependency rule describing the way
+(typically) everything depends on the standard libraries
+listed in ``$(LIB)''.
+The normal form would be:
+.DS
+$(BINS):	$(LIB)
+.DE
+This avoids having to mention ``$(LIB)'' in every rule for building
+a program.
+.PP
+It is unfortunately necessary to have an explicit rule for building
+each program.
+There is no fully-standard way of defining a generic rule for this.
+The individual program-building rules should typically be of the
+form:
+.DS
+p:	p.o
+	$(CC) $(LDFLAGS) p.o $(LIBS) -o $@
+.DE

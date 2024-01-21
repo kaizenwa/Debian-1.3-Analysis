@@ -1,0 +1,227 @@
+*** ld.c.orig	Fri Sep 23 19:09:07 1994
+--- ld.c	Sat Dec  3 16:39:01 1994
+***************
+*** 691,695 ****
+  symbol *builtin_fixups; /* Points to all fixups identified by jumpas */
+  unsigned int local_builtins = 0;
+! unsigned char qmagic = 0;
+  symbol *fixup_symbol;   /* this is used by crt0 to fixup all of the fixups */
+  
+--- 691,695 ----
+  symbol *builtin_fixups; /* Points to all fixups identified by jumpas */
+  unsigned int local_builtins = 0;
+! unsigned char qmagic = 1;
+  symbol *fixup_symbol;   /* this is used by crt0 to fixup all of the fixups */
+  
+***************
+*** 1151,1166 ****
+--- 1151,1176 ----
+  
+  int linux_library;
++ int checker_opts = 0; /* bit 0: 1 if not compiled with Checker */
++ int checker_warns = 0;	/* Number of warnings */
++ #define MAX_CHECKER_WARN 20
+  
+  #define LINUX_JUMP_SHARED_LIB		0
+  #define LINUX_CLASSIC_SHARED_LIB	1
+  #define LINUX_STATIC_LIB		2
++ #define LINUX_NULL_LIB			3
++ #define LINUX_CHECKER_LIB		4
+  
++ #define LINUX_CHECKER_FLAGS	0x40
++ 
+  static char *linux_library_suffix [] = {
+  	".sa",		/* jump table shared library, default */
+  	".ca",		/* classic shared library */
+  	".a",		/* static library */
++ 	NULL,		/* separator */
++ 	".chkr.a",	/* checkered library */
+  	NULL
+  };
+  
++ void checker_init();
+  #endif
+  
+***************
+*** 1295,1298 ****
+--- 1305,1313 ----
+      symtab_init ();
+  
++ #ifdef __linux__  
++   if (output_style != OUTPUT_RELOCATABLE)
++     checker_init();
++ #endif
++ 
+    /* Compute where each file's sections go, and relocate symbols.  */
+  
+***************
+*** 1351,1354 ****
+--- 1366,1370 ----
+    {"m486", 0, 0, 203},	/* For Linux. */
+    {"qmagic", 0, 0, 204},	/* For Linux. */
++   {"checker", 0, 0, 205},	/* For Linux. */
+  #endif
+    {0, 0, 0, 0}
+***************
+*** 1418,1421 ****
+--- 1434,1438 ----
+  	    fatal ("illegal combination of -n with -N, -r, or -z", (char *) 0);
+  	  output_style = OUTPUT_READONLY_TEXT;
++ 	  qmagic = 0;
+  	  break;
+  
+***************
+*** 1437,1440 ****
+--- 1454,1458 ----
+  	  output_style = OUTPUT_RELOCATABLE;
+  	  text_start = 0;
++ 	  qmagic = 0;
+  #ifdef __linux__
+  	  strip_dll = 0;
+***************
+*** 1480,1483 ****
+--- 1498,1502 ----
+  	    fatal ("illegal combination of -z with -N, -n, or -r", (char *) 0);
+  	  output_style = OUTPUT_DEMAND_PAGED;
++ 	  qmagic = 0;
+  	  break;
+  
+***************
+*** 1512,1515 ****
+--- 1531,1535 ----
+  	    fatal ("illegal combination of -N with -n, -r, or -z", (char *) 0);
+  	  output_style = OUTPUT_WRITABLE_TEXT;
++ 	  qmagic = 0;
+  	  break;
+  
+***************
+*** 1559,1562 ****
+--- 1579,1584 ----
+  	  if (linux_library == LINUX_CLASSIC_SHARED_LIB)
+  	  	fatal ("illegal combination of -static with -nojump", (char *) 0);
++ 	  if (linux_library == LINUX_CHECKER_LIB)
++ 		fatal ("illegal combination of -static with -checker", (char *) 0);	  	
+  	  linux_library = LINUX_STATIC_LIB;
+  	  break;
+***************
+*** 1566,1569 ****
+--- 1588,1593 ----
+  	  if (linux_library == LINUX_STATIC_LIB)
+  		fatal ("illegal combination of -nojump with -static", (char *) 0);
++ 	  if (linux_library == LINUX_CHECKER_LIB)
++  		fatal ("illegal combination of -nojump with -checker", (char *) 0);
+  	  linux_library = LINUX_CLASSIC_SHARED_LIB;
+  	  break;
+***************
+*** 1574,1577 ****
+--- 1598,1609 ----
+  	  qmagic = 1;
+  	  break;
++ 	/* For Linux. -checker, checkered library */
++  	case 205:
++  	  if (linux_library == LINUX_CLASSIC_SHARED_LIB)
++  	  	fatal ("illegal combination of -checker with -nojump", (char *)0);
++  	  if (linux_library == LINUX_STATIC_LIB)
++  		fatal ("illegal combination of -checker with -static", (char *) 0);	  	
++  	  linux_library = LINUX_CHECKER_LIB;
++  	  break;
+  #endif
+  	}
+***************
+*** 1630,1634 ****
+  
+    if (!output_style)
+!     output_style = DEFAULT_OUTPUT_STYLE;
+  
+  #if 0
+--- 1662,1669 ----
+  
+    if (!output_style)
+!     {
+!       output_style = DEFAULT_OUTPUT_STYLE;
+!       qmagic = 1;
+!     }
+  
+  #if 0
+***************
+*** 2126,2129 ****
+--- 2161,2184 ----
+    entry->bss_size = hdr.a_bss;
+  
++ #ifdef __linux__
++   if (linux_library == LINUX_CHECKER_LIB)	/* checker is used */
++     if (!(N_FLAGS(hdr) & LINUX_CHECKER_FLAGS))
++       {
++         checker_opts |= 1;
++         if (checker_warns < MAX_CHECKER_WARN)
++           {
++             fprintf(stderr, "Warning: ");
++             print_file_name(entry, stderr);
++             fprintf(stderr," was not compiled with Checker\n");
++             checker_warns++;
++           }
++         else if (checker_warns == MAX_CHECKER_WARN)
++           {
++             checker_warns++;
++             fprintf(stderr, "More files not compiled with Checker follow\n");
++           }
++       }
++ #endif  
++ 
+    entry->syms_size = hdr.a_syms;
+    entry->syms_offset = N_SYMOFF(hdr);
+***************
+*** 4327,4330 ****
+--- 4382,4390 ----
+  #endif
+  
++ #ifdef __linux__
++   if (linux_library == LINUX_CHECKER_LIB && !(checker_opts & 1))
++     N_SET_FLAGS(outheader, LINUX_CHECKER_FLAGS);
++ #endif
++ 
+    text_header_size = sizeof (struct exec);
+  #ifdef COFF_ENCAPSULATE
+***************
+*** 6577,6581 ****
+  Usage: %s [-d] [-dc] [-dp] [-e symbol] [-l lib] [-n] [-noinhibit-exec]\n\
+         [-nostdlib] [-o file] [-r] [-s] [-t] [-u symbol] [-x] [-y symbol]\n\
+!        [-z] [-A file] [-Bstatic] [-D size] [-L libdir] [-M] [-N]\n\
+         [-static] [-nojump] [-dll-verbose] [-S] [-T[{text,data}] addr]\n\
+         [-V prefix] [-X] [file...]\n",
+--- 6637,6641 ----
+  Usage: %s [-d] [-dc] [-dp] [-e symbol] [-l lib] [-n] [-noinhibit-exec]\n\
+         [-nostdlib] [-o file] [-r] [-s] [-t] [-u symbol] [-x] [-y symbol]\n\
+!        [-z] [-A file] [-Bstatic] [-D size] [-L libdir] [-M] [-N] [-checker]\n\
+         [-static] [-nojump] [-dll-verbose] [-S] [-T[{text,data}] addr]\n\
+         [-V prefix] [-X] [file...]\n",
+***************
+*** 7137,7140 ****
+  }
+  
+! #endif
+  
+--- 7197,7219 ----
+  }
+  
+! void
+! checker_init()
+! {
+!   symbol *checker_sym;
+  
++   checker_sym = getsym ("____chkr_ld_opts__");
++   if (!checker_sym->defined)
++     {
++       if (checker_sym->referenced)
++ 	/* The symbol was not defined, and we are defining it now.  */
++ 	undefined_global_sym_count--;
++       checker_sym->defined = N_ABS | N_EXT;
++       checker_sym->referenced = 1;
++       checker_sym->value = checker_opts;	/* set options */
++     }
++   else
++     {
++       checker_sym->value |= checker_opts;	/* add options */
++     }
++ }
++ #endif

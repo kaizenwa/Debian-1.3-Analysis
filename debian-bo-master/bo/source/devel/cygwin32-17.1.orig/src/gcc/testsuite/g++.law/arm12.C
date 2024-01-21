@@ -1,0 +1,45 @@
+// arm file
+// From: belley@cae.ca (Benoit Belley 3218)
+// Subject: Bad access control with private constructor and derivation
+// Date: Fri, 28 May 1993 12:39:57 -0400 (EDT)
+
+#include <iostream.h>
+
+class X
+{
+public:
+  void f();
+
+private:
+  X();
+};
+
+class Y : public X
+{
+public:
+  Y();
+};
+
+X::X()
+{
+  cout << "X::X()" << endl;
+}
+
+void X::f()
+{
+  cout << "X::f()" << endl;
+}
+
+Y::Y()
+{
+  cout << "Y::Y()" << endl;
+}
+
+
+int main()
+{
+  Y y;
+  y.f();
+}
+
+

@@ -1,0 +1,62 @@
+#
+#  MMS file to build MOST.
+#
+#  Written by Hunter Goatley <goathunter@WKUVX1.BITNET> ( 4-OCT-1993 15:41)
+#
+.IFDEF __MATTS_MMS__
+.ELSE
+EXE = .EXE
+OBJ = .OBJ
+.ENDIF
+
+CC = CC/STANDARD/VAXC
+
+.IFDEF __ALPHA__
+CC = CC/STANDARD=VAXC
+OPTFILE =
+OPTIONS =
+NATIVE  = /NONATIVE_ONLY
+.ELSE
+OPTFILE = ,VAXCRTL.OPT
+OPTIONS = $(OPTFILE)/OPTIONS
+NATIVE  =
+.ENDIF
+
+.IFDEF SLANG_OLB
+.ELSE
+SLANG_DIR = [-.SLANG.SRC]
+SLANG_OLB = $(SLANG_DIR)SLANG$(OLB)
+.ENDIF
+
+CFLAGS = $(CFLAGS)/INCLUDE=$(SLANG_DIR)
+LINKFLAGS = $(LINKFLAGS)$(NATIVE)/NOTRACE
+
+OBJS =	MAIN$(OBJ),-
+	BUFFER$(OBJ),-
+	FILE$(OBJ),-
+	WINDOW$(OBJ),-
+	LINE$(OBJ),-
+	DISPLAY$(OBJ),-
+	SYSDEP$(OBJ),-
+	KEYM$(OBJ),-
+	MOST$(OBJ),-
+	SEARCH$(OBJ),-
+	HELP$(OBJ),-
+	DIR$(OBJ),-
+	CMD$(OBJ),-
+	EDIT$(OBJ),-
+	KEYPARSE$(OBJ)
+
+MOST$(EXE) :	$(OBJS)$(OPTFILE)
+	$(LINK)$(LINKFLAGS) $(OBJS)$(OPTIONS),$(SLANG_OLB)/LIBRARY
+
+#
+#  Build the linker options file for OpenVMS VAX and VAX C.
+#
+VAXCRTL.OPT :
+        @ open/write tmp vaxcrtl.opt
+        @ write tmp "SYS$SHARE:VAXCRTL.EXE/SHARE"
+        @ close tmp
+
+
+

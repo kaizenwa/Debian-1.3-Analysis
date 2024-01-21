@@ -1,0 +1,308 @@
+.TH NEWSOVERVIEW 3 "C News" "redistributable"
+.DA 16 December 1992
+.SH NAME
+newsoverview: novopen, novstream, novall, novnext, novthread, novclose \- parse and thread netnews overview files
+.SH SYNOPSIS
+.nf
+.ft B
+#include <stdio.h>
+#include <hash.h>
+#include <hdbm.h>
+#include <newsoverview.h>
+.sp 0.3v
+novartdir(dir)
+char *dir;
+.sp 0.3v
+struct novgroup *novopen(grp)
+char *grp;
+.sp 0.3v
+struct novgroup *novstream(stream)
+FILE *stream;
+.sp 0.3v
+struct novart *novall(gp)
+struct novgroup *gp;
+.sp 0.3v
+struct novart *novnext(gp)
+struct novgroup *gp;
+.sp 0.3v
+novthread(gp)
+struct novgroup *gp;
+.sp 0.3v
+novclose(gp)
+struct novgroup *gp;
+.ft
+.fi
+.SH DESCRIPTION
+This library provides access for news readers
+to the adjunct data maintained for each news group
+by C News.
+Memory consumption is one
+.I "struct novgroup"
+and one hash table
+per open group,
+plus
+one
+.I "struct novart"
+per article per open group that has had one of
+.IR novall ,
+.IR novnext ,
+and
+.I novthread
+executed on its behalf,
+plus
+one hash table per open group that has had
+.I novthread
+executed on its behalf.
+.PP
+.I Novartdir
+may be called to set the news spool directory to
+.I dir
+rather than the default of
+.BR /usr/spool/news .
+.I Novopen
+opens the overview data for
+newsgroup
+.IR grp ,
+and returns a pointer to a structure
+of type
+.I "struct novgroup"
+containing at least these members:
+.RS
+.ft B
+.nf
+	HASHTABLE *g_msgids;
+	HASHTABLE *g_roots;
+.fi
+.ft
+.RE
+or NULL if there is no overview data for
+.I grp
+or it is inaccessible.
+.I Novstream
+is a variant that
+arranges that
+.I stream
+will be read when needed rather than the overview
+data for
+.IR grp .
+.I G_msgids
+is a hash table mapping message-ids to
+.\" the indirection dance
+pointers to
+their corresponding summary data
+(\c
+.IR "struct novart" s);
+it will be NULL until
+.IR novall ,
+.IR novnext ,
+or
+.I novthread
+are called for this group.
+.I G_roots
+is a hash table mapping the message-ids of root messages to
+.\" the indirection dance
+pointers to
+their corresponding summary data;
+it will be NULL until
+.I novthread
+is run on this group.
+Either hash table may be walked to enumerate its members
+(see
+.I hashwalk
+in
+.IR hash (3)).
+.PP
+.I Novall
+returns a pointer to the first structure of a linked list
+of structures
+of type
+.I "struct novart"
+containing at least these members:
+.RS
+.ft B
+.nf
+	char *a_num;
+	char *a_subj;
+	char *a_from;
+	char *a_date;
+	char *a_msgid;
+	char *a_refs;
+	char *a_bytes;
+	char *a_lines;		/* a waste of bits */
+	char *a_others;
+	/* these members are message-ids, filled in by novthread() */
+	char *a_parent;
+	char *a_child1;		/* first child of a chain */
+	char *a_sibling;	/* next sibling in this chain */
+	/* end message-ids */
+	struct novart *a_nxtnum;	/* next in numeric order */
+.fi
+.ft
+.RE
+All structures in the linked list will be in memory upon
+return from
+.IR novall .
+.I A_num
+is the number
+(file name)
+of the article in its spool directory.
+.I A_subj
+is the value of the article's
+.B Subject:
+header;
+.I a_from
+its
+.B From:
+header;
+.I a_date
+its
+.B Date:
+header;
+.I a_msgid
+its message-id;
+.I a_refs
+its
+.B References:
+header;
+.I a_bytes
+the number of bytes in the article on disk,
+including headers and signature(s);
+.I a_lines
+is its
+.B Lines:
+header.
+.I A_others
+is any other headers,
+for this article,
+stored in the database
+by the local database maintenance program.
+This set of headers is empty by default.
+If
+.I a_others
+is a non-empty string,
+it will consist of complete headers
+(keyword, colon, value and all)
+with any newlines and tabs turned into spaces,
+and separated by tabs.
+.PP
+.I A_parent
+is the message-id of this article's parent article,
+if the parent article is described by the overview data for this group;
+.I a_child1
+the message-id of this article's first child article,
+if any;
+.I a_sibling
+the message-id of this article's next sibling in a chain,
+if any.
+Any of the three members may be NULL if no article applies,
+and all three will be NULL until
+.I novthread
+is run on the group this article belongs to.
+.PP
+.I Novnext
+returns a pointer to the numerically-next
+(possibly first)
+article summary structure,
+or NULL if the group is exhausted.
+(Numerical order in the database is assumed and not checked.)
+.I Novthread
+constructs a hash table in
+.I gp\(->g_roots
+of the roots of the trees formed by following
+.B References:
+headers backward.
+This forest can be walked by traversing these roots using
+.I hashwalk
+(see
+.IR hash (3))
+and looking up the message-ids
+.IR a_parent ,
+.IR a_child1 ,
+and
+.I a_sibling
+in
+.I gp\(->g_msgids
+(a hash table of all articles in
+.IR gp ).
+.I Novclose
+destroys
+.I gp
+and its substructure.
+.SH EXAMPLES
+Building, walking and printing a group's reference trees.
+.RS
+.ft B
+.nf
+rootvisit(key, data, hook)
+char *key, *data, *hook;
+{
+	prtree((struct novgroup *)hook, ((struct novart *)data)\(->a_msgid, 1);
+}
+
+process(in, inname)
+FILE *in;
+char *inname;
+{
+	register struct novgroup *gp;
+
+	gp = novopen(inname);
+	if (gp == NULL)
+		error("can't open overview file for group `%s'", inname);
+	novthread(gp);
+	if (gp\(->g_roots != NULL)
+		hashwalk(gp\(->g_roots, rootvisit, (char *)gp);
+	novclose(gp);
+}
+
+prtree(gp, msgid, level)
+register struct novgroup *gp;
+register char *msgid;
+register int level;
+{
+	register int i;
+	register struct novart *art;
+
+	if (gp == NULL || gp\(->g_msgids == NULL || msgid == NULL)
+		return;
+	art = (struct novart *)hashfetch(gp\(->g_msgids, msgid);
+	if (art == NULL)
+		return;
+	for (i = 1; i < level; i++)
+		(void) putchar('\et');
+	(void) printf("%s\et%s", art\(->a_from, msgid);
+	if (level == 1)
+		(void) printf("\et%s", art\(->a_subj);
+	(void) putchar('\en');
+	prtree(gp, art\(->a_child1, level + 1);
+	prtree(gp, art\(->a_sibling, level);	/* next sibling */
+}
+.ft
+.fi
+.RE
+.SH FILES
+.PD 0
+.TP 2i
+.BI /usr/spool/news/ group /.overview
+summary of articles in group
+.PD
+.SH SEE ALSO
+.IR nn (1),
+.IR trn (1),
+.IR fgetfln (3),
+.IR hash (3),
+.IR split (3),
+.IR newsdb (5),
+.IR newsoverview (5),
+.IR relaynews (8)
+.SH DIAGNOSTICS
+Returns 0 on failure.
+.SH HISTORY
+Written by Geoff Collyer,
+as part of the C News project,
+to provide access to the adjunct data maintained by C News
+for the benefit of newsreaders.
+.SH BUGS
+The contents of
+.I a_lines
+should not be believed
+and are really pretty worthless yet popular.

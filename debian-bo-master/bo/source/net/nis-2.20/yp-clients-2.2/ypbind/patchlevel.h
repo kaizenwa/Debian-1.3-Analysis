@@ -1,0 +1,1 @@
+#define YPBIND_VERSION "3.0"

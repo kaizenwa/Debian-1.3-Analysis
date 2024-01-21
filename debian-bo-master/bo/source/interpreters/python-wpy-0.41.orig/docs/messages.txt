@@ -1,0 +1,176 @@
+Message Handlers
+
+Programs written with wpy are message driven.  The system sends messages
+when the user presses a key or mouse button, when windows are created or
+destroyed, or when various other events happen.  In wpy you simply provide
+a handler for any message you wish to respond to.  If a message happens, and
+if you have a handler with the proper name defined, then that handler will
+be called.  If there is no handler, then the message is ignored.  There is no
+need in general to register to receive messages.
+
+Event handlers are methods of the class instances in the application.
+Event handlers have standard names which start with "On".  For example, if
+the user presses a key, the "OnChar" method is called for the view class
+instance.  To use messages you need to know what messages there are and what
+class instances receive what messages.
+
+There three types of messages: command messages, window messages and user
+messages.  Window messages are always sent to the relevant window.  An example
+is the "OnCreate" message sent when a window is created.  It is sent to
+the window being created.  User messages consist of key press and mouse events.
+They are always sent to the active view; that is, the view of the window which
+has the input focus.  These messages have standard system-defined names (see below).
+
+Command messages are produced as the result of the user pressing a button or
+selecting something from a menu.  The command message handlers have a default
+name which is derived from the button or menu text.  For buttons, the name is
+"OnButton" followed by the alphanumeric characters of the button text.  For
+example, a "Quit" button has the default handler name "OnButtonQuit".  For menus,
+the default handler name is "OnMenu" followed by a capitalized name based on the
+hierarchical menu text.  For the "Save As..." item on the "file" menu, the name
+would be "OnMenuFileSaveas".  The handler name is the attribute "wpyHandler" of the
+button or menu, and may be printed out or changed to any string value.
+
+Command messages are aggressively routed to a variety of potential target class
+instances.  The routing follows the MFC model and is performed by WpyCommandRouter()
+in wpy.py.  The order of routing is as follows:
+
+For normal windows:
+  First to the active view;
+  then to the active document;
+  then to the active frame;
+  then to the application;
+  then to the main frame of the application;
+  then to the control which produced the message;
+  otherwise the message is ignored.
+  
+For dialog boxes:
+  First, to the dialog box;
+  then to the parent of the dialog box;
+  then to the application;
+  otherwise the message is ignored.
+
+The point of the routing is to enable the user to define handlers wherever
+it is most convenient.  For example, a message from a "Quit" button or a
+"Exit" menu item should logically be a method of the application, so the
+method could be defined there.  When the message occurred, the routing
+would send it there, and the "self" object would refer to the application
+instance.  The "File Save" menu item should be defined as a method of the
+document, and the menu "Edit" commands should probably go to the view.  The
+salient point is that the "self" pointer is changed by the routing logic
+to the particular class instance targeted by the router.  Although
+the routing is complicated, the gain in programming ease is worth it.  To
+prevent confusion, it is best to make sure handler names are unique, so that
+the exact order of command routing don't matter.
+
+Standard Window and User Messages
+
+These are all the non-command messages and the class with the default handler:
+
+Sent to the application CWinApp:
+  CWinApp::InitInstance(self)
+    This is the first message sent, and is used to initialize the instance
+    of the application.  You must provide a handler for this message.  Your
+    handler must at least register a template and set up the main frame.
+  CWinApp::ExitInstance(self)
+    Called when the application exits.  Used to perform clean up.
+  CWinApp::Run(self)
+    Used by the NT console program, but not intended for public use.
+
+Sent to frame windows:
+  CWnd::OnCreate(self, not_used)
+    Sent to windows soon after they are created.  This is always the first
+    message sent to a window.
+  CWnd::OnDestroy(self)
+    Sent to windows before they are destroyed.
+  CWnd::OnSetFocus(self, previous_focus)
+    Send to windows when they gain focus.  The window which
+    previously had focus is given.
+  CWnd::OnKillFocus(self, new_focus)
+    Send to windows when they lose focus.  The window which
+    is gaining focus is given when running under Windows.  Under Tk
+    new_focus is always None.
+
+Sent to views (except for CEditView):
+  CWnd::OnCreate(self, not_used)
+    See above.
+  CView::OnInitialUpdate(self)
+    Sent after "OnCreate" after the view is connected to a document but
+    before the view is displayed.  Used when the document must be available.
+    For example, use it to set view scroll ranges according to document size.
+  CWnd::OnDestroy(self)
+    See above.
+  CView::OnDraw(self, DC)
+    Sent when the view must be redrawn, for example, when the view was covered
+    by another window which was subsequently removed.  Generally, you should plan
+    to do all drawing in OnDraw().
+  CWnd::OnSize(self, new_size)
+    Sent after "OnCreate" when a window is created, or when the user or system
+    changes the window size.  Generally you should do layout in "OnSize".  The
+    size of the client area is given by the rectangle "new_size".  Different
+    systems will send several different "OnSize" events, sometimes with 1-pixel
+    window sizes as part of the window creation process, so make your code robust.
+  CWnd::OnChar(self, char ch, int flags)
+    Sent when the user presses a key.  The character is ch, and flags gives the
+    status of the control and shift keys.
+  CWnd::OnLButtonUp    (self, int x, int y, int flags)
+  CWnd::OnLButtonDown  (self, int x, int y, int flags)
+  CWnd::OnLButtonDblClk(self, int x, int y, int flags)
+  CWnd::OnRButtonUp    (self, int x, int y, int flags)
+  CWnd::OnRButtonDown  (self, int x, int y, int flags)
+  CWnd::OnRButtonDblClk(self, int x, int y, int flags)
+    Sent when the user presses, releases or double clicks the left or right mouse button.
+    The mouse location is (x, y), and flags gives the state of the shift and
+    control keys.
+  CWnd::OnMouseMove(self, int x, int y, int flags)
+    Sent when the user moves the mouse provided that a mouse button or the
+    shift or control keys are pressed.  Mouse move commands are not generated
+    if all keys are up.  The mouse position is (x, y) and flags gives the key state.
+  int CWnd::OnHScroll(self, not_used)
+  int CWnd::OnVScroll(self, not_used)
+    Sent when the horizontal or vertical scroll bar of a view is operated by the
+    user.  This is not used by scroll bar controls.
+
+Sent to CEditView:
+  CWnd::OnCreate(self, not_used)
+    See above.
+  CView::OnInitialUpdate(self)
+    See above.
+  CWnd::OnDestroy(self)
+    See above.
+  CWnd::OnSize(self, new_size)
+    See above.
+  int CWnd::OnChar(self, char ch, int flags)
+    See above.
+
+Sent to dialogs:
+  CDialog::OnInitDialog(self)
+    Sent to dialogs before they are displayed.  All initialization should
+    be done here.
+
+Sent to Documents:
+  CDocument::OnNewDocument(self)
+    Sent when a new empty document is created.  Be sure to call the base class.
+  CDocument::OnOpenDocument(self, filename)
+    Sent when an existing document is opened.  Be sure to call the base class.
+  CDocument::DeleteContents(self)
+    Sent when the user requests the document contents to be discarded.
+  CDocument::OnCloseDocument(self)
+    Sent when the document is closed.
+  CDocument::SerializeIn/Out(self, file_object)
+    Sent when the user requests the document to be read or written to disk.
+
+Control Messages
+
+These are routed as described above until a handler is found.
+
+OnMenuAaaBbb(self, control)
+  Sent when a menu button is selected.  The menu button is "control".
+
+OnButtonAaa(self, control)
+  Sent when a button is pressed.  The button is "control".
+
+OnScroll(self, control)
+  Sent when a scroll bar control (not a window scroll bar) is operated.  The
+  scroll bar is "control".
+

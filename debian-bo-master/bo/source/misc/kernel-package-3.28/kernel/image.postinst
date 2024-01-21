@@ -1,0 +1,491 @@
+#! /usr/bin/perl
+#                              -*- Mode: Perl -*- 
+# debian.postinst --- 
+# Author           : Manoj Srivastava ( srivasta@pilgrim.umass.edu ) 
+# Created On       : Sat Apr 27 05:55:26 1996
+# Created On Node  : melkor.pilgrim.umass.edu
+# Last Modified By : Manoj Srivastava
+# Last Modified On : Mon Mar 31 00:36:38 1997
+# Last Machine Used: tiamat.datasync.com
+# Update Count     : 46
+# Status           : Unknown, Use with caution!
+# HISTORY          : 
+# Description      : 
+# 
+# 
+# use strict; #for debugging
+$|=1;
+# Predefined values:
+my $version = "=V";
+my $image_in_boot = "=B";	# Should be empty, mostly
+
+#known variables
+my @boilerplate = ();
+my $bootdevice = '';
+my $rootdevice = '';
+my $rootdisk = '';
+my $rootpartition = '';
+my $imagedir = "/";
+my $realimageloc = "boot/";
+
+if ($image_in_boot) {
+  $imagedir = "/boot/";
+  $realimageloc = "";
+}
+
+# Ignore all invocations uxcept when called on to configure.
+exit 0 unless $ARGV[0] =~ /configure/;
+
+# most of our work is done in $imagedir
+chdir("$imagedir") or die "could not chdir to $imagedir:$!\n";
+
+# Test if we need to do anything in / at all. This test make us idempotent.
+if (! -e 'vmlinuz') {
+  die "$imagedir" . "vmlinuz does not exist. This is disastrous. Exiting\n";
+}
+# follow link target.
+if (-l 'vmlinuz') {
+  my $vmlinuz_target = readlink 'vmlinuz';
+  if (! (defined($vmlinuz_target) && 
+	 "$vmlinuz_target" eq "$realimageloc" . "vmlinuz-$version")) {
+    # don't clobber vmlinuz.old quite yet
+    rename("vmlinuz", "vmlinuz.$$") || 
+      die "failed to move " . $imagedir . "vmlinuz:$!";
+    if (!rename("System.map", "System.$$")) {
+      rename("vmlinuz.$$", "vmlinuz");
+      die "Error renaming " . $imagedir . "System.map";
+    }
+
+    if (! symlink($realimageloc . "vmlinuz-$version", "vmlinuz")) {
+      rename("vmlinuz.$$", "vmlinuz");
+      rename("System.$$",  "System.map");
+      die("Failed to symbolic-link /boot/vmlinuz-$version to "
+	  . $imagedir . "vmlinuz .\n"); 
+    }
+    
+    if ( symlink($realimageloc . "System.map-$version", "System.map") < 0 ) {
+      rename("vmlinuz.$$", "vmlinuz");
+      rename("System.$$", "System.map");
+      die("Failed to sym-link /boot/System.map-$version to "
+	  . $imagedir . "System.map.\n"); 
+    }
+
+    # Ok, now we may clobber the previous .old files
+    rename("vmlinuz.$$", "vmlinuz.old");
+    rename("System.$$", "System.old");
+  }
+}
+
+if ( -x "/sbin/psupdate" && -f "/boot/vmlinux-$version" ) {
+  unlink("/boot/psdatabase");
+  symlink("/boot/psdatabase-$version", "/boot/psdatabase");
+  system("psupdate /boot/vmlinux-$version");
+  if ( -f "/boot/psdatabase-$version" ) {
+    unlink("/boot/vmlinux-$version");
+  }
+  else {
+    print "\nAn error seems to have occurred while generating the\n";
+    print "psdatabase file /boot/psdatabase.  NOT deleting the\n";
+    print "/boot/vmlinux-$version so that the database may be \n";
+    print "created manually\n";
+  }
+}
+
+if ( -f '/lib/modules/$version/modules.dep' ) {
+  unlink '/lib/modules/$version/modules.dep';
+  system("depmod -a $version");
+}
+
+undef $rootdevice;
+undef $rootdisk;
+undef $rootpartition;
+undef $bootdevice;
+
+open(FSTAB, "</etc/fstab") || die "Could not open /etc/fstab:$!";
+
+my $line = '';
+while ( $line=<FSTAB> ) {
+  my $device;
+  my $filesystem;
+  my $islilo;
+
+  if ( $line =~ m/^\#/ ) {
+    next;
+  }
+  ($device,$filesystem)=split(/[ \t]+/, $line);
+  next unless $device =~ m|^/dev/|; #ignore NFS and proc systems
+  next if $device =~ m|^/dev/fd|;   #ignore floppy drives
+  next if $filesystem =~ m|^none$|; #swap? in any case, do not run dd
+
+  if ( $filesystem =~ m!^/$! ) {
+    $rootdevice = $device;
+  }
+  $islilo=`dd if=$device ibs=1 skip=2 count=4 2>/dev/null`;
+  if ($islilo =~ /LILO/o) {
+    $bootdevice = $device;
+  }
+  if (defined($rootdevice) && defined($bootdevice)) {
+    last;
+  }
+}
+close(FSTAB);
+
+if (! defined($rootdevice)) {
+  my $answer;
+  print "Could not find where the current root file system is mounted!\n";
+  print "Please make some arrangement for your system to boot the new\n";
+  print "kernel (like running LILO, or getting a boot floppy). \n";
+  print "Please hit return to continue.\n";
+  $answer = <STDIN>;
+  exit (0);
+}
+else {
+  $rootdisk = $rootdevice;
+  $rootdisk =~ s/[0-9]+$//;
+  $rootpartition = $rootdevice;
+  $rootpartition =~ s/$rootdisk//;
+}
+
+if ( ! -x "/sbin/lilo" ) {
+  print "A new kernel image has been installed, but LILO, the Linux\n";
+  print "boot loader, is not present. Please install LILO, or make\n";
+  print "some other arrangement for your system to boot the new kernel\n";
+  exit (0) unless defined $rootdevice;
+
+  print "I can make a non-LILO diskette instead, but it won't be as useful.\n";
+
+  if (&ask_y("Would you like to create a boot floppy now")) {
+    &makefloppy();
+  }
+  exit(0);
+}
+
+@boilerplate = (
+    "compact\n",
+    "install=/boot/boot.b",
+    "\nmap=/boot/map\n",
+    "vga=normal\n",
+    "delay=20\n",
+    "image=" . $imagedir . "vmlinuz\n",
+    "label=Linux\n",
+    "read-only\n"
+);
+
+print STDERR <<"EOMSG";
+A new kernel image has been installed. 
+LILO, the LInux LOader, sets up your system to boot Linux directly
+from your hard disk, without the need for a boot floppy.
+
+WARNING
+If you are keeping another operating system or another version
+of Linux on a separate disk partition, you should not have LILO
+install a boot block now. Wait until you read the LILO documentation.
+That's because installing a boot block now might make the other
+system un-bootable. If you only want to run this version of Linux,
+go ahead and install the boot block here. If it doesn't work, you
+can still boot this system from a floppy.
+
+EOMSG
+;
+
+if (&ask("Would you like to create a boot floppy now")) {
+  &makefloppy();
+}
+
+if (-T "/etc/lilo.conf") {
+  # Trust and use the existing lilo.conf.
+  print "You already have a LILO configuration in the file /etc/lilo.conf\n";
+  if ( &ask_y("Install a boot block using the existing /etc/lilo.conf") ) { 
+    my $ret = &run_lilo();
+    exit $ret;
+  }
+  else {
+    if (&ask("Wipe out your old LILO configuration and make a new one")){
+      rename("/etc/lilo.conf", "/etc/lilo.conf.OLD");
+    }
+    else {
+      exit (0);
+    }
+  }
+}
+if (! &ask_y("Do you wish to set up Linux to boot from the hard disk")) {
+  exit (0);
+}
+
+print "You must do three things to make the Linux system boot from the\n";
+print "hard disk. Install a partition boot record, install a master boot\n";
+print "record, and set the partition active. You'll be asked to perform\n";
+print "each of these tasks. You may skip any or all of them, and perform\n";
+print "them manually later on.\n";
+print "\n";
+
+# If we get this far, we need to make a new lilo conf, and run lilo
+&make_liloconf();
+
+if (&ask_y("Install a partition boot block on partition $bootdevice")) {
+  my $ret = &run_lilo();
+  exit $ret if $ret;
+}
+print "\n";
+print "A master boot record is required to run the partition boot record.\n";
+if (-f "/boot/mbr.b") {
+  print "If you are already using a boot manager, and want to keep it,\n";
+  print "answer \"no\" to the following question. If you don't know\n";
+  print "what a boot manager is or whether you have one, answer \"yes\".\n";
+  if ( &ask_y("Install a master boot record (/boot/mbr.b) on $rootdisk")) {
+    my $ret = system("dd if=/boot/mbr.b of=$rootdisk bs=444 count=1");
+    if ($ret) {
+      print "There was a problem copying the master boot record.\n";
+      print "Please run \"dd if=/boot/mbr.b of=$rootdisk bs=444 count=1\"\n";
+      print "by hand. Please hit return to continue.\n";
+      my $ans = <STDIN>;
+    }
+  }
+}
+else {
+  print "However, you do not seem to have /boot/mbr.b, provided by the\n";
+  print "Debian package mbr.  I hope that your master boot record or \n";
+  print "boot manager does boot the active partition.  If not, you have\n";
+  print "to acquire the package mbr and install it. Please hit return to\n";
+  print "proceed.\n";
+  my $ans = <STDIN>;
+}
+print "\n";
+print "The master boot record will boot the active partition.\n";
+print "If you want your system to boot another operating system,\n";
+print "such as DOS or Windows, by default, answer \"no\" to the following\n";
+print "question. You may still use your boot manager or the master\n";
+print "boot record to boot Linux. If you want the system to boot Linux.\n";
+print "by default, answer \"yes\".\n";
+if ( &ask_y("Make $rootdevice the active partition") ) {
+  my $ret = system("/sbin/activate $rootdisk $rootpartition");
+  if ($ret) {
+    print "There was an error trying to activate $rootdevice.\n";
+    print "Please run \"/sbin/activate $rootdisk $rootpartition\"\n";
+    print "by hand. Please hit return to proceed.\n";
+    my $ans = <STDIN>;
+  }
+}
+else {
+  print "\n";
+  print "OK. If you installed the master boot record, and the partition\n";
+  print "boot record, you may boot Linux by holding down the shift key\n";
+  print "as the system boots, and then pressing the $rootpartition key\n";
+  print "when you see the \"1234F:\" prompt.\n";
+  print "";
+  print "For more information, see /usr/doc/mbr/README, and the files\n";
+  print "in the /usr/doc/lilo directory.\n";
+}
+
+sub ask {
+  my $answer;
+  print @_,"? [No] ";
+  $answer=<STDIN>;
+  return ( $answer =~ /^\s*[yY].*/ );
+}
+
+sub ask_y {
+  my $answer;
+  print @_,"? [Yes] ";
+  $answer=<STDIN>;
+  return ( $answer !~ /^\s*[Nn].*/ );
+}
+
+sub makefloppy {
+  my $answer;
+  my $done = 0;
+  my $drive = 0;
+  
+  print <<EO_MSG_A;
+
+This process needs a formatted floppy Please note that an unformatted
+floppy will cause this process to fail, and may well need a reboot to
+fix, and unfortunately, the system is not bootable yet.
+
+The first thing to determine is which floppy drive you wish to use.
+For most people, the default, which is the the default floppy drive,
+referred to as /dev/fd0, or A: would work.  Some people may want the
+second floppy drive which is drive 1, or /dev/fd1, or B:. 
+(Theoretically there there could be 8 floppy drives on a machine) If
+in doubt, accept the default [0], which should work in most cases.
+
+EO_MSG_A
+  ;
+  
+  print "Which floppy drive [0-7] do you want to use? [0] ";
+  $answer=<STDIN>;
+  if ($answer =~ m/^\s*(\d+)\s*$/) {
+    $drive = $1;
+  }
+  print "\nOk, using drive at /dev/fd$drive.\n\n";
+  
+  if (-x "/usr/bin/fdformat" || -x "/usr/bin/superformat") {
+      print "If there is no formatted floppy available, I could attempt\n";
+      print "to format it for you.\n";
+      if (&ask("Do you wish me to format the floppy")){
+         my $ret;
+	 my $format_command = '/usr/bin/fdformat';
+	 my $opt = ' ';
+	 
+	 if (-x "/usr/bin/fdformat" ) {
+	   $format_command = '/usr/bin/fdformat';
+	   $opt = '';
+
+	   if (-x "/usr/bin/superformat") {
+	     print "\n";
+	     print "Hmm, I see you have the newer superformat command\n";
+	     if (&ask("Do you wish me to use superformat format the floppy")) {
+	       $format_command = '/usr/bin/superformat';
+	       $opt = ' -d ';
+	     }
+	     print "\n";
+	   }
+	 }
+	 else {
+	    $format_command = '/usr/bin/superformat';
+	    $opt = ' -d ';   
+	 }
+	 
+         print "Insert a floppy diskette into your boot drive \n";
+         print "(/dev/fd$drive) and press <Return> when ready:";
+         $answer=<STDIN>;
+        FMTFLOPPY: while (! $done) {
+         DOFORMAT:{
+              $ret = system $format_command, " $opt /dev/fd$drive";
+              last DOFORMAT if $ret;
+              $done = 1;
+           }
+           if (! $done) {
+	     print <<EO_MSG_B;
+
+There was a problem formatting the floppy diskette in /dev/fd$drive
+
+Please make sure that you inserted the disk in the correct drive and
+that the disk is not write-protected.  Also, you may have to run
+setfdprm for fdformat to work.
+
+In some rare cases, it may mean a problem with the Floppy or the drive
+it self (try formatting the floppy with
+      % $format_command  $opt /dev/fd$drive
+manually to make sure if the problem persists).  In case the problem
+persists, it maybe because you have an older fdformat which has a
+problem auto- detecting the floppy drive.  Upgrading to the latest
+fdutils may help, or maybe you need to run
+      % setfdprm /dev/fd$drive 1440/1440 
+(or something like that) or you may try some thing like
+      % $format_command  $opt  /dev/fd0H1440
+ or even 
+      % $format_command  $opt  /dev/fd0u1440
+manually which _may_ work. Or else, try a new floppy.
+
+EO_MSG_B
+  ;
+	     
+	     
+             if (! &ask_y("Would you like to try again")) {
+		print "\n";
+		print "If there are no pre-formatted floppies available, \n";
+		print "you should stop right here. \n";
+		if (! &ask_y("Do you have a blank pre-formatted floppy")){
+		  print "Ok, aborting.\n";
+		  print "\n";
+		  return 1;
+		}
+		print "\n";
+              	last FMTFLOPPY;
+             }
+           }
+         }
+      }
+  }
+  else {
+       print "If there are no pre-formatted floppies available, you\n";
+       print "should stop right here. \n";
+      if (! &ask_y("Do you have a blank pre-formatted floppy")){
+	print "Ok, aborting.\n";
+        return 1;
+      }
+  }
+  if (!$done) {
+      print "\n";
+      print "Insert a (formatted) floppy diskette into your boot drive\n";
+      print "(/dev/fd$drive) and press <Return> when ready:";
+      $answer=<STDIN>;
+  }
+  $done=0;
+  while (! $done) {
+  MKBOOT:{
+      my $ret;
+      $ret = system '/bin/dd', "if=/boot/vmlinuz-$version", "of=/dev/fd$drive";
+      last MKBOOT if $ret;
+      $ret = system '/usr/sbin/rdev', "/dev/fd$drive", "$rootdevice";
+      last MKBOOT if $ret;
+      $ret = system '/usr/sbin/rdev', '-R', "/dev/fd$drive", '1';
+      last MKBOOT if $ret;
+      $done = 1;
+      print "\n";
+    }
+    if (! $done) {
+      print "\nThere was a problem creating the boot diskette in \n";
+      print "/dev/fd$drive\n.";
+      print "Please make sure that you inserted the diskette into the\n";
+      print "correct drive and that the diskette is not write-protected.\n";
+      print "In some rare cases, it may mean a problem with the\n";
+      print "Floppy or the drive it self.\n";
+      if (! &ask_y("Would you like to try again")) {
+	$done = 1;
+      }
+      print "\n";
+      print "Insert a (formatted) floppy diskette into your boot drive\n";
+      print "/dev/fd$drive and press <Return> when ready:";
+      $answer=<STDIN>;
+    }
+  }
+}
+sub make_liloconf {
+  # Create a lilo.conf if one doesn't exist.
+  if (!defined($bootdevice)) {
+    print "\nHmm... I can't determine which partition to put the \n";
+    print "partition boot record on. I'm defaulting to the $rootdevice\n";
+    print "which is where the root file system lives.\n";
+    $bootdevice = $rootdevice;
+  }
+  
+  open(CONF, ">/etc/lilo.conf");
+  print CONF "boot=".$bootdevice, "\n", "root=".$rootdevice, "\n", 
+             @boilerplate;
+  close(CONF);
+  chmod("/etc/lilo.conf", 0644);
+  chown("/etc/lilo.conf", 0, 0);
+}
+
+sub run_lilo (){
+  my $ret;
+  print "Testing lilo.conf ... \n";
+  $ret = system("/sbin/lilo -t >/tmp/lilo_log.$$");
+  if ($ret) {
+    my $ans;
+    print "There was an error with running lilo in test mode, a log is \n";
+    print "available in file /tmp/lilo_log.$$.  Please edit /etc/lilo.conf\n";
+    print "manually and re-run lilo, or make other arrangements to boot \n";
+    print "your machine. \n\t Please hit return to continue";
+    $ans = <STDIN>;
+    return $ret;
+  }
+  unlink "/tmp/lilo_log.$$";
+  print "Testing successful. Installing the partition boot sector... \n";
+  $ret = system("/sbin/lilo >/tmp/lilo_log.$$");
+  if ($ret) {
+    my $ans;
+    print "There was an error with running lilo, a log file is \n";
+    print "available in file /tmp/lilo_log.$$.  Please edit /etc/lilo.conf\n";
+    print "manually and re-run lilo, or make other arrangements to boot \n";
+    print "your machine. \n\t Please hit return to continue";
+    $ans = <STDIN>;
+    return $ret;
+  }
+  unlink "/tmp/lilo_log.$$";
+  print "Installation successful.\n";
+  return 0;
+}
+__END__

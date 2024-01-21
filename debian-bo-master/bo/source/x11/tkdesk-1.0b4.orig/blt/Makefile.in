@@ -1,0 +1,130 @@
+# ------------------------------------------------------------------------
+#       Makefile for demonstation shell of BLT library
+# ------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------
+#       C Compiler options 
+# ------------------------------------------------------------------------
+
+DEFINES      = 
+CFLAGS       = @CFLAGS@ @GCCFLAGS@
+CC 	     = @CC@
+
+TOPDIR	     = @DESTDIR@
+BINDIR       = @BINDIR@
+INCDIR	     = @INCDIR@
+
+# ------------------------------------------------------------------------
+#       Include directives for Tcl, Tk, and X include files 
+# ------------------------------------------------------------------------
+
+INCLUDES     = -I. @TCLINCSW@ @TKINCSW@ @XINCSW@
+
+# ------------------------------------------------------------------------
+#       Libraries directives for Tcl, Tk, X11, and BLT
+# ------------------------------------------------------------------------
+
+STD_LIBS     = @TKLIBSW@ @TCLLIBSW@ @XLIBSW@ @SHLIB_LIBS@
+INCR_LIBS    = @ITKLIBSW@ @ITCLLIBSW@
+EXTRA_LIBS   = @LIBS@ 
+
+LIBDIR       = @LIBDIR@
+XLIBDIR      = @XLIBDIR@
+TCLLIBDIR    = @TCLLIBDIR@
+TKLIBDIR     = @TKLIBDIR@
+
+LIBRARIES    = ./src/libBLT.a $(INCR_LIBS) $(STD_LIBS) $(EXTRA_LIBS)
+
+# ------------------------------------------------------------------------
+#       Don't edit anything beyond this point
+# ------------------------------------------------------------------------
+
+demo 	     = bltwish
+HEADERS	     = blt.h
+
+CC_SWITCHES  = $(CFLAGS) $(DEFINES) $(INCLUDES)
+LD_FLAGS     = @LDFLAGS@ @SHLIB_EXTRA_FLAGS@
+INSTALL      = @INSTALL@
+RANLIB 	     = @RANLIB@
+SHELL 	     = /bin/sh
+RM 	     = rm -f
+srcdir	     = @srcdir@
+
+all: lib-static $(demo) @SHLIB_TARGET@ 
+	@echo "make finished on `date`"
+
+$(demo): lib-static 
+	@echo "making BLT demo \"$(demo)\"..."
+	$(RM) $(demo)
+	$(CC) $(CC_SWITCHES) $(LD_FLAGS) \
+		$(srcdir)/tkAppInit.c -o $(demo) $(LIBRARIES) 
+
+libs: lib-static lib-shared
+shared: lib-shared
+
+lib-static:
+	@echo "making all in ./src"
+	@(cd src; $(MAKE) CFLAGS="$(CFLAGS)" all)
+
+lib-shared: 
+	@echo "making shared library in ./src/shared"
+	@(cd src/shared; $(MAKE) CFLAGS="$(CFLAGS)" all)
+
+
+install: install-top install-library \
+	install-bin install-lib install-man install-include
+
+install-top:
+	@if test -d $(TOPDIR); then : ; else mkdir $(TOPDIR); fi
+
+install-bin: $(demo)
+	@if test -d $(BINDIR); then : ; else mkdir $(BINDIR); fi
+	chmod 0755 $(demo)
+	$(INSTALL) $(demo) $(BINDIR)
+
+install-man: 
+	@(cd man; $(MAKE) install)
+
+install-include:
+	@if test -d $(INCDIR); then : ; else mkdir $(INCDIR); fi
+	chmod 0444 $(HEADERS)
+	$(INSTALL) $(HEADERS) $(INCDIR)
+
+install-lib:
+	@(cd src; $(MAKE) install)
+	@(cd src/shared; $(MAKE) install)
+
+install-library:
+	@(cd library; $(MAKE) install)
+
+
+clean:
+	@echo "cleaning in ./src"
+	@(cd src; $(MAKE) clean)
+
+.c.o:
+	$(CC) -c $(CC_SWITCHES) $<
+
+GENERATED_FILES = \
+	config.status config.cache config.log \
+	config.BLT src/bltConfig.h \
+	Makefile \
+	src/Makefile \
+	src/TAGS \
+	src/shared/Makefile \
+	man/Makefile \
+	library/Makefile \
+	demos/*.ps
+
+distclean: clean
+	$(RM) $(GENERATED_FILES)
+
+PUREFLAGS=
+pure: lib-static
+	$(PURIFYHOME)/purify $(PUREFLAGS) \
+	$(CC) $(CC_SWITCHES) $(srcdir)/tkAppInit.c -o $(demo) $(LIBRARIES)
+
+QUANTIFYFLAGS=
+profile: lib-static
+	$(QUANTIFYHOME)/quantify $(QUANTIFYFLAGS) \
+	$(CC) $(CC_SWITCHES) $(srcdir)/tkAppInit.c -o $(demo) $(LIBRARIES)

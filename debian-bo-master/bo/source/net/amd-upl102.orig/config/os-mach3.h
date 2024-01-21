@@ -1,0 +1,252 @@
+/*
+ * Copyright (c) 1989 Jan-Simon Pendry
+ * Copyright (c) 1989 Imperial College of Science, Technology & Medicine
+ * Copyright (c) 1989 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Jan-Simon Pendry at Imperial College, London.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *      This product includes software developed by the University of
+ *      California, Berkeley and its contributors.
+ * 4. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	%W% (Berkeley) %G%
+ *
+ * $Id: os-mach3.h,v 5.2.1.3 91/05/07 22:20:07 jsp Alpha $
+ *
+ * mt Xinu mach 2.6    (os-xinu43.h seems buggy for us)
+ * (tested on sun3)
+ * Erik Schoenfelder <schoenfr@ibr.cs.tu-bs.de>,
+ * Stefan Petri <petri@ibr.cs.tu-bs.de>
+ * RT Mach 2.5 (MSD 4.3) by Erez Zadok <ezk@cs.columbia.edu>
+ * i386 Mach-3.0: MK83/STD+WS, UX41/STDNFS+WS
+ * 		by Erez Zadok <ezk@cs.columbia.edu>
+ */
+
+/*
+ * Mach't nix  (does'nt ...)
+ */
+#ifndef MACH
+#define MACH
+#endif /* MACH */
+#ifndef MACH2
+#define MACH2 1
+#endif /* MACH2 */
+#ifndef MACH3
+#define MACH3 1
+#endif /* MACH3 */
+
+/*
+ * Check if this is an IBM RT, and set special values.
+ */
+#ifdef ibm032
+#ifndef ibmrt
+#define ibmrt
+#endif /* !ibmrt */
+#endif /* ibm032 */
+
+/*
+ * Does the compiler grok void *
+ */
+#ifdef __GNUC__
+#define	VOIDP
+#endif
+
+/*
+ * Which version of the Sun RPC library we are using
+ * This is the implementation release number, not
+ * the protocol revision number.
+ */
+#define RPC_3
+
+/*
+ * mt Xinu have a compatibility problem
+ * with getreq vs. getreqset.  On SunOS
+ * getreqset takes a pointer to an fd_set,
+ * whereas on MORE/bsd, getreq takes a
+ * fd_set directly (cf. an integer on SunOS).
+ */
+#define	svc_getreqset(p)	svc_getreq(*p)
+
+/*
+ * Which version of the NFS interface are we using.
+ * This is the implementation release number, not
+ * the protocol revision number.
+ */
+#define	NFS_4
+
+/*
+ * This is braindead. it seems to be NFS_4, but does not have the
+ * following defines.
+ */
+#define M_NEWTYPE 0
+
+/*
+ * Type and name of UFS mount.
+ */
+#ifdef ibmrt
+#undef MNTTYPE_UFS
+#define MNTTYPE_UFS MNTTYPE_42
+#endif /* ibmrt */
+
+#undef MNTTYPE_AUTO
+#define MNTTYPE_AUTO "nfs"
+
+/*
+ * Type of status argument passed to wait3 syscall
+ */
+#if defined(ibmrt) || defined(MACH2)
+#undef WAIT_STATUS_TYPE
+#define WAIT_STATUS_TYPE union wait
+#endif /* defined(ibmrt) || defined(MACH2) */
+
+/*
+ * Name of filesystem types
+ */
+#define	MOUNT_TYPE_NFS	"nfs"
+#define	MOUNT_TYPE_UFS	"ufs"
+#undef MTAB_TYPE_UFS
+#define	MTAB_TYPE_UFS	"ufs"
+
+/*
+ * How to get a mount list
+ */
+#if 0
+#undef	READ_MTAB_FROM_FILE
+#define	READ_MTAB_MACH3_STYLE
+#endif 0
+
+/*
+ * Byte ordering
+ */
+#ifndef BIG_ENDIAN
+#define BIG_ENDIAN 4321
+#endif /* BIG_ENDIAN */
+#ifndef LITTLE_ENDIAN
+#define LITTLE_ENDIAN 1234
+#endif /* LITTLE_ENDIAN */
+
+#ifdef ibmrt
+#define BYTE_ORDER      BIG_ENDIAN /* mc68000, tahoe, most others */
+#endif
+
+#ifndef BYTE_ORDER
+#include <machine/endian.h>
+#endif /* BYTE_ORDER */
+
+#undef ARCH_ENDIAN
+#if BYTE_ORDER == LITTLE_ENDIAN
+#define ARCH_ENDIAN "little"
+#else
+#if BYTE_ORDER == BIG_ENDIAN
+#define ARCH_ENDIAN "big"
+#else
+XXX - Probably no hope of running Amd on this machine!
+#endif /* BIG */
+#endif /* LITTLE */
+
+/*
+ * Type of a file handle
+ */
+#undef NFS_FH_TYPE
+#if defined(ibmrt) || defined(MACH2)
+#define NFS_FH_TYPE     fhandle_t *
+#else
+#define NFS_FH_TYPE     caddr_t
+#endif /* defined(ibmrt) || defined(MACH2) */
+
+/*
+ * Type of filesystem type
+ */
+#undef MTYPE_TYPE
+#define	MTYPE_TYPE	char *
+
+/*
+ * IBM-RT's need this for M_RDONLY and others.
+ */
+#ifdef ibmrt
+#include <sys/vfs.h>
+#endif /* ibmrt */
+
+/*
+ * Signal handlers return int
+ */
+#if defined(ibmrt) || defined(MACH2)
+#undef SIG_HNDL_TYP
+#define SIG_HNDL_TYP void
+#endif /* defined(ibmrt) || defined(MACH2) */
+
+/*
+ * the thing about ``old kernel'' was inspired by a look at the 
+ * source of /etc/mount 
+ * /etc/mount also tries to trap SIGSYS
+ */
+
+#ifndef __HC__
+#undef MOUNT_TRAP
+#include <sys/syscall.h>
+#if defined(__GNUC__)
+#define MOUNT_TRAP(type, mnt, flags, mnt_data) \
+( \
+{ int err = 0; \
+  errno = 0; \
+  if (syscall(SYS_vfsmount, type, mnt->mnt_dir, flags, mnt_data)) { \
+    err = -1; \
+    if (errno == ENODEV) { \
+      /* \
+       * might be an old kernel, need to try again \
+       * with file type number instead of string \
+       */ \
+      int typeno = 1; \
+      plog(XLOG_ERROR, "%s: 1SYS_vfsmount: %m", mnt->mnt_dir); \
+      if (strcmp(mnt->mnt_type, MNTTYPE_UFS) == 0) \
+        typeno = 0; \
+      else if (strcmp(mnt->mnt_type, MNTTYPE_NFS) == 0) \
+        typeno = 1; \
+      else \
+	   plog(XLOG_ERROR, "%s: type defaults to nfs...", mnt->mnt_dir); \
+      plog(XLOG_ERROR, "%s: retry SYS_vfsmount %s %d", mnt->mnt_dir, \
+	   mnt->mnt_type, typeno); \
+      if (typeno >= 0) { \
+        if (syscall(SYS_vfsmount, typeno, mnt->mnt_dir, flags, mnt_data)) { \
+          plog(XLOG_ERROR, "%s: 2SYS_vfsmount: %m", mnt->mnt_dir); \
+	} else { \
+          err = 0; \
+	} \
+      } \
+    } \
+  } \
+  err; \
+} \
+)
+#else /* !__GNUC__ */
+#define MOUNT_TRAP(a,b,c,d) define of MOUNT_TRAP in os-mach2.h needs GCC
+#endif /* __GNUC__ */
+#endif /* !__HC__ */
+
+/* end of os-mach2.h */

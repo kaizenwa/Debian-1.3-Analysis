@@ -1,0 +1,250 @@
+dnl ######################################################################
+dnl Process this file with autoconf to produce a configure script.
+dnl ######################################################################
+
+AC_PREREQ(2.10)
+
+AC_INIT(src/cfengine.c)
+AC_CONFIG_HEADER(src/conf.h)
+
+AC_CANONICAL_SYSTEM
+
+dnl
+dnl dsm - set version number string with every release
+dnl
+cfversion=`cat version`
+AC_SUBST(cfversion)
+
+echo ""
+echo "Configuring cfengine"
+echo ""
+
+#
+# Add default list of places to LDFLAGS to compensate for
+# ... the configure default value of LIBS on some systems
+#
+if test -z "$LDFLAGS"; then
+  for x in /usr/local/gnu/lib /usr/local/gnulib /usr/local/lib /usr/lib /lib
+  do
+    if test -d "$x"; then
+      LDFLAGS="$LDFLAGS -L$x"
+    fi
+  done
+fi
+
+dnl ######################################################################
+dnl Checks for programs.
+dnl ######################################################################
+
+AC_PROG_CC
+AC_PROG_MAKE_SET
+ADD_CC_WALL=false
+
+AC_PROG_LEX
+AC_PROG_YACC
+
+dnl dsm - YACC doesn't appear to need this
+dnl 
+dnl AC_CHECK_FUNC(yyerror, YFUNC=y, YFUNC=n)
+dnl AC_CHECK_LIB(ly, yyerror, YLIB=y, YLIB=n)
+dnl if test "$YFUNC" = "n" -a "$YLIB" = "y"; then
+dnl   LIBS="$LIBS -ly"
+dnl fi
+
+AC_PROG_RANLIB
+AC_PROG_INSTALL
+
+AC_PATH_PROG(PERL, perl, "", $PATH:$prefix/bin:/usr/bin:/usr/local/bin)
+AC_PATH_PROG(TEX, tex, "", $PATH:$prefix/bin:/usr/bin:/usr/local/bin)
+AC_PATH_PROG(TEXINDEX, texindex, "", $PATH:$prefix/bin:/usr/bin:/usr/local/bin)
+AC_PATH_PROG(DVIPS, dvips, "", $PATH:$prefix/bin:/usr/bin:/usr/local/bin)
+AC_PATH_PROG(TEXI2HTML, texi2html, "", $PATH:$prefix/bin:/usr/bin:/usr/local/bin)
+AC_PATH_PROG(MAKEINFO, makeinfo, "", $PATH:$prefix/bin:/usr/bin:/usr/local/bin)
+
+dnl #######################################################################
+dnl Determine what documentation to build by looking for builders
+dnl #######################################################################
+
+AC_CHECK_PROG(TFILE, tex, "cfengine.dvi", "", \
+	$PATH:$prefix/bin:/usr/bin:/usr/local/bin)
+AC_CHECK_PROG(DFILE, dvips, "cfengine.ps", "", \
+	$PATH:$prefix/bin:/usr/bin:/usr/local/bin)
+AC_CHECK_PROG(HFILE, texi2html, "cfengine.html", "", \
+	$PATH:$prefix/bin:/usr/bin:/usr/local/bin)
+AC_CHECK_PROG(IFILE, makeinfo, "cfengine.info", "", \
+	$PATH:$prefix/bin:/usr/bin:/usr/local/bin)
+
+CFDOCS="$IFILE $TFILE $DFILE $HFILE"
+AC_SUBST(CFDOCS)
+
+dnl ######################################################################
+dnl Checks for libraries.
+dnl ######################################################################
+
+dnl AC_CHECK_LIB(m, main)
+
+dnl ######################################################################
+dnl Checks for header files.
+dnl ######################################################################
+
+AC_HEADER_DIRENT
+AC_HEADER_STDC
+AC_CHECK_HEADERS(unistd.h)
+AC_CHECK_HEADERS(mount.h)
+AC_CHECK_HEADERS(utime.h)
+AC_CHECK_HEADERS(time.h)
+AC_CHECK_HEADERS(sys/time.h)
+AC_CHECK_HEADERS(malloc.h)
+AC_CHECK_HEADERS(vfs.h)
+AC_HEADER_TIME
+AC_HEADER_SYS_WAIT
+AC_CHECK_HEADERS(sys/sockio.h)
+
+dnl ######################################################################
+dnl Checks for header files.
+dnl ######################################################################
+
+AC_TYPE_MODE_T
+AC_TYPE_SIZE_T
+AC_TYPE_UID_T
+AC_TYPE_PID_T
+
+dnl ######################################################################
+dnl Checks for typedefs, structures, and compiler characteristics.
+dnl ######################################################################
+
+AC_C_CONST
+
+dnl ######################################################################
+dnl Check for special functions
+dnl ######################################################################
+
+AC_CHECK_FUNCS(getcwd getnetgrent)
+AC_CHECK_FUNCS(uname gethostname)
+AC_CHECK_FUNCS(lchown strstr putenv)
+AC_CHECK_FUNCS(bcopy mkfifo)
+
+dnl #######################################################################
+dnl Newer BSD systems don't have a compatible rtentry - use ortentry
+dnl #######################################################################
+ 
+if test -f /usr/include/net/route.h; then
+   echo -n "checking for ortentry... "
+   if grep ortentry /usr/include/net/route.h; then
+      AC_DEFINE(HAVE_ORTENTRY)
+      echo yes
+   else
+      echo no
+   fi
+fi
+
+dnl ######################################################################
+dnl OS specific stuff
+dnl ######################################################################
+
+LIBS="$LIBS -L../pub -lpub"
+
+dnl
+dnl dsm - To ensure conf.h is picked up via VPATH
+dnl
+if test "$srcdir" != "."; then
+  CPPFLAGS="$CPPFLAGS -I`pwd`/src"
+fi
+
+dnl
+dnl dsm - This case should be in the conf.h.in file.
+dnl
+case "$target_os" in
+
+   sunos3*)
+        CFLAGS="$CFLAGS -DSUN3 -DREGEX_MALLOC"
+        ;;
+   sunos4*)
+        CFLAGS="$CFLAGS -DSUN4 -DREGEX_MALLOC"
+        ;;
+   solaris*)
+        LIBS="$LIBS -lsocket -lnsl -lelf"
+        CFLAGS="$CFLAGS -DSOLARIS -DREGEX_MALLOC"
+        ;;
+   ultrix*)
+        CFLAGS="$CFLAGS -DULTRIX"
+        ;;
+   hpux*) 
+        LIBS="$LIBS -lc -lPW"
+        if test "$GCC" = "yes"; then
+          CFLAGS="$CFLAGS -DHPuUX"
+        else
+          CFLAGS="$CFLAGS -DHPuUX -DREGEX_MALLOC"
+        fi
+        ;;
+   aix*)
+        CFLAGS="$CFLAGS -DAIX"
+        ;;
+   osf*)
+        CFLAGS="$CFLAGS -DOSF -DHAVE_LCHOWN"
+        ;;
+   irix*)
+        CFLAGS="$CFLAGS -DIRIX -DREGEX_MALLOC -w"
+        ;;
+   linux*)
+        CFLAGS="$CFLAGS -DLINUX"
+        if test -d /var/lib/dpkg
+        then
+          echo "This is a Debian system, great!"
+          CFLAGS="$CFLAGS -DDEBIAN"
+        fi
+        ;;
+   freebsd*)
+        CFLAGS="$CFLAGS -DFREEBSD"
+        ;;
+   netbsd*)
+        CFLAGS="$CFLAGS -DNETBSD"
+        ;;
+   newsos*)
+        CFLAGS="$CFLAGS -DNEWS_OS"
+        ;;
+   bsd/os*)
+        CFLAGS="$CFLAGS -DBSDOS"
+        ;;
+   bsd*)
+        CFLAGS="$CFLAGS -DBSD43"
+        ;;
+   aos*)
+        CFLAGS="$CFLAGS -DAOS"
+        ;;
+   nextstep*)
+        CFLAGS="$CFLAGS -DNEXTSTEP"
+        ;;
+
+   *)   echo Unknown system type $target_os
+        exit 1
+        ;;
+esac
+
+
+dnl ######################################################################
+dnl Now make the Makefiles
+dnl ######################################################################
+
+AC_OUTPUT(pub/Makefile doc/Makefile src/Makefile bin/Makefile contrib/Makefile \
+	inputs/Makefile Makefile bin/cf-install bin/cfbackup bin/cfrestore \
+	bin/cfmail bin/cfdaily bin/cfwrap bin/cfbg bin/noseyparker \
+	bin/editquotas)
+
+chmod 0755 bin/cfbackup bin/cfrestore bin/cfmail bin/cfdaily bin/cfwrap \
+		bin/cfbg bin/noseyparker bin/editquotas
+
+dnl
+dnl dsm - is this really necessary?
+dnl
+if hostname > /dev/null; then
+   hostname=`hostname`
+else
+   hostname="unknown"
+fi
+
+echo "#define AUTOCONF_HOSTNAME \"$hostname\"" >> src/conf.h
+echo "#define AUTOCONF_SYSNAME \"$target_os\"" >> src/conf.h
+echo "#define CFVERSION \"$cfversion\"" >> src/conf.h
+
+echo "Configuration done. Run make to build cfengine."

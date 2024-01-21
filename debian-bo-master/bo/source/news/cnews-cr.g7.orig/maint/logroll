@@ -1,0 +1,97 @@
+#! /bin/sh
+# logroll - roll over log files
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/maint:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+suffixes=".9 .8 .7 .6 .5 .4 .3 .2 .1"
+initial=
+delete=
+compat='.3'
+defcompat="$compat"
+compress="compress -f"
+comped='.Z'
+notify='sleep 5'
+
+for dummy
+do
+	case "$1" in
+	-o)	suffixes=".ooo .oo .o"
+		if test " $compat" = " $defcompat"
+		then
+			compat='.oo'
+		fi
+		;;
+	-s)	suffixes="$2" ; shift	;;
+	-i)	initial="$2" ; shift	;;
+	-d)	delete="$2" ; shift	;;
+	-c)	compat="$2" ; shift	;;
+	-n)	notify="$2" ; shift	;;
+	-w)	compress="$2" ; shift	;;
+	-z)	comped="$2" ; shift	;;
+	-p)	compress=":" ; comped=	;;
+	--)	shift ; break		;;
+	-*)	echo "$0: unknown option \`$1'" >&2 ; exit 2	;;
+	*)	break			;;
+	esac
+	shift
+done
+
+sufs=
+sawdel=n
+for s in $suffixes
+do
+	# default -d is final suffix
+	if test " $delete" = " "
+	then
+		delete="$s"
+	fi
+	# turn on accumulation of sufs at $delete
+	if test " $s" = " $delete"
+	then
+		sawdel=y
+	fi
+	# do accumulation
+	if test " $sawdel" = " y"
+	then
+		sufs="$sufs $s"
+	fi
+done
+if test " $sufs" = " "
+then
+	echo "$0: \`$delete' not in suffix sequence" >&2
+	exit 1
+fi
+
+for f
+do
+	last=oops
+	comp="$comped"
+	for s in $sufs "$initial"
+	do
+		case "$s" in
+		"$delete")	rm -f $f$s$comp	;;
+		*)	if test -f $f$s$comp
+			then
+				mv $f$s$comp $f$last$comp || exit 1
+				if test " $s" = " $initial"
+				then
+					touch $f$s$comp || exit 1
+					eval $notify
+				fi
+				if test " $last" = " $compat"
+				then
+					eval $compress $f$last || exit 1
+				fi
+			fi
+			;;
+		esac
+		last="$s"
+		case "$s" in
+		"$compat")	comp=		;;
+		esac
+	done
+done

@@ -1,0 +1,352 @@
+                    README for CTI-ifhp
+                    ===================
+
+                Patrick Powell <papowell@sdsu.edu>
+                  Sun Oct 29 06:25:05 PST 1995
+
+This code has been derived from the CTI Laser Jet filter set;
+a modified version of the original README is attached below.
+
+1. The following executables are available:
+    ifhp,ofhp    - IF and OF filter
+    banner.sh    - PCL banner printer (GNU AWK)
+       - ofhp is symbolic link to or copy of the ifhp filter
+       - if ifhp invoked as ofhp or with -Fo option, acts as OF filter
+       - 'ofhp -Tbanner' will print banners using banner.sh
+
+2. The if filter will check the job files for printability and/or
+    postscript format.  If it is PostScript,  it will set the printer
+	to PostScript mode using the PCL commands,  otherwise it will
+	set the printer to PCL.  If you do not want this to happen,
+	then print the job as a binary file;  this suppresses the checks.
+	Some LPR spoolers use the 'v' format to indicate a binary file;
+	If this is the case you will need to use the following printcap:
+
+	printer:\
+		:of=/usr/lib/CTI-print/ofhp:\
+		:if=/usr/lib/CTI-print/ifhp:\
+		:vf=/usr/lib/CTI-print/ifhp -c:
+
+    If your LPD server does not allow options in the filter spec,
+	use the following entry and the following shell script:
+		:vf=/usr/lib/CTI-print/vfhp.sy:
+    vfhp.sh -
+        #/bin/sh
+        /usr/lib/CTI-print/ifhp -c  $*
+
+2. ifhp takes the full range of LPD filter options, and uses or
+    or ignores them as applicable. The following command line options
+    are used:
+    -c    - cleartext - dump this directly to the printer, no fonts,
+            no nothing done.  For those desperate people trying to
+            find a way to print those obnoxious files
+    -sstatusfile    - the name of a status file that is updated with
+            'rolling status' - i.e. - the last few log messages.
+    -nuser, -hhost, -Jjob  - used by ofhp for banner printing defaults
+    -T[filteroptions,]* - filter options
+       autodetect=(yes|no*) printer has autodetect to determine
+                            job type, PCL or POSTSCRIPT
+                            ** AUTODETECT environment variable overrides
+       banner[=off]         when in OF mode generates a banner using information
+							supplied on the 'sb' (short banner) line sent
+							by the LPR server to the of filter.
+							When banner is off,  the input is simply passed to
+							the output device and no banner page generation
+							is done.
+       cartridge=[*yes|no]  postscript cartridge present.
+                            If a postscript job detected and no cartridge
+                            prints a message and discards job.
+                            ** CARTRIDGE environment variable overrides
+       debug=debuglevel     set the debug level
+       dev=outdevice        /iodevice  - an io device, opened RW
+                            host%port  - a TCP/IP stream connection
+								to port on host
+       model=(III|IIID|IIISi|IV*)  HP model (default IV)
+                            ** MODEL environment variable overrides
+       plp=[yes|no*]         return errorcodes compatible with PLP
+                            default is LPRng errorcodes.
+       resourcesave=(yes|no*)  keep track of fonts
+                            from previous job, and do not download if
+                            font was last downloaded.  WARNING: if
+                            multiple spoolers use printer this will not
+                            work.
+                            ** RESOURCESAVE environment variable overrides
+       retries=nn (0*)      retry connection or printing count; 0 is infinite
+                            ** RETRIES environment variable overrides
+       sleep=nn (30*)       sleep between retries; 0 is no sleep
+                            ** SLEEPTIME environment variable overrides
+       stty=sttycommands    a set of stty commands applied when the
+                            iodevice is a serial line.
+       status=(on|off)      get printer status/linenumber information
+       trace=(on|off*)       dump output to a trace file
+                            ** TRACE environment variable overrides
+       wrap=(on|off*)        wrap long ouptput lines
+                            ** WRAP environment variable overrides
+
+        example: hpif '-Tdevice=/dev/ttya,stty=-echo pass8 39200'
+            -T=model=IIISi,plp,cart=yes,banner=off
+
+       Note: you may have multiple -T options.
+
+  The -T dev and stty parameters are useful when using the filter with
+  SUN LPR systems.  You may need need a shim filter, i.e. - small shellscript
+  to set the values:
+
+  Printcap: 
+        psfilter:if=/usr/lib/CTI-print/ofhp.sh
+
+  ofhp.sh:
+        #/bin/sh
+        /usr/lib/CTI-print/ofhp `-Tstty=-echo pass8 39200' $*
+
+  See the man page for option details.
+
+3. The ifhp filter has the ability to download fonts to the printer,
+    the font depending on the host originating a job.  The mapping is
+	controlled by the $(FONTDIR)/host_fonts file, which has lines of the form:
+      hostname       font
+    e.g.:
+      leon.cti.gr    $(FONTDIR)/dec-greek/cp12.fnt
+    See font/host_fonts.proto for details and examples.
+
+    $(FONTDIR) is a compile time value,  and must be fixed in the Makefile.
+    During installation the Makefile will generate the correct fontdirectory
+    pathname.
+
+4.  Printer problems are reported using syslog(3)-
+     syslog( LOG_WARNING|LOG_LPR, msg);  
+    consult the syslogd(8) man page for details of logging.  The parameters
+	to syslog have been bombproofed and strings are less 80 bytes long.
+
+5. Accounting.
+
+   The accounting procedures may appear rather strange to somebody who does
+   not come from an Academic environment where avoiding printer accounting
+   has long been a tradition.  The following methods are used.
+
+   1. At the start of a job the page counter value is read from the
+      printer.  Since this value is electromechanical,  it is VERY difficult
+      to modify it through software :-)
+      The value is printed to the accounting file using a line of the form:
+       start -hhost -uuser -pcountervalue -Pprinter; see src/doaccnt.c
+        for details.
+   2. At the end of a job the counter is read again, and the usage calculted;
+      the following line is written to the accounting file:
+       end -bpages -hhost -uuser -pcountervalue -Pprinter
+   3. In addition, if the ACCNTSH value is not NULL and the file exists,
+        then the accounting shell script is invoked with a command line
+        of the form
+           ACCNT -bpages -hhost -uuser -pcountervalue -Pprinter [accntfile]
+   This may appear to be overkill, but it is not.  Believe me, it is not.
+   Read the README.ACCOUNTING for details.
+
+6. I have to admit that I may have been a tiny little bit agressive on
+   editting the original CTI code;  I THINK that there is a line
+   that has not been modified,   but I am not sure about it. :-)
+   According to the copyright rules,  this is a derivative work;
+   the copyright is jointly held by
+    Panos Dimakopoulos, Systems Programmer and Patrick Powell
+   See README.COPYRIGHT
+
+README from the CTI-Print 1.2 Distribution (Edited for consistency with
+ current version of this software)
+
+-------------------------- VERSION 1.2 README ---------------------------
+
+
+* The font is not downloaded every time a job is submitted if the same font
+  was used in the previous job. Unfortunately there are two drawbacks here.
+  The first is that this cannot work if a printer is controlled by more than
+  one printer servers. This is because each of the servers can remember the
+  font which was downloaded by itself and not by the others. Unless an
+  interaction among the servers takes place some of them might be fooled
+  about the font actually downloaded last to the printer.
+  The second issue is that the LaserJet Series 4 printers need to have the
+  Resource Saving option enabled in order to be able to keep a downloaded
+  font during personality changes. For the 4MP printer this option can be
+  enabled if at least 7 MBytes of RAM are installed.
+
+* The user can choose from the command line the font he/she requires to be
+  used for the submitted job.
+
+                    README for PLP-lpd-filters v1.1
+                    ===============================
+
+* The handshake between the father and the child process of the hp4 filters has
+  been improved. This made the filters work well now and not remain hung as this
+  happened before.
+
+* When the hpiii filters cannot write on the parallel port they exit with RETRY
+  status and not with ABORT. In this way the job remains in the queue and 
+  another retry is given.
+
+
+                    README for PLP-lpd-filters v1.0
+                    ===============================
+
+The PLP-lpd-filters provided in this package have been developed as part of the
+CTI-Print project at the Division of Computing Facilities of the Computer 
+Technology Institute (CTI), Patras, Greece. The main objective of the project 
+was to develop a mechanism to serve any kind of printing requests (ascii, PCL 
+and PostScript jobs) from different network/OS environments supporting 
+configurable downloading of fonts (in the case of ascii jobs) depending on the 
+source of the request (i.e. in order to print jobs containing Greek characters 
+such as the ISO 8859/7, DEC Greek etc).
+
+The PLP-lpd-filters v1.0 are filters for HP LaserJet printers of the III and 
+4 series. They have been developed to work as part of the lpd platform 
+implemented by the PLP software (Portable Line Printer Spooler, release 
+3.4.12 - Patrick Powell, San Diego State University, papowell@sdsu.edu, 
+1988 - Justin Mason, jmason@iona.ie, 1994). However some patches to PLP 
+v3.4.12 are required so that additional info is passed to the filters as
+arguments.
+
+(1) Interface of PLP-lpd-filters with the PLP lpd daemon
+--------------------------------------------------------
+* The filters provide the interface  between the PLP-lpd daemon and the
+  printer and are to be configured in the printcap file in order to be executed 
+  by the lpd daemon every time a printing request is sent to the printer.
+* There are two filters for each printer series; one for the banner page 
+  printing and another for the main printing job. 
+* The filters are assigned to the :bp: and :if: printcap capabilities and, when 
+  executed, are passed as arguments from the lpd all the necessary info 
+  required for their functionality.
+
+(2) Communication with the printer
+----------------------------------
+* The interface between the filters and the printer varies for the two HP 
+  series.
+* For series III the filters have complete control of the interaction and use 
+  the specific ioctl() routines of the /dev/bpp SunOS parallel device to 
+  determine if something goes wrong and why. 
+(****** - NOTE - not in this version *******)
+
+* For series 4, the filters talk through the tcp-lp pipe from PLP 3.4.12 
+  which redirects the standard I/O file pointers through a network socket
+  ending to the printer. In this way the filters do not bother with the 
+  details of the port connection.
+(****** - NOTE - a direct connection can be made now *******)
+
+(3) Printer features supported by the filters
+---------------------------------------------
+* Accounting:
+- For the III series printers: Accounting is implemented for ascii printouts. 
+  Printers of this series do not support bidirectional communication; therefore
+  counting is attempted by the filters software and not by the printer itself
+  as the III series printers cannot return any status. For simple ascii files
+  it's easy to implement accounting by counting chars and lines but not for 
+  PCL and PostScript files.
+
+- For the 4 series printers: full accounting is provided for ascii, PCL and 
+  PostScript printing jobs (as all models of series 4 support status readback 
+  commands, which can report directly from the printer the pages actually 
+  printed).
+
+* Printing in duplex mode:
+  The filters can satisfy direct duplex printing requests (as long as the 
+  printer model supports that and the optional duplex unit is attached) for
+  Ascii, PCL and PostScript files. This is achieved when invoking lpr by 
+  passing the "duplex" argument with the -Z flag.
+
+* Printing in landscape mode:
+  This is achieved in the same way as in the
+  duplex case when invoking lpr by passing the "landscape" argument with the
+  -Z flag.
+
+* Line wrapping:
+  By setting an env variable in the configuration files  the filter can set
+  the printer to print with line wrapping. 
+
+* Font downloading for ascii files from a font pool:
+- The font to be downloaded for ascii files is specified per remote host in a 
+  configuration file. This provides the System Administrator with the 
+  capability to configure the printer with special character fonts such as for 
+  various national languages (Greek in the CTI's case).
+
+- The filters of the :if: capability send the file chars to
+  the printer. They can check the file beforehand and decide if it is a simple
+  ascii, a PCL or a PostScript file. In the first case it downloads the 
+  appropriate font from the font pool mentioned above. 
+  If the file to be printed is in PCL the filter switches the printer
+  to PCL mode and then sends the file to be printed. For the Postscript case 
+  the printer acts similarly except that, for series III, it first checks if 
+  the PostScript language is configured to the printer.
+
+* Configurable persistence:
+- The filters of series III check the parallel port pins to check the printer 
+  status while the filters of series 4 read the status returned from the 
+  printer itself to check the printer state. If things are not ok the filter 
+  can sleep and retry later. The sleep time as well as the number of retries 
+  (can vary from 0 to for ever) are configurable parameters.
+- Printer malfunctions are reported in the standard error log file. 
+
+(4) Support of specific HP printer models
+-----------------------------------------
+* For series III the filters work for all models III, IIID and IIISi with the
+  restrictions mentioned above when mentioning the supported printer features.
+
+* In series 4 for the printer job level control the PJL (Printer Job Language) 
+  is fully utilised. Actually the principles described in Chapter 9, Programming
+  Tips for Using PJL, of the Printer Job Language Technical Reference Manual
+  (HP 5961-0603, First Edition - July 1993) have considerably been taken into
+  account.
+
+* From the technical point of view the filter forks into two processes
+  which communicate through a pipe. The child is the one which monitors the
+  printer port by being in an eternal loop. Every time it receives something
+  from the printer port it places that in the pipe and notifies its father to
+  parse it and act accordingly. The child does not send anything to the printer
+  port which is its father's job. The father's job starts off by trying to 
+  synchronise with the printer. If the attempt is successful it carries on with
+  sending the job start command followed by the job itself. When all that has 
+  proceeded successfully the end of job command sent to the printer is expected
+  to finish the job. The reason the filter does not work for the 4L is that 
+  these commands for starting and ending a job are not recognized by this model.
+  As for the other models, according to the PJL manual, all the PJL commands 
+  used in the filter are recognised.
+
+* The printer status response handling is based on the responses returned by 
+  the HP4m+ printer. According to the PJL manual there is no variation. 
+  Therefore the filter should work for all the other models except the 4L. I 
+  rely on the manual's sayings for that but I have not tested that myself as 
+  we did not have the other models.
+
+(5) Debugging
+-------------
+* The System Administrator can check the filters-printer configuration by
+  Tracing the chars sent to the printer. This is requested by setting an env
+  variable in one of the configuration files.
+
+(****** also the -Tdebug=level option ******)
+
+(6) Usage Experience at CTI
+---------------------------
+* The filters for series III have been installed and operating on printer
+  models III, IIID and IIISi at C.T.I. (a total number of five printers) 
+  serving Ascii, PostScript and PCL requests from Unix, VMS and Novell 
+  environments through a PLP printer server running on a SunOS 4.1.3 platform. 
+  The results have been quite satisfactory.
+  Especially with the IIISi printer the printing is fast. It could be even
+  faster but there is the limiting reason of having to accompany with nulls 
+  the language switching command (for PCL or PostScript). While printer is 
+  receiving the nulls the filter process should sleep to give the printer the
+  chance to make the transition. A lot of hard effort had really to be made to
+  discover why these nulls had to be sent and what is the optimum number for
+  each printer type.
+
+* The series 4 filters  are currently used to drive an HP 4M and an HP 4MPlus 
+  network printers. There have not been reported any problems apart from some 
+  kind of delay. It seems that the printer takes some time to respond to the 
+  status requests and this probably is the real cause of the filter delay.
+
+* According to the info found in the manuals (Printer Job Language Technical 
+  Reference Manual, Part No: 5961-0603, PCL5 Comparison Guide, Part No: 
+  5961-0602) the commands used in the filters are supposed to operate on all
+  models of series 4 except for 4L (this model does not support the start and 
+  end of job commands and its behaviour is undefined).
+
+(7) Related e-mail lists
+------------------------
+Send your comments or suggestions to distribution e-mail list:
+
+        plp@iona.ie  - PLP/LPRng support

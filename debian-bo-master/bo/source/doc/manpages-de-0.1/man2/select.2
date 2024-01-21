@@ -1,0 +1,213 @@
+.\" Hey Emacs! This file is -*- nroff -*- source.
+.\"
+.\" This manpage is copyright (C) 1992 Drew Eckhardt,
+.\"                 copyright (C) 1995 Michael Shields.
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\"
+.\" Modified 1993-07-24 by Rik Faith <faith@cs.unc.edu>
+.\" Modified 1995-05-18 by Jim Van Zandt <jrv@vanzandt.mv.com>
+.\"
+.\" Sun Feb 11 14:07:00 MET 1996  Martin Schulze  <joey@linux.de>
+.\"	* translated from english to german
+.\"
+.TH SELECT 2 "27. April 1996" "Linux" "Systemaufrufe"
+.SH BEZEICHNUNG
+select \- Synchrone I/O-Multiplexsteuerung
+.SH ÜBERSICHT
+.B #include <sys/time.h>
+.br
+.B #include <sys/types.h>
+.br
+.B #include <unistd.h>
+.sp
+\fBint select(int \fIn\fB, fd_set *\fIreadfds\fB,
+fd_set *\fIwritefds\fB, fd_set *\fIexceptfds\fB,
+struct timeval *\fItimeout\fB);
+.sp
+.BI "FD_CLR(int " fd ", fd_set *" set );
+.br
+.BI "FD_ISSET(int " fd ", fd_set *" set );
+.br
+.BI "FD_SET(int " fd ", fd_set *" set );
+.br
+.BI "FD_ZERO(fd_set *" set );
+.fi
+.SH BESCHREIBUNG
+.B select()
+wartet für eine Reihe von Dateideskriptoren, daß sich deren Status
+ändert.
+
+Es werden drei voneinander unabhängige Mengen von Deskriptoren
+behandelt.  Bei den in
+.I readfds
+enthaltenen wird darauf geachtet, daß neue Zeichen zum Lesen
+ankommen, bei den in
+.I writefds
+angegebenen wird reagiert, wenn weitere Zeichen geschrieben werden
+können, und bei den in
+.I exceptfds
+angegebenen Deskriptoren wird reagiert, wenn etwas außergewöhnliches
+passiert ist.  Wenn die Routine beendet wird, werden die übergebenen
+Mengen so verändert, daß sie anzeigen, welcher Deskriptor seinen
+Status geändert hat.
+
+Vier Makros werden bereitgestellt, um mit diesen Mengen zu arbeiten.
+.B FD_ZERO
+löscht eine Menge,
+.B FD_SET
+und
+.B FD_CLR
+fügt einen Deskriptor zur Menge hinzu bzw. löscht diesen,
+.B FD_ISSET
+prüft, ob der Deskriptor in der Menge enthalten ist.  Dieses ist
+insbesondere nach einem
+.BR "select()" -Aufruf
+sinnvoll.
+
+.I n
+entspricht der Zahl des am höchsten nummerierten Datei-Deskriptors in allen
+drei Mengen, plus 1.
+
+.I timeout
+ist eine obere zeitliche Grenze, die
+.B select()
+wartet, bis es weitergeht.  Ist der Wert null, kehrt
+.B select()
+sofort zurück.  Wenn
+.I timeout
+.B NULL
+ist (kein timeout), kann
+.B select()
+unendlich lang blockieren.
+
+.SH "RÜCKGABEWERTE"
+Bei Erfolg gibt
+.B select()
+die Anzahl der Deskriptoren zurück, deren Status sich geändert hat.
+Wenn ein Fehler aufgetreten ist, wird \-1 zurückgegeben und 
+.I errno
+entsprechend gesetzt.  Die Mengen und
+.I timeout
+befinden sich in einem undefinierten Zustand, auf deren Inhalt sollte
+sich also bei einem Fehler nicht mehr verlassen werden.
+
+.SH FEHLER
+.TP 0.8i
+.B EBADF
+In einer der Mengen wurde ein ungültiger Datei-Deskriptor angegeben.
+.TP
+.B EINTR 
+Ein nicht-blockierendes Signal wurde empfangen.
+.TP
+.B EINVAL 
+.I n
+ist negativ.
+.TP
+.B ENOMEM
+.B select()
+ist nicht in der Lage, Speicher für die internen Tabellen zu
+bekommen.
+
+.SH ANMERKUNGEN
+Einige Programme rufen
+.B select()
+mit drei leeren Mengen,
+.I n
+gleich null und einem von null verschiedenen
+.I timeout
+auf, um eine portable Möglichkeit zu haben, ein
+.B sleep()
+mit der Präzision von Bruchteilen einer Sekunde zu benutzen.
+
+Bei Linux wird
+.I timeout
+derart verändert, daß es der nicht verstrichenen Zeit
+entspricht (relativ zum vorherigen
+.IR timeout ).
+Die meisten anderen Implementierungen unterlassen dieses, was Probleme
+mit sich bringt, wenn unter Linux geschriebener Quellcode, der
+.I timeout
+auswertet, auf andere Betriebssysteme portiert wird, und wenn Quellcode
+von anderen Betriebssystemen auf Linux portiert wird, der das struct
+timeval für mehrere
+.BR select() s
+in einer Schleife ohne Reinitialisierung verwendet.  Portabler Code
+sollte daher annehmen, daß
+.I timeout
+undefiniert ist, nachdem
+.B select()
+beendet ist.
+
+Nachdem der einzige Schreiber eine named Pipe schließt, wird
+.B select()
+zurückkehren und angeben, daß etwas von der Pipe gelesen werden kann.
+Wenn dann von dieser gelesen wird, wird 
+.BR read (2)
+0 zurückliefern, was das Dateiende markiert.  Code, der annimmt, daß
+.B select()
+blockiert, sollte die Pipe mit
+.B O_RDWR
+statt
+.B O_RDONLY
+öffnen.
+
+.SH BEISPIEL
+.nf
+#include <stdio.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+int main(int argc, char *argv[])
+{
+    fd_set rfds;
+    struct timeval tv;
+    int retval;
+
+    /* Achte auf stdin (fd 0), um zu sehen, wenn es
+     * Eingaben gibt.
+     */
+    FD_ZERO(&rfds);
+    FD_SET(0, &rfds);
+    /* Warte bis zu fünf Sekunden. */
+    tv.tv_sec = 5;
+    tv.tv_usec = 0;
+
+    retval = select(1, &rfds, NULL, NULL, &tv);
+    /* Verlaß Dich jetzt bloß nicht auf den Wert von tv! */
+
+    if (retval)
+        printf("Daten sind jetzt da.\\n");
+        /* FD_ISSET(0, &rfds) müßte jetzt true sein. */
+    else
+        printf("Keine Datein innerhalb von fünf Sekunden.\\n");
+
+    exit(0);
+}
+.fi
+.SH "SIEHE AUCH"
+.BR accept (2),
+.BR connect (2),
+.BR read (2),
+.BR recv (2),
+.BR send (2),
+.BR write (2).

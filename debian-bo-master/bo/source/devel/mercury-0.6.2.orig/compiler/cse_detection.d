@@ -1,0 +1,97 @@
+cse_detection.optdate cse_detection.c cse_detection.err cse_detection.o : cse_detection.m \
+	bool.int \
+	det_util.int \
+	globals.int \
+	goal_util.int \
+	hlds_data.int \
+	hlds_goal.int \
+	hlds_module.int \
+	hlds_out.int \
+	hlds_pred.int \
+	instmap.int \
+	int.int \
+	io.int \
+	list.int \
+	make_hlds.int \
+	map.int \
+	mercury_builtin.int \
+	mode_util.int \
+	modes.int \
+	options.int \
+	quantification.int \
+	require.int \
+	set.int \
+	std_util.int \
+	switch_detection.int \
+	term.int \
+	varset.int \
+	assoc_list.int2 \
+	char.int2 \
+	clause_to_proc.int2 \
+	delay_info.int2 \
+	equiv_type.int2 \
+	float.int2 \
+	getopt.int2 \
+	llds.int2 \
+	mode_errors.int2 \
+	mode_info.int2 \
+	ops.int2 \
+	prog_data.int2 \
+	relation.int2 \
+	shapes.int2 \
+	special_pred.int2 \
+	string.int2 \
+	tree.int2 \
+	tree234.int2 \
+	unify_proc.int2
+
+cse_detection.date : cse_detection.m \
+	bool.int3 \
+	det_util.int3 \
+	globals.int3 \
+	goal_util.int3 \
+	hlds_data.int3 \
+	hlds_goal.int3 \
+	hlds_module.int3 \
+	hlds_out.int3 \
+	hlds_pred.int3 \
+	instmap.int3 \
+	int.int3 \
+	io.int3 \
+	list.int3 \
+	make_hlds.int3 \
+	map.int3 \
+	mercury_builtin.int3 \
+	mode_util.int3 \
+	modes.int3 \
+	options.int3 \
+	quantification.int3 \
+	require.int3 \
+	set.int3 \
+	std_util.int3 \
+	switch_detection.int3 \
+	term.int3 \
+	varset.int3 \
+	assoc_list.int3 \
+	char.int3 \
+	clause_to_proc.int3 \
+	delay_info.int3 \
+	equiv_type.int3 \
+	float.int3 \
+	getopt.int3 \
+	llds.int3 \
+	mode_errors.int3 \
+	mode_info.int3 \
+	ops.int3 \
+	prog_data.int3 \
+	relation.int3 \
+	shapes.int3 \
+	special_pred.int3 \
+	string.int3 \
+	tree.int3 \
+	tree234.int3 \
+	unify_proc.int3
+
+cse_detection.dir/cse_detection_000.o: cse_detection.m
+	rm -rf cse_detection.dir
+	$(MCS) -s$(GRADE) $(MCSFLAGS) cse_detection.m

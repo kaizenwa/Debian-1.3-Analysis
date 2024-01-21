@@ -1,0 +1,257 @@
+#! /bin/sh
+
+###############################################################################
+###									    ###
+###	      GNU Interactive Tools 4.3.16 per file type action script	    ###
+###				   Global version			    ###
+###	    Copyright (C) 1994, 1995, 1996 Free Software Foundation, Inc.   ###
+###		    Written by Tudor Hulubei and Andrei Pitis.		    ###
+###			  Enhanced by Verdoolaege Sven.		            ###
+###									    ###
+###############################################################################
+
+###
+### This script executes a different action for each file type
+### specified.  It tries to match the second parameter against the
+### patterns specified in the 'case' statement (see below).
+###
+### If you want to add new file types & actions to this script, just
+### add a new entry to the 'case' statement *before* the last one
+### ( *) ... )
+###
+### For grater flexibility, gitaction's first parameter is the name of
+### the directory where the file resides.  So you can get the complete
+### file name appending the file base name to the file path just like
+### that: $1/$2
+###
+### If you enhance this script, please send me a patch at
+### tudor@cs.unh.edu.  I'll include it in the next release.
+###
+
+###
+### Instead of hardcoding `more' or `less` here, we can use GIT_PAGER,
+### a shell environment variable that binds on one of them, depending
+### on your environment.  The default is to call "more", but you can
+### change GIT_PAGER to point to your favorite pager...
+###
+
+###
+### Thanks to John Stump for suggesting me to get rid of gitmatch.
+###
+
+###
+### Note:
+### Not all the programs called here are able to handle the -- command
+### line switch.  These are: emacs, ghostview, tar, basename, ar, xv,
+### xanim, xfig, lynx, mpeg_vga, zip/unzip.  There are some that I couldn't
+### test.
+###
+### When these programs will be fixed, we should add -- to them...
+### Until then, we will fail to run commands like `xfig -P -P' to
+### process a file called `-P'.
+###
+
+name=`basename "$0"`
+
+if test "$#" -ne 2 || test ! -d "$1" || test ! -f "$2"; then
+	echo "$name: GIT internal script" >&2
+	exit 1
+fi
+
+done=0
+
+if test -f .gitaction; then
+	./.gitaction "$1" "$2"
+	done=$?
+fi
+
+if test $done -ne 0; then
+	exit 0
+fi
+
+if test -f $HOME/.gitaction; then
+	$HOME/.gitaction "$1" "$2"
+	done=$?
+fi
+
+if test $done -ne 0; then
+	exit 0
+fi
+
+
+msg="Press ENTER to continue"
+
+
+case "$2" in
+
+*.[oO])	 	objdump --syms --all-headers -- "$2" | $GIT_PAGER;	\
+		echo "$msg"; read key;;
+*.a | *.sa)	ar -tv "$2" | $GIT_PAGER;				\
+		echo "$msg"; read key;;
+*.tar)		tar tvf "$2" | $GIT_PAGER;				\
+		echo "$msg"; read key;;
+*.tar.gz |\
+*.t[arg]z |\
+*.tar.[zZ])	(echo "Compressed file info:";				\
+		gunzip -l -- "$2";					\
+		echo;							\
+		echo "Tar file info:";					\
+		gunzip -c -- "$2" | tar tvf -) | $GIT_PAGER;		\
+		echo "$msg"; read key;;
+*.man)		nroff -man "$2" | $GIT_PAGER;				\
+		echo "$msg"; read key;;
+*.html |\
+*.htm)		lynx "$2";;
+utmp)		w | $GIT_PAGER;						\
+		echo "$msg"; read key;;
+wtmp)		last | $GIT_PAGER;					\
+		echo "$msg"; read key;;
+pubring.pgp |\
+secring.pgp)	pgp -kv -- "$2" | $GIT_PAGER;				\
+		echo "$msg"; read key;;
+*.fig | *.FIG)	if test $DISPLAY; then					\
+			(xfig "$2" > /dev/null 2>&1 &);			\
+		else							\
+			$GIT_PAGER "$2";				\
+			echo "$msg"; read key;				\
+		fi;;
+*.gif  | *.GIF  |\
+*.jpg  | *.JPG  |\
+*.jpeg | *.JPEG |\
+*.tga  | *.TGA  |\
+*.bmp  | *.BMP  |\
+*.ppm  | *.PPM  |\
+*.pgm  | *.PGM  |\
+*.pbm  | *.PBM)	if test $DISPLAY; then					\
+			(xv "$2" > /dev/null 2>&1 &);			\
+		else							\
+			zgv -- "$2";					\
+		fi;;
+*.tif | *.TIF |\
+*.xbm | *.XBM |\
+*.xpm | *.XPM |\
+*.ras | *.RAS |\
+*.rgb | *.RGB |\
+*.fts | *.FTS |\
+*.pm  | *.PM)   if test $DISPLAY; then					\
+			(xv "$2" > /dev/null 2>&1 &);			\
+		else							\
+			$GIT_PAGER "$2";				\
+			echo "$msg"; read key;				\
+		fi;;
+*.mov | *.MOV |\
+*.avi | *.AVI) if test $DISPLAY; then					\
+			(xanim "$2" > /dev/null 2>&1 &);		\
+		else							\
+			$GIT_PAGER "$2";				\
+			echo "$msg"; read key;				\
+		fi;;
+*.mpeg | *.MPEG |\
+*.mpg  | *.MPG) if test $DISPLAY; then					\
+			(xanim "$2" > /dev/null 2>&1 &);		\
+		else							\
+			mpeg_vga "$2";					\
+		fi;;
+*.mov.gz    |\
+*.MOV.gz    |\
+*.mov.[zZ]  |\
+*.MOV.[zZ]  |\
+*.avi.gz    |\
+*.AVI.gz    |\
+*.avi.[zZ]  |\
+*.AVI.[zZ])	if test $DISPLAY; then					\
+			(gunzip -c -- "$2" |				\
+			 xanim - > /dev/null 2>&1 &);			\
+		else							\
+			$GIT_PAGER "$2";				\
+			echo "$msg"; read key;				\
+		fi;;
+*.mpg.gz    |\
+*.MPG.gz    |\
+*.mpg.[zZ]  |\
+*.MPG.[zZ]  |\
+*.mpeg.gz   |\
+*.MPEG.gz   |\
+*.mpeg.[zZ] |\
+*.MPEG.[zZ])	if test $DISPLAY; then					\
+			(gunzip -c -- "$2" |				\
+			 xanim - > /dev/null 2>&1 &);			\
+		else							\
+			gunzip -c -- "$2" | mpeg_vga;			\
+		fi;;
+*.fli | *.FLI |\
+*.flc | *.FLC)	if test $DISPLAY; then					\
+			(xanim "$2" > /dev/null 2>&1 &);		\
+		else							\
+			flip "$2";					\
+		fi;;
+*.fli.gz   |\
+*.FLI.gz   |\
+*.fli.[zZ] |\
+*.FLI.[zZ] |\
+*.flc.gz   |\
+*.FLC.gz   |\
+*.flc.[zZ] |\
+*.FLC.[zZ])	if test $DISPLAY; then					\
+			(gunzip -c -- "$2" |				\
+			 xanim - > /dev/null 2>&1 &);			\
+		else							\
+			gunzip -c -- "$2" | flip -;
+		fi;;
+*.gl | *.GL)	if test $DISPLAY; then					\
+			(xgrasp "$2" > /dev/null 2>&1 &);		\
+		else							\
+			$GIT_PAGER "$2";				\
+			echo "$msg"; read key;				\
+		fi;;
+*.gl.gz   |\
+*.GL.gz   |\
+*.gl.[zZ] |\
+*.GL.[zZ])	if test $DISPLAY; then					\
+			(gunzip -c -- "$2" | 				\
+			 xgrasp > /dev/null 2>&1 &);			\
+		else							\
+			$GIT_PAGER "$2";				\
+			echo "$msg"; read key;				\
+		fi;;
+*.mod | *.s3m)	(s3mod "$2" &);;
+*.voc | *.wav)	(vplay "$2" &);;
+*.ps | *.PS)	if test $DISPLAY; then					\
+			(ghostview "$2" > /dev/null 2>&1 &);		\
+		else							\
+			gs -sDEVICE=linux "$2";				\
+		fi;;
+*.dvi | *.DVI)	if test $DISPLAY; then					\
+			(xdvi "$2" > /dev/null 2>&1 &);			\
+		else							\
+			$GIT_PAGER "$2";				\
+			echo "$msg"; read key;				\
+		fi;;
+*.[1-9n] |\
+*.[1-9n][xXm])	nroff -man "$2" | $GIT_PAGER;				\
+		echo "$msg"; read key;;
+*.[1-9n][xXm].gz   |\
+*.[1-9n][xXm].[zZ] |\
+*.[1-9n].gz        |\
+*.[1-9n].[zZ])	gunzip -c -- "$2" | nroff -man | $GIT_PAGER;		\
+		echo "$msg"; read key;;
+RMAIL)		emacs -f rmail;;
+*.gz  | *.GZ |\
+*.[zZ])		gunzip -c -- "$2" | $GIT_PAGER;				\
+		echo "$msg"; read key;;
+*.zip | *.ZIP)	unzip -v "$2" | $GIT_PAGER;				\
+		echo "$msg"; read key;;
+*.arj | *.ARJ |\
+*.a[0-9][1-9] |\
+*.A[0-9][1-9])	unarj l "$2" | $GIT_PAGER;				\
+		echo "$msg"; read key;;
+*.rar | *.RAR)	unrar l "$2" | $GIT_PAGER;				\
+		echo "$msg"; read key;;
+*.rpm | *.RPM)	rpm -qilRsp -- "$2" | $GIT_PAGER;			\
+		echo "$msg"; read key;;
+*)		$GIT_PAGER "$2";					\
+		echo "$msg"; read key;;
+
+esac
+
+exit 0

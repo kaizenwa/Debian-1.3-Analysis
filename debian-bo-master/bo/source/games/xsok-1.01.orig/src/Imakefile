@@ -1,0 +1,178 @@
+# Imakefile for xsok
+#
+# ****************************************************************************
+
+# customizing:
+#
+# 0.) extra warnings for gcc and development
+#undef EXTRA_WARNINGS
+
+# 1.) specify, if you want online help
+# affected file(s): Xaw-main.c, Xaw-help.c
+HELP_OPTION = -DONLINE_HELP
+
+# 2.) specify, if you want sound (then, SOUNDOBJ should be one module of
+#	X-sound_*.o, else empty)
+#     Note: for X-sound_SUN.o, /dev/audio must have 666 permissions
+# affected file(s): (several, you should recompile completely)
+# note: sound isn't too great at the moment, we better leave it off.
+SOUND_OPTION = # -DSOUND
+SOUNDOBJ = # X-sound_SUN.o
+
+# 3.) there is a function popen() in sys-V / X/OPEN which opens a pipe.
+# Define -DHAVE_POPEN if you want to use this function for decompressing
+# level files. Do not define it if you want to use my emulation, which
+# does only require a standard POSIX.1 system and is faster, since it does
+# not spawn a shell.
+# Attention! In both cases, you need a binary of gunzip in your PATH.
+# affected file(s): xfopen.c
+PIPE_DEFINE = # -DHAVE_POPEN
+
+# 4.) There is a function gethostbyname() in BSD systems, which will extract
+# the domain of your host from the /etc/hosts database. The definition of the
+# relevant structure is in the system include file netdb.h.
+# This file is availaible on Linux, SUN-OS, HP-UX 9. (But it is not
+# part of the POSIX standard.)
+# Remove this define, if you do not have this function.
+# affected file(s): username.c
+NET_DEFINE = -DBSD_NETKIT
+
+# 5.) For the replay option, we need the possibility to sleep for a short
+# period of time. This can be done by the usleep() function.
+# Remove this, if you need usleep() emulation code.
+# affected file(s): X-gfx.c
+SLEEP_DEFINE = -DHAVE_USLEEP
+
+# BINDIR and LIBDIR should be predefined by the templates
+# BINDIR = /usr/bin/X11
+# LIBDIR = /usr/lib/X11
+XSOKLIBDIR = /usr/games/lib/xsok
+APPDEFSDIR = $(LIBDIR)
+XSOKMANDIR = /usr/man/man6
+XSOKDOCDIR = /usr/doc/xsok
+
+# This is the name of the save directory, where solved games are stored:
+# an alternative path would be $(XSOKLIBDIR)/save
+# The directory XSOKSAVEDIR must have permissions rwx for world, else
+# xsok must be installed suid, and XSOKDIR must have write permissions for
+# the owner of xsok
+XSOKSAVEDIR = /var/games/xsok
+
+# paths for installation in user's home-directory.
+LXSOKBINDIR = $(HOME)/bin
+LXSOKMANDIR = $(HOME)/xsok
+LAPPDEFSDIR = $(HOME)
+
+# xsok needs to know where the xpm library resides
+XPMLIB 			= -L$(USRLIBDIR) -lXpm
+XPMINCLUDE		= -I $(INCDIR)
+
+# *****************************************************************************
+# I hope you don't need to change anything below this point
+# *****************************************************************************
+#if defined(HPArchitecture) || defined(AIXArchitecture)
+CC = c89
+CCOPTIONS =
+#else
+CC = gcc
+#ifdef EXTRA_WARNINGS
+CCOPTIONS = -O2 -pipe -ansi -fno-common -Wall -Wshadow -Wpointer-arith \
+	-Wcast-qual -Wcast-align -Waggregate-return \
+	-Wstrict-prototypes -Wmissing-prototypes \
+	-Wnested-externs -Wwrite-strings
+#else
+CCOPTIONS = -O2 -pipe -ansi -Wall -fno-common
+#endif
+#endif
+
+# Xaw interface (the only one currently available)
+KIT_LIBS = XawClientLibs
+KIT_OBJS = Xaw-main.o Xaw-help.o
+DEPLIBS = XawClientDepLibs
+
+LOCAL_LIBRARIES = $(XPMLIB) $(KIT_LIBS)
+
+VER=1.00
+
+XOBJS   = X-events.o X-gfx.o X-widget.o $(SOUNDOBJ)
+STDOBJS = messages.o commands.o score.o parse.o tools.o move.o \
+	loadsave.o username.o xfopen.o mousemove.o
+
+OBJS = $(STDOBJS) $(XOBJS) $(KIT_OBJS)
+MYPROG = xsok
+ALLTARGETS = username combine showscore mergescores $(MYPROG)
+DEFINES = $(HELP_OPTION) $(SOUND_OPTION) $(XPMINCLUDE) $(NET_DEFINE) \
+   $(PIPE_DEFINE) -DXSOKDIR=\"$(XSOKLIBDIR)\" -DXSOKSAVE=\"$(XSOKSAVEDIR)\" \
+   $(SLEEP_DEFINE)
+
+# Dependencies:
+# *.c  require  version.h xsok.h
+# X*.c additionally require X-sok.h and Tableau.h
+# X-widget.c additionally requires TableauP.h
+LIBCONTS = *.gz *.help keys
+
+all::	$(ALLTARGETS)
+
+clean::
+	rm -f $(ALLTARGETS)
+
+testname:
+	@echo
+	@echo "The name used for highscores you break is"
+	@./username
+	@echo "If you do not like this, please set the Tableau.username \
+resource explicitly."
+	@echo
+
+username: username.c
+	$(CC) $(NET_DEFINE) -DTESTING -s -o username username.c
+
+combine: combine.c
+	$(CC) -s -o combine combine.c
+
+# the install targets require that make has been run in the lib directory
+install:: $(MYPROGS)
+	(umask 022 && mkdirhier $(XSOKLIBDIR))
+	# chmod 755 $(XSOKLIBDIR)
+	(umask 022 && mkdirhier $(XSOKSAVEDIR))
+	chmod 777 $(XSOKSAVEDIR)
+	(cd ../lib; tar cf - $(LIBCONTS) | (cd $(XSOKLIBDIR); tar xf -))
+	chown -R root $(XSOKLIBDIR) $(XSOKSAVEDIR)
+	chmod -R a+r $(XSOKLIBDIR)
+	(cd ../lib && ../src/mergescores $(XSOKSAVEDIR)/Xsok.score \
+	   $(XSOKSAVEDIR)/Sokoban.score $(XSOKSAVEDIR)/Cyberbox.score)
+	chmod 666 $(XSOKSAVEDIR)/[A-z]*.score
+	(umask 022 && mkdirhier $(XSOKDOCDIR))
+	if [ -r ../doc/xsok.dvi ]; then cp ../doc/xsok.dvi $(XSOKDOCDIR); fi
+	cp ../doc/cyberbox.doc $(XSOKDOCDIR)
+	cp ../etc/COPYRIGHT* $(XSOKDOCDIR)
+	chmod -R a+r $(XSOKDOCDIR)
+	mkdirhier $(XSOKMANDIR)
+	cp xsok.man $(XSOKMANDIR)/xsok.6x
+	chmod 644 $(XSOKMANDIR)/xsok.6x
+
+ComplexProgramTarget($(MYPROG))
+InstallAppDefaults(XSok)
+
+install.fsstnd:
+	$(MAKE) install
+	mkdirhier /usr/games/bin
+	chmod 755 /usr/games/bin
+	mv $(BINDIR)/xsok /usr/games/bin
+
+install.local: $(MYPROGS)
+	mkdirhier $(LXSOKBINDIR) $(LXSOKMANDIR) $(XSOKLIBDIR) $(XSOKSAVEDIR) \
+	   $(LAPPDEFSDIR)/app-defaults
+	chmod 755 $(XSOKLIBDIR) $(LXSOKMANDIR) $(LAPPDEFSDIR)/app-defaults
+	chmod 777 $(XSOKSAVEDIR)
+	cp XSok.ad $(LAPPDEFSDIR)/app-defaults/XSok
+	chmod 755 $(LAPPDEFSDIR)/app-defaults/XSok
+	(cd ../lib; tar cf - $(LIBCONTS) | (cd $(XSOKLIBDIR); tar xf -))
+	chmod -R a+r $(XSOKLIBDIR)
+	cp xsok $(LXSOKBINDIR)
+	chmod 755 $(LXSOKBINDIR)/xsok
+	cp xsok.man $(LXSOKMANDIR)/xsok.6x
+	chmod 644 $(LXSOKMANDIR)/xsok.6x
+	(cd ../lib && ../src/mergescores $(XSOKSAVEDIR)/Xsok.score \
+	   $(XSOKSAVEDIR)/Sokoban.score $(XSOKSAVEDIR)/Cyberbox.score)
+	chmod 666 $(XSOKSAVEDIR)/[A-z]*.score

@@ -1,0 +1,225 @@
+.DA "16 Aug 1994"
+.TL
+Locking in C News
+.Ix locking
+.SH
+Introduction
+.LP
+Several parts of
+C News
+need some way of locking parts of the news
+subsystem against concurrent execution.
+Various system-specific locking system calls exist,
+but none of them
+is truly portable,
+and most of them provide far more functionality than
+we need.
+.LP
+C News
+.Ix link
+locking uses the \fIlink\fR(2) system call and pre-agreed names.
+\fILink\fR has the necessary characteristic for safe locking:
+it is an atomic test-and-set operation.
+Furthermore,
+it exists in all Unixes.
+.SH
+Mechanism
+.LP
+.Ix lock names
+All locks are created in the NEWSCTL directory
+(see \fIConfiguration Mechanisms in C News\fR for where this directory
+is to be found and how programs can determine this)
+and have names starting with `LOCK'.
+To acquire a lock,
+.Ix lock acquiring
+.Ix LOCK
+.Ix files LOCK
+first create a temporary file in NEWSCTL with a name
+of the form `L.\fIn\fR', where \fIn\fR is your process id.
+Write your process id,
+in decimal ASCII,
+into this file.
+Then attempt to link the temporary file to `LOCK\fIx\fR',
+where \fIx\fR is chosen based
+on what sort of locking you wish to do.
+Existing lock names are:
+.IP LOCK \w'LOCKexplode'u+2n
+additions to article tree, changes to control files.
+Normally held mostly by \fIrelaynews\fR and
+administrative programs;
+grabbed briefly by \fIexpire\fR at the end of its run.
+.IP LOCKinput
+processing of spooled input.
+Held by \fInewsrun\fR to prevent multiple simultaneous \fInewsrun\fRs.
+.IP LOCKexplode
+changes to batch files.
+Held by the exploder when writing them,
+and grabbed briefly by the batcher when moving them aside.
+.IP LOCKoverview
+changes to overview files.
+.IP LOCKbatch
+preparation of batches.
+Held by the batcher (in the normal configuration)
+to prevent multiple simultaneous batching runs.
+.IP LOCKexpire
+rebuilding of history file, removal/archiving of articles.
+Held by \fIdoexpire\fR to prevent multiple simultaneous \fIexpire\fRs.
+.LP
+If the link fails,
+sleep briefly and try again.
+If it succeeds,
+remove the temporary file and proceed
+(some old code may defer removal of the temporary file
+until the lock itself is removed).
+Programs are expected to make a determined effort to remove lock files
+when they terminate,
+normally or as a result of signals
+(however, caution is indicated:
+race conditions should be resolved in favor of
+a small probability of leaving a dead lock around,
+\fInot\fR in favor of a small probability of removing
+a lock owned by someone else!).
+.LP
+Although there are various thorny questions associated with breaking
+locks by dead programs,
+.Ix lock clearing
+reboot is a time when surviving locks are
+definitely invalid.
+(Although there are problems even here if a networked group of systems
+are not rebooted as a unit.)
+For this and other reasons,
+a system running C News should execute
+.Ix newsboot
+.Ix /etc/rc
+NEWSCTL/bin/newsboot at reboot time (e.g. from \fI/etc/rc\fR).
+.SH
+C Interface
+.LP
+.Ix locking in C
+It's obviously desirable to package this mechanism up in a convenient form,
+to avoid having to reinvent it.
+It happens that the main lock,
+LOCK,
+is the only one that current C code needs\(emeverything else is done
+only from shell files.
+The C interface consists of three functions:
+.IP newslock \w'newsunlock'u+2n
+.Ix newslock
+acquire the main lock, and remember the fact.
+.IP newsunlock
+.Ix newsunlock
+release the main lock \fIif\fR I acquired it.
+.IP nolock
+.Ix nolock
+remember that I did \fInot\fR acquire the main lock
+(used by children of lock-holding processes).
+.LP
+In addition, there are two commonly-used utility functions
+that tie into the locking subsystem:
+.IP errunlock \w'errunlock'u+2n
+.Ix errunlock
+.Ix error
+.Ix warning
+invoke the \fIwarning\fR function
+to print an error message,
+call \fInewsunlock\fR,
+and do \fIexit(1)\fR.
+.IP nemalloc
+.Ix nemalloc
+.Ix malloc
+like \fImalloc\fR, except on failure, call \fIerrunlock\fR
+instead of returning NULL.
+.SH
+Shell Interface
+.LP
+.Ix locking in shell scripts
+The shell interface is a bit more problematic.
+Ideally, one would like to hide the locking machinery inside a pair
+of shell commands,
+analogous to the C functions,
+so that the locking mechanism could be changed easily.
+The trouble is that some kinds of mechanism require a single process
+to acquire the lock and then release it, and
+death of such a process automatically releases its lock(s).
+It's much more natural for a shell program to invoke separate ``lock''
+and ``unlock'' commands;
+an attempt at a single-process interface for locking in the C News
+Performance Release produced a rather odd shell programming style
+that did not lend itself well to complex cases.
+.LP
+The bottom line is:
+we're using a two-command model.
+If a single-process locking mechanism is used, it will be necessary to
+create a lock-holder background process as part of the locking operation,
+and kill it as part of the unlocking operation.
+The standard mechanism, using links, doesn't have this problem.
+.LP
+To acquire a lock, use the \fIlock\fR command,
+.Ix lock command
+found in NEWSBIN.
+The syntax is:
+.DS
+\fBlock\fR [\fB\-o\fR] [\fB\-v\fR] lockname pid [sleeptime]
+.DE
+\fILockname\fR is the name of the lock, e.g. ``LOCKinput''.
+\fIPid\fR is the process ID of the lock-holding process,
+normally written ``$$'' to have the shell supply it.
+.LP
+Normally, \fIlock\fR persists until it gets the lock,
+sleeping \fIsleeptime\fR (default 30) seconds after each failure.
+If the \fB\-o\fR option is used,
+\fIlock\fR tries only once, and returns exit status 0 for success
+and 1 for failure.
+If the \fB\-v\fR option is used,
+\fIlock\fR prints
+``news system locked, waiting..''
+to standard output just before sleeping after a failure.
+.LP
+To release a lock, invoke \fIunlock\fR
+.Ix unlock command
+(found in NEWSBIN)
+with the lock name(s) as arguments.
+You must be the lock holder\(em\fIunlock\fR does not check this.
+.LP
+A lock that has been sitting around for some time is naturally an
+object of suspicion.
+It can be useful for a program to indicate that it is \fIdoing\fR
+something by updating the date on the lock.
+To update a lock, invoke \fItouchlock\fR
+.Ix touchlock command
+(found in NEWSBIN)
+with the lock name(s) as arguments.
+You must be the lock holder\(em\fItouchlock\fR does not check this.
+.LP
+As an additional feature, potentially of use in special situations,
+if the
+\fIlockname\fR given to \fIlock\fR, \fItouchlock\fR, or \fIunlock\fR
+contains ``/'',
+it is understood to be the pathname of the lock,
+and \fIlockname\fB.\fIpid\fR is used as the pathname of the temporary.
+This permits use of locks that do not reside in NEWSCTL.
+.LP
+.Ix Unix "System V"
+.Ix "System V" breakage
+.Ix ln
+The underlying implementation of our standard locking mechanism
+in shell has an additional problem in that System V has broken
+\fIln\fR(1) so that it removes a pre-existing destination file.
+C News
+therefore provides a pure,
+simple locking program under
+the name NEWSBIN/newslock
+.Ix newslock
+(if the recommendations in
+\fIDirectory Layout and PATH in C News\fR are followed,
+this will
+automatically be in the search path of shell programs).
+Syntax is:
+.DS
+\fBnewslock\fR tempfile lockfile
+.DE
+Exit status is 0 for success,
+1 for failure,
+2 for wrong number of arguments.
+No messages are printed for normal failure,
+so no redirection of output is needed.

@@ -1,0 +1,133 @@
+.\" sd.4
+.\" Copyright 1992 Rickard E. Faith (faith@cs.unc.edu)
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\"
+.\" Translated Jan 29 1996 by Norbert Kümin (norbert.kuemin@lugs.ch)
+.\" translation polished, aeb
+.\" Modified Mon Jun 10 01:40:20 1996 by Martin Schulze (joey@linux.de)
+.\"
+.TH SD 4 "17. Dezember 1992" "Linux" "Gerätedateien"
+.SH BEZEICHNUNG
+sd \- Treiber für SCSI Disk
+.SH ÜBERSICHT
+#include <linux/hdreg.h>
+.SH KONFIGURATION
+Der blockorientierte Gerätename hat folgende Form:
+.BI sd lp,
+wobei
+.I l
+die physikalische Harddisk und
+.I p
+die Nummer der Partition auf der Harddisk symbolisiert.  Die
+Partitionsnummer wird weggelassen, wenn die ganze Disk
+angesprochen werden soll.
+
+SCSI Harddisks haben eine Hauptnummer (Major number) von 8, und eine
+Nebennummer (Minor number) der Formel (16 *
+.IR Laufwerksnummer ") + " Partitionsnummer ,
+wobei die
+.I Laufwerksnummer
+der Nummer des physikalischen Laufwerks in der Reihenfolge der
+Detektion, und die 
+.I Partitionsnummer
+der folgenden Beschreibung entsprechen:
+.sp
+Partition 0 ist das komplette Laufwerk
+.br
+Partition 1-4 sind DOS "primäre" Partitionen
+.br
+Partition 5-8 sind DOS "erweiterte" (oder "logische") Partitionen
+
+Beispielsweise hat
+.B /dev/sda
+die Hauptnummer 8, Nebennummer 0 und bezieht sich auf alles des ersten
+SCSI-Harddisk Laufwerkes im System; und
+.B /dev/sdb3
+hat die Hauptnummer 8, Nebennummer 19 und bezieht sich auf die dritte
+DOS "primäre" Partition des zweiten SCSI-Harddisk Laufwerkesim System.
+
+Zu diesem Zeitpunkt werden nur blockorientierte Schnittstellen unterstützt.
+Direkte Schnittstellen sind noch nicht implementiert.
+.SH BESCHREIBUNG
+die folgenden E/A Kontrollen (ioctl) werden unterstützt:
+.TP
+HDIO_REQ
+.RS
+Liefert die BIOS Harddisk-Parameter in der folgenden Struktur:
+.RS
+.nf
+.ft B
+struct hd_geometry {
+      unsigned char heads;
+      unsigned char sectors;
+      unsigned short cylinders;
+      unsigned long start;
+};
+.ft R
+.fi
+.RE
+
+Ein Zeiger auf diese Struktur wird als Parameter bei
+.BR ioctl (2)
+übergeben.
+
+Diese Informationen im Parameter sind die Diskgeometrie des Laufwerkes,
+.I "wie sie von DOS verstanden wird!"
+Diese Geometrie entspricht
+.I nicht
+der physikalischen Geometrie des Laufwerkes.  Es wird gebraucht um die
+Partitionstabelle des Laufwerks zu erstellen, welches folgende Programme
+betrifft:
+.BR fdisk (1),
+.BR efdisk (1),
+and 
+.BR lilo (1).
+Wenn keine Geometrie verfügbar ist, so wird Null für alle Parameter
+zurückgegeben.
+.RE
+.TP
+BLKGETSIZE
+
+Ergibt die Gerätegrösse in Sektoren.  Der 
+.BR ioctl (2)
+Parameter sollte ein Zeiger auf eine Variable des Datentyp
+parameter should be a pointer to a
+.BR long
+sein.
+.TP
+BLKRRPART
+Erzwingt ein erneutes Lesen der Partitionstabelle der SCSI-Disk.  Keine
+Parameter nötig.
+
+Die
+.BR scsi (4)
+E/A Kontrollen (ioctl) werden auch unterstützt.  Wird ein 
+.BR ioctl (2)
+Parameter benötigt, und dieser ist NULL, so gibt
+.BR ioctl (2)
+ein -EINVAL zurück.
+.SH DATEIEN
+/dev/sd[a-h]: Die kompletten Geräte
+.br
+/dev/sd[a-h][0-8]: Individuelle Partitionen
+.SH "SIEHE AUCH"
+.BR scsi (4)

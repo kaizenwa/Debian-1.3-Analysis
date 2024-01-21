@@ -1,0 +1,107 @@
+.TH gk_server n "8 Dec 1994" "GroupKit"
+.SH NAME
+gk_createServer, gk_connectToServer, gk_connectToPeer, gk_shutdownServer \- 
+GroupKit client/server/peer support
+.SH SYNOPSIS
+.TP
+\fBgk_createServer \fIenv port keyfield ?info?\fR
+.TP
+\fBgk_connectToServer \fIhost port info\fR
+.TP
+\fBgk_connectToPeer \fIhost port\fR
+.TP
+\fBgk_shutdownServer \fR
+.TP
+\fBgk_serverQueryID \fIcallback\fR
+
+.SH DESCRIPTION
+These commands provide a level on top of Tcl-DP's RPC Client/Server
+routines.  The extra functionality is there to maintain a list of 
+clients connected to the server, along with information about each
+of these clients.  
+
+This information is stored in GroupKit \fBenvironments\fR.  When
+a server is created, an environment is specified which will hold
+information about all remote clients during the time they are connected
+to the server; this environment must already exist.  
+Information on remote clients is stored under the
+"remote" key in the environment.  Each client's information is stored
+under a key; this key may be assigned via the server, or be included
+in the client's information.  If the key is to be supplied by the
+client, the server must be provided with the name of the field holding the 
+key.
+
+GroupKit \fBevents\fR are generated whenever clients connect or 
+disconnect from the server.  An event of type \fBclientConnected\fR 
+is generated after a client connects and provides its information.
+The attribute \fBkey\fR in the event specifies the key for the client.
+When a client disconnects, and immediately before information on the
+client is destroyed, an event of type \fBclientDisconnected\fR is 
+generated, again with a \fBkey\fR attribute.
+
+When a client provides its information to the server, the server
+supplements this information with the file descriptor which can be
+used to communicate with the client.  This is stored in the client's
+information under "remote.key.filedesc".
+
+Peer connections are similar to client/server connections except
+that rather than the client providing information to the server,
+both ends of the peer provide information to the other.  When
+using a peer connection, information on the local peer is found
+under the "local" key in the environment.
+.SH COMMANDS
+.TP
+\fBgk_createServer \fIenv port keyfield ?info?\fR
+Gk_createServer creates a new server, running on the specified \fIport\fR.
+The environment \fIenv\fR is used to hold information about
+each of the connected clients, under the "remote" key.
+\fIkeyfield\fR specifies the name of the key in the client's
+information (e.g. usernum) to use to store information in
+the environment; if specified as "", the server will use
+a built-in counter for this purpose.  
+The parameter \fIinfo\fR may be used to import information about
+the server (or local peer, as the case may be) under the
+"local" key in the environment.
+This command returns
+the port number the server is listening on.
+
+.TP
+\fBgk_connectToServer \fIhost port info\fR
+Gk_connectToServer opens up a connection to the given server
+(created with gk_createServer, above), and arranges for the
+client information stored as a keyed list in "info" to be
+sent to the server as identification.  This command returns
+the file descriptor used for communicating with the server.
+
+.TP
+\fBgk_connectToPeer \fIhost port\fR
+Gk_connectToPeer works similarly to \fBgk_connectToServer\fR except
+that a peer connection is opened.  Local information, found under
+the "local" key in the environment, is sent to the remote peer, and
+information from the remote peer is received.  
+
+.TP
+\fBgk_shutdownServer \fR
+Gk_shutdownServer terminates the server; all socket connections
+are closed.
+
+.TP
+\bgk_serverQueryID \fIcallback\fR
+Servers maintain a unique id number for each connected client; sometimes
+this can be useful to clients for their own purposes.  When a connected client
+sends this command to the server, the server will send back to the client
+a response consisting of the \fIcallback\fR parameter appended with the
+server's id number for this client.
+.SH "SEE ALSO"
+.PP
+dp_rpc(n), environment(n), gk_toAll(n)
+.SH LIMITATIONS
+Only one server per interpreter is permitted, since we're not
+keeping track of which socket the low level accept() occured on.
+As well, if a keyfield is specified in gk_createServer but that field 
+is not found
+in the client's info, the client will not be added to the 
+environment.  
+
+.SH AUTHOR
+Mark Roseman (roseman@cpsc.ucalgary.ca)

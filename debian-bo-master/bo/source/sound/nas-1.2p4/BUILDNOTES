@@ -1,0 +1,956 @@
+# $NCDId: @(#)BUILDNOTES,v 1.7 1995/11/28 23:25:57 greg Exp $
+
+This file contains information on the following topics:
+
+	1. Solaris 2.3 OpenWindows notes
+	2. System V Release 4.0 notes
+	3. X11R4 notes
+	4. SunOS 4.1.3 OpenWindows notes
+	5. SS5 notes
+	6. AIX notes
+	7. DEC Alpha (OSF1 V3.2) notes
+
+		    ==============================
+
+Solaris 2.3 OpenWindows notes
+-----------------------------
+
+The imake configuration files in /usr/openwin/lib/config are slightly
+broken and require the following patches to work effectively.
+
+Firstly, symlink the following:
+
+	# cd /usr/openwin/lib/X11
+	# ln -s ../app-defaults ../config .
+	# cd config
+	# patch < patch-below
+
+
+--------------
+diff -c ORIG.5.3/Imake.tmpl ./Imake.tmpl
+*** ORIG.5.3/Imake.tmpl	Tue Sep  7 08:12:34 1993
+--- ./Imake.tmpl	Fri Jan 28 16:34:58 1994
+***************
+*** 885,896 ****
+  	  CCFLAGS = $(CDEBUGFLAGS) $(CCCOPTIONS) $(ALLDEFINES)
+          LINTFLAGS = $(LINTOPTS) -DLINT $(ALLDEFINES)
+  #if AlternateUsrLibDir && !defined(UseInstalled)
+!            LDLIBS = -L$(USRLIBDIR) $(SYS_LIBRARIES) $(EXTRA_LIBRARIES)
+  #else
+             LDLIBS = $(SYS_LIBRARIES) $(EXTRA_LIBRARIES)
+  #endif
+  #if AlternateUsrLibDir && defined(UseInstalled)
+!         LDOPTIONS = $(CDEBUGFLAGS) $(CCOPTIONS) $(EXTRA_LDOPTIONS) $(LOCAL_LDFLAGS) -L$(USRLIBDIR)
+  #else
+          LDOPTIONS = $(CDEBUGFLAGS) $(CCOPTIONS) $(EXTRA_LDOPTIONS) $(LOCAL_LDFLAGS)
+  #endif
+--- 885,896 ----
+  	  CCFLAGS = $(CDEBUGFLAGS) $(CCCOPTIONS) $(ALLDEFINES)
+          LINTFLAGS = $(LINTOPTS) -DLINT $(ALLDEFINES)
+  #if AlternateUsrLibDir && !defined(UseInstalled)
+!            LDLIBS = -L$(USRLIBDIR) -R$(USRLIBDIR) $(SYS_LIBRARIES) $(EXTRA_LIBRARIES)
+  #else
+             LDLIBS = $(SYS_LIBRARIES) $(EXTRA_LIBRARIES)
+  #endif
+  #if AlternateUsrLibDir && defined(UseInstalled)
+!         LDOPTIONS = $(CDEBUGFLAGS) $(CCOPTIONS) $(EXTRA_LDOPTIONS) $(LOCAL_LDFLAGS) -L$(USRLIBDIR) -R$(USRLIBDIR)
+  #else
+          LDOPTIONS = $(CDEBUGFLAGS) $(CCOPTIONS) $(EXTRA_LDOPTIONS) $(LOCAL_LDFLAGS)
+  #endif
+Only in .: ORIG.5.3
+diff -c ORIG.5.3/site.def ./site.def
+*** ORIG.5.3/site.def	Tue Sep  7 08:12:36 1993
+--- ./site.def	Fri Jan 28 15:21:10 1994
+***************
+*** 27,32 ****
+--- 27,33 ----
+  
+  /* #define HasGcc YES */
+  
++ #undef 	UseInstalled
+  #define UseInstalled YES
+  #endif /* BeforeVendorCF */
+--------------
+
+		    ==============================
+
+System V Release 4.0 notes
+--------------------------
+
+The audio library has been ported to use the STREAMSCONN transport if enabled.
+
+Currently auscope(1) doesn't have STREAMSCONN support, but works ok with
+TCPCONN on our system.
+
+A side effect of the aulib STREAMSCONN implimentation is that /etc/services must
+contain lines of the form to satisfy netdir_getbyname(3):
+
+--------------
+#
+#	defacto standard for X11, required by SVR4 XLIB STREAMSCONN code
+#	(for X11 clients and server)
+#
+xserver0	6000/tcp
+xserver1	6001/tcp
+xserver2	6002/tcp
+
+#	audio service required by SVR4 AULIB STREAMSCONN code
+#	(for audio clients and server)
+
+auserver8000	8000/tcp
+auserver8001	8001/tcp
+auserver8002	8002/tcp
+--------------
+
+One day this might be fixed.
+
+		    ==============================
+
+X11R4 notes
+-----------
+
+This code has been ported back to X11R4 on two platforms
+
+	SVR3.2/386 with Lachman TCP/IP, using STREAMSCONN
+	    (except for auscope which still uses TCPCONN)
+
+	IBM AIX 3.2
+
+The only significant change required to support X11R4 is that the
+definition of the new-to-X11R5 "XCOMM" symbol needs to be added to Imake.tmpl
+so that XCOMM style comments get translated back into has comments.
+
+Add these lines to the top of /usr/lib/X11/config/Imake.tmpl (or wherever
+you keep it):
+
+#ifndef XCOMM
+#define XCOMM #
+#endif
+
+If your C compiler has a limit on the number of -L options supplied
+(some SVR3.2 cc's have a limit of 6), you may need to put this wrapper version
+of "cc" in your path ahead of the system one.
+
+----------------
+#! /bin/sh
+
+#	Reduce the number of -L options so cc(1) can cope
+
+ARGS="/bin/cc"
+LASTL=""
+
+for a in "$@"
+do
+	case "$a" in
+	"$LASTL")
+		# ignore
+		;;
+	-L*)
+		LASTL="$a"
+		ARGS="$ARGS $a"
+		;;
+		
+	*)
+		ARGS="$ARGS $a"
+		;;
+	esac
+done
+
+echo + $ARGS
+exec $ARGS
+----------------
+
+		    ==============================
+
+SunOS 4.1.3 OpenWindows notes
+-----------------------------
+
+Date: Tue, 14 Nov 95 12:22:08 EST
+From: cschroed@hercii.lasc.lockheed.com (Curt Schroeder)
+
+The following information is distilled from my notes regarding building
+NAS on my SPARCstation LX using SunOS 4.1.3_U1 and Openwindows.  I have
+successfully used the executables on IPX, LX, SS5, and SS10
+workstations.  It does not work on SS5 workstations without some
+modifications and an operating system patch (see below).
+
+
+The easiest place I have found to build NAS is as a subdirectory of
+/usr/openwin/lib (i.e. /usr/openwin/lib/nas-1.2p1).
+
+- Had to put the following in the sysetm Imake.tmpl:
+	#ifndef XCOMM
+	#define XCOMM #
+	#endif
+
+- Added the "ForceSubdirs" rule to the system Imake.rules:
+
+/*
+ * ForceSubdirs - force make to build subdirectories
+ */
+#ifndef ForceSubdirs
+#define ForceSubdirs(dirs)                                              @@\
+dirs: FRC                                                               @@\
+        @cd $@ ; echo "making all in $(CURRENT_DIR)/$@..."; \           @@\
+        $(MAKE) $(MFLAGS) PassCDebugFlags all                           @@\
+                                                                        @@\
+FRC:
+#endif /* ForceSubdirs */
+
+
+- Added definition 'BINDIR = $OPENWINHOME/bin' to NetAudio.tmpl; I am
+  not absolutely certain this is needed.
+
+- Change MKDIRHIER definition to execute '$(BINDIR)/mkdirhier' in
+  system Project.tmpl (both instances).
+
+- Created symbolic link: ln -s /usr/openwin/lib/config /usr/lib/X11/config
+
+- Created symbolic link: ln -s /usr/openwin/include/X11 /usr/include/X11
+
+- Makedepend could not find the following files:
+	Xosdefs.h
+	Xfuncs.h
+
+  Made the following replacements in the server/include/misc.h file:
+	<X11/Xosdefs.h> => <audio/Aosdefs.h>
+	<X11/Xfuncs.h> => <audio/Afuncs.h>
+
+- Changed definition AUDIODEPLIBS to '$(DEPAULIB)' in NetAudio.tmpl.
+
+- Changed definition AUDIOLIBS to '$(AULIB) $(XAUTHLIB) -lm' in
+  NetAudio.tmpl.
+
+- Executed 'xmkmf' from the /usr/openwin/lib/nas-1.2
+  directory.
+
+		    ==============================
+
+SS5 notes
+---------
+
+Date: Wed, 19 Jul 95 15:28:14 EDT
+From: cschroed@hercii.lasc.lockheed.com (Curt Schroeder)
+Subject: NAS 1.2p1 on SS5
+
+I have gotten NAS 1.2p1 to work on the SS5 under SunOS 4.1.3_U1, but it
+requires two patches; one to SunOS and one to NAS.  What follows is
+first the information for the SunOS patch, and then the patch file for
+NAS (which has been previously posted here, but worth posting again to
+provide a total solution).
+
+NOTE - the patched SS5 server does NOT replace the "standard" server,
+but instead should only be used on the workstation types that need it.
+A possible automated solution is to rename the server executables and
+provide a shell script named 'ausun' that starts the correct server
+depending on the hardware it is running on.
+
+------------------ begin 'ausun' script -----------------------------
+#!/bin/csh
+# set if logging in on a sun4m sparc 5.3
+if ( -d /usr/sbin ) then
+        set DEVINFO="/usr/sbin/sysdef -d"
+else
+        set DEVINFO="/usr/etc/devinfo"
+endif   
+if ( `${DEVINFO} | awk '/SPARCstation-5/ { print $2 }'` != "" ) then
+# start NAS server for SS5 workstations
+   $NASHOME/server/ausun_ss5 &
+else
+# start NAS server for all other Sun workstations
+   $NASHOME/server/ausun_other &
+endif
+------------------- end 'ausun' script -------------------------------
+
+Share and enjoy,
+
+Curt
+
+Curt Schroeder                        | cschroed@hercii.lasc.lockheed.com
+Lockheed Martin Aeronautical Systems  | cschroed@source.asset.com
+======================================|====================================
+Me, speak for LMAS? I don't think so! |    --- Apple II Forever! ---
+
+----
+
+SRDB ID: 7220
+ 
+SYNOPSIS: Sparcstation 5 error: /dev/audio not found
+
+DETAIL DESCRIPTION:
+
+
+On a Sparcstation 5 (also called SS5 or S5) workstation running Solaris 1.1.1B, 
+when attempting to play an audio file, the following message appears in the
+audiotool window:
+
+        /dev/audio not found 
+
+As a result, no sound is played.
+
+The device existsand permissions are correct.
+   
+
+
+SOLUTION SUMMARY:
+
+
+A patch included on the Solaris 1.1.1B CD must be installed to fix
+this problem.
+
+1. Load the Solaris 1.1.B CD in CD-ROM. 
+
+2. Enter the following command, and answer yes to rebuild the kernel:
+
+                extract_patch -dsr0 -pms2
+
+3. reboot the system.
+
+----------
+
+From: Mikael Pettersson <mpe@ida.liu.se>
+Date: Mon, 24 Oct 1994 16:40:31 +0100
+Subject: patches for Sun SS5
+
+nas-1.2p1 wouldn't work reliably on my SS5. For one particular
+sound file, the server would play it and then enter a tight CPU-
+consuming loop.
+
+Running `truss' (a tool to trace a process' system calls), I found
+that on the SS5, the server got a series of (stray?) SIGPOLLs
+when it was done with the file. These caused the signal handler
+to reinvoke AuProcessData(), which would eventually write out
+a small block of 0xFF:s to the audio device. And then when the
+output procedure unlocked its critical region, another SIGPOLL
+would immediately arrive, and the whole process would repeat itself.
+(This behaviour did _not_ occur on our SS10s or SS20s.)
+
+I didn't like the idea of using the SIGPOLL feature of the audio
+device to drive the server, so I changed the implementation to use
+real-time timers and SIGALRMs instead. With this change, the server
+works (seemingly) ok on our SS10s, SS20s and SS5s.
+
+A patch follows below (apply it in server/dda/sun).
+I haven't tested it on SunOS 4.1.x .
+
+Cheers,
+
+/Mikael
+
+-------------------- begin patch file -------------------------------------
+
+*** audbri.c.~1~	Thu Aug 11 22:52:21 1994
+--- audbri.c	Mon Oct 24 15:01:29 1994
+***************
+*** 26,31 ****
+--- 26,32 ----
+  #include "os.h"					/* for xalloc/xfree and NULL */
+  #include <fcntl.h>
+  #include <stropts.h>
++ #include <sys/time.h>
+  #ifndef SVR4
+  #include <sun/audioio.h>
+  #else						/* SVR4 */
+***************
+*** 52,58 ****
+  #define IS_DBRI(_t)							      \
+      ((_t) == AUDIO_DEV_SPEAKERBOX || (_t) == AUDIO_DEV_CODEC)
+  #else						/* SVR4 */
+! #define IS_DBRI(_t)	(!strcmp((_t).name, "SUNW,dbri"))
+  #endif						/* SVR4 */
+  
+  static int      devAudio = -1,
+--- 53,59 ----
+  #define IS_DBRI(_t)							      \
+      ((_t) == AUDIO_DEV_SPEAKERBOX || (_t) == AUDIO_DEV_CODEC)
+  #else						/* SVR4 */
+! #define IS_DBRI(_t)	(!strcmp((_t).name, "SUNW,dbri") || !strcmp((_t).name, "SUNW,CS4231"))
+  #endif						/* SVR4 */
+  
+  static int      devAudio = -1,
+***************
+*** 297,306 ****
+      return AuSuccess;
+  }
+  
+  static void
+  serverReset()
+  {
+!     signal(SIGPOLL, SIG_IGN);
+      ioctl(devAudio, AUDIO_DRAIN, 0);	       /* drain everything out */
+  }
+  
+--- 298,327 ----
+      return AuSuccess;
+  }
+  
++ static void setTimer(rate)
++     AuInt32 rate;
++ {
++     struct itimerval ntval;
++     AuInt32 usec;
++ 
++     if( rate == 0 )
++ 	usec = 0;
++     else
++ 	usec = (auMinibufSamples * 900) / rate;
++ 
++     ntval.it_interval.tv_sec = 0;
++     ntval.it_interval.tv_usec = usec;
++     ntval.it_value.tv_sec = 0;
++     ntval.it_value.tv_usec = (usec / 2) + 1;
++ 
++     setitimer(ITIMER_REAL, &ntval, (struct itimerval*)0);
++ }
++ 
+  static void
+  serverReset()
+  {
+!     signal(SIGALRM, SIG_IGN);
+!     setTimer(0);
+      ioctl(devAudio, AUDIO_DRAIN, 0);	       /* drain everything out */
+  }
+  
+***************
+*** 311,338 ****
+      {
+  	audio_info_t    info;
+  
+! 	ioctl(devAudioCtl, I_SETSIG, 0);       /* disable signal */
+  
+  	if (updateGains)
+  	{
+- 	    AUDIO_INITINFO(&info);
+  	    info.play.gain = outputGain;
+  	    info.play.port = outputMode;
+  	    info.record.gain = inputGain;
+  	    info.record.port = inputLineMode;
+  	    updateGains = AuFalse;
+- 	    ioctl(devAudioCtl, AUDIO_SETINFO, &info);
+  	}
+  
+  	if (updateSampleRate)
+  	{
+! 	    AUDIO_INITINFO(&info);
+  	    info.play.sample_rate = info.record.sample_rate = sampleRate;
+  	    updateSampleRate = AuFalse;
+- 	    ioctl(devAudio, AUDIO_SETINFO, &info);
+  	}
+  
+! 	ioctl(devAudioCtl, I_SETSIG, S_MSG);   /* re-enable signal */
+      }
+  }
+  
+--- 332,356 ----
+      {
+  	audio_info_t    info;
+  
+! 	AUDIO_INITINFO(&info);
+  
+  	if (updateGains)
+  	{
+  	    info.play.gain = outputGain;
+  	    info.play.port = outputMode;
+  	    info.record.gain = inputGain;
+  	    info.record.port = inputLineMode;
+  	    updateGains = AuFalse;
+  	}
+  
+  	if (updateSampleRate)
+  	{
+! 	    setTimer(sampleRate);
+  	    info.play.sample_rate = info.record.sample_rate = sampleRate;
+  	    updateSampleRate = AuFalse;
+  	}
+  
+! 	ioctl(devAudio, AUDIO_SETINFO, &info);
+      }
+  }
+  
+***************
+*** 430,444 ****
+  enableProcessFlow()
+  {
+      ioctl(devAudio, I_FLUSH, FLUSHRW);		/* flush pending io */
+-     ioctl(devAudioCtl, I_SETSIG, S_MSG);       /* enable signal */
+      updateHardware();
+      writeEmptyOutput();
+  }
+  
+  static void
+  disableProcessFlow()
+  {
+!     ioctl(devAudioCtl, I_SETSIG, 0);		/* disable signal */
+      ioctl(devAudio, AUDIO_DRAIN, 0);	       /* drain everything out */
+  }
+  
+--- 448,462 ----
+  enableProcessFlow()
+  {
+      ioctl(devAudio, I_FLUSH, FLUSHRW);		/* flush pending io */
+      updateHardware();
+      writeEmptyOutput();
++     setTimer(sampleRate);
+  }
+  
+  static void
+  disableProcessFlow()
+  {
+!     setTimer(0);
+      ioctl(devAudio, AUDIO_DRAIN, 0);	       /* drain everything out */
+  }
+  
+***************
+*** 560,570 ****
+  }
+  
+  static void
+! processAudioSignal(sig)
+  int             sig;
+  {
+      updateHardware();
+      AuProcessData();
+  }
+  
+  static AuUint32
+--- 578,594 ----
+  }
+  
+  static void
+! intervalProc(sig)
+  int             sig;
+  {
++ #ifndef SVR4
++     signal(SIGALRM, SIG_IGN);
++ #endif
+      updateHardware();
+      AuProcessData();
++ #ifndef SVR4
++     signal(SIGALRM, intervalProc);
++ #endif
+  }
+  
+  static AuUint32
+***************
+*** 628,633 ****
+--- 652,658 ----
+  	    devAudio = devAudioCtl = -1;
+  	    return AuFalse;
+  	}
++ 	ioctl(devAudioCtl, I_SETSIG, 0);
+      }
+  
+      if (!(VENDOR_STRING = (char *) aualloc(strlen(SUN_DBRI_VENDOR) + 1)))
+***************
+*** 671,677 ****
+      auPhysicalOutputBuffersSize = physicalBuffersSize -
+  	PhysicalTwoTrackBufferSize;
+  
+!     signal(SIGPOLL, processAudioSignal);
+  
+      AuRegisterCallback(AuCreateServerComponentsCB, createServerComponents);
+      AuRegisterCallback(AuSetPhysicalOutputGainCB, setPhysicalOutputGain);
+--- 696,703 ----
+      auPhysicalOutputBuffersSize = physicalBuffersSize -
+  	PhysicalTwoTrackBufferSize;
+  
+!     setTimer(0);
+!     signal(SIGALRM, intervalProc);
+  
+      AuRegisterCallback(AuCreateServerComponentsCB, createServerComponents);
+      AuRegisterCallback(AuSetPhysicalOutputGainCB, setPhysicalOutputGain);
+*** ausun.c.~1~	Thu Aug 11 22:51:40 1994
+--- ausun.c	Sun Oct 23 17:50:34 1994
+***************
+*** 28,33 ****
+--- 28,34 ----
+  #include "os.h"					/* for xalloc/xfree and NULL */
+  #include <fcntl.h>
+  #include <stropts.h>
++ #include <sys/time.h>
+  #ifndef SVR4
+  #include <sun/audioio.h>
+  #else						/* SVR4 */
+***************
+*** 290,295 ****
+--- 291,315 ----
+      return AuSuccess;
+  }
+  
++ static void setTimer(rate)
++     AuInt32 rate;
++ {
++     struct itimerval ntval;
++     AuInt32 usec;
++ 
++     if( rate == 0 )
++ 	usec = 0;
++     else
++ 	usec = (auMinibufSamples * 900) / rate;
++ 
++     ntval.it_interval.tv_sec = 0;
++     ntval.it_interval.tv_usec = usec;
++     ntval.it_value.tv_sec = 0;
++     ntval.it_value.tv_usec = (usec / 2) + 1;
++ 
++     setitimer(ITIMER_REAL, &ntval, (struct itimerval*)0);
++ }
++ 
+  #if 0
+  static AuUint32
+  setSampleRate(rate)
+***************
+*** 306,312 ****
+  static void
+  serverReset()
+  {
+!     signal(SIGPOLL, SIG_IGN);
+      ioctl(devAudio, AUDIO_DRAIN, 0);	       /* drain everything out */
+  }
+  
+--- 326,333 ----
+  static void
+  serverReset()
+  {
+!     signal(SIGALRM, SIG_IGN);
+!     setTimer(0);
+      ioctl(devAudio, AUDIO_DRAIN, 0);	       /* drain everything out */
+  }
+  
+***************
+*** 388,401 ****
+  enableProcessFlow()
+  {
+      ioctl(devAudio, I_FLUSH, FLUSHRW);		/* flush pending io */
+-     ioctl(devAudioCtl, I_SETSIG, S_MSG);       /* enable signal */
+      writeEmptyOutput();
+  }
+  
+  static void
+  disableProcessFlow()
+  {
+!     ioctl(devAudioCtl, I_SETSIG, 0);		/* disable signal */
+      ioctl(devAudio, AUDIO_DRAIN, 0);	       /* drain everything out */
+  }
+  
+--- 409,422 ----
+  enableProcessFlow()
+  {
+      ioctl(devAudio, I_FLUSH, FLUSHRW);		/* flush pending io */
+      writeEmptyOutput();
++     setTimer(8000);	/* 8KHz for `audioamd' */
+  }
+  
+  static void
+  disableProcessFlow()
+  {
+!     setTimer(0);
+      ioctl(devAudio, AUDIO_DRAIN, 0);	       /* drain everything out */
+  }
+  
+***************
+*** 479,503 ****
+  }
+  
+  static void
+! processAudioSignal(sig)
+  int             sig;
+  {
+      if (updateGains)
+      {
+  	audio_info_t    info;
+  
+  	AUDIO_INITINFO(&info);
+- 	ioctl(devAudioCtl, I_SETSIG, 0);       /* disable signal */
+  	info.play.gain = outputGain;
+  	info.play.port = outputMode;
+  	info.record.gain = inputGain;
+  	ioctl(devAudioCtl, AUDIO_SETINFO, &info);
+- 	ioctl(devAudioCtl, I_SETSIG, S_MSG);   /* re-enable signal */
+  
+  	updateGains = AuFalse;
+      }
+  
+      AuProcessData();
+  }
+  
+  #define	PhysicalOneTrackBufferSize					       \
+--- 500,528 ----
+  }
+  
+  static void
+! intervalProc(sig)
+  int             sig;
+  {
++ #ifndef SVR4
++     signal(SIGALRM, SIG_IGN);
++ #endif
+      if (updateGains)
+      {
+  	audio_info_t    info;
+  
+  	AUDIO_INITINFO(&info);
+  	info.play.gain = outputGain;
+  	info.play.port = outputMode;
+  	info.record.gain = inputGain;
+  	ioctl(devAudioCtl, AUDIO_SETINFO, &info);
+  
+  	updateGains = AuFalse;
+      }
+  
+      AuProcessData();
++ #ifndef SVR4
++     signal(SIGALRM, intervalProc);
++ #endif
+  }
+  
+  #define	PhysicalOneTrackBufferSize					       \
+***************
+*** 534,539 ****
+--- 559,565 ----
+  	    devAudio = devAudioCtl = -1;
+  	    return AuFalse;
+  	}
++ 	ioctl(devAudioCtl, I_SETSIG, 0);
+      }
+  
+      if (!(VENDOR_STRING = (char *) aualloc(strlen(SUN_VENDOR) + 1)))
+***************
+*** 571,577 ****
+      auPhysicalOutputBuffersSize = physicalBuffersSize -
+  	PhysicalOneTrackBufferSize;
+  
+!     signal(SIGPOLL, processAudioSignal);
+  
+      AuRegisterCallback(AuCreateServerComponentsCB, createServerComponents);
+      AuRegisterCallback(AuSetPhysicalOutputGainCB, setPhysicalOutputGain);
+--- 597,604 ----
+      auPhysicalOutputBuffersSize = physicalBuffersSize -
+  	PhysicalOneTrackBufferSize;
+  
+!     setTimer(0);
+!     signal(SIGALRM, intervalProc);
+  
+      AuRegisterCallback(AuCreateServerComponentsCB, createServerComponents);
+      AuRegisterCallback(AuSetPhysicalOutputGainCB, setPhysicalOutputGain);
+*** ausun.h.~1~	Wed Apr 27 19:50:09 1994
+--- ausun.h	Sun Oct 23 16:21:02 1994
+***************
+*** 47,59 ****
+  do									      \
+  {									      \
+      if ((int) (_x) != (int) SIG_HOLD)					      \
+! 	(void) sigset(SIGPOLL, (void (*)(int))(_x));			      \
+  } while(0)
+  
+! #define	AuBlockAudio()		(int) sigset(SIGPOLL, SIG_HOLD)
+  #else
+  #define	AuUnBlockAudio(_x)	sigsetmask(_x)
+! #define	AuBlockAudio()		sigblock(sigmask(SIGPOLL))
+  #endif
+  #define AuProtectedMalloc(_s)	xalloc(_s)
+  #define AuProtectedFree(_p)	free(_p)
+--- 47,59 ----
+  do									      \
+  {									      \
+      if ((int) (_x) != (int) SIG_HOLD)					      \
+! 	(void) sigset(SIGALRM, (void (*)(int))(_x));			      \
+  } while(0)
+  
+! #define	AuBlockAudio()		(int) sigset(SIGALRM, SIG_HOLD)
+  #else
+  #define	AuUnBlockAudio(_x)	sigsetmask(_x)
+! #define	AuBlockAudio()		sigblock(sigmask(SIGALRM))
+  #endif
+  #define AuProtectedMalloc(_s)	xalloc(_s)
+  #define AuProtectedFree(_p)	free(_p)
+
+-------------------- end patch file -------------------------------------
+
+		    ==============================
+
+AIX notes
+---------
+
+Subject: nas-1.2p2 for AIX
+Date: Wed, 1 Nov 1995 21:57:50 +0100 (CET)
+From: Harald Milz <hm@ix.de>
+
+Hi,
+
+being sick of the fact that nas-1.2p2 doesn't run on AIX 4.1.2 out of
+the box, I patched the source to get at least the clients working. As
+long as I don't have some audio output device on my 355, that's okay
+for me.  The patch is a bad hack in some places, e.g. TOP is hardwired
+to the current source directory (/usr/src/nas-1.2p2 in my case). I'm no
+"make" guru, so someone may help me out. There should be a way.
+$(CURRENT_DIR) doesn't work.
+
+I didn't test all of the clients. auplay (the most important one for
+me), auinfo, audial work fine. The other side was my Linux box at home,
+running auvoxware and connected via IP over ISDN.
+
+Here's my patch. RFC. 
+
+--------------------------------- snip ---------------------------------
+
+diff -cr nas-1.2p2/Imakefile nas-1.2p2-AIX/Imakefile
+*** nas-1.2p2/Imakefile	Fri Jun  3 21:06:22 1994
+--- nas-1.2p2-AIX/Imakefile	Wed Nov  1 20:27:54 1995
+***************
+*** 31,37 ****
+  
+     WORLDOPTS = -k
+  
+! SUBDIRS = include server lib clients doc
+  
+  MakeSubdirs($(SUBDIRS))
+  DependSubdirs($(SUBDIRS))
+--- 31,37 ----
+  
+     WORLDOPTS = -k
+  
+! SUBDIRS = include lib clients doc # server
+  
+  MakeSubdirs($(SUBDIRS))
+  DependSubdirs($(SUBDIRS))
+diff -cr nas-1.2p2/config/NetAudio.tmpl nas-1.2p2-AIX/config/NetAudio.tmpl
+*** nas-1.2p2/config/NetAudio.tmpl	Tue Sep 27 17:51:26 1994
+--- nas-1.2p2-AIX/config/NetAudio.tmpl	Wed Nov  1 21:24:30 1995
+***************
+*** 22,27 ****
+--- 22,29 ----
+   * $NCDId: @(#)BUILDNOTES,v 1.7 1995/11/28 23:25:57 greg Exp $
+   */
+  
++ _NULLCMD_ = ":"
++ 
+  #if WantAutoSharedAudioLibrary
+  #define NormalLibAudio          NormalLibX
+  #define SharedLibAudio          SharedLibX
+***************
+*** 74,80 ****
+  #endif
+  #endif
+  
+!          AUSRC = $(TOP)/lib/audio
+  
+  #if SharedLibAudio
+  /*
+--- 76,83 ----
+  #endif
+  #endif
+  
+!         TOP = /usr/src/nas-1.2p2
+!         AUSRC = $(TOP)/lib/audio
+  
+  #if SharedLibAudio
+  /*
+***************
+*** 107,119 ****
+  #else /* SunArchitecture */
+  
+  /* place #ifdef's for other architectures around these lines */
+   LOCAL_LDFLAGS = _AuUse(-L$(USRLIBDIR), -L$(AUSRC) -L$(USRLIBDIR))
+        DEPAULIB =
+           AULIB = -laudio
+  
+  #endif /* SunArchitecture */
+  
+- 
+  #else /* SharedLibAudio */
+   LOCAL_LDFLAGS =
+        DEPAULIB = _AuUseCat($(USRLIBDIR),$(AUSRC),/libaudio.a)
+--- 110,123 ----
+  #else /* SunArchitecture */
+  
+  /* place #ifdef's for other architectures around these lines */
++ #ifdef AIXArchitecture
+   LOCAL_LDFLAGS = _AuUse(-L$(USRLIBDIR), -L$(AUSRC) -L$(USRLIBDIR))
+        DEPAULIB =
+           AULIB = -laudio
++ #endif
+  
+  #endif /* SunArchitecture */
+  
+  #else /* SharedLibAudio */
+   LOCAL_LDFLAGS =
+        DEPAULIB = _AuUseCat($(USRLIBDIR),$(AUSRC),/libaudio.a)
+***************
+*** 122,128 ****
+  
+    AUDIODEPLIBS = $(DEPAULIB) $(DEPXTOOLLIB) $(DEPXLIB)
+       AUDIOLIBS = $(AULIB) $(XTOOLLIB) $(XLIB) -lm
+!   BUILDINCROOT = $(TOP)/usr.include
+     BUILDINCDIR = $(BUILDINCROOT)
+  EXTRA_INCLUDES = -I$(BUILDINCROOT)
+      INCLUDESRC = $(TOP)/usr.include
+--- 126,132 ----
+  
+    AUDIODEPLIBS = $(DEPAULIB) $(DEPXTOOLLIB) $(DEPXLIB)
+       AUDIOLIBS = $(AULIB) $(XTOOLLIB) $(XLIB) -lm
+!   BUILDINCROOT = $(TOP)/usr.include 
+     BUILDINCDIR = $(BUILDINCROOT)
+  EXTRA_INCLUDES = -I$(BUILDINCROOT)
+      INCLUDESRC = $(TOP)/usr.include
+diff -cr nas-1.2p2/lib/audio/Alibint.c nas-1.2p2-AIX/lib/audio/Alibint.c
+*** nas-1.2p2/lib/audio/Alibint.c	Fri Aug 12 19:17:04 1994
+--- nas-1.2p2-AIX/lib/audio/Alibint.c	Wed Nov  1 21:09:58 1995
+***************
+*** 55,60 ****
+--- 55,63 ----
+  #ifdef SYSV	/* fd_set */
+  #include <sys/socket.h>
+  #endif
++ #ifdef _AIX
++ #include <sys/select.h>
++ #endif
+  
+  /* check for both EAGAIN and EWOULDBLOCK, because some supposedly POSIX
+   * systems are broken and return EWOULDBLOCK when they should return EAGAIN
+ 
+--------------------------------- snip ---------------------------------
+
+/usr/lpp/X11/lib/X11/config/Imake.rules is broken at least in AIX
+4.1.2 and 4.1.3. According to the AIX 4.1.3 release notes, you have to
+patch Imake.rules as follows to get nas-1.2p2 compiled cleanly:
+
+--------------------------------- snip ---------------------------------
+
+*** Imake.rules.old	Thu Nov  2 08:55:40 1995
+--- Imake.rules	Thu Nov  2 08:55:53 1995
+***************
+*** 1158,1164 ****
+   */
+  #ifndef NamedMakeSubdirs
+  #define NamedMakeSubdirs(name,dirs) \
+! NamedTargetSubdirs(name,dirs,"Making",name,PassCDebugFlags,all)
+  #endif /* NamedMakeSubdirs */
+  
+  #ifndef MakeSubdirs
+--- 1158,1164 ----
+   */
+  #ifndef NamedMakeSubdirs
+  #define NamedMakeSubdirs(name,dirs) \
+! NamedTargetSubdirs(name,dirs,"Making" name,PassCDebugFlags,all)
+  #endif /* NamedMakeSubdirs */
+  
+  #ifndef MakeSubdirs
+
+--------------------------------- snip ---------------------------------
+
+		    ==============================
+
+DEC Alpha (OSF1 V3.2) notes
+---------------------------
+Date: Tue, 29 Aug 1995 11:10:55 -0700 (PDT)
+From: Andrew Daviel <andrew@andrew.triumf.ca>
+Subject: NAS on Alpha
+
+I have built NAS 1.2 P2 on DEC Alpha (OSF1 V3.2); at least, it built OK 
+and the play utilities I have tried seem to work.
+
+The only thing I had to do was to add the line
+    EXTRA_LIBRARIES = -ldnet_stub 
+to the Makefiles. I'm not sufficiently familiar with Imake to do it 
+properly; I just made a script to hack them all after doing "make Makefiles".

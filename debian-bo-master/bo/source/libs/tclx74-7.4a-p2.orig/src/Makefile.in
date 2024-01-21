@@ -1,0 +1,196 @@
+#
+# src/Makefile.in  --
+#
+# Makefile for Extended Tcl C sources. 
+# 
+#------------------------------------------------------------------------------
+# Copyright 1992-1995 Karl Lehenbauer and Mark Diekhans.
+#
+# Permission to use, copy, modify, and distribute this software and its
+# documentation for any purpose and without fee is hereby granted, provided
+# that the above copyright notice appear in all copies.  Karl Lehenbauer and
+# Mark Diekhans make no representations about the suitability of this
+# software for any purpose.  It is provided "as is" without express or
+# implied warranty.
+#------------------------------------------------------------------------------
+# $Id: Makefile.in,v 5.0 1995/07/25 05:42:48 markd Rel $
+#------------------------------------------------------------------------------
+#
+SHELL = /bin/sh
+
+#------------------------------------------------------------------------------
+# Autoconfig defines that can be overridden in Config.mk
+
+CC          = @CC@
+CFLAGS      = @CFLAGS@
+CXX         = @CXX@
+CXXFLAGS    = @CXXFLAGS@
+TCLXX       = @TCLXX@
+YACC        = @YACC@
+RANLIB      = @RANLIB@
+srcdir      = @srcdir@
+srcbasedir  = @srcbasedir@
+bldbasedir  = @bldbasedir@
+VPATH       = @srcdir@
+prefix      = @prefix@
+exec_prefix = @exec_prefix@
+ARCH        = @TCL_ARCH@
+LIBS        = @LIBS@ @MATH_LIBS@
+
+#------------------------------------------------------------------------------
+# Include user-editable defines.
+
+@MAKEINCLUDE@ @MAKEQUOTE@${bldbasedir}/Config.mk@MAKEQUOTE@
+
+#------------------------------------------------------------------------------
+
+LIBTCL        = ${TCL_UCB_LIB}/libtcl.a
+INST_MASTER   = ${TCL_MASTERDIR}/`../tools/tclxversion`
+INSTCOPY      = ../runtcl ../tools/instcopy
+SYMLINKEXT    = ../tools/symlinkext
+
+LDLIBS = libtclx.a ${TCL_UCB_LIB}/libtcl.a ${LIBS} ${XLDLIBS}
+
+SHLDLIBS = ${TCLX_SHLIBS} ${LIBS} ${XLDLIBS}
+
+
+CC_FLAGS = ${CPPFLAGS} ${XCFLAGS} ${CFLAGS} -I${srcbasedir}/src \
+           -I${bldbasedir}/src -I${TCL_UCB_SRC}
+
+LD_FLAGS = ${LDFLAGS} ${XLDFLAGS} ${XCFLAGS} ${CFLAGS}
+
+CXX_FLAGS = ${CPPFLAGS} ${XCFLAGS} ${CXXFLAGS} -I${srcbasedir}/src \
+           -I${bldbasedir}/src -I${TCL_UCB_SRC}
+
+LDXX_FLAGS = ${LDFLAGS} ${XLDFLAGS} ${XCFLAGS} ${CXXFLAGS}
+
+.c.o:
+	${CC} ${CC_FLAGS} -c $<
+
+#------------------------------------------------------------------------------
+
+OBJS= \
+    tclXbsearch.o    tclXchmod.o      tclXclock.o      tclXcmdInit.o \
+    tclXcmdloop.o    tclXcnvclock.o   tclXdebug.o      tclXdup.o     \
+    tclXfcntl.o      tclXfilecmds.o   tclXfilescan.o   tclXflock.o   \
+    tclXfstat.o      tclXgeneral.o    tclXgetdate.o    tclXhandles.o \
+    tclXid.o         tclXinit.o       tclXkeylist.o    tclXlib.o     \
+    tclXlist.o       tclXmath.o       tclXmsgcat.o     tclXlibInit.o \
+    tclXprocess.o    tclXprofile.o    tclXregexp.o     tclXselect.o  \
+    tclXserver.o     tclXsignal.o     tclXshell.o      tclXstring.o  \
+    tclXunixcmds.o   tclXutil.o
+
+#------------------------------------------------------------------------------
+# Compile the TclX library and link the shell.  If the link fails, purge
+# the executable, as some systems leave invalid executables around.
+
+all: made.tmp tcl TCLXX_${TCLXX}
+
+tcl: tclXAppInit.o libtclx.a ${LIBTCL} made.tmp 
+	${CC} ${LD_FLAGS} tclXAppInit.o ${LDLIBS} -o tcl || \
+	    (rm -f tcl; exit 1)
+
+made.tmp libtclx.a: ${OBJS} TCLXX_O_${TCLXX}
+	${AR} cr libtclx.a ${OBJS}
+	if [ "${TCLXX}" = "YES" ] ; then \
+	    ${AR} cr libtclx.a tcl++.o ;\
+	else exit 0 ; fi
+	${RANLIB} libtclx.a
+	touch made.tmp
+
+tclXlibInit.o: ${srcdir}/tclXlibInit.c
+	${CC} -c ${CC_FLAGS} -DTCLX_LIBRARY=\"${INST_MASTER}\" \
+	    ${srcdir}/tclXlibInit.c
+
+tclXcmdInit.o: ${srcdir}/tclXcmdInit.c ${srcdir}/tclXpatchl.h
+
+tclXgetdate.c: ${srcdir}/tclXgetdate.y
+	${YACC} $(srcdir)/tclXgetdate.y
+	sed 's/yy/TclXyy/g' <y.tab.c >tclXgetdate.c
+	rm y.tab.c
+
+tcl++.o: ${srcdir}/tcl++.C ${srcdir}/tcl++.h
+	${CXX} -c ${CXX_FLAGS} ${srcdir}/tcl++.C
+
+#------------------------------------------------------------------------------
+# Do some special checks to make sure TclX is built ok.
+
+checkup: made2.tmp
+
+made2.tmp: tcl
+	../runtcl ${srcbasedir}/tools/checkup.tcl
+	touch made2.tmp
+
+#------------------------------------------------------------------------------
+# Make sure we can link a C++ program (the result is not install).  Target
+# also forces tcl++.o to be compiled.
+
+TCLXX_O_YES:  tcl++.o
+	touch TCLXX_O_YES
+TCLXX_O_NO:
+	touch TCLXX_O_NO
+
+TCLXX_YES:  tcl++
+TCLXX_NO:
+
+tcl++: tclXAppInit++.o tcl++.o made.tmp
+	${CXX} ${LDXX_FLAGS} tclXAppInit++.o ${LDLIBS} -o tcl++
+
+tclXAppInit++.o: ${srcdir}/tcl++.h tclXAppInit++.C
+	${CXX} -c ${CXX_FLAGS} tclXAppInit++.C
+
+tclXAppInit++.C: ${srcdir}/tclXAppInit.c
+	rm -f tclXAppInit++.C
+	cp ${srcdir}/tclXAppInit.c tclXAppInit++.C
+
+#------------------------------------------------------------------------------
+# Relink using shared libraries.  The libraries must be built and installed
+# by hand.
+
+shlink:
+	${CC} ${LD_FLAGS} tclXAppInit.o ${SHLDLIBS} -o tcl || \
+	    (rm -f tcl; exit 1)
+
+#------------------------------------------------------------------------------
+
+install: install-exec
+	${INSTCOPY} ${srcdir}/tclExtend.h ${srcdir}/tcl++.h \
+	    ${INSTALL_ROOT}${TCL_INCLUDEDIR}
+
+install-exec:
+	${INSTCOPY} tcl ${INSTALL_ROOT}${TCL_BINDIR}
+	${STRIP} ${INSTALL_ROOT}${TCL_BINDIR}/tcl
+	${INSTCOPY} libtclx.a ${INSTALL_ROOT}${TCL_LIBDIR}
+	${RANLIB} ${INSTALL_ROOT}${TCL_LIBDIR}/libtclx.a
+	${INSTCOPY} tclxlibs.mk ${INSTALL_ROOT}${TCL_LIBDIR}
+
+install-master: install-master-exec
+	${INSTCOPY} ${TCL_UCB_SRC}/tcl.h ${srcdir}/tclExtend.h \
+	    ${srcdir}/tcl++.h ${INSTALL_ROOT}${INST_MASTER}/include
+	${SYMLINKEXT} ${INST_MASTER}/include/* ${INSTALL_ROOT}${TCL_INCLUDEDIR}
+
+install-master-exec:
+	${INSTCOPY} tcl ${INSTALL_ROOT}${INST_MASTER}/bin${ARCH}
+	${STRIP} ${INSTALL_ROOT}${INST_MASTER}/bin${ARCH}/tcl
+	${INSTCOPY} ${LIBTCL} libtclx.a \
+	    ${INSTALL_ROOT}${INST_MASTER}/lib${ARCH}
+	${RANLIB} ${INSTALL_ROOT}${INST_MASTER}/lib${ARCH}/*.a
+	${INSTCOPY} tclxlibs.mk ${INSTALL_ROOT}${INST_MASTER}/lib${ARCH}
+	${SYMLINKEXT} ${INST_MASTER}/bin${ARCH}/* ${INSTALL_ROOT}${TCL_BINDIR}
+	${SYMLINKEXT} ${INST_MASTER}/lib${ARCH}/* ${INSTALL_ROOT}${TCL_LIBDIR}
+
+#------------------------------------------------------------------------------
+
+clean:
+	-rm -f made*.tmp tclXgetdate.c tclXAppInit.o
+	-rm -f ${OBJS} libtclx.a tcl tcl++
+	-rm -f tclXAppInit++.C TCLXX_O_YES TCLXX_O_NO tclXAppInit++.o tcl++.o
+
+#------------------------------------------------------------------------------
+# Restore to the distributed state.
+
+distclean: clean
+	rm -f Makefile tclXconf.h tclxlibs.mk
+
+# Disable Sun's parallel make, it doesn't get the dependencies right.
+.NO_PARALLEL:

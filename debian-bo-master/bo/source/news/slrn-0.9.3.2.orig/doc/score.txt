@@ -1,0 +1,160 @@
+Basic Idea:
+
+  slrn awards an article points by giving it a score.  If the score for the
+article is less than zero, the article is marked as read or killed.  The
+purpose of the score file is to define the set of tests that an article must
+go through to determine the score.  Although the score may be based on ANY
+header item, it is recommended that one stick with the following for
+efficiency:
+
+      * Subject
+      * From
+      * Xref
+      * References
+      * Lines
+      
+as well as the newsgroup that the article is part of.
+  
+Score file format:
+
+  The format of the file is very simple (See below for an explicit
+example). The file is divided into sections delimited by a newsgroup
+or newsgroups enclosed in square brackets, e.g.,
+
+     [rec.crafts.*, rec.hobbies.*]
+
+The name may contain the `*' wild card character.  
+
+Comments begin with the `%' character.  Leading whitespace is ignored.
+
+Each section consists of comment lines, empty lines or keyword lines.
+Only the keyword lines are meaningful and all leading whitespace is
+ignored.  A keyword line begins with the name of the keyword followed
+immediately by one or two colons and one space.  The rest of the line
+usually consists of a regular expression.  The keyword may be prefixed
+by the `~' character to signify that the regular expression should not
+match the object specified by the keyword.
+
+A group of keywords defines a test that is given to the header of the
+article.  The `Score' keyword is used to assign a score to the header
+if the header passes the test.  It also serves to delimit tests.  The
+score can be any positive or negative integer.  However there are two
+special values: 9999 and -9999.  If the score for an individual test
+is one of these two values, any following tests are skipped and the
+article is simply given one of the two special values.  If the
+numerical value of the score is prefixed by an equal sign, score
+processing for the header is stoped and the header will be given the
+score for that test.
+
+All keywords except for `Score' and `Expires' may be prefixed by the `~'
+character.  If the `Expires' keyword appears, it must immediately follow the
+`Score' keyword.  The `Expires' keyword may be used to indicate that the
+test is no longer to be applied on the date specified by the keyword.  For
+example,
+
+    Expires: 4/1/1996              (or: 1-4-1996)
+
+implies that the given test is no longer valid on or after April first 1996.
+As the example indicates, the date must be specified using either the format
+MM/DD/YYYY or DD-MM-YYYY.  Note: DO NOT CONFUSE THIS WITH THE EXPIRES HEADER
+KEYWORD.
+
+The Lines keyword is also special.  Its value is not a regular expression,
+rather, a simple integer.  It may be used to kill articles which contain too
+many or too few lines.  For example,
+
+    Score: -100
+    Lines: 1000
+    
+assignes a score of -100 to articles that have more than 1000 lines.
+Similarly, the test
+
+    Score: -100
+    ~Lines: 3
+    
+assigns a score to articles that have less than or equal to 3 lines.
+
+Here is a sample slrn score file:
+-------------------------------------------------------------  
+  [news.software.readers]
+     Score: 9999
+     % All slrn articles are good
+     Subject: slrn
+  
+     Score: 9999
+     % This is someone I want to hear from
+     From: davis@space\.mit\.edu
+
+     Score: -9999
+     Subject: \<f?agent\>
+
+  [comp.os.linux.*]
+     Score: -10
+     Expires: 1/1/1996
+     Subject: swap
+     
+     Score: 20
+     Subject: SunOS
+      
+     Score: 50
+     From: Linus
+     
+     % Kill all articles cross posted to an advocacy group
+     Score: -9999
+     Xref: advocacy
+     ~From: Linus
+     
+     % This person I want nothing to do with unless he posts about 
+     % `gizmos' but only in comp.os.linux.development.*
+     
+     Score: -9999
+     From: someone@who\.knows\.where
+     ~Subject: gizmo
+     ~Newsgroup: development
+  
+  [~misc.invest.*, misc.taxes]
+     Score:: -9999
+      Subject: Earn Money
+      Subject: Earn \$
+      
+--------------------------------------------------------  
+
+This file consists of two sections.  The first section defines a set
+of tests applied to the news.software.readers newsgroups.  The second
+section applies to the comp.os.linux newsgroups. The final section
+applies to ALL newsgroups EXCEPT misc.invest.* and misc.taxes (see
+below).
+
+The first section consists of three tests.  The first test applies a score
+of 9999 to any subject that contains the string `slrn'.  The second test
+applies to the `From'.  It says that any article from davis@space.mit.edu
+gets scores 9999.  The third test gives a score of -9999 to any article
+whose subject contains the word `agent'.  Since tests are applied in order,
+if an article contains both `slrn' and `agent', it will be given a score of
+9999 since 9999 is a special score value.
+
+The second section is more complex.  It applies to the newsgroups
+comp.os.linux newsgroups and consists of 5 tests.  The first three are
+simple: -10 points are given if the subject contains `swap', 20 if it
+contains SunOS, and 50 if the article is from someone named `Linus'.  This
+means that if Bill@Somewhere writes an article whose subject is `Swap, Swap,
+Swap', the article is give -10 points.  However, if the Linus writes an
+article with the same title, it is given -10 + 50 = 40 points.  Note that
+the first test expires at the beginning of 1996.
+
+The fourth test kills all articles that were cross posted to an advocay
+newsgroup UNLESS they were posted by Linus.  Note that if a keyword begins
+with the `~' character, the effect of the regular expression is reversed.
+
+The fifth test serves to filter out posts from someone@who.knows.where
+unless he posts about `gizmos' in one of the comp.os.development newsgroups.
+Again note the `~' character.
+
+The final section of the score file begins with the line
+
+  [~misc.invest.*, misc.taxes]
+
+If the first chaarcter following the opening square bracket is `~',
+then the newsgroup or newsgroups contained in the brackets are NOT to
+be matched.  That is, the `~' character is used to denote the boolean
+NOT operation.

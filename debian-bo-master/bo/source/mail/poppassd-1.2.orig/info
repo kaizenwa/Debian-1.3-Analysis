@@ -1,0 +1,107 @@
+A Eudora and NUPOP change password server.
+
+John Norstad
+Academic Computing and Network Services
+Northwestern University
+j-norstad@nwu.edu
+
+Based on earlier versions by Roy Smith <roy@nyu.edu> and Daniel
+L. Leavitt <dll.mitre.org>.
+
+Doesn't actually change any passwords itself.  It simply listens for
+incoming requests, gathers the required information (user name, old
+password, new password) and executes /bin/passwd, talking to it over
+a pseudo-terminal pair.  The advantage of this is that we don't need
+to have any knowledge of either the password file format (which may
+include dbx files that need to be rebuilt) or of any file locking
+protocol /bin/passwd and cohorts may use (and which isn't documented).
+
+The current version has been tested at NU under SunOS release 4.1.2 
+and 4.1.3, and under HP-UX 8.02 and 9.01. We have tested the server 
+with both Eudora 1.3.1 and NUPOP 2.0.
+
+Other sites report that this version also works under AIX and NIS,
+and with PC Eudora.
+
+Note that unencrypted passwords are transmitted over the network.  If
+this bothers you, think hard about whether you want to implement the
+password changing feature.  On the other hand, it's no worse than what
+happens when you run /bin/passwd while connected via telnet or rlogin.
+Well, maybe it is, since the use of a dedicated port makes it slightly
+easier for a network snooper to snarf passwords off the wire.
+
+NOTE: In addition to the security issue outlined in the above paragraph,
+you should be aware that this program is going to be run as root by
+ordinary users and it mucks around with the password file.  This should
+set alarms off in your head.  I think I've devised a pretty foolproof
+way to ensure that security is maintained, but I'm no security expert and
+you would be a fool to install this without first reading the code and
+ensuring yourself that what I consider safe is good enough for you.  If
+something goes wrong, it's your fault, not mine.
+
+The front-end code (which talks to the client) is directly 
+descended from Leavitt's original version.  The back-end pseudo-tty stuff 
+(which talks to /bin/password) is directly descended from Smith's
+version, with changes for SunOS and HP-UX by Norstad (with help from
+sample code in "Advanced Programming in the UNIX Environment"
+by W. Richard Stevens). The code to report /bin/passwd error messages
+back to the client in the final 500 response, and a new version of the
+code to find the next free pty, is by Norstad.
+       
+Should be owned by root, and executable only by root.  It can be started
+with an entry in /etc/inetd.conf such as the following:
+
+poppassd stream tcp nowait root /usr/local/bin/poppassd poppassd
+
+and in /etc/services:
+
+poppassd	106/tcp
+
+Logs to the local2 facility. Should have an entry in /etc/syslog.conf
+like the following:
+
+local2.err	/var/adm/poppassd-log
+
+This version has been ported to Linux. It understands the passwd
+program strings used by the Linux passwd program. (My version comes
+from Slackware.)
+
+In addition, the binary included does not support shadow passwords. I
+put the code into the source to support it. Simply define the usual
+HAS_SHADOW define and rebuild the code.
+
+The shadow password support includes code for either eight or sixteen
+character passwords. It will be automatically selected based upon your
+original choice for the configuration of the shadow suite.
+
+The original source had several problems for Linux. If you want the
+original code, you may obtain it from the archive site at
+ftp.qualcomm.com.
+
+- There must be no parameters passed to passwd for Linux. Linux
+  complains if you try and change your own password by specifying
+  your own name and you are not root.
+
+  When I switched to using shadow passwords, I found an un-expected
+  problem. It turns out that the passwd program for shadow checks the
+  user ident. from the terminal and the utmp login database. Since the
+  poppasswd program does not 'log' the user into the database, the
+  program would fail to find the user identity. I punted. I left the
+  program as root and passed the user name as the parameter to the
+  passwd program. This is really not a security hole any more than the
+  original. The password for the user is not passed on the command
+  line, but the user name is. User names are not secret.
+
+  For the non-shadow case, the passwd program uses the uid of the
+  program to be user name.
+
+- The Linux pty drivers, as of 1.1.52, still have problems with
+  setting the terminal to strip the return character. Include the
+  return in the expected response strings.
+
+- Make sure that you use the proper expect response strings. The ones
+  for Linux are the first in the item lists.
+
+- The location of the passwd program is either /bin or /usr/bin. I
+  added support for either location since Slackware stores them in
+  /usr/bin.

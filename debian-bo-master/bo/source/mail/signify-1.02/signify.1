@@ -1,0 +1,270 @@
+.\" Hey, Emacs!  This is an -*- nroff -*- source file.
+.\" Signify and this man-page were written by Brian White and
+.\" are copyright (c) 1996 by Verisim, Inc.  It may be distributed
+.\" under the terms of the GNU General Public License.
+.\"
+.de Sh
+.br
+.if t .Sp
+.ne 5
+.PP
+\fB\\$1\fR
+.PP
+..
+.de Vb
+.ft CW
+.nf
+.ne \\$1
+..
+.de Ve
+.ft R
+.fi
+..
+.de Ip
+.br
+.ie \\n(.$>=3 .ne \\$3
+.el .ne 3
+.IP "\\$1" \\$2
+..
+.TH SIGNIFY 1 "Copyright (c) 1996 by Verisim, Inc." "96.08.24" "Generate Semi-Random Signatures"
+.SH NAME
+signify - Program to generate semi-random signatures
+
+.SH SYNOPSIS
+.B signify [--fifo=$HOME/.signature] [--input=<file>]
+
+.SH DESCRIPTION
+.PP
+.B Signify
+will take a signature description file (
+.I ~/.signify
+or whatever file is specified by the
+.I --input=<file>
+option ) and create a random signature based on the information
+contained therein.  This allows the ability to do such things as pick
+a random quote for each message sent.
+
+.B Signify,
+by default, will write the generated signature to standard output
+from where it can be redirected to overwrite the
+.I .signature
+file.  Alternatively,
+.B Signify
+can pipe it's output to a given 'fifo'.  Each read from that file will
+return a different signature.
+
+To use the FIFO feature, delete the current "$HOME/.signature" file
+and start
+.B Signify
+in the background like "signify --fifo=$HOME/.signature &".  With this
+running, try "cat $HOME/.signature" a few times.  A different
+signature will be returned each time.  (Note: This feature will
+probably work only on unix systems.)
+
+.SH CONFIGURATION
+The definition for the generated signatures is contained entirely within the
+.I .signify
+file contained in the user's home directory.  Any completely empty
+lines (lines with even a single space are considered part of the
+signature data) and those lines starting with a hash character (#) are
+completely ignored.  Those lines starting with a percent sign (%) are
+considered commands and affect the way
+.B Signify
+behaves.
+
+.Sh "Defining Variables"
+.B Signify
+will substitute variables within each line of the signature in much
+the same way as the shell would.  Any sequence of "$WORD" will be
+replaced by the value corresponding to the name "WORD".  Case is
+significant.  By default, these variables look up the values inside
+the environment variables, but can also be defined within the
+.I .signify
+file itself with a command such as:
+
+.Vb 1
+\&    % $email=myid@mycompany.com
+.Ve
+
+Everything after the equals sign (=) is considered part of the value.
+Variables can be used in the definition of other variables.
+
+The variable
+.I SIGWIDTH
+can be used to set the desired output width of the generated
+signature.  By default, this variable has the value "79".
+
+.Sh "Creating Alternates"
+An unlimited number of "alternates" can be specified by using the "{",
+"|", and "}" commands.  When the signature is generated, only one of
+all the possible alternates will be output.  For example:
+
+.Vb 8
+\&    % {
+\&    This is the first possibility.
+\&    % |
+\&    This is the second possibility.
+\&    % |
+\&    This is the third (and last) possibility.
+\&    Note that alternatives can span multiple lines.
+\&    % }
+.Ve
+
+.Sh "Creating Columns"
+.B Signify
+will automatically create side-by-side columns with nice, even spacing
+by using the "(", "|", and ")" commands.  When output, everything will
+be padded out with spaces to fit nicely on the line.  For example:
+
+.Vb 9
+\&    % (
+\&    This is the
+\&    first column.
+\&    % |
+\&    This is the second.
+\&    % |
+\&    This is the third
+\&    (and last) column.
+\&    % )
+.Ve
+
+.Sh "Nesting Sections"
+Alternates and columns can be nested to any depth, though this can
+quickly become unwieldy and may not work exactly as expected,
+especially with columns.  As a general rule, only supply alignment
+options (eg. "center", "right") at the most outside level to do any
+text formatting.  For example, if supplying multiple "alternates"
+within a column, put the alignment options on the column and not on
+the alternates.
+
+.Sh "Section Command Options"
+The "alternates" and "columns" commands can take options to alter how
+they behave.  The following is a list of supported options and what
+they do, though not all have meaning for both types of section.
+
+.Ip "\fBbottom\fR"
+push the following lines of text to the bottom of a column should it
+have fewer lines than the longest column.  This option has no meaning
+to "alternates" sections.
+
+.Ip "\fBcenter\fR"
+adjust the following lines to be centered on the page or in the
+column.  When used in an "alternates" section, an additional
+"=<number>" can be used to specify what column to center around
+instead of the middle of the page.
+
+.Ip "\fBleft\fR"
+adjust the following lines so they sit at the left margin.  This is
+the default horizontal alignment and most closely reflects how the
+lines are entered into the
+.I .signify
+file itself.  Note that pad spaces will still be placed on both sides
+of a column with this type of alignment unless the
+.I minwidth
+option is also specified.
+
+.Ip "\fBminwidth\fR"
+do not pad the left and right sides of this column when placing next
+to other columns.  This is useful for building column separator lines
+and the like that are not really part of the content.  This option has
+no meaning to "alternates" sections.
+
+.Ip "\fBrepeat\fR"
+output the following lines multiple times to fill all lines in the
+column.  This is useful for building column separator lines and the
+like that are just a repeated sequence.  A multi-line sequence can be
+specified and only those lines necessary to fill the column will be
+output.  The entire sequence will be output in its entirety at least
+once, however.  This option has no meaning to "alternates" sections.
+
+.Ip "\fBright\fR"
+adjust the following lines so they sit at the right margin.  Note that
+pad spaces will still be placed on both sides of a column with this
+type of alignment unless the
+.I minwidth
+option is also specified.
+
+.Ip "\fBtop\fR"
+push the following lines of text to the top of a column should it have
+fewer lines than the longest column.  This is the default action if
+no vertical centering is specified.  This option has no meaning to
+"alternates" sections.
+
+.Ip "\fBvcenter\fR"
+push the following lines of text in the vertical center of a column
+should it have fewer lines than the longest column.  This option has
+no meaning to "alternates" sections.
+
+.Ip "\fBweight=<number>\fR"
+change the likelihood a given alternate will be chosen.  The chance of
+any specific alternate being chosen is the given
+.I <number>
+divided by the total of all weights.  If not specified, the weight
+defaults to 1.0.  Decimal numbers and numbers less that 1.0 are
+allowed.  This option has no meaning to "columns" sections.
+
+.SH "THE COST OF FREE SOFTWARE"
+Let's face it: Somebody has to pay for all software that gets written.
+Whether it is the time donated by the programmer or the salary donated
+by the company, everything has its cost.
+.B Signify
+has been made available to the general public in the hope that it will
+be useful and thus help raise the visibility of the company that
+sponsored its creation:
+.B Verisim.
+In this way, the cost of creating
+.B Signify
+is offset by the publicity gained.  If you use this program and would
+like to further the development of such software, it is asked (but by
+no means required) that you put something like the following in the
+quotes section of your
+.I .signify
+file.
+
+.Vb 2
+\&    % | center, weight=0.1
+\&    Generated by $PROGRAM.  For this and more, visit $WEBSITE
+.Ve
+
+(for single-line quote)  or  (for multi-line in a column)
+
+.Vb 4
+\&    % | weight=0.1
+\&    This signature was automatically generated with
+\&    $PROGRAM.  For this and other cool products,
+\&    check out $WEBSITE
+.Ve
+
+These are weighted very low (though you are more than welcome to
+increase these weightings :-) and will thus show up in your signature
+only occasionally.  The variables are defined internal to
+.B Signify
+and provide the program name (including version number) and the web
+site where it can be found.  We thank you for your support!
+
+.SH BUGS
+Please report any bugs to:
+.B signify-bugs@verisim.com
+
+.SH AUTHOR
+.B Signify
+was written and documented by Brian White <bcwhite@pobox.com> on
+August 24th, 1996.
+.SH COPYRIGHT
+.B Signify
+is copyright (c) 1996 by Verisim, Inc. and may be distributed in its
+unmodified (i.e. "archive") form without restriction.  It may also be
+distributed without fee in accompaniment of another product so long
+the
+.B Signify
+program itself, this man page, and the basic examples (those starting
+with a capital letter) are all included in their original,
+.B unmodified
+state.  Any changes should be sent to signify-bugs@verisim.com so they
+can be propogated to all users of this software.
+
+In addition, up to 25% of the
+.B Signify
+code may be included directly in another product without requiring the
+express permission of
+.B Verisim, Inc.

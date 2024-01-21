@@ -1,0 +1,796 @@
+-*- mode: text; mode: fold; -*-
+The purpose of this note is to provide some instructions on extending
+the newsreader in its macro language.  It consists of two parts: an
+overview of macros and the reference manual for slrn intrinsic
+functions.
+
+{{{ Introduction 
+
+The present implementation does not provide many hooks into the
+newsreader.  More capabilities will be added in subsequent releases.
+      
+When slrn is started, it reads the .slrnrc user initialization file.
+That file may contain the `interpret' command which causes the
+newsreader to load a specified S-Lang script, e.g.,
+
+    interpret ".slrn.sl"
+
+The script file must obey the syntax of the S-Lang language.  See
+slang/doc/slang.tex for information about the syntax.  This
+distribution includes a file called `slrn.sl' which contains examples
+of functions described in this document.
+
+This macro file can define hooks that the newsreader will call, new
+functions with keybindings, etc...  
+
+
+---------------------------------------------------------------------------
+Defining Key Macros
+---------------------------------------------------------------------------
+
+    Although one is able to bind keys to specific functions via lines
+    of the form
+    
+         setkey group "refresh_groups"  "G"
+	 
+    in the .slrnrc file, it is not possible to defined more
+    complicated actions in this manner.  However, macros can be
+    defined by using a S-Lang script.  For example, the
+    `refresh_groups' internal function refreshes the newsgroups but it
+    does not cause the cursor to move to the top of the newsgroup
+    list.  On the other hand, the internal function `bob' moves to the
+    top of the list but it does not refresh the groups.  One can
+    define a S-Lang function to perform both actions:
+    
+         define refresh_groups_bob ()
+	 {
+	     call ("refresh_groups");
+	     call ("bob");
+	 }
+	 
+    and bind it to a key:
+    
+         definekey ("refresh_groups_bob", "g", "group");
+	 
+    Note: It is not yet possible to write this as:
+    
+        define refresh_groups_bob ()
+	{
+	    refresh_groups ();
+	    bob ();
+	}
+
+    This restriction will be lifted in the future.
+    
+    The `definekey' function takes 3 arguments:
+    
+         function to execute
+	 keybinding
+	 keymap name   ("article" or "group")
+	 
+    Here is another macro that may be used in article mode.  It
+    performs a regular expression search for subjects.
+	
+	variable Last_Search_Str = "";
+	define re_subject_search_forward ()
+	{
+	   variable str;
+	   
+	   ERROR_BLOCK
+	     {
+	       () = header_up (1);
+	     }
+	
+	   !if (header_down (1)) return;
+	
+	   str = read_mini ("Subject re-search fwd", Last_Search_Str, "");
+	
+	   !if (strlen (str))
+	     return;
+	
+	   Last_Search_Str = str;
+	   !if (re_fsearch_subject (str))
+	     error ("Not found.");
+	}
+	
+    To bind it to, e.g., `s' in the article keymap, use:
+   
+	definekey ("re_subject_search_forward", "s", "article");
+    
+
+    Some slrn keyboard functions require a ``prefix argument''.
+    Many people find the use of prefix arguments somewhat strange.
+    For example, instead of typing `ESC 1 ESC p' to reconstruct a thread,
+    one can simply use the function:
+    
+        define my_recreate_thread ()
+	{
+	    set_prefix_argument (1);
+	    call ("get_parent_header");
+	}
+	
+   Here is a function that pipes the current article to a
+   command called `most' (a paging program similar to more/less):
+   
+        define pipe_to_most ()
+	{
+	    pipe_article ("most");
+	}
+	definekey ("pipe_to_most", "&", "article");
+ 
+   Here it has been bound to the `&' key.  Most likely one will want
+   to pipe the article to a shell script for further processing.
+   
+   Finally, some of the built-in keyboard functions will prompt for a
+   string.  For example, in article mode, pressing the `:' key will
+   prompt for an filename.  The function `set_input_string' may be
+   used to provide a response to such a prompt, e.g.,
+   
+      % The `:' command will prompt for a filename.
+      set_input_string ("/tmp/decoded");
+      call ("decode");
+
+   
+---------------------------------------------------------------------------
+Hooks
+---------------------------------------------------------------------------
+   
+Currently, the newsreader
+recognizes the following hooks:
+
+   startup_hook
+      This hook is called right after the newsreader is initialized
+      and immediately before checking for news.  This hook allows
+      the user to set variables on a server by server basis.
+      
+      Here is an example:
+      
+         define startup_hook ()
+	 {
+	   !if (strcmp (server_name (), "uhog"))
+	     {
+	       set_integer_variable ("lines_per_update", 20);
+	       set_integer_variable ("read_active", 0);
+	     }
+	 }
+
+      It simply sets the `lines_per_update' variable to 20 and turns
+      off reading of the active file if the servername is `uhog' (it
+      is a slow server).
+
+   group_mode_hook
+      This hook is called after checking for news and immediately
+      before entering the main keyboard loop.
+      
+   article_mode_hook
+      This hook is called immediately before going into article mode.
+      One can set variables based on the group name.  For example,
+      
+      define article_mode_hook ()
+      {
+         variable sorting_method = 7;
+	 variable author_display = 2;
+         variable signature_file = ".signature";
+	 
+         if (is_substr (current_newsgroup (), "binaries")
+	     or is_substr (current_newsgroup (), "pictures"))
+	   {
+	      sorting_method = 3;
+	      author_display = 0;
+	   }
+
+	 if (strncmp (current_newsgroup (), "comp.", 5))
+	   signature_file = ".nerd-signature";
+	   
+	 set_integer_variable ("sorting_method", sorting_method);
+	 set_integer_variable ("author_display", author_display);
+	 set_string_variable ("signature", signature_file);
+      }
+      
+     changes the `sorting_method' and `author_display' variables to
+     something more appropriate for newgroups which contain encoded
+     articles.
+     
+   header_number_hook
+     If defined, this function will be called after selecting a header
+     via a header number.
+
+}}}
+
+---------------------------------------------------------------------------
+Command Reference
+---------------------------------------------------------------------------
+The above examples used ``intrinsic'' functions such as `call',
+`set_integer_variable', etc.  This section describes all slrn
+intrinsic functions that are available via the interpreter.  The code
+S-Lang langauge includes many others such as `strcmp' and `is_substr'
+which are not described here.
+
+
+---------------------------------------------------------------------------
+ article_as_string
+   Prototype: String article_as_string ();
+   
+   This function will return the entire contents of the current
+   article as a string.
+   
+   See Also:
+
+---------------------------------------------------------------------------
+ call
+   Prototype: Void call (String fun);
+   
+   This function is used to execute an interactive slrn internal
+   function.  Such functions are used with `setkey' statements in the
+   .slrnrc startup files.
+   
+   See Also: definekey, undefinekey, set_prefix_argument
+
+---------------------------------------------------------------------------
+ collapse_thread
+   Prototype: Void collapse_thread ();
+   
+   This function may be used to collapse the current thread.
+   
+   See Also: uncollapse_thread, collapse_threads, is_thread_collapsed
+
+---------------------------------------------------------------------------
+ collapse_threads
+   Prototype: Void collapse_threads ();
+   
+   This function will collapse all threads in the current newsgroup. 
+   
+   See also: uncollapse_threads
+
+---------------------------------------------------------------------------
+ current_newsgroup
+   Prototype: String current_newsgroup ();
+   
+   This function returns the name of the current newsgroup.
+   
+   See Also: server_name
+
+---------------------------------------------------------------------------
+ definekey
+   Prototype: definekey (String fun, String key, String km);
+   
+   This function is used to bind a key sequence specified by `key' to
+   a function `fun' in the keymap `km'.  Here `fun' can be any
+   predefined slang function that takes 0 arguments and returns void.
+   The parameter `km' must be either "article", "group", or "readline".
+   
+   See Also: undefinekey, call, set_prefix_argument
+
+---------------------------------------------------------------------------
+ error
+   Prototype: Void error (String s);
+   
+   This function generates a S-Lang error and displays a message given
+   by `s'.
+   
+   See Also: message
+
+---------------------------------------------------------------------------
+ extract_article_header
+   Prototype: String extract_article_header (String h);
+
+   This function returns the article header line specified by the
+   header keyword `h'.  If the header does not exist, it returns the
+   empty string.
+   
+   See Also: is_article_visible
+   
+---------------------------------------------------------------------------
+ get_group_flags
+   Prototype: Integer get_group_flags ();
+
+   This function returns the flags associated with the current
+   newsgroup.  This integer is a bitmapped value whose bits are
+   defined by the following constants:
+
+     GROUP_UNSUBSCRIBED   : set if the group is unsubscribed
+     GROUP_NEW_GROUP_FLAG : set if the group is new
+
+   See Also: get_header_flags, set_group_flags, current_newsgroup
+   
+---------------------------------------------------------------------------
+ get_header_flags
+   Prototype: Integer get_header_flags ();
+   
+   This functions returns the flags for the current header.  This
+   integer is a bitmapped value whose bits are defined by the following 
+   constants:
+   
+      HEADER_READ : set if header is marked as read
+      HEADER_TAGGED : set if header has `*' tag
+      HEADER_HIGH_SCORE : set if header has high score
+      HEADER_LOW_SCORE : set if header has low score
+   
+   See also: set_header_flags
+
+---------------------------------------------------------------------------
+ get_header_tag_number
+   Prototype: Integer get_header_tag_number ();
+   
+   This function returns the value of the numerical tag associated
+   with the current header.  If the header has no numerical tag, zero
+   is returned.
+   
+   See Also:
+
+---------------------------------------------------------------------------
+ get_select_box_response
+   Prototype: Integer get_select_box_response (title, item_1, ..., n_items);
+   
+   This function pops a selection box and queries the user for a
+   response.  An integer is returned which indicates the user's choice.
+   For example:
+   
+       variable rsp = get_select_box_response (
+                         "Pick a number:",
+			 "one", "two", "three", "four", 
+			 4);
+       
+       message (Sprintf ("You chose %d", rsp, 1));
+       
+   See also: read_mini, message, get_yes_no_cancel
+
+---------------------------------------------------------------------------
+ get_variable_value
+   Prototype: Value get_variable_value (String v);
+   
+   This function returns the value of an internal variable specified
+   by `v'.  Here `v' must be one of the variable names that can be
+   used in .slrnrc `set' commands.  The type of the object returned will
+   depend upon the type of the object `v' represents.
+   
+   See Also: set_integer_variable, set_string_variable
+
+---------------------------------------------------------------------------
+ get_yes_no_cancel
+   Prototype: Integer get_yes_no_cancel (str);
+   
+   This function displays `str' in the minibuffer after concatenating
+   "? [Y]-es, N-o, C-ancel" to it.  It then awaits user input and
+   returns:
+   
+        1 if yes
+	0 if no
+       -1 if cancel
+       
+   Note:  if a `%' character is to appear, it must be doubled.
+   
+   See also: get_select_box_response, getkey, read_mini
+---------------------------------------------------------------------------
+ getkey
+   Prototype: Integer getkey ();
+   
+   Read a character from the terminal and returns its value.
+   
+   Note: Function and arrow keys usually return more than one character.
+   
+   See Also: ungetkey, input_pending, read_mini
+
+---------------------------------------------------------------------------
+ goto_num_tagged_header
+   Prototype: Integer goto_num_tagged_header (Integer n);
+   
+   This function causes the header with numerical tag `n' to become the
+   current header.  It returns 1 upon success or 0 upon failure.
+   
+   See also: header_down, get_header_flags, call
+
+---------------------------------------------------------------------------
+ group_down_n
+   Prototype: Integer group_down_n (Integer n);
+   
+   This function moves the current group pointer down `n' groups and
+   returns the actual number moved.
+   
+   See Also: group_up_n, group_search, current_newsgroup
+   
+---------------------------------------------------------------------------
+ group_search
+   Prototype: Integer group_search (String name);
+   
+   This function searches for a newsgroup containing the string
+   `name'.  It also searches newsgroup descriptions.  A non-zero value
+   is returned upon success or zero upon failure.
+   
+   Note: This search may wrap.
+   
+   See Also: select_group, current_newsgroup
+   
+---------------------------------------------------------------------------
+ group_unread
+   Prototype: Integer group_unread ();
+   
+   This function returns the number of unread articles in the current
+   newsgroup.
+   
+   See Also: select_group, current_newsgroup, is_group_mode
+---------------------------------------------------------------------------
+ group_up_n
+   Prototype: Integer group_up_n (Integer n);
+   
+   This function moves the current group pointer up `n' groups and
+   returns the actual number moved.
+   
+   See Also: group_down_n, group_search, current_newsgroup
+   
+---------------------------------------------------------------------------
+ header_down
+   Prototype: Integer header_down (Integer n);
+
+   The function moves the current position down `n' headers.  It
+   returns the number that was actually moved.
+
+   See also: header_up
+
+---------------------------------------------------------------------------
+ header_next_unread
+   Prototype: Intger header_next_unread ();
+   
+   Goto next unread header.  The function returns one upon success or
+   zero upon failure.
+   
+   See Also: header_down
+
+---------------------------------------------------------------------------
+ header_up
+   Prototype: header_up ();
+   
+   The function moves the current position up `n' headers.  It
+   returns the number that was actually moved.
+
+   See also: header_down
+
+---------------------------------------------------------------------------
+ input_pending
+   Prototype: Integer input_pending (Integer tsecs);
+   
+   This function checks for keyboard input.  Its argument specifies
+   the number of tenths of a second to wait.  It returns 0 if no input
+   is available or a non-sero value if input is available.
+   
+   See Also: getkey, ungetkey
+
+---------------------------------------------------------------------------
+ is_article_visible
+   Prototype: Integer is_article_visible ();
+   
+   This function returns information about whether or not the article
+   associated with the current header is visible in a window.
+   Specifically, it returns:
+   
+      0  : if the article window is hidden
+      1  : if the article window is showing but the current header
+             does not refer to the article
+      3  : if the article window contains the current header article
+      
+   See Also: call
+   
+---------------------------------------------------------------------------
+ is_group_mode
+   Prototype: Integer is_group_mode ();
+   
+   This function returns non-zero if the current mode is group-mode.
+   
+   See Also:
+   
+---------------------------------------------------------------------------
+ is_thread_collapsed
+   Prototype: Integer is_thread_collapsed ();
+   
+   If the current header is the start of a collapsed thread, this
+   function will return a non-zero value.  If the thread is expanded,
+   zero will be returned.
+   
+   See Also: collapse_thread
+
+---------------------------------------------------------------------------
+ make_home_filename
+   Prototype: String make_home_filename (name);
+   
+   This function returns the complete filename associated with a file
+   called `name' located in the user's home directory.
+
+   See Also: read_mini
+
+---------------------------------------------------------------------------
+ message
+   Prototype: Void message (String m);
+   
+   The `message' function displays the string `m'.
+   
+   See Also: error, get_select_box_response
+
+---------------------------------------------------------------------------
+ next_tagged_header
+   Prototype: Integer next_tagged_header ();
+   
+   This function moves the current header position to the next `*'
+   tagged header.  It returns non-zero upon success or zero upon
+   failure.
+   
+   See also: prev_tagged_header, goto_num_tagged_header, header_up, header_down
+
+---------------------------------------------------------------------------
+ pipe_article
+   Prototype: Void pipe_article (String cmd);
+   
+   This function may be used to pipe the current article to the command
+   given by the `cmd' argument.
+   
+   See Also: `read_mini'
+
+---------------------------------------------------------------------------
+ prev_tagged_header
+   Prototype: Integer prev_tagged_header ();
+   
+   
+   This function moves the current header position to the previous `*'
+   tagged header.  It returns non-zero upon success or zero upon
+   failure.
+   
+   
+   See also: next_tagged_header, goto_num_tagged_header, header_up, header_down
+
+---------------------------------------------------------------------------
+ quit
+   Prototype: Void quit (Integer exit_status);
+   
+   This function will cause the newsreader to exit with exit status
+   specified by `exit_status'.
+   
+   See Also: call
+
+---------------------------------------------------------------------------
+ re_bsearch_author
+   Prototype: Integer re_bsearch_author (String regexp);
+
+   Search backward for header whose author matches regular expression
+   `regexp'. If successful, it returns 1 and the current header is set
+   to the matching header.  It returns 0 upon failure.
+
+   See also: re_fsearch_author, re_fsearch_subject
+
+---------------------------------------------------------------------------
+ re_bsearch_subject
+   Prototype: Integer re_bsearch_subject (String regexp);
+
+   Search backward for header whose subject matches regular expression
+   `regexp'. If successful, it returns 1 and the current header is set
+   to the matching header.  It returns 0 upon failure.
+
+   See also: re_fsearch_author, re_bsearch_subject
+
+---------------------------------------------------------------------------
+ re_fsearch_author
+   Prototype: Integer re_bsearch_author (String regexp);
+
+   Search forward for header whose author matches regular expression
+   `regexp'. If successful, it returns 1 and the current header is set
+   to the matching header.  It returns 0 upon failure.
+
+   See also: re_bsearch_author, re_fsearch_subject
+
+---------------------------------------------------------------------------
+ re_fsearch_subject
+   Prototype: Integer re_fsearch_subject (String regexp);
+
+   Search forward for header whose subject matches regular expression
+   `regexp'. If successful, it returns 1 and the current header is set
+   to the matching header.  It returns 0 upon failure.
+
+   See also: re_fsearch_author, re_bsearch_subject
+
+---------------------------------------------------------------------------
+ re_search_article
+   Prototype: Integer re_search_article (String pat);
+
+   This function searches forward in the article associated with the
+   currently selected header for a string matching the regular
+   expression given by the parameter `pat'.  It returns 0 if no
+   matching line is found.   Otherwise, it returns 1 and the matching
+   line will be left on the stack as a string.
+   
+   See also: search_article
+
+---------------------------------------------------------------------------
+ read_mini
+   Prototype: String read_mini (String p, String dflt, String init);
+   
+   This function will prompt the user for a string value using prompt
+   `p'.  The second parameter `dfl' is used to specify the default value.
+   If the final parameter is not the empty string (""), it will be
+   made available to the user for editing.
+   
+   See Also: read_mini_no_echo, getkey, set_input_string
+
+---------------------------------------------------------------------------
+ read_mini_no_echo
+   Prototype: String read_mini_no_echo (String p, String dflt, String init);
+   
+   This function performs the same purpose as `read_mini' except it
+   does not echo the entered text to the screen.
+   
+   See Also: read_mini, getkey, set_input_string
+   
+---------------------------------------------------------------------------
+ save_current_article
+   Prototype: Integer save_current_article (String filename);
+   
+   This function saves the currently selected article to a file
+   specified by `filename'.  It returns 0 upon success or -1 upon
+   failure.
+   
+   Note: This function always creates a new file.
+    
+   See Also:
+   
+---------------------------------------------------------------------------
+ search_article
+   Prototype: Integre search_article (String str);
+
+   This function searches forward in the article associated with the
+   currently selected header for the string given by the parameter
+   `str'.  It returns 0 if no matching line is found.  Otherwise, it
+   returns 1 and the matching line will be left on the stack as a
+   string.
+
+   See also: re_search_article
+
+---------------------------------------------------------------------------
+ select_group
+   Prototype: Integer select_group ();
+   
+   This function may be used to select the current group.  It returns
+   0 upon success or -1 upon failure.  It can fail if the group has no
+   articles.
+   
+   See Also: current_newsgroup
+   
+---------------------------------------------------------------------------
+ server_name
+   Prototype: String server_name ();
+   
+   The `server_name' function returns the name of the current server.
+   
+   See Also: current_newsgroup
+
+---------------------------------------------------------------------------
+ set_article_window_size
+   Prototype: Void set_article_window_size (Integer nrows);
+   
+   The `set_article_window_size' may be used to set the height of the
+   article window.  The variable `SCREEN_HEIGHT' may be used to
+   facilitate this.
+
+   See Also:
+
+---------------------------------------------------------------------------
+ set_group_flags
+   Prototype: Void set_group_flags (Integer flags);
+   
+   This function may be used to set the flags associated with the
+   current newsgroup.
+   
+   See Also: get_group_flags
+      
+---------------------------------------------------------------------------
+ set_header_flags
+   Prototype: Void set_header_flags (Integer flags);
+   
+   This function may be used to set the flags associated with the
+   currently selected header.  See the description for the
+   `get_header_flags' function for more information.
+   
+   See also: get_header_flags
+
+---------------------------------------------------------------------------
+ set_input_string
+   Prototype: Void set_input_string (String val);
+   
+   This function may be used to set the string that will be returned
+   by the next prompt for input in the minibuffer.  One can set the
+   value returned for the next n prompts by separating the values by
+   \n characters.  For example,
+   
+       variable a, b;
+       set_input_string ("Apple\nOrange");
+       a = read_mini ("Enter Fruit", "", "");
+       b = read_mini ("Enter another Fruit", "", "");
+       
+   will result in `a' having the value `Apple' and `b' having the
+   value `Orange'.
+   
+   See Also: read_min
+
+---------------------------------------------------------------------------
+ set_integer_variable
+   Prototype: Void set_integer_variable (String name, Integer v);
+   
+   This function may be used to set the value of the internal integer
+   variable specified by `name' to value `v'.  `name' must be an integer
+   variable name allowed in .slrnrc `set' commands.
+   
+   See Also: set_string_variable, get_variable_value
+
+---------------------------------------------------------------------------
+ set_prefix_argument
+   Prototype: Void set_prefix_argument (Integer val);
+   
+   The `set_prefix_argument' function may be used to set the prefix 
+   argument to `val'.  It is mainly used immediately before `calling'
+   internal functions which take prefix arguments.
+   
+   See Also: `call'
+
+---------------------------------------------------------------------------
+ set_string_variable
+   Prototype: Void set_string_variable (String name, String v);
+   
+   This function may be used to set the value of the internal string
+   variable specified by `name' to value `v'.  `name' must be a string
+   variable name allowed in .slrnrc `set' commands.
+   
+   See Also: set_integer_variable, get_variable_value
+
+---------------------------------------------------------------------------
+ thread_size
+   Prototype: Integer thread_size ();
+   
+   This function returns the number of articles in the current thread
+   or subthread.
+   
+   See Also:
+
+---------------------------------------------------------------------------
+ uncollapse_thread
+   Prototype: Void uncollapse_thread ();
+   
+   This function may be used to uncollapse the current thread.
+   
+   See Also: thread_size, collapse_thread, is_thread_collapsed
+
+---------------------------------------------------------------------------
+ uncollapse_threads
+   Prototype: Void uncollapse_threads ();
+   
+   This function uncollapses all threads.  This is usually necessary
+   if one wants to use the header movement functions to access hidden
+   headers.
+   
+   See also: collapse_threads
+
+---------------------------------------------------------------------------
+ undefinekey
+   Prototype: Void undefinekey (String key, String map);
+   
+   This function undefineds a key sequence specified by `key' from
+   keymap `map'.
+   
+   See Also: definekey
+
+---------------------------------------------------------------------------
+ update
+   Prototype: update ();
+   
+   This function may be used to force the display to be updated.
+   
+   See also: message
+
+---------------------------------------------------------------------------
+ ungetkey
+   Prototype: Void ungetkey (Integer ch);
+ 
+   This function pushes the character `ch' back upon the input stream
+   such that the next call to `getkey' will return it.  It is possible
+   to push several characters back.
+   
+   See Also: getkey
+
+---------------------------------------------------------------------------
+
+

@@ -1,0 +1,226 @@
+#!/usr/local/bin/perl
+;# aD! BBS 2.1 (c) Chris Church / aD! Data Systems
+;#
+;# ------------------------------------------------------
+
+$nop = 'NOOP';
+
+$| = 1;
+$done = 0;
+require '/usr/local/etc/adbbs.cf';
+require 'bbs-lib.pl';
+require 5.001;
+
+
+sub do_pre_wel {
+ 
+	 &clear;
+         &checkcolor('fore', 5);
+	 print("\n\n\n\n");
+	 print("          aD! BBS 2.1 (c) 1995, 1996 aD! Data Systems / Chris Church\n");
+	 &checkcolor('fore', 7);
+	 print("\n\n\n");
+	 print("Do You Wish To Skip The Welcome Screens ? \(Y/N\)\n");
+
+	 &ckc;
+         if($shownews == 1) {
+		 
+		 &do_news if($enval =~ /y/i);
+		 $done = 1 if($enval =~ /y/i);
+		} else {
+			return;
+	}
+
+	 &show_welcome if($enval =~ /n/i);
+
+} 
+
+sub show_welcome {
+
+ &clear;
+ opendir(WDIR, $WDIR) || die "Could Not Open Directory $WDIR: $!\n";
+ @wfiles = grep(!/^\./, readdir(WDIR));
+ closedir(WDIR);
+
+ foreach $i (0 .. $#wfiles) {
+
+	$f = $i;
+	$f++;
+
+	$CURFILE = "$WDIR/welcome.$f";
+	open(CURFILE) || die "Could Not Open $curfile: $!\n";
+
+	while(<CURFILE>) {
+		print;
+		}
+
+	&eprom;
+	&clear;
+
+	}
+}	  	
+
+sub do_news {
+	
+ &clear;
+ opendir(NDIR, $NDIR) || die("Could Not Open Directory $ndir -> $!\n");
+ @nfiles = grep(!/^\./, readdir(NDIR));
+ closedir(NDIR);
+
+ foreach $i (0 .. $#nfiles) {
+	
+	$f = $i;
+	$f++;
+	print("[System News - #$f]\n");
+	$CURFILE = "$NDIR/news.$f";
+
+	open(CURFILE) || die("Could Not Open $CURFILE -> $!\n");
+
+	while(<CURFILE>) {
+		print;
+		}
+
+	&eprom;
+	&clear;
+
+	}
+ undef(@nfiles);
+ 
+}	
+
+						
+sub do_men {
+
+ die("I Can't Seem To Find Your tty!\n") if(! -t STDOUT);
+
+format STDOUT =
+@<<<<<<<<<<<<<<<<<<<<<<<<<<<<< @<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+$line1,                     $line2
+.
+
+ $menu = shift(@_);
+ $CURM = "$MDIR/$menu.cf";
+ $AMEN = "$MDIR/$menu.scr";
+
+ $mrpti = "$MDIR/$menu.pi";
+
+ &rtpi($mrtpi) if(-r $mrpti);
+
+######################
+# idea for menu.scr from uncle bob
+######################
+
+ $pray = 1 if(-r $AMEN);
+
+ $UMEN = "$home/$menu.cf";
+ if(-r $UMEN) {
+	$CURM = $UMEN;
+	$pray = 0;
+	}
+ 
+ undef(@opts); undef(@progs); undef(@mens); undef(@keys);
+
+
+ 
+ open(CURM) || die("Could Not Open $menu Menu File: $!\n"); ;# you get the point
+ while(<CURM>) {    ;# open up that big bad config file =)
+
+	next if /^\s*#/ || /^$/;
+
+	if (/\s*option\s*(.*)/) {
+		push(@opts, $1);
+	}
+
+	if (/\s*prog\s*(.*)/) {  ;# parse that puppy
+		push(@progs, $1);
+		push(@mens, $nop);
+		} elsif (/^\s*menu\s*(.*)/) {
+		push(@mens, $1);
+		push(@progs, $nop);
+	} 
+	if (/\s*mkey\s*(.*)/) {
+		push(@keys, $1);
+		}
+	}
+ close(CURM);
+
+ while (1) {
+
+	&clear;
+	if($pray != 1) {
+		print("\[$menu Menu\]\n");
+		print("\[Your Email Address is $id\@$hostend\]\n") if ($menu eq 'mail'); 
+			open(MTOP);
+			while(<MTOP>) {
+				print;
+				}
+	
+		}
+
+	die("Error In $menu Menu File!\n") unless ($#opts == $#progs);
+	die("Error In $menu Menu File!\n") unless ($#progs == $#mens);
+	die("Error In $menu Menu File!\n") unless ($#mens == $#keys);
+
+	if($pray != 1) {
+		$i = 0;
+		while($i <= $#opts) {  ;# print out formatted options
+		
+			$line1 = "\($keys[$i]\) $opts[$i]";
+			$i++;
+			$line2 = "\($keys[$i]\) $opts[$i]";	
+			$line2 = "" unless ($keys[$i] ne '');
+			write; 
+			$i++;
+			}
+
+		print("\n\n");
+		} else { 
+			open(AMEN) || die("Unable to open $AMEN -> $!\n");
+			while(<AMEN>) {
+				print;
+				}
+			}
+	&ckc;
+	$fukcnt++;
+        if($fukcnt >= 50) {
+		die("aD!BBS Exiting: Internal Error, failed -> looping");
+		}
+	foreach $i (0 .. $#keys) {  ;# parse the input
+		if ($enval eq $keys[$i] || ( $enval =~ /\w+\b/ && $enval =~ /$keys[$i]/i)) {
+			$fukcnt = 0;
+			if ($progs[$i] eq $nop) {
+				&do_men($mens[$i]);
+			} else { &int_intcalls($progs[$i]); last; }
+				
+			}
+		}
+	}
+
+}
+			
+	
+	
+
+		
+;# setup some variables, and then print the initial screen
+ $tdinr = $FDIR;
+ &int_envvars;
+ &clear;
+ &user_defs;
+ &get_ttype;
+ &rtpi("$MDIR/prerun.pi") if(-r "$MDIR/prerun.pi");
+ &do_pre_wel if($showwel == 1);
+ unless($done == 1) { &do_news if($shownews == 1); }
+
+ if ($showmail == 1) {
+	 print("[Mail Notification]\n\n");
+	 &check_messages;
+	 print "\n\n";
+	 &eprom;
+ }
+  
+ &do_men(main);
+
+;# all done!
+
+  

@@ -1,0 +1,97 @@
+unused_args.optdate unused_args.c unused_args.err unused_args.o : unused_args.m \
+	bool.int \
+	char.int \
+	code_util.int \
+	globals.int \
+	hlds_data.int \
+	hlds_goal.int \
+	hlds_module.int \
+	hlds_pred.int \
+	instmap.int \
+	int.int \
+	io.int \
+	list.int \
+	make_hlds.int \
+	map.int \
+	mercury_builtin.int \
+	mercury_to_mercury.int \
+	mode_util.int \
+	options.int \
+	passes_aux.int \
+	prog_data.int \
+	prog_out.int \
+	quantification.int \
+	require.int \
+	set.int \
+	special_pred.int \
+	std_util.int \
+	string.int \
+	type_util.int \
+	varset.int \
+	assoc_list.int2 \
+	delay_info.int2 \
+	equiv_type.int2 \
+	float.int2 \
+	getopt.int2 \
+	llds.int2 \
+	mode_errors.int2 \
+	mode_info.int2 \
+	modes.int2 \
+	ops.int2 \
+	relation.int2 \
+	shapes.int2 \
+	term.int2 \
+	tree.int2 \
+	tree234.int2 \
+	unify_proc.int2
+
+unused_args.date : unused_args.m \
+	bool.int3 \
+	char.int3 \
+	code_util.int3 \
+	globals.int3 \
+	hlds_data.int3 \
+	hlds_goal.int3 \
+	hlds_module.int3 \
+	hlds_pred.int3 \
+	instmap.int3 \
+	int.int3 \
+	io.int3 \
+	list.int3 \
+	make_hlds.int3 \
+	map.int3 \
+	mercury_builtin.int3 \
+	mercury_to_mercury.int3 \
+	mode_util.int3 \
+	options.int3 \
+	passes_aux.int3 \
+	prog_data.int3 \
+	prog_out.int3 \
+	quantification.int3 \
+	require.int3 \
+	set.int3 \
+	special_pred.int3 \
+	std_util.int3 \
+	string.int3 \
+	type_util.int3 \
+	varset.int3 \
+	assoc_list.int3 \
+	delay_info.int3 \
+	equiv_type.int3 \
+	float.int3 \
+	getopt.int3 \
+	llds.int3 \
+	mode_errors.int3 \
+	mode_info.int3 \
+	modes.int3 \
+	ops.int3 \
+	relation.int3 \
+	shapes.int3 \
+	term.int3 \
+	tree.int3 \
+	tree234.int3 \
+	unify_proc.int3
+
+unused_args.dir/unused_args_000.o: unused_args.m
+	rm -rf unused_args.dir
+	$(MCS) -s$(GRADE) $(MCSFLAGS) unused_args.m

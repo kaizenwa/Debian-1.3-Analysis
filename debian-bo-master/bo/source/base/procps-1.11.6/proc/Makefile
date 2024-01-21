@@ -1,0 +1,117 @@
+# Auto-adaptive C library Makefile adapted for libproc, Chuck Blake.
+# Assumptions are basically that all the .c files in the CWD are modules
+# for the library and that all .h files are the interface to the library.
+
+# PROJECT SPECIFIC MACROS
+NAME       =  proc
+#VERSION    =  1        #These are inherited 
+#SUBVERSION =  02
+#SHARED     =  #1#	if 1 then do shared libraries as well as static
+
+# INSTALLATION OPTIONS
+TOPDIR     = /usr
+HDRDIR     = $(TOPDIR)/include/$(NAME)#	where to put .h files
+LIBDIR     = $(TOPDIR)/lib#		where to put library files
+SHLIBDIR   = /lib#			where to put shared library files
+HDROWN     = -o root -g root #		owner of header files
+LIBOWN     = -o root -g root #		owner of library files
+INSTALL    = install
+
+# COMPILATION OPTIONS
+CC         =  gcc -O4 -fomit-frame-pointer#-ggdb # easy to command-line override
+CFLAGS     =  -I.. -Wall -fwritable-strings $(PROC_COLOR)
+
+# ----------------------------------------------------------------#
+# The rest is the auto-magic section -- highly GNU make dependent #
+# You should never need to edit this.                             #
+# ----------------------------------------------------------------#
+
+VC_SUF     =  ,v
+VC_PFX     =  RCS/
+RCSFILES   =  $(patsubst $(VC_PFX)%$(VC_SUF),%,$(wildcard $(VC_PFX)*$(VC_SUF)))
+
+# We take the union of RCS files and other files in CWD so that new files do
+# not need to alter this makefile.  'sort' removes duplicates.  This allows the
+# convenience of compiling and testing new files before the initial check-in.
+
+SRC        =  $(sort $(wildcard *.c) $(filter %.c,$(RCSFILES)))
+HDR        =  $(sort $(wildcard *.h) $(filter %.h,$(RCSFILES)))
+
+OBJ        =  $(SRC:.c=.o)
+SOBJ       =  $(SRC:.c=.so)
+SONAME     =  lib$(NAME).so.$(VERSION).$(SUBVERSION)
+
+ifeq ($(SHARED),1)
+all: lib$(NAME).a $(SONAME)
+else
+all: lib$(NAME).a
+endif
+
+lib$(NAME).a: $(OBJ)
+	$(AR) rcs $@ $^
+
+$(SONAME): $(SOBJ)
+	gcc -Wl,-shared -Wl,-soname,$(SONAME) -o $@ $^
+	strip --strip-unneeded $(SONAME)
+	ln -sf $(SONAME) lib$(NAME).so
+
+# AUTOMATIC DEPENDENCY GENERATION -- GCC AND GNUMAKE DEPENDENT
+
+.depend:
+	$(strip $(CC) $(CFLAGS) -MM -MG $(SRC) > .depend)
+include .depend
+
+# INSTALLATION
+
+install: all
+	if ! [ -d $(HDRDIR) ] ; then mkdir $(HDRDIR) ; fi
+	$(INSTALL) $(HDROWN) $(HDR) $(TOPDIR)/include/$(NAME)
+	$(INSTALL) $(LIBOWN) lib$(NAME).a $(LIBDIR)
+ifeq ($(SHARED),1)
+	$(INSTALL) $(LIBOWN) $(SONAME) $(SHLIBDIR)
+	ln -sf $(SHLIBDIR)/$(SONAME) $(SHLIBDIR)/lib$(NAME).so
+	ldconfig
+endif
+
+# VARIOUS SHORT CUT TARGETS
+.PHONY:	all install dep clean distclean checkout checkclean
+
+dep:	.depend
+
+clean:
+	$(RM) lib$(NAME).a lib$(NAME).so* *.o *.so
+
+distclean:	clean
+	$(RM) .depend *~ signames.h
+
+checkout:
+	$(CO) $(RCSFILES)
+
+checkclean:
+	$(RM) $(RCSFILES)
+
+# CUSTOM c -> o rule so that command-line has minimal whitespace
+
+%.o : %.c
+	$(strip $(CC) $(CFLAGS) -c $<)
+
+%.so : %.c
+	$(strip $(CC) $(CFLAGS) -fPIC -c $< -o $@)
+
+# PROJECT SPECIFIC DEPENDENCIES/BUILD RULES
+
+
+version.o:	version.c version.h
+	$(strip $(CC) $(CFLAGS) -DVERSION=\"$(VERSION)\" -DSUBVERSION=\"$(SUBVERSION)\" -c version.c)
+
+version.so:	version.c version.h
+	$(strip $(CC) $(CFLAGS) -fPIC -DVERSION=\"$(VERSION)\" -DSUBVERSION=\"$(SUBVERSION)\" -c version.c -o $@ )
+
+signals.o signals.so: signames.h
+
+signames.h ../proc/signames.h : /usr/include/signal.h
+	/lib/cpp -dM </usr/include/signal.h |	\
+	tr -s '\t ' '  ' | sort -n +2 | sed		\
+	's:#define SIG\([A-Z]\+[0-9]*\) \([0-9]\+\) *\(\|/\*.*\)$$:{\
+\2,"\1" },:p;d'  > signames.h
+

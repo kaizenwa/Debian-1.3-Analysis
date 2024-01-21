@@ -1,0 +1,397 @@
+#
+# Makefile for octave's src directory
+#
+# John W. Eaton
+# jwe@bevo.che.wisc.edu
+# University of Wisconsin-Madison
+# Department of Chemical Engineering
+
+TOPDIR = ..
+
+srcdir = @srcdir@
+top_srcdir = @top_srcdir@
+VPATH = @srcdir@
+
+include $(TOPDIR)/Makeconf
+
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
+
+PT_FLAGS = -fexternal-templates -fno-implicit-templates
+CXXFLAGS_NO_PT_FLAGS = $(filter-out $(PT_FLAGS), $(ALL_CXXFLAGS))
+
+%.df : %.cc
+	@echo making $@ from $<
+	@$(CXXCPP) -c $(CPPFLAGS) $(CXXFLAGS_NO_PT_FLAGS) -DMAKE_BUILTINS $< \
+	  | $(srcdir)/mkdefs > $@.t
+	@mv $@.t $@
+
+# How to make a .oct file from a .o file:
+
+ifeq ($(OCTAVE_LITE), true)
+  ifdef CXXPICFLAG
+    %.oct : pic/%.o
+	  $(CXX) $(SH_LDFLAGS) -o $@ $<
+  else
+    %.oct : %.o
+	  $(CXX) $(SH_LDFLAGS) -o $@ $<
+  endif
+endif
+
+DLD_SRC := balance.cc chol.cc colloc.cc dassl.cc det.cc eig.cc \
+	   expm.cc fft.cc fft2.cc filter.cc find.cc fsolve.cc \
+	   fsqp.cc getgrent.cc getpwent.cc getrusage.cc givens.cc \
+	   hess.cc ifft.cc ifft2.cc inv.cc log.cc lpsolve.cc lsode.cc \
+	   lu.cc minmax.cc npsol.cc pinv.cc qpsol.cc qr.cc quad.cc \
+	   qzval.cc rand.cc schur.cc sort.cc svd.cc syl.cc time.cc 
+
+DLD_OBJ := $(patsubst %.cc, %.o, $(DLD_SRC))
+
+ifeq ($(OCTAVE_LITE), true)
+  OCT_FILES := $(patsubst %.o, %.oct, $(DLD_OBJ))
+  ifdef CXXPICFLAG
+    DLD_PICOBJ := $(addprefix pic/, $(DLD_OBJ))
+  else
+    DLD_PICOBJ := $(DLD_OBJ)
+  endif
+  ifeq ($(WITH_DYNAMIC_LINKING), false)
+    DLD_STATIC_OBJ := $(DLD_OBJ)
+  endif
+else
+  DLD_STATIC_OBJ := $(DLD_OBJ)
+endif
+
+INCLUDES := builtins.h data.h defun.h defun-dld.h \
+	defun-int.h dirfns.h dynamic-ld.h error.h file-io.h \
+	fn-cache.h gripes.h help.h input.h lex.h load-save.h \
+	mappers.h oct.h oct-fstrm.h oct-hist.h oct-iostrm.h \
+	oct-map.h oct-obj.h oct-prcstrm.h oct-procbuf.h \
+	oct-stdstrm.h oct-stream.h oct-strstrm.h pager.h parse.h \
+	pathlen.h pr-output.h procstream.h pt-base.h pt-cmd.h \
+	pt-const.h pt-exp-base.h pt-exp.h pt-fcn.h pt-fvc-base.h \
+	pt-fvc.h pt-mat.h pt-misc.h pt-mvr-base.h pt-mvr.h \
+	pt-plot.h pt-pr-code.h pt-walk.h sighandlers.h symtab.h \
+	syscalls.h sysdep.h systime.h syswait.h token.h toplev.h \
+	unwind-prot.h utils.h variables.h version.h \
+	xdiv.h xpow.h BaseSLList.h Map.h SLList.h SLStack.h Stack.h \
+	ov-re-mat.h ov-cx-mat.h ov-ch-mat.h ov-struct.h ov-scalar.h \
+	ov-range.h ov-complex.h ov-va-args.h ov-colon.h ov-base.h \
+	ov-str-mat.h ov.h ov-typeinfo.h ops.h \
+	op-cm-cm.h op-cm-cs.h op-cm-m.h op-cm-s.h op-cs-cm.h \
+	op-cs-cs.h op-cs-m.h op-cs-s.h op-m-cm.h op-m-cs.h \
+	op-m-m.h op-m-s.h op-s-cm.h op-s-cs.h op-s-m.h op-s-s.h \
+	op-str-str.h
+
+TI_SRC := Array-oc.cc Array-os.cc Array-tc.cc Map-fnc.cc Map-tc.cc \
+	SLList-expr.cc SLList-misc.cc SLList-plot.cc SLList-tc.cc \
+	SLList-tm.cc SLStack-i.cc SLStack-pc.cc SLStack-str.cc \
+	SLStack-sym.cc SLStack-tok.cc SLStack-ue.cc SLStack-ui.cc
+
+TI_OBJ := $(patsubst %.cc, %.o, $(TI_SRC))
+
+TI_PICOBJ := $(TI_OBJ)
+ifeq ($(SHARED_LIBS), true)
+  ifdef CXXPICFLAG
+    TI_PICOBJ := $(addprefix pic/, $(TI_OBJ))
+  endif
+endif
+
+SOURCES := BaseSLList.cc Map.cc SLList.cc SLStack.cc Stack.cc \
+	data.cc defaults.cc dirfns.cc dynamic-ld.cc error.cc \
+	file-io.cc fn-cache.cc gripes.cc help.cc input.cc lex.l \
+	load-save.cc mappers.cc oct-fstrm.cc oct-hist.cc \
+	oct-iostrm.cc oct-map.cc oct-obj.cc oct-prcstrm.cc \
+	oct-procbuf.cc oct-stdstrm.cc oct-stream.cc oct-strstrm.cc \
+	pager.cc parse.y pr-output.cc procstream.cc pt-base.cc \
+	pt-cmd.cc pt-const.cc pt-exp-base.cc pt-exp.cc pt-fcn.cc \
+	pt-fvc-base.cc pt-fvc.cc pt-mat.cc pt-misc.cc pt-mvr-base.cc \
+	pt-mvr.cc pt-plot.cc pt-pr-code.cc \
+	sighandlers.cc strcasecmp.c strncase.c strfns.cc strftime.c \
+	symtab.cc syscalls.cc sysdep.cc token.cc toplev.cc \
+	unwind-prot.cc utils.cc variables.cc xdiv.cc xpow.cc \
+	ov-base.cc ov-ch-mat.cc ov-re-mat.cc ov-cx-mat.cc ov-range.cc \
+	ov-scalar.cc ov-complex.cc ov-str-mat.cc ov-struct.cc \
+	ov-va-args.cc ov-colon.cc ov.cc ov-typeinfo.cc ops.cc \
+	op-cm-cm.cc op-cm-cs.cc op-cm-m.cc op-cm-s.cc op-cs-cm.cc \
+	op-cs-cs.cc op-cs-m.cc op-cs-s.cc op-m-cm.cc op-m-cs.cc \
+	op-m-m.cc op-m-s.cc op-s-cm.cc op-s-cs.cc op-s-m.cc op-s-s.cc \
+	op-str-str.cc
+
+OBJECTS_4 := $(SOURCES)
+OBJECTS_3 := $(patsubst %.l, %.o, $(OBJECTS_4))
+OBJECTS_2 := $(patsubst %.y, %.o, $(OBJECTS_3))
+OBJECTS_1 := $(patsubst %.c, %.o, $(OBJECTS_2))
+OBJECTS := $(patsubst %.cc, %.o, $(OBJECTS_1))
+
+ifeq ($(SHARED_LIBS), true)
+  ifdef CXXPICFLAG
+    PICOBJ := $(addprefix pic/, $(OBJECTS))
+  else
+    PICOBJ := $(OBJECTS)
+  endif
+endif
+
+# Ugh.
+
+DEP_SOURCES_3 := $(SOURCES) $(DLD_SRC) $(TI_SRC) builtins.cc octave.cc
+DEP_SOURCES_2 := $(patsubst %.l, %.cc, $(DEP_SOURCES_3))
+DEP_SOURCES_1 := $(patsubst %.y, %.cc, $(DEP_SOURCES_2))
+DEP_SOURCES := $(patsubst %.c, %.d, $(DEP_SOURCES_1))
+MAKEDEPS := $(patsubst %.cc, %.d, $(DEP_SOURCES))
+
+DEF_FILES_5 := $(SOURCES) $(DLD_SRC) $(TI_SRC)
+DEF_FILES_4 := $(addprefix $(srcdir)/, $(DEF_FILES_5))
+DEF_FILES_3 := $(notdir $(shell grep -l "^DEFUN" $(DEF_FILES_4)))
+DEF_FILES_2 := $(patsubst %.y, %.df, $(DEF_FILES_3))
+DEF_FILES_1 := $(patsubst %.l, %.df, $(DEF_FILES_2))
+DEF_FILES := $(patsubst %.cc, %.df, $(DEF_FILES_1))
+
+OCTAVE_LFLAGS = -L../liboctave -L../libcruft -L../readline \
+	-L../kpathsea -L../glob -L../dlfcn -L. $(RLD_FLAG)
+
+OCTAVE_LIBS = -loctinterp -loctave -ltinst -lcruft \
+	$(LIBPLPLOT) -lreadline -lkpathsea -lglob $(LIBDLFCN)
+
+LIBS_TO_INSTALL = liboctinterp.a libtinst.a
+
+SH_LIBS_TO_INSTALL = liboctinterp.$(SHLEXT) libtinst.$(SHLEXT)
+
+LIBS = @LIBS@
+
+DISTFILES = Makefile.in ChangeLog mkdefs mkbuiltins mk-oct-links \
+	defaults.h.in oct-conf.h.in octave.gperf oct-gperf.h \
+	octave.cc parse.cc lex.cc y.tab.h \
+	$(INCLUDES) $(DLD_SRC) $(SOURCES) $(TI_SRC)
+
+ifeq ($(SHARED_LIBS), true)
+  BINDISTFILES = octave $(OCT_FILES) $(SH_LIBS_TO_INSTALL)
+  BINDISTLIBS = $(addprefix src/, $(SH_LIBS_TO_INSTALL))
+else
+  BINDISTFILES = octave $(OCT_FILES)
+endif
+
+all: libraries stamp-oct-links octave
+.PHONY: all
+
+stamp-oct-links: $(OCT_FILES)
+	if [ -n "$(OCT_FILES)" ]; then \
+	  $(srcdir)/mk-oct-links . $(addprefix $(srcdir)/, $(DLD_SRC)) ; \
+	fi
+	touch stamp-oct-links
+
+stamp-prereq: stamp-picdir defaults.h oct-conf.h
+	touch stamp-prereq
+
+octave: octave.o builtins.o $(DLD_STATIC_OBJ) libraries
+	$(CXX) $(CPPFLAGS) $(ALL_CXXFLAGS) $(ALL_LDFLAGS) -o octave \
+	octave.o builtins.o $(DLD_STATIC_OBJ) \
+	$(OCTAVE_LFLAGS) \
+	$(OCTAVE_LIBS) \
+	$(FLIBS) $(LEXLIB) $(TERMLIBS) $(LIBS)
+
+stamp-picdir:
+	@if $(SHARED_LIBS) || [ "$(OCTAVE_LITE)" = true ]; then \
+	  if [ -n "$(CPICFLAG)" ] || [ -n "$(CXXPICFLAG)" ]; then \
+	    if [ -d pic ]; then \
+	      true ; \
+	    else \
+	      echo "mkdir pic" ; \
+	      mkdir pic ; \
+	    fi ; \
+	  fi ; \
+	else \
+	  true ; \
+	fi
+	touch stamp-picdir
+
+libraries: liboctinterp.a libtinst.a stamp-interp stamp-tinst
+
+liboctinterp.a: stamp-prereq $(OBJECTS)
+	$(AR) $(ARFLAGS) liboctinterp.a $(OBJECTS)
+	$(RANLIB) liboctinterp.a
+
+libtinst.a: stamp-prereq $(TI_OBJ)
+	$(AR) $(ARFLAGS) libtinst.a $(TI_OBJ)
+	$(RANLIB) libtinst.a
+
+stamp-interp: stamp-prereq $(PICOBJ)
+	if $(SHARED_LIBS); then \
+	  $(SH_LD) $(SH_LDFLAGS) -o liboctinterp.$(SHLEXT) $(PICOBJ) ; \
+	else \
+	  true ; \
+	fi
+	touch stamp-interp
+
+stamp-tinst: stamp-prereq $(TI_PICOBJ)
+	if $(SHARED_LIBS); then \
+	  $(SH_LD) $(SH_LDFLAGS) -o libtinst.$(SHLEXT) $(TI_PICOBJ) ; \
+	else \
+	  true ; \
+	fi
+	touch stamp-tinst
+
+builtins.cc: $(DEF_FILES) mkbuiltins
+	@echo making $@ from $(DEF_FILES)
+	@$(srcdir)/mkbuiltins $(DEF_FILES) > $@.t
+	@$(top_srcdir)/move-if-change $@.t $@
+
+$(DEF_FILES): mkdefs defun-int.h defun-dld.h defun.h defaults.h oct-conf.h
+
+$(MAKEDEPS): defaults.h oct-gperf.h oct-conf.h
+
+@bsd_gcc_kluge_targets_frag@
+
+check: all
+.PHONY: check
+
+install: install-bin install-oct install-lib install-inc
+.PHONY: install
+
+install-bin:
+	$(top_srcdir)/mkinstalldirs $(bindir)
+	rm -f $(bindir)/octave$(EXE)
+	$(INSTALL_PROGRAM) octave$(EXE) $(bindir)/octave-$(version)$(EXE)
+	cd $(bindir) ; $(LN_S) octave-$(version)$(EXE) octave$(EXE)
+.PHONY: install-bin
+
+install-oct:
+	if [ -n "$(OCT_FILES)" ]; then \
+	  $(top_srcdir)/mkinstalldirs $(octfiledir) ; \
+	  xfiles="$(OCT_FILES)" ; \
+	  for f in $$xfiles ; do \
+	    $(INSTALL_PROGRAM) $$f $(octfiledir)/$$f; \
+	  done ; \
+	  $(srcdir)/mk-oct-links \
+	    $(octfiledir) $(addprefix $(srcdir)/, $(DLD_SRC)) ; \
+	fi
+.PHONY: install-oct
+
+install-lib:
+	$(top_srcdir)/mkinstalldirs $(libdir)
+	for f in $(LIBS_TO_INSTALL); do \
+	  if [ -f $$f ]; then $(INSTALL_DATA) $$f $(libdir)/$$f; fi; \
+	done
+	for f in $(SH_LIBS_TO_INSTALL); do \
+	  if [ -f $$f ]; then $(INSTALL_PROGRAM) $$f $(libdir)/$$f; fi; \
+	done
+.PHONY: install-lib
+
+install-inc:
+	$(top_srcdir)/mkinstalldirs $(octincludedir)
+	for f in $(INCLUDES) ; do \
+	  rm -f $(octincludedir)/$$f ; \
+	  $(INSTALL_DATA) $(srcdir)/$$f $(octincludedir)/$$f ; \
+	done
+	for f in defaults.h oct-conf.h oct-gperf.h ; do \
+	  rm -f $(octincludedir)/$$f ; \
+	  $(INSTALL_DATA) $$f $(octincludedir)/$$f ; \
+	done
+	tmp=`echo $(octincludedir) | sed 's|/*$$||'` ; \
+	dir=`echo $$tmp | sed 's|[^/]*$$||'` ; \
+	src=`echo $$tmp | sed 's|^.*/||'` ; \
+	dest=`echo $$src | sed 's|-$(version)$$||'` ; \
+	if [ "$$src" = "$$dest" ] ; then \
+	  true ; \
+	else \
+	  if [ -d $$dir/$$dest ] ; then \
+	    true ; \
+	  else \
+	    cd $$dir ; rm -f $$dest && $(LN_S) $$src $$dest ; \
+	  fi ; \
+	fi
+.PHONY: install-inc
+
+uninstall:
+	rm -f $(bindir)/octave$(EXE)
+	for f in $(LIBS_TO_INSTALL); do rm -f $(libdir)/$$f; done
+	for f in $(SH_LIBS_TO_INSTALL); do rm -f $(libdir)/$$f; done
+	for f in $(INCLUDES) defaults.h oct-conf.h; do \
+	  rm -f $(octincludedir)/$$f; \
+	done
+.PHONY: uninstall
+
+tags: $(SOURCES) $(DLD_SRC) $(TI_SRC)
+	ctags $(SOURCES) $(DLD_SRC) $(TI_SRC)
+
+TAGS: $(SOURCES) $(DLD_SRC) $(TI_SRC)
+	etags $(SOURCES) $(DLD_SRC) $(TI_SRC)
+
+clean:
+	rm -f *.a *.o *.d *.df pic/*.o builtins.cc defaults.h oct-conf.h
+	if $(SHARED_LIBS); then rm -f *.$(SHLEXT); fi
+.PHONY: clean
+
+mostlyclean:
+	rm -f *.o pic/*.o
+.PHONY: mostlyclean
+
+distclean: clean
+	rm -f Makefile octave .fname so_locations
+	rm -f stamp-picdir stamp-tinst stamp-interp stamp-prereq
+	-rmdir pic
+.PHONY: distclean
+
+maintainer-clean: distclean
+	rm -f tags TAGS y.tab.c y.tab.h y.output yy.lex.c lex.cc parse.cc
+	rm -f oct-gperf.h stamp-picdir stamp-tinst stamp-interp stamp-prereq
+	-rmdir pic
+.PHONY: maintainer-clean
+
+dist: parse.cc lex.cc oct-gperf.h
+	ln $(DISTFILES) ../`cat ../.fname`/src
+	rm -f parse.cc lex.cc y.tab.h y.output yy.lex.c
+	rm -f oct-gperf.h defaults.h oct-conf.h *.d *.df builtins.cc
+.PHONY: dist
+
+conf-dist:
+	ln octave.cc Makefile.in ../`cat ../.fname`/src
+.PHONY: conf-dist
+
+bin-dist:
+	if [ -n "$(BINDISTFILES)" ]; then \
+	  ln $(BINDISTFILES) ../`cat ../.fname`/src ; \
+	fi
+	if [ -n "$(OCT_FILES)" ]; then \
+	  $(srcdir)/mk-oct-links -p $(octfiledir) \
+	    $(addprefix $(srcdir)/, $(DLD_SRC)) \
+	    > ../`cat ../.fname`/src/links-to-make ; \
+	fi
+	if [ -n "$(BINDISTLIBS)" ]; then \
+	  echo $(BINDISTLIBS) >> ../`cat ../.fname`/LIBRARIES ; \
+	fi
+.PHONY: bin-dist
+
+# Special rules -- these files need special things to be defined.
+
+parse.cc : parse.y
+	@echo "expect 13 shift/reduce conflicts"
+	$(YACC) $(YFLAGS) $<
+	@$(top_srcdir)/move-if-change y.tab.c $(@F)
+
+lex.cc : lex.l
+	$(LEX) $(LFLAGS) $< > $(@F)
+
+defaults.h: defaults.h.in ../Makeconf Makefile
+	@$(do-subst-default-vals)
+
+oct-conf.h: oct-conf.h.in ../Makeconf Makefile
+	@$(do-subst-config-vals)
+
+oct-gperf.h: octave.gperf
+	@echo "making $@ from $<"
+	@gperf -a -C -E -H octave_kw_hash -g -N octave_kw_lookup -p -t \
+	  $< > $@.t
+	@$(top_srcdir)/move-if-change $@.t $@
+
+check: all
+.PHONY: check
+
+# If missing, GNU make attempts to create them in the reverse of the
+# order in which they are listed here.  We rely on that fact to ensure
+# that defaults.h is created before trying to create the .d files.
+# Hmm.  I wonder if we can count on that...
+
+ifndef omit_deps
+-include $(MAKEDEPS) stamp-prereq
+endif

@@ -1,0 +1,455 @@
+.\" Peter J. Churchyard, 1994
+.\" Copyright (C) Trusted Information Systems, Inc.
+.\" All rights reserved
+.TH HTTP-GOPHER-PROXY 8 "26 September 1994"
+.SH NAME
+HTTP-GW - Gopher / HTTP proxy
+.SH SYNOPSIS
+.B http-gw [ options \]
+- invoked from inetd
+.SH DESCRIPTION
+.IX  "HTTP-GW"  ""  "\(em Gopher/HTTP proxy server"
+.LP
+.B HTTP-GW
+provides Gopher and HTTP proxy services with logging and
+access control. It allows Gopher and Gopher+ client to access
+Gopher, Gopher+, and FTP servers. It also allows WWW clients
+such as Mosaic to access HTTP, Gopher and FTP servers. Both
+standard and proxy aware WWW clients are supported. The proxy supports 
+.B common use
+of the Gopher, Gopher+ and HTTP protocols. Except where noted, 
+.B client
+means Gopher, Gopher+, WWW, or proxy aware WWW clients, 
+.B server
+means Gopher, Gopher+, HTTP, or FTP servers.
+.LP
+Proxy aware clients should be configured to use the proxy. Non proxy
+aware clients should be setup so that their 
+.B HOME PAGE
+is the proxy. If you are installing a firewall where you already have
+users using Gopher or WWW, then they need to edit their 
+.B Hotlists
+to route the requests through the proxy. 
+.TP 5
+.B WWW (URLs)
+Insert the string 
+.B http://firewall/
+in front of the existing URL.
+.TP 5
+.B Gopher
+Change the Gopher menu information from
+.LP
+.RS 10
+Host=somehost
+.br
+Port=someport
+.br
+Path=somepath
+.RS 5
+.br
+to
+.RS -5
+.br
+Host=firewall
+.br
+Port=70
+.br
+Path=gopher://somehost:someport/somepath
+.LP
+.RS -10
+Assuming that the proxy has been configured to be on the default HTTP and
+Gopher ports (80 and 70 repectively)
+.SH OPTIONS
+.LP
+.B \-d file
+This option can only be used if the proxy was compiled with BINDDEBUG. It
+allows debugging information to be written to the specified file.
+.LP
+.B \-D
+This option turns on the debugging log if specified. The proxy must be
+compiled with BINDDEBUG for the option to be recognised.
+.LP
+.SH OPERATION
+.LP
+.B HTTP-GW
+is invoked from
+.B inetd(8),
+it reads its configuration and checks to see if the
+system that has just connected is permitted to use the
+proxy. If not, it returns a message/menu and logs
+the connection. If the peer is permitted to use the
+proxy,
+.B HTTP-GW
+reads in a single line request which it then decodes. 
+If needed, more lines are read from
+the client. Most requests carry the information that the proxy needs in the
+first line.
+.LP
+When a user initiates a request, the client determines three pieces of 
+information. These are 
+.B host, port 
+and a
+.B selector.
+The client then connects to the host on the port and sends the selector. When
+using a proxy, the host and port refer to the proxy itself. The proxy has
+to determine the host and port from information contained in the selector.
+The proxy does this by re-writing the information it passes back to the client.
+Both Gopher and WWW clients do none or only minimal processing on the selector.
+If the proxy cannot find it's special information in the selector, it looks in
+it's configuration file to see if a server has been defined that the request
+can be handed off to.
+.LP
+There are three main types of information that the proxy has to process.
+.TP 5
+.B Gopher menus
+.br
+these contain a 
+.B description
+(to be displayed to the user), a
+.B selector, 
+a
+.B host, 
+and a
+.B port.
+The first character of the description is used to tell the client the sort of
+information that the entry refers to.
+.TP 5
+.B HTML files
+.br
+contain Hypertext which can contain embedded 
+.B links 
+to other documents. The proxy has to parse the HTML file and re-write 
+the links so that the client routes the request through the proxy.
+.TP 5
+.B other data files
+.b
+these can be roughly classified as 
+.B text
+or
+.B binary
+data. The proxy just passes the data through without changing it.
+.LP
+The proxy encodes the extra information into the selector by converting it
+into a
+.B URL
+(Universal Resource Locator) This is also the form of selector that is used
+in 
+.B HTML
+documents.
+.LP
+.ne 20
+When building a Gopher Menu from an FTP directory list, the proxy has to 
+guess what Gopher type to specify by looking at the file extension. 
+
+.TS
+l l l
+l l l.
+Description	Gopher type	Extensions
+ 
+GIF Image	g	.gif
+DOS archives	5	.zip .zoo .arj .arc .lzh
+DOS binaries	9	.exe .com .dll .lib .sys
+Misc Images	I	.jpg .jpeg .pict .pct .tiff 
+		.tif .pcx
+Unix binaries	9	.tar .z .gz
+MAC archives	4	.hqx
+Misc sounds	s	.au .snd .wav 
+HTML Documents	h	.html .htm 
+Misc Documents	9	.doc .wri 
+ 
+Directories	1	Filenames that end in /
+ 
+Plain text	0	All other extensions.
+ 
+.TE
+.LP
+.ne 10
+.SH CONFIGURATION
+.LP
+.B HTTP-GW
+reads its configuration rules and permissions
+information from the firewall configuration
+table
+.B netperm-table,
+retrieving all rules specified for "http-gw". 
+The "ftp-gw" rules are also retrieved. The "ftp-gw" rules are consulted when
+looking for 
+.B host
+rules once the "http-gw" ones have been searched. 
+The following configuration rules are recognized:
+.TP 5
+.B userid user
+specify a numeric user-id or the name of a password file entry.
+If this value is specified,
+.B HTTP-GW
+will set its user-id before providing service. Note that this
+option is included mostly for completeness, as
+.B HTTP-GW
+performs no local operations that are likely to introduce a
+security hole.
+.TP 5
+.B directory pathname
+specifies a directory to which
+.B HTTP-GW
+will chroot(2) prior to providing service.
+.TP 5
+.B timeout secondsvalue
+This value is used as a dead-watch timer when the proxy is
+reading data from the net. Defaults to 60 minutes.
+.TP 5
+.B default-gopher server
+define a gopher server to which requests can be handed off.
+.TP 5
+.B default-httpd server
+define an HTTP server to which requests can be handed off if they came
+from a WWW client using the HTTP protocol.
+.TP 5
+.B ftp-proxy server
+define an 
+.B ftp-gw
+that should be used to access 
+.B FTP
+servers.
+.B If not specified, 
+.B the proxy will do the FTP 
+.B transaction with the FTP server.
+Since the ftp-gw rules will be used if there are no relevant HTTP-GW rules 
+then this is not a major problem.
+.TP 0
+.B hosts host-pattern [host-pattern ...] [options]
+.B permit-hosts host-pattern [host-pattern ...] [options]
+.br
+.B deny-hosts host-pattern [host-pattern ...] 
+.RS 5
+.br
+rules specify host and access permissions. Typically, a
+hosts rule will be in the form of:
+.na
+.sp 1
+http-gw:	deny-hosts unknown
+.br
+http-gw:	hosts 192.33.112.* 192.94.214.*
+.ad
+.sp 1
+There may be several host patterns following the "hosts"
+keyword, ending with the first optional parameter beginning
+with '-'. Optional parameters permit the selective enabling
+or disabling of logging information, etc. 
+.RS -5
+.TP 5
+.B permit-hosts options
+.LP
+permit-hosts rules may take options. Some of the options take parameters.
+The functions are defined later (see 
+.B gopher functions)
+.RS 5
+.ne 5
+.TP 0
+.B -permit function
+.br
+.B -permit { function [function ...] }
+.RS 5
+.br
+Only the specified functions are permitted. Other functions will be
+denyed. If this option is not specified then all functions are initially
+permitted.
+.RS -5
+.ne 5
+.TP 0
+.B \-deny function
+.br
+.B \-deny { function [function ...] }
+.RS 5
+.br
+specifies a list of Gopher/HTTP functions to deny. 
+.RS -5
+.ne 5
+.TP 5
+.B \-gopher server
+Make 
+.B server
+the default server for this transaction.
+.ne 5
+.TP 5
+.B \-httpd server
+Make
+.B server
+the default HTTP server for this transaction. Will be used if the request came
+in via the HTTP protocol.
+.TP 0
+.B \-filter function
+.br
+.B \-filter { function [function ...] }
+.RS 5
+.br
+will remove the specified functions when re-writing selectors and URL's. Does
+not stop the user from entering selectors that the client will execute locally
+but can be used to remove them from retrieved documents.
+.LP
+.RS -10
+The following options are also recognised and processed since they
+may be specified on an ftp-gw config line.
+.RS 5
+.TP 5
+.B \-noinput
+Disables data read functions.
+.TP 5
+.B \-nooutput
+Disables data write functions.
+.TP 0
+.B \-log function
+.br
+.B \-log { function [function ...] }
+.RS 5
+.br
+specifies that a log entry to the system log should be made
+whenever the listed functions are performed through the
+proxy.
+.RS -5
+.TP 5
+.B \-authall
+specifies that all functions require the user to be authenticated.
+.TP 0
+.B \-auth function
+.br
+.B \-auth { function [function ...] }
+.RS 5
+.br
+specifies that the functions listed require the user to be authenticated.
+.RS -5
+.TP 0
+.B \-dest pattern
+.br
+.B \-dest { pattern [pattern ...] }
+.RS 5
+.br
+specifies a list of valid destinations. If no list is specified,
+all destinations are considered valid. The -dest list is processed
+in order as it appears on the options line. -dest entries preceeded
+with a '!' character are treated as negation entries. Therefore the
+rule:
+.sp
+.nf
+.na
+-dest !*.mit.edu -dest *
+.fi
+.ad
+.sp
+will permit hosts that are not in the domain "mit.edu" to be
+connected to.
+.RS -5
+.RE
+.LP
+.ne 30
+.B gopher functions
+.LP
+The proxy characterizes each transaction as one of a number of functions. For
+the 
+.B deny
+options it is the request that is used. For 
+.B filter
+options it is the returned selectors that are used.
+.LP
+.TS
+ll.
+Function	Description
+ 
+dir	Fetching Gopher Menus
+	Getting a directory listing via FTP
+	Fetching an HTML document (This is being studied)
+ 
+read	Fetching a file of any type. 
+	HTML files are treated as \f3read\f1 even though 
+	they are also \f3dir\f1
+ 
+write	Putting a file of any type.
+	Needs \f3plus\f1 since only available to Gopher+ 
+	and HTTP/1.x
+ 
+ftp	Accessing an FTP server
+ 
+plus	Gopher+ operations
+	HTTP methods other than GET
+ 
+wais	WAIS index operations
+ 
+exec	Operations that require a program to be run, 
+	e.g. telnet. (See \f3SECURITY\f1)
+ 
+.TE
+.LP
+.SH SECURITY
+There are a number of situations that the user needs to know about. The most
+important of which is the way that certain functions are handled by the 
+.B client, server,
+and
+.B proxy
+programs. When the client wants to perform certain actions such as 
+.B telnet
+then the client program often runs the telnet command to perform the function.
+If the client passes arguments to the program then there is a chance
+that rogue commands could be executed as well as the intended one. 
+Gopher requests to do FTP operations cause the server to run
+the FTP program. Again there is the chance that 
+the server could be tricked into
+running rogue commands as well as the intended one.
+
+Most client programs only know how to display a small number of data types and
+they rely on external 
+.B viewers
+to handle the other data types. Again, there is a chance that client programs
+can be tricked into running rogue commands as well as the intended ones.
+' .SH AUTHENTICATION
+' .PP
+' If the user needs to authenticate to gain access, the proxy will build
+' a response that will allow the user to enter a username. Currently this
+' is done via a 
+' .B wais
+' enquiry. After the user has sent of the enquiry, the proxy will generate
+' either a password or a challenge request also as a 
+' .B wais
+' enquiry. If the authorization succeeds, then the user is finally given the
+' requested information. An authentication token will be inserted into the
+' selectors(URL's) so that subsequent requests are allowed.
+' .B The initial release only 
+' .B has very simple hooks for this!
+.SH INSTALLATION
+.LP
+To install
+.B HTTP-GW
+first place the executable in a system area, then modify
+.B /etc/inetd.conf.
+The TCP service port on which to install the Gopher/HTTP proxy
+will depend on local site configuration. You would normally configure the
+proxy to be on ports 70 and 80. 70 is the normal Gopher port and 80 is the
+normal HTTP port. 
+Once 
+.B inetd.conf has been modified, 
+.B restart or reload
+.B inetd.
+Verify installation by attempting a connection and
+monitoring the system logs.
+.LP
+Typical configuration of the proxy in a firewall situation
+involves rules to block all systems that are not in the
+DNS from using the proxy, but to permit all systems on
+the internal protected network to use the proxy. I.e.:
+.na
+.sp 1
+http-gw: deny-hosts unknown
+.br
+http-gw: hosts 192.33.112.* 192.94.214.*
+.ad
+.sp 1
+.SH FILES
+.PD 0
+.TP 20
+.B /etc/inetd.conf
+.B /etc/services
+.B netperm-table
+.SH SEE ALSO
+.BR netperm-table (5)
+.BR inetd (8)
+.BR authd (8)
+.BR ftp-gw (8)
+.SH BUGS

@@ -1,0 +1,875 @@
+TUBS-MIB DEFINITIONS ::= BEGIN
+
+	IMPORTS
+	    MODULE-IDENTITY, OBJECT-TYPE, 
+	    enterprises, Counter32, Integer32, TimeTicks, Unsigned32
+	    	FROM SNMPv2-SMI
+	    DisplayString, RowStatus, DateAndTime, TruthValue, TimeStamp
+	        FROM SNMPv2-TC
+	    TAddress
+		FROM SNMPv2-PARTY-MIB;
+
+
+	 tubs MODULE-IDENTITY
+	      LAST-UPDATED "9411152024Z"
+              ORGANIZATION "TU Braunschweig"
+              CONTACT-INFO
+                      "        Juergen Schoenwaelder
+
+                       Postal: TU Braunschweig
+                               Bueltenweg 74/75
+                               D-38108 Braunschweig
+                               GERMANY
+
+                          Tel: +49 531 391 3249
+                          Fax: +49 531 391 5936
+
+                       E-mail: schoenw@ibr.cs.tu-bs.de"
+              DESCRIPTION
+                      "Experimental MIB modules for scotty based agents."
+              ::= { enterprises 1701 }
+
+-- the scotty group
+
+scotty OBJECT IDENTIFIER ::= { tubs 1 }
+
+scottyStatus OBJECT IDENTIFIER ::= { scotty 1 }
+
+scottyVersion OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The version number of the scotty agent."
+	::= { scottyStatus 1 }
+
+scottyTclVersion OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The version number of the running Tcl interpreter."
+	::= { scottyStatus 2 }
+
+scottyTclCmdCount OBJECT-TYPE
+	SYNTAX    	Counter32
+	MAX-ACCESS	read-only
+	STATUS	  	current
+	DESCRIPTION	
+		"The nummber of Tcl statements evaluated so far."
+	::= { scottyStatus 3 }
+
+scottyDate OBJECT-TYPE
+	SYNTAX		DateAndTime
+	MAX-ACCESS      read-only
+	STATUS		current
+	DESCRIPTION	
+		"The current date."
+	::= { scottyStatus 4 }
+
+scottyTrapDst OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS      read-write
+	STATUS		current
+	DESCRIPTION
+		"The host name of the trap sink host."
+	::= { scottyStatus 5 }
+
+scottyTrapMsg OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS      read-only
+	STATUS		current
+	DESCRIPTION
+		"The description of the last trap create by this entity."
+	::= { scottyStatus 6 }
+
+--
+--
+--
+
+scottyDownload OBJECT IDENTIFIER ::= { scotty 2 }
+
+URL ::= TEXTUAL-CONVENTION
+	DISPLAY-HINT	"255a"
+	STATUS		current
+ 	DESCRIPTION
+		"A uniform ressource locator as defined in RFC 1738."
+	SYNTAX		OCTET STRING (SIZE  (0..255))
+
+scottyHttpProxy OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS	read-write
+	STATUS		current
+	DESCRIPTION
+		"This variable specifies the proxy server. It must be of the
+		 form <name>[:<port>] where <name> is either a domain name
+		 or an IP address and <port> is the port number used to access
+		 the proxy server. The default port number is 80."
+	::= { scottyDownload 1 }
+
+scottyHttpSource OBJECT-TYPE
+	SYNTAX		URL
+	MAX-ACCESS	read-write
+	STATUS		current
+	DESCRIPTION
+		"Setting this variable will make scotty to download
+		 and source the document with the given URL. The agent
+		 will try to retrieve the document and sets the variable
+		 to the URL if this operations was successfull. 
+		 Otherwise, the value will become an empty string."
+	::= { scottyDownload 2 }
+
+scottyHttpError OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"This variable contains an error string is an http
+		 operation fails. An empty string signals that the
+		 last operation completed successfully."
+	::= { scottyDownload 3 }
+
+--
+--
+--
+
+scottyPeers OBJECT IDENTIFIER ::= { scotty 3 }
+
+scottyPeerTable OBJECT-TYPE
+	SYNTAX		SEQUENCE OF ScottyPeerEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"A (conceptual) table storing known scotty peers."
+	::= { scottyPeers 1 }
+
+scottyPeerEntry OBJECT-TYPE
+	SYNTAX		ScottyPeerEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"An entry (conceptual row) in the peer table."
+	INDEX   { scottyPeerTAddress }
+	::= { scottyPeerTable 1 }
+
+ScottyPeerEntry ::= SEQUENCE {
+	scottyPeerTAddress	TAddress,
+	scottyPeerAuth		OCTET STRING,
+	scottyPeerState		Integer32,
+	scottyPeerLastChecked	TimeStamp,
+	scottyPeerStatus	RowStatus
+}
+
+scottyPeerTAddress OBJECT-TYPE
+	SYNTAX		TAddress
+	MAX-ACCESS	read-create
+	STATUS		current
+	DESCRIPTION
+		"The address and port number of the peer agent."
+	::= { scottyPeerEntry 1 }
+
+scottyPeerAuth OBJECT-TYPE
+	SYNTAX		OCTET STRING
+	MAX-ACCESS	read-create
+	STATUS		current
+	DESCRIPTION
+		"The authentication information for this peer. This will
+		usually be a community string until we get the final SNMPv2
+		decisions about the security model."
+	::= { scottyPeerEntry 2 }
+
+scottyPeerState OBJECT-TYPE
+	SYNTAX		INTEGER { up(1), down(2) }
+	MAX-ACCESS	read-create
+	STATUS		current
+	DESCRIPTION
+		"The current status of the peer as returned by the last
+		status probe message."
+	::= { scottyPeerEntry 3 }
+
+scottyPeerLastChecked OBJECT-TYPE
+	SYNTAX		TimeStamp
+	MAX-ACCESS	read-create
+	STATUS		current
+	DESCRIPTION
+		"The value of sysUpTime when the status of the peer was
+		retrieved and written to scottyPeerState."
+	::= { scottyPeerEntry 4 }
+
+scottyPeerStatus OBJECT-TYPE
+	SYNTAX		RowStatus
+	MAX-ACCESS	read-create
+	STATUS		current
+	DESCRIPTION
+		"The status column used for creating, modifying,
+		and deleting instances of the columnar objects in
+		the scotty peer table."
+	DEFVAL  { active }
+	::= { scottyPeerEntry 5 }
+
+
+--
+-- Election Section
+--
+
+scottyElection OBJECT IDENTIFIER ::= { scotty 4 }
+
+scottyElectionIndex OBJECT-TYPE
+	SYNTAX		Unsigned32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The (hopefully) unique Index of this peer used by the
+		Gully election algorithm."
+	::= { scottyElection 1 }
+
+scottyElectionPanic OBJECT-TYPE
+	SYNTAX		TruthValue
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"Reading this variable will start the panic algorithm
+		on this peer. (We should use an inform request here.)"
+	::= { scottyElection 2 }
+
+scottyElectionMaster OBJECT-TYPE
+	SYNTAX		TAddress
+	MAX-ACCESS	read-write
+	STATUS		current
+	DESCRIPTION
+		"This variable will be set by a new master appearing
+		on the scene. (We should use an inform request here.)"
+	::= { scottyElection 3 }
+
+--
+-- the scottyEvalTable example adopted from RFC 1442
+--
+
+scottyEval OBJECT IDENTIFIER ::= { scotty 5 }
+
+scottyEvalSlot OBJECT-TYPE
+	SYNTAX		Integer32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The index number of the first unassigned entry in
+		the evaluation table.	
+
+                A management station should create new entries in
+		the evaluation table using this algorithm: first,
+		issue a management protocol retrieval operation to
+		determine the value of evalSlot; and, second,
+		issue a management protocol set operation to
+                create an instance of the evalStatus object
+                setting its value to underCreation(1).  If this
+                latter operation succeeds, then the management
+                station may continue modifying the instances
+                corresponding to the newly created conceptual row,
+                without fear of collision with other management
+                stations."
+	::= { scottyEval 1 }
+
+scottyEvalTable OBJECT-TYPE
+	SYNTAX		SEQUENCE OF ScottyEvalEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"The (conceptual) evaluation table."
+	::= { scottyEval 2 }
+
+scottyEvalEntry OBJECT-TYPE
+	SYNTAX		ScottyEvalEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"An entry (conceptual row) in the evaluation table."
+	INDEX   { scottyEvalIndex }
+	::= { scottyEvalTable 1 }
+
+ScottyEvalEntry ::= SEQUENCE {
+	scottyEvalIndex		Integer32,
+	scottyEvalString	DisplayString,
+	scottyEvalValue		DisplayString,
+	scottyEvalStatus	RowStatus
+}
+
+scottyEvalIndex OBJECT-TYPE
+	SYNTAX		Integer32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The auxiliary variable used for identifying
+                 instances of the columnar objects in the
+                 evaluation table."
+	::= { scottyEvalEntry 1 }
+
+scottyEvalString OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS	read-create
+	STATUS		current
+	DESCRIPTION
+		"The string to evaluate."
+        ::= { scottyEvalEntry 2 }
+
+scottyEvalValue OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The value resturned by executing evalString."
+	::= { scottyEvalEntry 3 }
+
+scottyEvalStatus OBJECT-TYPE
+	SYNTAX		RowStatus
+	MAX-ACCESS	read-create
+	STATUS		current
+	DESCRIPTION
+		"The status column used for creating, modifying,
+		and deleting instances of the columnar objects in
+		the evaluation  table."
+	DEFVAL  { active }
+	::= { scottyEvalEntry 4 }
+
+
+-- the nfsstat example
+
+nfs OBJECT IDENTIFIER ::= { tubs 2 }
+
+nfsServer OBJECT IDENTIFIER ::= { nfs 1 }
+
+nfsClient OBJECT IDENTIFIER ::= { nfs 2 }
+
+-- server nfs statistics
+
+calls OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The number of nfs calls received by the server.
+		 Every read access to this variable will cause the
+		 agent to reload the statistics contained in this
+		 group."
+	::= { nfsServer 1}
+
+bad OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The number of incorrect nfs calls received by the
+		server."
+	::= { nfsServer 2}
+
+null OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs null operations."
+        ::= { nfsServer 3}
+
+getattr OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs getattr operations."
+        ::= { nfsServer 4}
+
+setattr OBJECT-TYPE
+	 SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs setattr operations."
+        ::= { nfsServer 5}
+
+root OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs root operations."
+        ::= { nfsServer 6}
+
+lookup OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs lookup operations."
+        ::= { nfsServer 7}
+
+readlink OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs readlink operations."
+        ::= { nfsServer 8}
+
+read OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs read operations."
+        ::= { nfsServer 9}
+
+wrcache OBJECT-TYPE
+	SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs wrcache operations."
+        ::= { nfsServer 10}
+
+write OBJECT-TYPE
+	SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs write operations."
+        ::= { nfsServer 11}
+
+create OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs create operations."
+        ::= { nfsServer 12}
+
+remove OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs remove operations."
+        ::= { nfsServer 13}
+
+rename OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs rename operations."
+        ::= { nfsServer 14}
+
+link OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs link operations."
+        ::= { nfsServer 15}
+
+symlink OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs symlink operations."
+        ::= { nfsServer 16}
+
+mkdir OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs mkdir operations."
+        ::= { nfsServer 17}
+
+rmdir OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs rmdir operations."
+        ::= { nfsServer 18}
+
+readdir OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs readdir operations."
+        ::= { nfsServer 19}
+
+fsstat OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs fsstat operations."
+        ::= { nfsServer 20}
+
+-- client nfs statistics.
+
+calls OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The number of nfs calls send by the client
+		 Every read access to this variable will cause the
+		 agent to reload the statistics contained in this
+                 group."
+	::= { nfsClient 1}
+
+bad OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The number of incorrect nfs calls send by the client."
+	::= { nfsClient 2}
+
+null OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs null operations."
+        ::= { nfsClient 3}
+
+getattr OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs getattr operations."
+        ::= { nfsClient 4}
+
+setattr OBJECT-TYPE
+	 SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs setattr operations."
+        ::= { nfsClient 5}
+
+root OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs root operations."
+        ::= { nfsClient 6}
+
+lookup OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs lookup operations."
+        ::= { nfsClient 7}
+
+readlink OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs readlink operations."
+        ::= { nfsClient 8}
+
+read OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs read operations."
+        ::= { nfsClient 9}
+
+wrcache OBJECT-TYPE
+	SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs wrcache operations."
+        ::= { nfsClient 10}
+
+write OBJECT-TYPE
+	SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs write operations."
+        ::= { nfsClient 11}
+
+create OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs create operations."
+        ::= { nfsClient 12}
+
+remove OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs remove operations."
+        ::= { nfsClient 13}
+
+rename OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs rename operations."
+        ::= { nfsClient 14}
+
+link OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs link operations."
+        ::= { nfsClient 15}
+
+symlink OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs symlink operations."
+        ::= { nfsClient 16}
+
+mkdir OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs mkdir operations."
+        ::= { nfsClient 17}
+
+rmdir OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs rmdir operations."
+        ::= { nfsClient 18}
+
+readdir OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs readdir operations."
+        ::= { nfsClient 19}
+
+fsstat OBJECT-TYPE
+        SYNTAX          Counter32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+                "The number of nfs fsstat operations."
+        ::= { nfsClient 20}
+
+-- the WWW server example
+
+www OBJECT IDENTIFIER ::= { tubs 3 }
+
+wwwUpTime OBJECT-TYPE
+	SYNTAX		TimeTicks
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The time the WWW server is up and running."
+	::= { www 1 }
+
+wwwGetRequests OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The number of GET requests processed by 
+		this server."
+	::= { www 2 }
+
+wwwHeadRequests OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The number of HEAD requests processed by 
+		this server."
+	::= { www 3 }
+
+wwwPostRequests OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The number of POST requests processed by 
+		this server."
+	::= { www 4 }
+
+wwwPutRequests OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The number of PUT requests processed by 
+		this server."
+	::= { www 5 }
+
+wwwDeleteRequests OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The number of DELETE requests processed by 
+		this server."
+	::= { www 6 }
+
+wwwLinkRequests OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The number of LINK requests processed by 
+		this server."
+	::= { www 7 }
+
+wwwUnlinkRequests OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The number of UNLINK requests processed by 
+		this server."
+	::= { www 8 }
+
+wwwOtherRequests OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The number of HEAD requests processed by 
+		this server."
+	::= { www 9 }
+
+wwwBadRequests OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The number of bad requests processed by
+		this server."
+	::= { www 10 }
+
+wwwOutBytes OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The number of bytes retrieved from this server."
+	::= { www 11 }
+
+-- the process table example
+
+proc OBJECT IDENTIFIER ::= { tubs 4 }
+
+procReload OBJECT-TYPE
+	SYNTAX		DateAndTime
+	MAX-ACCESS      read-write
+	STATUS		current
+	DESCRIPTION	"Any set operation will reload the process
+		table. It contains a time stamp when the proc table
+		was reloaded the last time."
+	::= { proc 1 }
+
+procTable OBJECT-TYPE
+	SYNTAX     	SEQUENCE OF ProcEntry
+	MAX-ACCESS 	not-accessible
+	STATUS     	current
+	DESCRIPTION	"The process table."
+	::= { proc 2 }
+
+procEntry OBJECT-TYPE
+        SYNTAX     	ProcEntry
+        MAX-ACCESS 	not-accessible
+        STATUS     	current
+        DESCRIPTION	"An entry for a process in the processes table."
+        INDEX      	{ procID }
+        ::= { procTable 1 }
+
+ProcEntry ::= SEQUENCE {
+        procID
+        	Integer32,
+	procCmd
+		DisplayString
+	}
+
+procID OBJECT-TYPE
+	SYNTAX		Integer32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The unique process ID."
+	::= { procEntry 1 }
+
+procCmd OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The command name used to start this process."
+	::= { procEntry 2 }
+
+-- the mail queue table example
+
+mailq OBJECT IDENTIFIER ::= { tubs 5 }
+
+mailqLength OBJECT-TYPE
+	SYNTAX		Counter
+	MAX-ACCESS      read-only
+	STATUS		current
+	DESCRIPTION	"The length of the current mail queue."
+	::= { mailq 1 }
+
+mailqTable OBJECT-TYPE
+	SYNTAX     	SEQUENCE OF MailqEntry
+	MAX-ACCESS 	not-accessible
+	STATUS     	current
+	DESCRIPTION	"The mail queue table."
+	::= { mailq 2 }
+
+mailqEntry OBJECT-TYPE
+        SYNTAX     	MailqEntry
+        MAX-ACCESS 	not-accessible
+        STATUS     	current
+        DESCRIPTION	"An entry for a queued mail message."
+        INDEX      	{ mailqID }
+        ::= { mailqTable 1 }
+
+MailqEntry ::= SEQUENCE {
+        mailqID
+        	DisplayString,
+	mailqSize
+		INTEGER,
+	mailqSender
+		DisplayString
+	}
+
+mailqID OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The unique mail ID."
+	::= { mailqEntry 1 }
+
+mailqSize OBJECT-TYPE
+	SYNTAX		INTEGER
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The size in octets of the queued mail message."
+	::= { mailqEntry 2 }
+
+mailqSender OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The sender of the mail message."
+	::= { mailqEntry 3 }
+
+mailqTime OBJECT-TYPE
+	SYNTAX		DateAndTime
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The date and time when we queued the mail message."
+	::= { mailqEntry 4 }
+
+END

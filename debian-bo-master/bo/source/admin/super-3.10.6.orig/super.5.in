@@ -1,0 +1,1545 @@
+.TH SUPER 5 local
+.\"
+.\"	Copyright (c) 1993 by California Institute of Technology.
+.\"	Written by William Deich.  Not derived from licensed software.
+.\"
+.\"    You may distribute under the terms of either the GNU General Public
+.\"    License or the Artistic License, as specified in the README file.
+.\"  
+.\"
+.SH NAME
+super.tab \- database of restricted commands for super(1)
+.SH DESCRIPTION
+The
+.I super.tab
+file contains the restrictions on who can execute commands with
+.BR super (1).
+It may also contain options that modify the uid and/or gid under which
+a command is run; the list of environment variables that are discarded before
+executing a command, and so on.
+The reader is expected to be familiar with the
+.BR super (1)
+man page.
+.PP
+Unless modified with options in the
+.I super.tab
+file, super executes commands
+using effective uid root; unchanged real uid and gid;
+no supplementary groups; no open file descriptors save 0, 1, and 2;
+no environment variables except a few with safe values
+(see 
+.BR super.1 );
+and signal handling reset to the default.
+.PP
+When
+.I super
+uses a command from a user-supplied super file (\fB.supertab\fP in the
+user's home directory) these rules are modified: the real and effective
+uid and gid are set to the owner of the
+.B .supertab
+file, and the supplementary groups are set to the user's login groups.
+.PP
+The
+.I super.tab
+file is formatted as a series of control lines of the form
+.sp
+.ti +.5i
+.B CmdPat\ \ FullPath\ \ Options\ \\\\
+.ti 3.5i
+.B PermittedUsers PermittedTimes
+.\" .RE
+.br
+or
+.br
+.ti +.5i
+.B CmdPat1::FullPath1 CmdPat2::FullPath2 ...\\\\
+.ti 2.5i
+.B Options\ \ PermittedUsers PermittedTimes
+.br
+or
+.br
+.ti +.5i
+.B \fI:\fPBuiltinCmd  arguments
+.sp
+For each control line,
+.I Super
+matches the following:
+.RS
+.HP
+\(bu the user-entered command to a
+.IR CmdPat ;
+.HP
+\(bu the {user,group,host} triplet to a
+.I PermittedUsers
+entry; and
+.HP
+\(bu the current time to a
+.I PermittedTimes
+entry.
+.RE
+.PP
+If these conditions are not satisfied,
+.I super
+``falls through'' and tries the next control line.
+.PP
+For example, the entry
+.sp
+.RS
+.nf
+.B renice\ /etc/renice\ jack@hill jill@bucket time~8-17
+.fi
+.RE
+.sp
+specifies that between hours 8:00 and 17:00,
+user Jack can renice any process on host hill,
+and user Jill can do so on host bucket,
+by simply typing
+.B "super renice <args>  ."
+.PP
+Control lines begin in column 1, and the
+fields are whitespace-separated.
+Note that you can either use a single
+.I CmdPat
+and
+.IR FullPath ,
+separated by whitespace, or you can use a series of them in one
+control line by putting
+.RB ` :: '
+between each
+.I CmdPat
+and
+.I FullPath
+pair.
+
+Whitespace may be included in a field by enclosing text in single- or
+double-quotes.  The quoting is shell-like, in the sense that quotemarks
+don't have to surround the entire field, and you can switch between
+quotemark types in a single entry.  For instance, \fBX"a\ b"Y'd\ e'\fR
+is equivalent to \fB"Xa\ bYd\ e"\fR.
+Comments begin with a `#' and continue to the end of a line.
+.PP
+There can also be blank or comment lines without any control data.
+.PP
+A control line may be continued by preceding the newline
+with a backslash, and indenting the continuation line with whitespace.
+When the multiple-line entry is read, the text just before the
+backslash-newline is not modified (any whitespace before the backslash
+will be kept), and the backslash-newline-whitespace
+sequence is either eliminated entirely or treated as whitespace.
+The rule is simple: following a letter, digit, or underscore, it is
+treated as whitespace.  Otherwise, it is eliminated.  This means that
+.ne 5
+.sp
+.nf
+.RS
+\fBCmd\ \ File\ \ user1\\\fP
+\fB\ \ \ \ \ \ \ \ \ \ \ user2\\\fP
+\fB\ \ \ \ \ \ \ \ \ \ \ user3\fP
+.RE
+.fi
+.sp
+.ne 5
+is equivalent to
+.sp
+.RS
+.B Cmd\ \ File\ \ user1 user2 user3
+.RE
+.sp
+.ne 5
+On the other hand,
+.sp
+.nf
+.RS
+\fBCmd\ \ File\ \ {user1,\\\fP
+\fB\ \ \ \ \ \ \ \ \ \ \ user2,\\\fP
+\fB\ \ \ \ \ \ \ \ \ \ \ user3}\fP
+.RE
+.fi
+.sp
+.ne 5
+is equivalent to
+.sp
+.RS
+.B Cmd\ \ File\ \ {user1,user2,user3}
+.RE
+.sp
+That is, the sensible interpretation is done in both cases.
+.PP
+The indentation requirement for continuation lines helps
+.B super
+catch typos.
+Comments may be placed before each backslash-newline pair,
+not just at the end of a continued control line.
+.PP
+.SH The CmdPat Field
+.PP
+In response to the user typing
+.sp
+.RS
+.B super
+.IR cmd " [" " args " ],
+.RE
+.sp
+the
+.I cmd
+is searched for in the
+.I super.tab
+file.
+The
+.I cmd
+is matched against each pattern
+.IR CmdPat .
+.PP
+.B "Basic Use: Simple Command Patterns without Wildcards."
+.PP
+Typically, a
+.I CmdPat
+just uses plain characters without any regular-expression special characters,
+so a
+.I cmd
+must be the same as the
+.I CmdPat
+string.  For example:
+.sp
+.RS
+.B
+skill /usr/local/bin/skill   user1 user2 user3
+.RE
+.sp
+Here, any user in the list {user1, user2, user3} may type
+.B super skill
+to execute /usr/local/bin/skill.
+.PP
+.B "Advanced Use: Command Patterns with Wildcards."
+.PP
+More generally, a
+.IR CmdPat
+can be either an
+\fIed\fR-style pattern (``regex'' \(em the BSD\ 4.x syntax used in the
+re_comp()/re_exec()
+routines) or a Bourne-shell-style
+regular expression.  You can set the pattern style using
+the global option \fBpatterns\fR (see below).
+The default is ``regex'' for historical reasons; however,
+shell-style patterns are easier to use without errors,
+and most sites should use shell-style patterns.
+In both cases the patterns are extended to support csh-style
+brace expansion.
+For instance,
+.B a{x,y,z}b
+stands for the set of patterns
+.BR "axb ayb azb" .
+Don't put any whitespace inside the braces!
+.PP
+For convenience,
+there is always an implied set of braces around an entire pattern.
+This means that any comma-separated list
+.B "a,b,c"
+is interpreted as
+.BR "{a,b,c}" ,
+and is very helpful so that you don't have to worry about getting
+braces just right when you build complex lists of
+out of (say) variables containing other lists of users.
+.PP
+All pattern matching is ``anchored'': patterns are forced to match
+the entire
+.I cmd
+string.
+.PP
+If the
+.I CmdPat
+is matched and the other conditions are met
+(such as the user being in the PermittedUser list to execute this command),
+.I FullPath
+gives the name of the actual command that will be executed with
+.IR execve() .
+If
+.I FullPath
+contains an asterisk, the asterisk is first replaced by the user's
+.IR cmd .
+.PP
+If you put special pattern-matching characters into the
+.IR CmdPat ,
+but don't put an asterisk into
+.IR FullPath ,
+you have simply given more ways a user can execute the same
+.I FullPath.
+This isn't useful, and in fact isn't a good idea at all.
+The power of using patterns in the
+.I CmdPat
+comes when
+.I FullPath
+includes an asterisk.
+For instance, a SysV-based host might have
+.ne 5
+an entry in the
+.I super.tab
+file that looks like:
+.sp
+.RS
+\fB/usr/bin/{lp,lpstat,disable,enable,cancel} * \\\fP
+.br
+.B \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ :operators uid=0
+.RE
+.sp
+This would allow anybody in the "operators" group to have root access
+to the line printer commands
+(the \fIuid=0\fP tells
+.B super
+to set the real uid to 0, not just the effective uid).
+.ne 3
+For instance, if the user typed:
+.sp
+.RS
+.BI "super /usr/bin/disable " some_printer
+.RE
+.sp
+then the
+.I FullPath
+(``\fB*\fR'') would be replaced by
+.BR /usr/bin/disable ,
+which would be the command to exec.
+.sp
+More conveniently, the
+.I super.tab
+.ne 5
+file could have a line like:
+.sp
+.RS
+\fB{lp,lpstat,disable,enable,cancel} /usr/bin/* \\\fP
+.br
+.B \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ :operators uid=0
+.RE
+.sp
+In this case, the user can type
+.sp
+.RS
+.BI "super disable " some_printer
+.RE
+.sp
+The asterisk-replacement ability also lets a user execute any
+of an entire directory of commands, using a
+.I super.tab
+entry like the following:
+.sp
+.RS
+\fBop/* /usr/local/super/scripts/* :operators uid=0
+.RE
+.sp
+In this case, the user can type
+.sp
+.RS
+.BI "super op/" xyz
+.RE
+.sp
+and
+.I super
+will execute
+.I /usr/local/super/scripts/op/xyz.
+.PP
+The asterisk-replacement capability is useful but potentially dangerous,
+because it may unintentionally open the door to programs you hadn't intended
+to give away.
+It is a sensible precaution to restrict asterisk-replacement
+to entries where the valid-user list includes trusted users only.
+.PP 
+If you
+.I completely
+trust some users, but want logging of all actions executed as root,
+.ne 5
+you could use:
+.sp
+.RS
+.B /* \ \ * \ \ \fIReallyReallyTrustedUsers\fP
+.RE
+or
+.RS
+.B /.* \ \ * \ \ \fIReallyReallyTrustedUsers\fP
+.RE
+.sp
+(depending on whether \fBpatterns=shell\fP or \fBpatterns=regex\fP).
+The trusted users can now execute any command.  Note that the pattern
+begins with a slash, to ensure that the
+.I cmd
+must be an absolute path -- this helps avoid accidental execs of the
+wrong program.
+.PP
+If you were really going to give everything away as shown
+above, you'd probably want to exclude any public-area
+workstations, require the trusted users to periodically give
+their passwords, and set the real uid=root (instead of just the effective
+.ne 5
+uid), so the entry might be modified to read something like:
+.sp
+.RS
+.nf
+\fB/* \ \ * \ \ \fITrustedUsers\fP \\
+\fB\ \ \ \ \ \ \ \ \ !{\fIPatternsOfPublicWorstations\fP} \\\fP
+\fB\ \ \ \ \ \ \ \ \ password=y timeout=5 uid=0\fP
+.fi
+.RE
+.sp
+.PP
+.SH The FullPath Field
+.PP
+The
+.I FullPath
+field
+gives the name of the actual command that will be executed,
+and if it contains an asterisk, the asterisk is first replaced by the user's
+.IR cmd
+string.
+The
+.I FullPath
+can optionally contain a list of initial arguments that precede any
+arguments passed by the user.
+For example,
+.sp
+.RS
+\fBxyz	"/usr/local/bin/blah \-o1 \-o2 \-xrm 'a b c'" ...\fR
+.RE
+.sp
+specifies that when a valid user types
+.BR "super xyz" ,
+the command to execute is
+.B /usr/local/bin/blah
+and its arguments will be
+.RS
+argv[1]: \fB\-o1\fR
+.br
+argv[2]: \fB\-o2\fR
+.br
+argv[3]: \fB\-xrm\fR
+.br
+argv[4]: \fBa b c\fR
+.RE
+followed by any arguments that the user put on the super command line.
+Note: asterisk replacement is only done on the filename part of the
+.IR FullPath ,
+not on the arguments.  You can safely include asterisks
+in the argument list.  For security,
+the user's
+.I cmd
+may not contain any whitespace or backslashes.
+.PP
+The
+.I FullPath
+string is parsed using rules similar to the Bourne shell rules
+for backslashes in quoted strings, namely:
+.RS
+.br
+(a) backslash-newline is discarded;
+.br
+(b) Otherwise, if outside a quoted substring,
+\fB\\\fIx\fR \(-> plain \fIx\fR, which will not be treated as a delimiter,
+quotemark, or comment character;
+.br
+(c) Otherwise, inside a quoted substring of \fIFullPath\fR:
+.RS
+\fB\\\\\fR \(-> \fB\\\fR;
+.br
+\fB\\\fR\fIq\fR \(-> \fIq\fR,
+where
+.I q
+is the quote character that encloses the
+.I FullPath
+string;
+.br
+other backslashes are preserved: \fB\\x\fR \(-> \fB\\x\fR.
+.RE
+.RE
+.PP
+After writing a command with such backslash escapes,
+you should certainly use
+.RB `` super\ \-d\ cmd ''
+to check
+that your args are being parsed
+as expected before you offer this command to your users.
+.PP
+The same
+.I cmd
+can be listed several times in the
+.I super.tab
+file, in which case the first entry that allows the user to
+execute the command is chosen.
+The EXAMPLES section shows how this can be useful.
+.PP
+.SH Permitted Users
+.PP
+Permitted users are those
+who may execute the specified \fICmd\fP's.
+Entries for any number of permitted users are given after
+the
+.I CmdPat
+and
+.IR FullPath
+fields.
+Local options \(em options that apply to this command only \(em
+may also appear anywhere after the
+.IR FullPath .
+Options are distinguished from permitted users because options
+all have the form
+.IR key = value ,
+whereas
+permitted-user entries may not contain unescaped equal signs.
+Each whitespace-separated word is a pattern in one of the formats
+.in +.5i
+.sp
+\(bu	[\fBuser~\fP]\fIuser\fR[\fB:\fR][\fB@\fIhost\fR]
+.sp
+\(bu	[\fBuser~\fP]\fR[\fB:\fIgroup\fR][\fB@\fIhost\fR]
+.sp
+\(bu	[\fBuser~\fP]\fIuser\fR[\fB:\fIgroup\fR][\fB@\fIhost\fR]
+.sp
+.in -.5i
+Note that the
+.B user~
+part is optional.
+The user's login name must match the
+.I user
+pattern; the user must belong to a group whose name matches the
+.I group
+pattern; and the hostname must match the
+.I host
+pattern.
+If the
+.I user,
+.I group,
+or
+.I host
+part is not given, there are no corresponding restrictions.
+.sp
+By default, the ``group'' field is first matched against named groups
+to which the user belongs,
+and then against the user's decimal gid -- this allows the user to
+be put in a group in the /etc/passwd file that isn't given a name
+in the /etc/group file.
+(If you want to change the rules for using decimal gid, see the
+use of MATCH_DECIMAL_UID and MATCH_DECIMAL_GID in
+.I super.c
+for details.)
+.sp
+Since you can restrict users to particular hosts, a single
+.I super.tab
+file can be shared among many different machines.
+If the
+.I host
+part is of the form
+.BI + xyz ,
+then
+.I xyz
+is interpreted as a netgroup name and any host in netgroup
+.I xyz
+is matched.  In that case, 
+.I xyz
+is taken literally, and
+.I not
+interpreted as a pattern to be matched.
+Note: netgroup lookup is only
+implemented if the function
+.I innetgr()
+is available.
+.sp
+If the
+.I host
+part doesn't match the hostname, it might be because
+the pattern and actual hostnames contain two different (but both valid)
+incomplete versions of the fully-qualified domain name (FQDN).
+By default, if the
+.I host
+part fails to match the hostname, the FQDN is looked up and
+all of the ways of naming the host are matched against
+the pattern.
+For example, if the FQDN is \fIspacely.sprockets.com\fP,
+.B super
+will first try
+.IR spacely.sprockets.com ,
+then
+.IR spacely.sprockets ,
+and finally
+.IR spacely .
+This can be turned off; see option
+.BR gethostbyname .
+(You might want to turn it off because using nameserver lookup
+can reduce security a bit \(em your host may
+query a nameserver on another host to obtain the FQDN, and (a) that
+nameserver or an intermediate host along the way could
+have been subverted, or (b) another host could impersonate the nameserver.
+In either case your computer could receive incorrect hostnames.)
+.PP
+The patterns for valid users, groups, and hosts follow the same rules
+for the
+.IR CmdPat s,
+described above: they can be entered with either
+.IR ed -style
+or
+Bourne-shell-style patterns (depending on the setting of the
+.B patterns
+global option); csh-style brace expansion is allowed;
+and all pattern matching is ``anchored'': patterns
+are forced to match the entire username, groupname, or hostname.
+.PP
+To make it easy to exclude some users/groups/hosts, any of these
+patterns can be negated by prefixing the pattern
+with `\fB!\fP'.  If a negated pattern is matched,
+the user may \fInot\fP execute the command, even
+if there was a previous non-negated pattern that the user matched.
+All patterns are read left-to-right, and the last matched
+pattern ``wins''.  Thus if the user/group/host list is
+.sp
+.RS
+.B j.*  !jo
+.br
+or
+.br
+.B user~j.*  !user~jo
+.RE
+.sp
+then the first entry allows any username beginning with `\fBj\fP' to execute
+the command, but the second entry disallows user `\fBjo\fP'.
+If entered in the reverse order,
+.sp
+.RS
+.B !jo  j.*
+.RE
+.sp
+then the second entry, `\fBj.*\fP', allows all users beginning `\fBj\fP', and
+therefore the first entry has no effect.
+.PP
+.SH Permitted Times
+.PP
+The
+.B time
+condition restricts the days and times during which this command
+may be matched.  A time condition looks like:
+.ti +.5i
+.BI time~ pattern
+.sp
+with
+.IR pattern s
+that look like:
+.sp
+.RS
+.\" Older .BR macros limit the number of arguments, so we insert
+.\" the font alternation explicitly in these examples (blecch!)
+.ta 3i
+\fIPattern	Example\fP
+.br
+\fBhh\fR[\fB:mm\fR]\fB\-hh\fR[\fB:mm\fR][\fB/dayname\fR]	13:30-17/monday
+.br
+\fR{\fB<\fR,\fB>\fR,\fB<=\fR,\fB>=\fR}\fBhh\fR[\fB:mm\fR][\fB/dayname\fR]	<17/tues
+.br
+\fBdayname\fP	Friday
+.fi
+.RE
+.PP
+The first form explicitly specifies an interval during which the command may
+be used.  Times may not go past midnight; to specify the night between
+Monday and Tuesday, you must do something like:
+.RS
+.B time~{17:30-24:00/mon,0-8/tues}
+.RE
+.sp
+The second form for time patterns allows you to use logical operators.
+The Monday-night example could equally have been rendered as:
+.RS
+.B time~{>17:30/mon,<8/tues}
+.RE
+(There is a tiny difference in the two examples above: in the first example,
+the time range includes 17:30 and 8:00; in the second example, the time
+range is 17:31\-07:59.  Use \fBtime~{>=17:30/mon,<=8/tues}\fP to make
+the interpretation identical to the first example.)
+.PP
+For systems that support the
+.IR setlocale( 3 )
+function, the valid
+.IR dayname s
+are
+(a) those of your current locale (case-insensitive);
+(b) an official abbreviated day name in the current locale;
+(c) a 3-or-more character abbreviation of the full weekday; or
+(d) \fB*\fP, meaning any day.
+.PP
+Time patterns have a special defaulting rule when
+the current time is not in the time list:
+.RS
+\(bu if
+.I all
+time patterns are negated,
+.I super
+permits execution at any time not explicitly listed;
+.br
+\(bu otherwise, there is at least one non-negated pattern, and
+.I super
+denies execution at any time not explicitly listed.
+.RE
+The reason is that the natural interpretation of a series of negated
+conditions, such as
+.RS
+.B !time~{0-8,17-24}  !time~{sat,sun}
+.RE
+is to infer that all other times are acceptable for execution.
+On the other hand, if there are any ordinary, non-negated times, such as
+.RS
+.B time~8-17/{mon,tues,wed,thu,fri}
+.RE
+the natural interpretation is that all other times are not acceptable.
+.PP
+Note that explicit braces are important in the above list.  If they
+were missing, the implied braces around the entire pattern would render this
+equivalent to
+.RS
+.B "time~8-17/mon time~tues time~wed time~thu time~fri"
+.RE
+That is, the permitted times are 8-17h on Monday,
+and any time on Tuesday through Friday.
+.PP
+.SH Global Conditions
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+Global options and conditions affect the overall
+.B super
+processing.  To set them, you must use a line like
+.sp
+.RS
+\fB:global\fP		\fIGlobal\ Options\ And\ Patterns\fP
+.RE
+or
+.RS
+\fB:global_options\fP	\fIGlobal\ Options\ And\ Patterns\fP
+.RE
+.sp
+For backwards compatibility, you can alternatively use
+.RS
+.sp
+\fB/	/	\fIGlobalOptionsAndPatterns\fR
+.sp
+.RE
+but this use is discouraged.
+.PP
+These so-called ``global'' options and conditions actually take
+effect immediately after the line
+on which they appear, and are valid until the end of the input
+or until there is a countermanding global option or pattern.
+To have a global option or pattern affect the entire file, you must
+place it as the \fIfirst non-comment line\fR
+of the
+.I super.tab
+file.
+.PP
+If there are any PermittedUser or PermittedTime conditions
+on the global settings line, they are applied to
+each following command in the
+.I super.tab
+file.
+The conditions look like
+.sp
+.RS
+\fB:global	\fIcond cond ...  \fB<>\fP \fIcond cond ...\fR
+.RE
+.sp
+PermittedUser and PermittedTime
+conditions to the left of ``\fB<>\fP'' are processed
+.I before
+the local (per-command) conditions; conditions
+to the right of ``\fB<>\fP'' are processed
+.I after
+the per-command conditions.
+If ``\fB<>\fP'' is missing, all conditions are processed after
+the local conditions.
+For example,
+.sp
+.RS
+.B :global	jan <> !@+badhosts
+.RE
+.sp
+says that user
+.I jan
+can usually execute any command,
+but under no circumstances will a user on any host in netgroup
+.I badhosts
+be allowed to execute any command.
+(User
+.I jan
+will not be allowed to execute a command if the per-command
+conditions disallow it, or if
+.I jan
+is on one of the
+.I badhosts
+computers).
+.sp
+Global PermittedUser (PermittedTime) conditions take effect on
+the line on which they are defined,
+and are good until another set of global PermittedUser (PermittedTime)
+conditions is entered on another
+.B :global_option
+line.  That is,
+a new global condition line replaces any previous global conditions.
+.PP
+One sensible approach to using global conditions is to put conditions
+that allow users to execute commands \fIbefore\fR the per-command conditions
+are processed, and to put negating patterns (for users/groups/hosts that
+are never to be allowed to execute anything)
+\fIafter\fR the per-command conditions.
+.PP
+(Global options are discussed below, together with local options).
+.SH Variables
+.PP
+.B Super
+offers variables to make it easier to handle entries that
+are duplicated or are constructed out of other entries.
+Variables are defined by typing
+.sp
+.RS
+.B :define VariableName VariableDefinition
+.RE
+.sp
+The
+.I VariableName
+must be made up only of letters, digits, and/or underscore.
+
+The
+.I VariableDefinition
+begins at the first non-whitespace character after the
+.I VariableName
+and continues up to but not including the final newline.
+Comments embedded on the variable definition line(s) are
+deleted before the variable definition is stored.
+A variable definition may be continued across multiple lines
+by preceding each newline with a backslash,
+and indenting the continuation line with whitespace.
+Just as for regular control lines, the backslash-newline-whitespace
+sequence is treated as whitespace if it follows a letter, digit, or underscore;
+otherwise, it is eliminated.  For example,
+.sp
+.nf
+\fB
+.RS
+:define  Users   user1,\\
+\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ user2,\\
+\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ user3
+.RE
+.fi
+and
+.RS
+:define Users   user1,user2,user3
+.RE
+\fR
+.sp
+are equivalent definitions.
+ 
+Unlike Makefiles, the variable definitions are not scanned first
+and then the file re-scanned.  Instead, variables take effect at
+the point they are defined, and remain in effect until they are
+re-defined or end of file \(em thus variables definitions must precede
+their first use in the file.
+
+Variables may contain other variables (which must have already been
+defined).  Variable substitution is done when a line is first read.
+A line is never re-scanned after variable substitution.
+
+Variables are used in a file by typing
+.sp
+.RS
+.B $VariableName
+.RE
+.sp
+or
+.sp
+.RS
+.B $(VariableName)
+.RE
+.sp
+
+The special variable
+.B $$
+is replaced by a single
+.RB `` $ ''.
+Any other name
+.BI $ X
+(where
+.I X
+is not a letter, digit, or underscore) is an error.
+
+Because a line is never re-scanned after variable substitution,
+the following sequence:
+.sp
+.nf
+.RS
+.B :define A $$
+.B :define B A
+.B :define C $B $$B
+.B $C
+.RE
+.fi
+.sp
+defines
+.B C
+to be simply
+.RB `` A\ $B ''.
+.PP
+Variables can be helpful in grouping users or hosts together.
+For example, you might restrict access to a command so that it
+can't be run from a public-access workstation:
+.nf
+.RS
+.B :define Room103_WS hosta,hostb,hostc,hostd
+.B :define Room105_WS hoste,hostf,hostg,hosth
+.B :define Room106_WS +nonprivate
+.B :define PublicWorkstations $Room103_WS,$Room105_WS,$Room106_WS
+.B SomeCmd   FullPathHere   !@$(PublicWorkstations)
+.RE
+.fi
+.PP
+In the above example, we have taken advantage of the implied braces
+that are always placed around any pattern, so that the comma-separated
+list of workstations is brace-expanded into
+.B !@hosta
+.B !@hostb\ ...\ !@hoste
+.BR !@hostf\ ...\ !@+nonprivate .
+.SH Options
+.PP
+Options can be divided into (a) \fIlocal\fP options,
+which are defined on a regular control line, and apply only to that
+control line; and (b) \fIglobal\fP options,
+which are defined on a
+.B :global
+or
+.B :global_options
+line, take effect immediately after the line,
+and are valid until the end of the input
+or until there is a countermanding global option or pattern.
+.PP
+Some options can be given as either local or global options.
+If both are used, the local setting overrides the global one.
+.PP
+Two special names can be used with any of the options
+that take user or group ids as arguments:
+.BI owner= xxx,
+.BI uid= xxx,
+.BI gid= xxx,
+.BI u+g= xxx,
+.BI groups= xxx,
+.BI addgroups= xxx.
+These names are
+.BR <owner> ,
+meaning the owner of the file to be executed
+(or the owner's group, whichever is appropriate in the context);
+and
+.BR <caller> ,
+meaning the owner or group of the user calling super.
+The angle brackets are literally part of the name.
+For example, the options
+.RS
+gid=Foo uid=<caller>
+.RE
+would change the group to
+.IR Foo ,
+but leave the uid unchanged.
+.PP
+The recognized options are:
+.PP
+.I "Group 1.  Options Affecting How Superfiles Are Read and Processed."
+.HP
+\fBpatterns=\fIxxx\fR
+.br
+.B (Global)
+Select the pattern-matching type for the user/group/host patterns.
+The string
+.I xxx
+must be one of:
+.RS
+.HP
+.B regex
+\(em patterns are ed-style
+regular expressions, using the rules embodied in the BSD\ 4.x routines
+.IR re_comp()/re_exec() ,
+with the addition of csh-style brace expansion.
+This is the default for historical reasons, but most people prefer
+to use shell-style patterns here, and it is recommended that you put
+\fBpatterns=shell\fP (see below) in your global options list.
+.HP
+.B shell
+\(em patterns are approximately Bourne-shell style, with the addition
+of csh-style brace expansion.  The patterns are formed from:
+.RS
+.HP
+\\x	force x to be a plain character;
+.HP
+?	matches any single character;
+.HP
+*	matches any sequence of 0 or more chars;
+.HP
+[\fIchars\fP]	matches any single character in the set;
+.HP
+[^\fIchars\fP]	matches any single char NOT in the set;
+.HP
+^\fIpat\fP	inverts the sense of the match --
+the string must NOT match the pattern.
+.RE
+.RE
+.HP
+\fBrelative_path=\fIy\fR|\fIn\fR
+.br
+.B (Global)
+If \fIy\fR, FullPathNames can be relative instead of absolute.
+By default this is disallowed, because it is almost always a very
+foolish (unsafe) thing to do.
+.HP
+\fBgroup_slash=\fIy\fR|\fIn\fR
+.br
+.B (Global)
+If \fIy\fR, group names can contain a slash.  By default this is disallowed,
+so that
+.B super
+can catch certain typos in the
+.I super.tab
+file.
+(Namely,
+.B super
+can catch errors in which an entry is of the form
+.IB Cmd : File
+instead of the required
+.IB Cmd :: File.
+The trouble is that
+.IB Cmd : File
+looks syntactically like
+.IB user : group,
+and can therefore be mistaken for a valid part of a control line.
+But the filename will contain a slash \(em unless you have unwisely
+enabled the
+.B relative_path
+option \(em so disallowing
+slashes allows
+.B super
+to flag the line as syntactically invalid.)
+.HP
+\fBgethostbyname=\fIy\fR|\fIn\fR
+.br
+.B (Global)
+Enables or disables the use of
+.I gethostbyname()
+to find the fully-qualified domain name
+(see the discussion in the
+.BR "Permitted Users"
+section, which describes the security issues associated with enabling
+this option.)
+Default: enabled (if your host supports gethostbyname()).
+.PP
+.I "Group 2.  Logging Options."
+.HP
+\fBlogfile=\fIxxx\fR
+.br
+.B (Global)
+Enables logging to a local file.
+Each invocation of
+.B super
+(aside from ones for help) generates an entry in
+file
+.IR xxx .
+.HP
+\fBloguid=\fIxxx\fR
+.br
+.B (Global)
+If logging is enabled with logfile=\fIxxx\fR, the
+logfile will be opened for writing using uid=\fIxxx\fR
+(can be either a username or numeric uid).
+This option allows you to
+have the file created/opened under another uid that
+does have cross-host access, such as the uid of a
+system manager.
+(See
+.I timestampuid=xxx
+for additional comments).
+Default: loguid=0.
+.HP
+\fBrlog_host=\fIhostname\fR
+.br
+.B (Global)
+Tells super which host's syslog daemon is to receive log messages
+when option
+.B syslog=y
+is enabled.  Default: \fIlocalhost\fP.
+.HP
+\fBsyslog=\fIy\fR|\fIn\fR
+.br
+.B (Global)
+Logging information is passed to the logs maintained by the
+.I syslogd
+daemon.
+This is independent of the setting of the
+.B logfile
+option (above).
+Error messages are by default logged at priority LOG_ERR (the actual priority
+can be specified in the
+.IR Makefile ),
+and successful attempts to run programs are logged at priority LOG_INFO.
+(You could instead configure the
+.I syslog.conf
+file to forward the messages to a central machine, but
+.I rsyslog()
+is a convenient alternative that doesn't require separately modifying
+.I syslog.conf
+on each host.)
+.HP
+\fBmail="\fImail-command\fB"\fR
+.br
+.B (Local|Global)
+Notices of super failures are piped to the shell command
+.IR mail-command .
+This is independent of the setting of the
+.B logfile
+and
+.B syslog
+options.
+For instance,
+\fImail="mail -s Super joeblow"\fR
+will cause error messages to be mailed to user
+.I joeblow
+(on some systems you may need to substitute
+.I mailx
+for
+.IR mail ).
+Note: the
+.I mail-command
+is executed by passing it as an argument to
+.IR popen(3) .
+This is safe to execute because of the clean environment assured
+by
+.B super.
+.HP
+\fBmailany="\fImail-command\fB"\fR
+.br
+.B (Local|Global)
+This is identical to the
+.I mail
+option, except that
+.I mailany
+sends notification of successful invocations as well as errors.
+.PP
+.I "Group 3.  Extra Help Information for Users."
+.HP
+.BI info= xxx
+.br
+.B (Local)
+The string
+.I xxx
+is printed when giving help to users.  It should be set to a helpful
+one-line description of the command.
+.PP
+.I "Group 4.  Password and Other Restrictions Before Approval."
+.HP
+\fBnargs=\fR[\fImmm\fB\-\fR]\fInnn\fR
+.br
+.B (Local)
+The user is required to enter
+.I mmm - nnn
+arguments to the command.  If just
+.I nnn
+is given, the user must enter exactly
+.I nnn
+arguments.  These arguments are in addition to any arguments entered
+in the command part of the
+.I super.tab
+file.  The default is to allow
+the user to enter any number of arguments.
+.HP
+\fBarg\fR[\fImmm\fB\-\fR]\fInnn\fB=\fIsss\fR
+.br
+.B (Local)
+This means that the
+.IR mmm 'th
+or
+.IR mmm\-nnn 'th
+arguments must match pattern
+.IR sss .
+The pattern must be enclosed in quotes if it contains whitespace.
+Note that this option does not
+.I require
+that there be
+.IR mmm \- nnn
+arguments; it only says what those arguments must look like, if entered.
+.HP
+\fBowner=\fIxxx\fR
+.br
+.B (Local|Global)
+This option specifies that the
+.I FullPath
+(after asterisk-substitution)
+must be owned by user (or uid) \fIxxx\fR, or else it won't be
+executed.
+.HP
+\fBpassword=\fIy\fR|\fIn\fR
+.br
+.B (Local|Global)
+If \fIy\fR, the user's password is required before the command is executed.
+See also the options
+.I timeout
+and
+.IR renewtime ,
+and be sure to read the warning under
+.I timestampbyhost.
+.HP
+\fBtimeout=\fIm\fR
+.br
+.B (Local|Global)
+Passwords are good for \fIm\fR minutes; that is, the command may be executed
+without re-entering the user's password
+for \fIm\fR minutes after the last time the user's password was entered
+(for any command).  After \fIm\fR minutes, the password will be required
+again before the command can be executed.  If \fItimeout\fR is zero or
+negative, a password is required every time the command is used.
+The timestamp for user \fIusr\fR is recorded in the file
+\fBTIMESTAMP_DIR\fR directory (see \fBtimestampbyhost\fR and
+the FILES section, below).
+.HP
+\fBrenewtime=\fIy\fR|\fIn\fR
+.br
+.B (Global)
+If \fIy\fR, the user's timestamp file is updated to the current time
+whenever a password-requiring command is executed.
+The result is that a user who frequently executes password-requiring
+commands won't need to re-enter his or her password until more than
+.I timeout
+minutes elapse since the last such command.
+Otherwise, the user will need to re-enter his or her
+.I timeout
+minutes after last entering the password.
+The default is \fIn\fR.
+.HP
+\fBtimestampbyhost=\fIy\fR|\fIn\fR
+.br
+.B (Global)
+If \fIy\fR (default), the timestamp files are given names that are
+unique on each host.  For instance, \fIjouser@somehost\fR will be
+given a timestamp file named \fITIMESTAMP_DIR/somehost/jouser\fR,
+where \fITIMESTAMP_DIR\fR is defined in the FILES section.
+If \fItimestmapbyhost=n\fR, the timestamp files are given names
+that are unique to each user, but not unique per host.  For instance,
+\fIjouser\fR on any host will be given a timestamp file named
+\fITIMESTAMP_DIR/jouser\fR.
+.br
+.I WARNING:
+The hostname used is that from
+.I gethostname().
+Note that this is not necessarily unique across
+internet domains, since it is frequently not a
+fully-qualified domain name.  Therefore you should
+not share timestamp directories with hosts outside
+the local domain.  (Generally such connections don't
+exist, but one
+.I could
+crossmount the timestamp directory disk...)
+.HP
+\fBtimestampuid=\fIxxx\fR
+.br
+If a password is required, the time at which it was entered is
+recorded as the mtime of a timestamp file.  The timestamp file
+is normally created with owner=root; however, this option
+causes it to be created/modified using uid=\fIxxx\fR
+(\fIxxx\fR can be either a username or numeric uid).
+This option is useful when a network of hosts are
+sharing a cross-mounted timestamp directory.  Note that networks
+are typically configured to not allow root on one
+host to have root access to files on another host,
+which will forbid root on other hosts from creating
+the timestamp file unless it's world-writable.
+This option allows you to
+have the file created/opened under another uid that
+does have cross-host access, such as the uid of a
+system manager.
+Default: timestampuid=0.
+.PP
+.I "Group 5.  Modifications to Environment Before Executing Command."
+.HP
+.BI uid= xxx
+.br
+.B (Local)
+Set the real and effective uid to
+.I xxx
+just before executing the command.
+The uid
+.I xxx
+is first tried as a login name and then as a number.
+.HP
+.BI gid= yyy
+.br
+.B (Local)
+Set the real and effective gid to
+.I yyy
+just before executing the command.
+The gid
+.I yyy
+is first tried as a group name and then as a number.
+.HP
+.BI u+g= zzz
+.br
+.B (Local)
+Set the real and effective uid to
+.IR zzz ,
+the real and effective gid to
+.IR zzz 's
+login gid,
+and the supplementary groups list to
+.IR zzz 's
+supplementary groups just before executing the command.
+Since this option conflicts with
+.BI uid=xxx
+and
+.BI gid=yyy,
+it may not be mixed with them.
+.HP
+\fBgroups=\fIname\fR[,...]
+.br
+.B (Local|Global)
+By default, the user's supplementary groups list is deleted before
+executing a command (unless the option
+.B u+g
+is used).
+This option instead sets the group list to \fIname\fR[,...]
+.HP
+\fBaddgroups=\fIname\fR[,...]
+.br
+.B (Local|Global)
+This option adds the listed groups to the supplementary groups list.
+Since the default is to provide an empty supplementary groups list,
+this option usually has the same effect as the plain
+.B groups
+option.
+However, if the options
+.BI u+g= foo
+.BI addgroups= a,b,c
+are used, then the supplementary groups list is composed of user
+.IR foo 's
+supplementary groups plus \fIa, b\fR, and \fIc\fR.
+.HP
+\fBenv=\fIname\fR[,...]
+.br
+.B (Local)
+Each
+.I name
+in the comma-separated list is an environment variable which should
+.I not
+be deleted before executing the
+.IR Cmd ;
+these variables are in addition to the normal variables created or passed
+by
+.B super
+(TERM, IFS, PATH, USER, LOGNAME, HOME, ORIG_USER, ORIG_LOGNAME,
+ORIG_HOME, LINES, COLUMNS, SUPERCMD).
+Be careful here; environment variables can sometimes be abused to create
+security holes.
+If you use the option more than once, the later instance overrides the
+earlier one.
+.HP
+\fBcd=\fIdir\fR
+.br
+.B (Local|Global)
+Just before executing the command,
+.I super
+changes the working directory to
+.IR dir .
+.HP
+\fBsetenv=\fIvar\fB=\fIxxx\fR
+.br
+.B (Local)
+The environment variable
+.I var
+is defined to have the value
+.IR xxx ,
+and is passed on when executing the
+.IR Cmd .
+You can add several environment variable definitions
+by using the option more than once.
+.HP
+\fBfd=\fIn\fR[,...]
+.br
+.B (Local)
+Each file descriptor
+.I n
+in the comma-separated list should
+.I not
+be closed before executing the
+.I Cmd.
+These descriptors are added to the usual set of descriptors kept open,
+namely 0, 1, 2.
+.HP
+\fBnice=\fIn\fR
+.br
+.B (Local|Global)
+changes the ``nice'' value of the executed command by an amount
+.I n
+from the default level.  (Positive increments reduce the command's
+priority; negative increments increase it.)
+.HP
+\fBumask=\fInnn\fR
+.br
+.B (Local|Global)
+sets the umask of any executed command to
+.IR n .
+A leading
+.B 0x 
+or
+.B 0X
+in \fInnn\fP means a hexadecimal value; otherwise,
+a leading
+.B 0
+means octal; otherwise it's decimal.
+.PP
+.I "Group 6.  Other Options"
+.HP
+.BI print= message
+.br
+.B (Local)
+If the rest of the line is matched, then
+.B super
+prints the specified
+.I message
+just before executing the command.
+.HP
+.BI die= message
+.br
+.B (Local)
+If the rest of the line is matched, then
+.B super
+prints the specified
+.I message
+and exits.
+This lets you conveniently set up some ``stop'' conditions, and use the
+die option to prevent super from looking at any line past the stop
+conditions.  Otherwise, you'd have to individually attach the stop
+conditions to every control line.
+.SH Include Files
+.PP
+A
+.I super.tab
+file can include other files by means of an entry like
+.RS
+.BI :include \ filename
+.RE
+If the
+.I filename
+isn't an absolute path, it is taken to be relative to the
+directory containing the
+.I super.tab
+file.  Include files may be nested up to the system limit
+on the number of
+simultaneously-open file descriptors.
+.SH FILES
+.TP
+.I @SUPERFILE@
+The location of the
+.I super.tab
+file on your system.
+.TP
+.IR /usr/local/lib/superstamps/ username
+Default location of the file whose \fImtime\fR is used as the timestamp for the
+last time the user entered his or her password for password-requiring
+commands.  Check your installation for the directory used on your system.
+.SH EXAMPLES
+.ta 1i 4i
+.HP
+Example 1.
+The control line
+.sp
+.in +.5i
+.nf
+doit /usr/local/bin/doit		\\
+	me	\\
+	you@{h1,h32}	\\
+	ja.*:ok_j	\\
+	:goodguys
+.fi
+.in -.5i
+.sp
+allows /usr/local/bin/doit to be run setuid-root by
+.in +.5i
+\(bu user
+.B me
+on any host,
+.br
+\(bu user
+.B you
+on hosts
+.B h1
+and
+.BR h32 ;
+.br
+\(bu any users named
+.B ja.*
+in group
+.BR ok_j ;
+.br
+\(bu and anybody in group
+.BR goodguys .
+.br
+.in -.5i
+.HP
+Example 2.
+The pair of control lines
+.sp
+.in +.5i
+.nf
+doit /usr/local/bin/doit		\\
+	u+g=smith env=TZ,TAPE	\\
+	password=y timeout=0	\\
+	jo@PublicWorkstation
+
+doit /usr/local/bin/doit		\\
+	u+g=smith env=TZ,TAPE	\\
+	jo
+.fi
+.in -.5i
+.sp
+allows user
+.B jo
+to run /usr/local/bin/doit with
+uid\ =\ \fBsmith\fP,
+gid\ =\ \fBsmith\fP's login gid, and keeping the environment variables
+TZ and TAPE in addition to the standard set.
+If user 
+.B jo
+is at
+.BR PublicWorkstation ,
+the first entry will match, requiring
+jo's password every time the command is used; otherwise,
+.I super
+will match at the second entry, and no password is needed to run the command.
+.HP
+Example 3.
+Here is an entry restricting CD-ROM mounting on different hosts:
+.B tas
+is the only user who may mount
+CD's on
+.BR elgar ;
+anybody in group
+.B xyz
+may mount CD's on
+.B alpha
+or
+.BR delta ;
+and anybody on a host in the netgroup
+.B india
+may mount a CD on the
+.B india
+hosts.  However, user
+.B jo
+may never run \fIcdmount\fP, regardless of his or her group or host
+(assuming that there is no overriding global pattern that permits
+.B jo
+to use the command).  Note that shell-style patterns are used,
+not regex-style patterns.
+.sp
+.in +.5i
+.nf
+cdmount /usr/local/bin/cdmount		\\
+	tas@elgar		\\
+	:xyz@{alpha,delta}	\\
+	*@+india		\\
+	!jo
+
+.fi
+.in -.5i
+.sp
+.SH "SEE ALSO"
+super(1)

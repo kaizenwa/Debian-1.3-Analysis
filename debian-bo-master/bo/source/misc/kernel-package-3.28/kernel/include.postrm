@@ -1,0 +1,149 @@
+#! /usr/bin/perl
+#                              -*- Mode: Perl -*- 
+# debian.postrm --- 
+# Author           : Manoj Srivastava ( srivasta@pilgrim.umass.edu )
+# Created On       : Sat Apr 27 05:44:16 1996
+# Created On Node  : melkor.pilgrim.umass.edu
+# Last Modified By : root
+# Last Modified On : Thu Jun 13 08:40:48 1996
+# Last Machine Used: melkor.pilgrim.umass.edu
+# Update Count     : 10
+# Status           : Unknown, Use with caution!
+# HISTORY          : 
+# Description      : 
+# 
+# 
+
+
+$|=1;
+
+# Predefined values:
+my $package="=P";
+
+my $LastVersion = '';
+
+# Ignore all invocations uxcept when called on to configure.
+exit 0 unless ($ARGV[0] && $ARGV[0] =~ /remove/);
+
+# most of our work is done in /usr/src.
+chdir '/usr/src' or die "Could not chdir to /usr/src:$!";
+
+# let us make sure that if the file .linux-versions exists, and that
+# we can read and write to it.
+if (! -f '.linux-versions') {
+  my $answer;
+  print STDERR <<"ERR";
+The file /usr/src/.linux-versions does not exist. This is an 
+misconfiguration, making it hard to provide a /usr/src/linux
+symlink if the latest target is removed.
+
+Please Hit return to continue.
+ERR
+  ;
+ $answer = <STDIN>;
+  if (open(REGISTRY,">/usr/src/.linux-versions")) {
+    print REGISTRY <<REG;
+# This is a list of the current versions of Linux kernel sources or
+# kernel header packages on the system. 
+REG
+      ;
+    close(REGISTRY);
+  }
+  else {
+    my $answer;
+    print STDERR <<"ERR";
+ The file /usr/src/.linux-versions should be read and writable. ($!)
+ Please change permissions on /usr/src/
+
+ Please Hit return to continue.
+ERR
+     ;
+    $answer = <STDIN>;
+    
+  }
+}
+else {
+  my $found = 0;
+  my @Versions = ();
+
+  $LastVersion = '';
+  if (open(REGISTRY,"/usr/src/.linux-versions")) {
+    while (<REGISTRY>) {
+      chop;
+
+      $found = 1, next if /^\s*$package\s*$/o;
+      push @Versions, $_ ;
+
+      s/\s+//;
+      next if /^\s*$/;
+      next if /^\#/o;
+
+      $LastVersion = $_ ;
+    }
+    close (REGISTRY);
+  }
+  else {
+    warn "Could not read /usr/src/.linux-versions: $!";
+  }
+  if ($found && open(REGISTRY,">/usr/src/.linux-versions")) {
+    foreach (@Versions) {
+      print REGISTRY "$_\n";
+    }
+    close(REGISTRY);
+  }
+  else {
+    warn "Could not write /usr/src/.linux-versions: $!" if $found;
+  }
+}
+
+# Test if we need to do anything at all. This test and exit make us
+# idempotent. 
+
+if (! -l 'linux') {
+  print STDERR 
+    "Error: /usr/src/linux not a symbolic link, not removing.\n";
+  exit 1;
+}
+# fine.  We now have a link.
+my $old_target = readlink('linux');
+die "could not read link /usr/src/linux:$!" unless defined $old_target;
+
+if ("$old_target" eq "$package") {
+  unlink 'linux' or do {
+    print STDERR <<"ERR";
+  Could not remove /usr/src/linux ($!)
+  Please remove manually.
+ERR
+  ;
+    exit 1;
+  } ;
+  if ($LastVersion) {
+    if (-d "$LastVersion") {
+      symlink $LastVersion, "linux" or 
+	die "Error linking /usr/src/$LastVersion to /usr/src/linux: $!";
+    }
+    else {
+      print STDERR "Could not find dir /usr/src/$LastVersion\n";
+      print STDERR "  maybe corrupt /usr/src/.linux-versions?\n";
+      die "  Please create the link /usr/src/linux manually\n";
+    }
+  }
+  else {
+    print STDERR "No version to link /usr/src/linux to.\n";
+  }
+}
+else {
+  exit 0;
+}
+
+
+exit 0
+__END__
+
+
+
+
+
+
+
+

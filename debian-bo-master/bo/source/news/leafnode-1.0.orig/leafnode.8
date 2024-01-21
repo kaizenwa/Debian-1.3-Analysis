@@ -1,0 +1,275 @@
+.TH leafnode 8 "30 Oct 1995" "Troll Tech AS" \" -*- nroff -*-
+.\"
+.\" Written by Arnt Gulbrandsen <agulbra@troll.no> and copyright 1995 Troll
+.\" Tech AS, Postboks 6133 Etterstad, 0602 Oslo, Norway, fax +47 22646949.
+.\"
+.\" Use, modification and distribution is allowed without limitation,
+.\" warranty, or liability of any kind.
+.\"
+.\" $Id: leafnode.8,v 1.10 1996/06/23 21:33:52 agulbra Exp $
+.\"
+.\" hilit19 is stupid: "
+.SH NAME
+leafnode \- NNTP server for small (dialup) sites
+
+.SH SYNOPSIS
+.B leafnode
+
+.SH DESCRIPTION
+.B Leafnode
+is a USENET package intended for small sites, where there are few
+users and little disk space, but where a large number of groups is
+desired.
+.PP
+The design of
+.B leafnode
+is intended to self-repair after problems, and to require no
+manual maintenance.
+.PP
+The
+.B leafnode
+program itself is the NNTP server.  It is run from
+.I /etc/inetd.conf
+when someone wants to read news.  The other parts of the package, 
+.B fetch
+and
+.B texpire,
+are responsible for fetching new news from another server, and for
+deleting old news.
+
+.SH "ACCESS CONTROL"
+No authentication or access control is supported.  This is a
+deliberate omission: Implementing this is a job which should not be
+redone for each and every service.
+.PP
+I recommend that either firewalling or tcpd be used for access control.
+
+.SH FILES
+All these files and directories
+.I must
+be writable by user "news".
+.PP
+.I /usr/lib/leafnode/groupinfo
+contains the information about each USENET group.  In case of harm, it
+is rebuilt by
+.BR fetch (8).
+.PP
+.I /usr/lib/leafnode/config
+contains the configuration parameters for
+.B leafnode.
+See CONFIGURATION below.
+.PP
+.I /var/spool/news
+contains the news articles; e.g.
+.I /var/spool/news/alt/fan/agulbra
+contains the articles in the 
+.I alt.fan.agulbra
+group.  Each directory contains articles in numbered files (decimal
+numbers, monotonically increasing), and a special file called
+.I .overview
+which contains the "Subject", "From", "Date", "Message-ID",
+"References", "Bytes" and "Lines" headers for each article in the
+group.
+.PP
+Several subdirectories are special:
+.PP
+.I /var/spool/news/out.going
+contains local postings that
+.BR fetch (8)
+is to pass to the upstream NNTP server.
+.PP
+.I /var/spool/news/failed.postings
+contains local postings that the upstream server rejected.
+.BR fetch (8)
+will create files in this directory, but none of the
+.B leafnode
+programs will delete anything in it.
+.PP
+.I /var/spool/news/message.id
+contains hard links to each message; this is used in place of the
+.B dbz
+database typically used by bigger servers.  (A directory such as this
+is probably more efficient for the small servers
+.B leafnode
+is designed for but scales very badly.)
+.PP
+.I /var/spool/news/interesting.groups
+contains one 0-byte file for each group an NNTP client has asked to read.
+.B leafnode
+will touch the the relevant file when a LISTGROUP, XOVER, XHDR, STAT,
+HEAD, BODY or ARTICLE command is issued immediately after a GROUP
+command is issued, and
+.BR fetch (8)
+will retrieve all new articles in all groups whose files have been
+either
+.IP
+- touched during the past two days, or
+.IP
+- touched more than once, and at least once within the past week.
+.PP
+.I /etc/inetd.conf
+contains the line which starts 
+.B leafnode.
+It is strongly recommended to start
+.B leafnode
+as user news.
+
+.SH CONFIGURATION
+All configuration is done using the file
+.I /usr/lib/leafnode/config.
+There is no GUI configuration tool yet.
+.PP
+The file is in the common UNIX format: One line per argument, white
+space allowed, # starts a comment which lasts until the end of the
+line.  Here is a simple example:
+.PP
+.in +5
+# Server is news.somewhere.org
+.br
+server = news.somewhere.org
+.br
+.br
+# We keep news for 21 days
+.br
+expire = 21
+.in -5
+.PP
+Since the configuration is so simple, here is
+.I another
+simple example.  But different:
+.PP
+.in +5
+server=news02.bigprovider.com
+.br
+expire=7#don't use much space
+.br
+maxfetch=1000#again, don't use much space
+.in -5
+.PP
+"server" is used by
+.BR fetch (8)
+to select what NNTP server to retrieve news from.  Changing this
+involves a lot of work on part
+of
+.B leafnode
+and inconvenience for the users.  It should not be done without good
+reason.
+.PP
+"expire" is the number of days a thread should be kept around.  This
+many days after it has last been read, a discussion thread will be
+deleted by
+.BR texpire (8).
+.PP
+"maxfetch" specifies the maximum number of articles
+.BR fetch (8)
+should fetch from the upstream server in each group.  This limits the
+size of the backlog a reader of a group will see when first
+subscribing.  By default there is no limit, so a new reader will see
+all of the available postings.
+.PP
+.B Warning:
+If you set maxcount too low, regular readers of a group may not see
+all of the traffic in that group.  I recommend setting it to at least
+1000-1500.
+
+.SH PROTOCOL
+Here are the NNTP commands supported by this server.
+.TP
+.B ARTICLE
+Return the headers and body text of an article.
+.B Leafnode
+supports this imperfectly; the message-id and article number of the
+article may not be reported in the reply line.  This does not affect
+any tested NNTP clients.
+.TP
+.B BODY
+Return the body text of an article.  See 
+.B ARTICLE.
+.TP
+.B GROUP
+Sets the current USENET group and article pointer, and returns the
+status information about this group.
+.TP
+.B HEAD
+Return the headers of an article.  See 
+.B ARTICLE.
+.TP
+.B HELP
+Accepted but I'm afraid it is not very helpful.
+.TP
+.B IHAVE
+Known but rejected.  See
+.BR fetch (8).
+.TP
+.B LAST
+Moves the article pointer back by 1.
+.TP
+.B LIST
+Lists the available USENET groups.
+.TP
+.B LISTGROUP
+Lists the articles present in the current group, or the argument group
+if an argument is present.
+.TP
+.B MODE
+Accepted and blithely ignored.
+.TP
+.B NEWGROUPS
+Accepted but the reply is always empty.  This command does not make
+sense for this server.
+.TP
+.B NEWNEWS
+Accepted but the reply is always empty.  This command does not make
+sense for this server.
+.TP
+.B NEXT
+Moves the article pointer forward by 1.
+.TP
+.B POST
+Post a new article.  Only scant syntax checking is performed.  The
+article is sent to the upstream NNTP server by
+.BR fetch (8).
+.TP
+.B QUIT
+Quit reading news.
+.TP
+.B SLAVE
+Accepted but ignored.
+.TP
+.B STAT
+Return the availability of an article.  See
+.B ARTICLE.
+.TP
+.B XHDR
+Accepted, but supported only for the "Subject", "From", "Date",
+"Message-ID", "References", "Bytes" and "Lines" headers.
+.TP
+.B XOVER
+Returns the "Subject", "From", "Date", "Message-ID", "References",
+"Bytes" and "Lines" headers for the indicated article(s).
+
+.PP
+The rest of the commands given in the NNTP RFC or added in other
+servers are left out in order to keep the server simple and bug-free.
+
+.SH BUGS
+None known.
+
+.SH "AUTHOR AND LICENCE"
+Written by Arnt Gulbrandsen <agulbra@troll.no> and copyright 1995
+Troll Tech AS, Postboks 6133 Etterstad, 0602 Oslo, Norway, fax +47
+22646949.
+.PP
+Use, modification and distribution is allowed without limitation,
+warranty, or liability of any kind.
+.PP
+The development of
+.B leafnode
+has been paid for by Uninett AS (http://www.uninett.no/).
+
+.SH SEE ALSO
+.BR tcpd (8),
+.BR hosts.allow (5),
+.BR fetch (8),
+.BR texpire (8),
+.B "RFC 977"

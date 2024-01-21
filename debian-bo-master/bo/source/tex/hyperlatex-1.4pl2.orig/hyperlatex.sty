@@ -1,0 +1,266 @@
+%%
+%% LaTeX style to handle hyperlatex files, version 1.4
+%%
+%% suitable for both Latex2.09 and Latex2e
+%%
+%%   $Modified: Tue Dec  5 18:47:06 1995 by otfried $
+%%
+%% This code has GNU copyleft, 1994,1995 Otfried Schwarzkopf
+%%
+\newif\if@hyla@ldLatex
+%%
+\@ifundefined{NeedsTeXFormat}{
+  % LaTeX 2.09 
+  \typeout{Package: 'hyperlatex' v1.4  Otfried Schwarzkopf}
+  \@hyla@ldLatextrue
+  \input{verbatim.sty}
+  }{
+  % LaTeX2e
+  \NeedsTeXFormat{LaTeX2e}
+  
+  \ProvidesPackage{hyperlatex}
+  [1995/10/01 v1.4 LaTeX2e package for Hyperlatex mode]
+  \typeout{Package: 'hyperlatex' v1.4  Otfried Schwarzkopf}
+  \@hyla@ldLatexfalse
+  \RequirePackage{verbatim}
+  }
+
+\chardef\other=12
+
+%%
+%% Comments,  
+%%
+{\obeylines\gdef\hyla@W#1^^M{\endgroup\ignorespaces}}
+\def\W{\begingroup\obeylines\catcode`\{=\other\catcode`\}=\other\hyla@W}
+
+\newcommand{\htmlonly}[1]{}
+\newcommand{\texorhtml}[2]{#1}
+\newenvironment{iftex}{}{}
+\newcommand{\texonly}[1]{#1}
+\newcommand{\T}{}
+
+%%
+%% Treatment of special characters
+%%
+
+\def\hyla@nonspecials{}
+\def\NotSpecial{\def\hyla@nonspecials}
+\def\hyla@turnon{\let\do=\@makeother\hyla@nonspecials}
+
+\if@hyla@ldLatex
+\newcommand{\topnode}[1]{\hyla@turnon}
+\else
+\newcommand{\topnode}[1]{}
+\AtBeginDocument{\hyla@turnon}
+\fi
+
+\let\htmltab=&
+
+%%
+%% \begin{tex} ... \end{tex}    escapes into raw Tex temporarily.
+%% you can write {\tex .....} as well, if already escaped from Html
+%%
+\newenvironment{tex}{\catcode `\$=3 \catcode `\&=4 \catcode `\#=6
+\catcode `\^=7 \catcode `\_=8 \catcode `\%=14}{}
+
+%%
+%% \back \LaTeXe
+%% 
+
+\newcommand{\back}{{\tt\char`\\}}
+
+\if@hyla@ldLatex
+\newcommand{\LaTeXe}{\LaTeX2$\epsilon$}
+\fi
+
+%%
+%% \math
+%%
+
+\def\math{\@ifnextchar [{\@math}{\@math[]}}
+\def\@math[#1]{\begingroup\tex\@@math}
+\def\@@math#1{$#1$\endgroup}
+
+%%
+%% Commands that don't do anything interesting in Latex
+%%
+
+\def\hyla@pass{\begingroup\let\protect\@unexpandable@noexpand\@sanitize}
+
+\newcommand{\htmldirectory}[1]{\gdef\gif@directory{#1}}
+\newcommand{\htmlname}[1]{}
+\newcommand{\htmldepth}[1]{}
+\newcommand{\htmltitle}[1]{}
+\newcommand{\htmladdress}[1]{}
+\newcommand{\html}{\hyla@pass\@html}
+\def\@html#1{\endgroup}
+
+\newcommand{\htmlsym}[1]{}
+\def\htmlrule{\@ifnextchar [{\@htmlrule}{\@htmlrule[]}}
+\def\@htmlrule{\hyla@pass\@@htmlrule}
+\def\@@htmlrule[#1]{\endgroup}
+
+\newcommand{\htmllevel}[1]{}
+\newcommand{\htmlmenu}[1]{}
+\newcommand{\htmlautomenu}[1]{}
+\newcommand{\htmlprintindex}{}
+\newcommand{\htmlfootnotes}{}
+
+\def\htmlimage{\@ifnextchar [{\@htmlimage}{\@htmlimage[]}}
+\def\@htmlimage{\hyla@pass\@@htmlimage}
+\def\@@htmlimage[#1]#2{\endgroup}
+
+\newcommand{\xlabel}{\hyla@pass\hyla@ignore}
+\newcommand{\xname}{\hyla@pass\hyla@ignore}
+\def\hyla@ignore#1{\endgroup}
+
+\newcommand{\htmlicons}[1]{}
+\newcommand{\htmlpanel}[1]{}
+\newcommand{\htmlheading}{\@ifnextchar[{\@htmlheading}{\@htmlheading[]}}
+\def\@htmlheading[#1]#2{}
+
+\newcommand{\htmlcaption}[1]{}
+
+\def\htmlattributes{\@ifstar{\@htmlattributes}{\@htmlattributes}}
+\def\@htmlattributes{\hyla@pass\@@htmlattributes}
+\def\@@htmlattributes#1#2{\endgroup}
+
+%%
+%% GIF environment,
+%%  will generate bitmaps when `\makegifs' is defined
+%%
+\newif\if@makegifs
+\@ifundefined{makegifs}{\@makegifsfalse}{\@makegifstrue}
+
+\def\gif{\@ifnextchar[{\@gif}{\@gif[b]}}
+\def\@gif[#1]{\@ifnextchar[{\@@gif}{\@@gif[100]}}
+\def\@@gif[#1]{\gdef\gif@resolution{#1}\@ifnextchar[{\@@@gif}{\@@@gif[300]}}
+\def\@@@gif[#1]#2{\gdef\gif@dpi{#1}\gdef\gif@name{#2}\@@@@gif}
+
+\if@makegifs
+\typeout{**********************************************}
+\typeout{* Making GIF bitmaps from Hyperlatex source! *}
+\typeout{**********************************************}
+\newwrite\@makegifcmds
+\immediate\openout\@makegifcmds=\jobname.makegif
+\newbox\@gifbox
+\newcount\@gifcount\@gifcount=10000
+\def\@@@@gif{\setbox\@gifbox=\vbox\bgroup\tex}
+\def\endgif{\egroup
+  {\global\advance\@gifcount by 1\count0=\@gifcount
+    \immediate\write\@makegifcmds{dvips\space -f\space -p\space
+      \the\@gifcount\space -n\space 1\space -D\space \gif@dpi\space
+      \jobname.dvi\space>\space\gif@name.ps^^J%
+      ps2gif\space -res\space \gif@resolution\space \gif@name.ps^^J%
+      mv\space \gif@name.gif\space \gif@directory^^J}
+    \shipout\copy\@gifbox}\unvbox\@gifbox}
+\else
+\def\@@@@gif{\tex}
+\def\endgif{}
+\fi
+%%
+%% Font style definitions
+%%
+
+\if@hyla@ldLatex
+\newcommand{\emph}[1]{{\it #1}}
+\newcommand{\textsl}[1]{{\sl #1}}
+\newcommand{\textit}[1]{{\it #1}}
+\newcommand{\textbf}[1]{{\bf #1}}
+\newcommand{\texttt}[1]{{\tt #1}}
+\newcommand{\textsc}[1]{{\sc #1}}
+\fi
+
+\let\cit=\textit
+\let\code=\texttt
+\let\kbd=\texttt
+\let\samp=\texttt
+\let\strong=\textbf
+\let\var=\textsl
+\let\dfn=\textit
+\let\file=\textit
+
+%%
+%% \begin{example} ... \end{example} obeys spaces and lines
+%%
+%% the indent can be controlled by \exampleindent
+%%
+\newdimen\exampleindent
+\setlength{\exampleindent}{7mm}
+\def\hyla@example{\do\$\do\&\do\#\do\^\do\_\do\~}
+{\obeyspaces
+  \gdef\turnon@spaces{\let =\ \obeyspaces\catcode``=\active\@noligs}}
+{\obeylines%
+  \gdef\turnon@lines{\obeylines\def^^M{\par\def^^M{\leavevmode\par}}}}
+
+\def\example{\list{}{\leftmargin\exampleindent
+    \itemindent\z@ \rightmargin\z@ \parsep \z@ plus\p@}\item[]\tt
+  \turnon@spaces\turnon@lines\let\do\@makeother\hyla@example}
+\let\endexample=\endlist
+
+\newenvironment{menu}{\list{$\bullet$}{\itemsep0pt\parsep0pt}}{\endlist}
+\newenvironment{ifhtml}{\comment}{\endcomment}
+
+\def\hyla@empty{}
+\def\hyla@zero{0}
+\newif\if@hyla
+
+\def\hyla@setclear#1{\@ifundefined{#1}{\@hylafalse}{%
+    \expandafter\ifx\csname#1\endcsname\hyla@empty\@hylafalse
+    \else\expandafter\ifx\csname#1\endcsname\hyla@zero\@hylafalse
+    \else\@hylatrue\fi\fi}}
+
+\def\ifclear#1{\hyla@setclear{#1}
+  \if@hyla
+  %% arg empty -> skip
+  \let\endifset\endcomment\let\hyla@comment\comment
+  \else
+  %% arg set -> ignore begin and end
+  \let\endifset\relax\let\hyla@comment\relax
+  \fi\hyla@comment}
+
+\def\ifset#1{\hyla@setclear{#1}
+  \if@hyla
+  % arg empty -> ignore begin and end
+  \let\endifclear\relax\let\hyla@comment\relax
+  \else
+  % arg set  -> skip environment
+  \let\endifclear\endcomment\let\hyla@comment\comment
+  \fi\hyla@comment}
+
+%%
+%% Define \link and \xlink macros
+%%
+\newcommand{\hyla@label}{}
+
+\newcommand{\Ref}{\ref{\hyla@label}}
+\newcommand{\Pageref}{\pageref{\hyla@label}}
+\newcommand{\Cite}{\cite{\hyla@label}}
+
+\newcommand{\htmlcite}[1]{\cite{#1}}
+
+\def\link{\@ifstar{\@star@link}{\@@link}}
+\def\@@link#1{#1\@@@link}
+\def\@star@link#1{\@@@link}
+\def\@@@link{\@ifnextchar [{\@link}% ] balance
+  {\@link[]}}
+\def\@link[#1]#2{\gdef\hyla@label{#2}#1}
+
+\def\xlink{\@ifstar{\@star@xlink}{\@@xlink}}
+\def\@@xlink#1{\@@@xlink{#1}}
+\def\@star@xlink#1{\@@@xlink{}}
+\def\@@@xlink#1{\@ifnextchar [{\@xlink{#1}}{\@xlink{#1}[]}}
+\def\@xlink#1[#2]#3{\formatxlink{#1#2}{#3}}
+\newcommand{\formatxlink}[2]{#1}
+
+%
+% index from latex.tex, and changed to include optional argument
+%
+\def\cindex{\@bsphack\begingroup
+  \let\protect\@unexpandable@noexpand
+  \@sanitize
+  \@ifnextchar [{\hyla@argwrindex}% balance ]
+  {\@wrindex}}
+\def\hyla@argwrindex[#1]#2{\@wrindex{#1@#2}}
+
+%% end of hyperlatex.sty

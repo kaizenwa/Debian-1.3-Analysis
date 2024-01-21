@@ -1,0 +1,649 @@
+;; vtwm-icon-mgr.gwm --- Multiple Icon Managers for VTWM Profile
+;;
+;; Author: Anders Holst  (aho@sans.kth.se)  
+;; Copyright (C) 1995  Anders Holst
+;; Version: vtwm-1.0
+;; Last change: 17/6 1995
+;;
+;; This file is copyrighted under the same terms as the rest of GWM
+;; (see the X Inc license for details). There is no warranty that it
+;; works. 
+;;
+;; --------------------------------------------------------------------- 
+;;
+;; This file implements icon managers for the VTWM profile.
+;;
+;; This file is highly inspired by "twm-icon-mgr.gwm" by Arup Mukherjee. 
+;; However it is thoroughly rewritten, to, among other things, handle 
+;; multiple icon managers.
+;;
+;; By default the "default icon manager" handles all windows not in
+;; 'icon-mgr-omit-list'. In addition, you can add icon managers with
+;; '(make-icon-mgr NAME XPOS YPOS CONDITION)' which then "steals"
+;; windows from the default icon manager.
+;; CONDITION can be (as can the elements of 'icon-mgr-omit-list')
+;; an atom representing a client class, a string representing a window
+;; name regexp, a list mathced by 'match-windowspec, or an arbitrary
+;; WOOL expression. 
+;; NOTE: If you create multiple managers from your vtwmrc.gwm, put the
+;; calls to 'make-icon-mgr' in 'to-be-done-after-setup'.
+;;
+;; In addition to the variables below, you might want to copy the
+;; setting of 'icon-mgr-behavior' to "vtwmrc.gwm" and change it.
+;;
+;; To use these icon managers in other profiles than VTWM, load the
+;; file "load-icon-mgr.gwm" which sets up the necessary environment.
+;;
+
+(declare-screen-dependent
+  icon-mgr-name
+  icon-mgr-xpos
+  icon-mgr-ypos
+  show-default-icon-mgr
+  show-icon-mgr
+  icon-mgr-hide-if-empty
+  iconify-by-unmapping
+  iconify-unmanaged-by-icon
+  iconify-by-icon-list
+  iconify-on-start-list
+  icon-mgr-omit-list
+  icon-mgr-sort
+  icon-mgr-font
+  icon-mgr-width
+  icon-mgr-foreground
+  icon-mgr-background
+  icon-mgr-title-foreground
+  icon-mgr-title-background
+  icon-mgr-no-title
+  icon-mgr-framed-bars
+  icon-mgr-fancy-colors
+  default-icon-mgr
+  icon-mgr-list
+  icon-mgr-window-feedback
+  icon-mgr-pixmap-name
+)
+
+;;
+;;    USER CUSTOMIZABLE VARIABLES
+;;    ---------------------------  
+;;    Adjust these in your own profile
+;;
+(for screen (list-of-screens)
+     (defaults-to
+       icon-mgr-name "Icon Manager"   ; Default name of icon manager     
+       icon-mgr-xpos 0                ; Default x position               
+       icon-mgr-ypos 0                ; Default y position               
+       show-default-icon-mgr t        ; Default icon manager is used     
+       show-icon-mgr t                ; Use icon managers                
+       icon-mgr-hide-if-empty t       ; Don't show empty managers        
+       iconify-by-unmapping t         ; Do not use icons by default      
+       iconify-unmanaged-by-icon t    ; Use an icon if not in any manager
+       iconify-by-icon-list ()        ; Always use icons for these
+       iconify-on-start-list () ; List of window types to iconify on start   
+       icon-mgr-omit-list ()    ; Window types not handled in default manager
+       icon-mgr-sort ()               ; Sort the entries in an icon manager
+       icon-mgr-font (font-make "8x13")   ; Font in icon managers
+       icon-mgr-width 150             ; Width of icon manager
+       icon-mgr-foreground black      ; Foreground of icon managers
+       icon-mgr-background white      ; Background of icon managers
+       icon-mgr-title-foreground ()
+       icon-mgr-title-background ()
+       icon-mgr-no-title ()           ; Inhibits the icon manager title
+       icon-mgr-framed-bars ()        ; Makes it look more like in real VTWM
+       icon-mgr-fancy-colors ()       ; List of (wintype fg bg) specifications
+       icon-mgr-window-feedback t     ; Rely on focus feedback from windows
+       icon-mgr-pixmap-name (if (boundp 'iconify-pixmap-name)
+                                iconify-pixmap-name
+                              "iconify2") ; Pixmap file for iconified symbol
+         ; In addition, the property 'icon-mgr-special-pixmap' can be set on
+         ; a window to the pixmap to use in the icon manager for that window.
+       )
+)
+
+
+(for screen (list-of-screens)
+  (with (imcond '(not (matches-list icon-mgr-omit-list)))
+    (defaults-to default-icon-mgr (list () () () () imcond ()))
+    (defaults-to icon-mgr-list (list default-icon-mgr)))
+)
+
+(if (not (boundp 'iconify-before-icon-mgr))
+    (: iconify-before-icon-mgr iconify-window))
+
+;; Redefine iconify-window
+;; During the time a window is "iconified by unmapping" the "wm-state-icon"
+;; is set to the real icon, and the "wm-state" to 'icon, to fool the client 
+;; that the window is iconified when it is really withdrawn.
+(defun iconify-window ()
+  (if (# 'icon? window-window)
+      (iconify-before-icon-mgr)
+    (if (= window-status 'icon)
+        (progn
+          (map-window window-window)
+          (window-wm-state-icon 0))
+      (progn 
+        (window-wm-state-icon (window-icon))
+        (unmap-window window-window)
+        (window-wm-state-update 'icon))))
+  (if raise-on-iconify 
+      (raise-window-orig))
+  (icon-mgr-update)
+  (virtual-update))
+
+
+;; Some useful functions for iconification
+(defun window-iconified ()
+  (= (window-wm-state) 'icon))
+;;  (not (with (wob window-window) window-is-mapped)))
+
+(defun de-iconify-window ()
+  (if (with (wob window-window)
+        (not window-is-mapped))
+      (with (wob (window-icon))
+        (iconify-window))))
+
+(defun do-iconify-window ()
+  (if (not (window-iconified))
+      (with (wob window-window)
+        (iconify-window))))
+
+(defun toggle-iconify-window ()
+  (if (with (wob window-window)
+        (not window-is-mapped))
+      (with (wob (window-icon))
+        (iconify-window))
+    (with (wob window-window)
+      (iconify-window))))
+
+
+(defun icon-mgr-focusin ()
+  (with (prop (# 'imgr-bar window))
+    (if (and (# 1 prop) (wob-is-valid (# 1 prop)))
+        (send-user-event 'imgr-focusin (# 1 prop)))))
+
+(defun icon-mgr-focusout ()
+  (with (prop (# 'imgr-bar window))
+    (if (and (# 1 prop) (wob-is-valid (# 1 prop)))
+        (send-user-event 'imgr-focusout (# 1 prop)))))
+
+(defun icon-mgr-update ()
+  (with (prop (# 'imgr-bar window-window))
+    (if (and (# 1 prop) (wob-is-valid (# 1 prop)))
+        (send-user-event 'imgr-rethink (# 1 prop)))))
+
+
+(defun icon-mgr-raise-all ()
+  (for ele icon-mgr-list
+       (if (and (# 0 ele) (wob-is-valid (# 0 ele)))
+           (with (wob (# 0 ele))
+             (if (wob-is-valid wob-parent)
+                 (with (wob wob-parent)
+                   (raise-window-orig)))))))
+
+(defun icon-mgr-lower-all ()
+  (for ele icon-mgr-list
+       (if (and (# 0 ele) (wob-is-valid (# 0 ele)))
+           (with (wob (# 0 ele))
+             (if (wob-is-valid wob-parent)
+                 (with (wob wob-parent)
+                   (lower-window-orig)))))))
+
+(if (not (boundp 'icon-mgr-header-behavior))
+(: icon-mgr-header-behavior
+   (state-make
+     (on (buttonpress 1 alone)
+         (icon-mgr-raise-all))
+     (on (buttonpress 2 alone)
+         (move-window))
+     (on (buttonpress 3 alone)
+         (icon-mgr-lower-all))))
+)
+
+(defun imgr-header-fsm ()
+  (fsm-make
+    (state-make
+     icon-mgr-header-behavior
+     (if (boundp 'standard-title-behavior)
+         standard-title-behavior)
+     (if (boundp 'standard-behavior)
+         standard-behavior))))
+
+(defunq icon-mgr-with-window body
+  (with (wob (# 'window wob-property))
+        (eval (+ '(progn)
+                 body))
+        (if autofocus
+            (set-focus))))
+
+(if (not (boundp 'icon-mgr-behavior))
+(: icon-mgr-behavior
+   (state-make
+     (on (buttonpress 1 any)
+         (icon-mgr-with-window
+           (de-iconify-window)
+           (raise-window)
+           (if (not autofocus)
+               (set-focus window))))
+     (on (buttonpress 2 any)
+         (icon-mgr-with-window
+           (toggle-iconify-window)))
+     (on (buttonpress 3 any)
+	 (icon-mgr-with-window
+           (de-iconify-window)
+           (lower-window)))
+     ))
+)
+
+(: imgr-bar-behavior
+   (state-make
+     (on enter-window
+         (progn
+           (if autofocus
+               (set-focus (# 'window wob-property)))
+           (if (not icon-mgr-window-feedback)
+               (wob-borderpixel (with (wob (# 'window wob-property)
+                                       cols (matches-cond icon-mgr-fancy-colors))
+                                  (or (# 0 cols) icon-mgr-foreground))))))
+     (on leave-window
+         (progn
+           (if autofocus
+               (set-focus ()))
+           (if (not icon-mgr-window-feedback)
+               (wob-borderpixel (with (wob (# 'window wob-property)
+                                       cols (matches-cond icon-mgr-fancy-colors))
+                                  (or (# 1 cols) icon-mgr-background))))))
+     (on (user-event 'imgr-install-yourself)
+         (with (barwob wob
+                menuwob wob-parent
+                wob (# 'window wob-property))
+           (## 'imgr-bar wob (list menuwob barwob))))
+     (on (user-event 'imgr-focusin)
+         (wob-borderpixel (with (wob (# 'window wob-property)
+                                 cols (matches-cond icon-mgr-fancy-colors))
+                            (or (# 0 cols) icon-mgr-foreground))))
+     (on (user-event 'imgr-focusout)
+         (wob-borderpixel (with (wob (# 'window wob-property)
+                                 cols (matches-cond icon-mgr-fancy-colors))
+                            (or (# 1 cols) icon-mgr-background))))))
+
+(defun imgr-bar-fsm ()
+   (fsm-make
+    (state-make
+     imgr-bar-behavior
+     icon-mgr-behavior
+     )))
+
+(defun imgr-icon-pixmap ()
+  (or (# 'icon-mgr-special-pixmap window)
+      (if (= (type icon-mgr-pixmap-name) 'pixmap)
+          icon-mgr-pixmap-name)
+      (pixmap-make icon-mgr-background
+                   icon-mgr-pixmap-name
+                   icon-mgr-foreground)))
+
+(defun imgr-empty-pixmap (icon-pmap)
+  (with (foreground icon-mgr-background)
+    (pixmap-make (width icon-pmap)
+                 (height icon-pmap))))
+
+(defun imgr-smart-icon-name ()
+  (if (= window-icon-name "icon") ; Means that no icon name was specified
+      window-name
+    window-icon-name))
+
+(: imgr-icon-fsm
+   (fsm-make
+    (state-make
+     (on (user-event 'imgr-rethink)
+         (if (with (wob (# 'window wob-property))
+               (window-iconified))
+             (wob-tile (# 'icon-pixmap wob-property))
+           (wob-tile (# 'empty-pixmap wob-property)))))))
+
+(: imgr-label-fsm
+   (fsm-make
+    (state-make
+     (on (user-event 'imgr-rethink)
+	 (with (borderwidth 0
+                cols (with (wob (# 'window wob-property))
+                           (matches-cond icon-mgr-fancy-colors))
+                icon-mgr-foreground (or (# 0 cols) icon-mgr-foreground)
+                icon-mgr-background (or (# 1 cols) icon-mgr-background)
+                background icon-mgr-background
+                foreground icon-mgr-foreground
+                borderpixel icon-mgr-background
+                font icon-mgr-font   
+                dumb-temporary     
+		   (active-label-make (with (wob (# 'window wob-property))
+					    (imgr-smart-icon-name))))
+	     (wob-tile dumb-temporary))))))
+
+(defun imgr-make-bar (wind)
+  (with (wob wind
+         plug-separator 0
+         cols (matches-cond icon-mgr-fancy-colors)
+         icon-mgr-foreground (or (# 0 cols) icon-mgr-foreground)
+         icon-mgr-background (or (# 1 cols) icon-mgr-background)
+         foreground icon-mgr-foreground
+         background icon-mgr-background
+         borderpixel icon-mgr-background
+         font icon-mgr-font
+         fsm (imgr-bar-fsm)
+         icon-pmap (imgr-icon-pixmap)
+         empty-pmap (imgr-empty-pixmap icon-pmap)
+         property (+ (list 'window window 
+                           'icon-pixmap icon-pmap 
+                           'empty-pixmap empty-pmap)
+                     property))
+    (list wind
+          (if icon-mgr-framed-bars
+              (with (borderwidth 2)
+                (bar-make
+                 (with (borderwidth 0
+                        fsm ())
+                   (bar-make
+                    (with (borderwidth 1
+                           borderpixel icon-mgr-foreground)
+                      (bar-make
+                       (with (borderwidth 0
+                              bar-min-width 3)
+                         (bar-make ))
+                       (with (borderwidth 0
+                              fsm imgr-icon-fsm)
+                         (if (window-iconified)
+                             (plug-make icon-pmap)
+                           (plug-make empty-pmap)))
+                       (with (borderwidth 0
+                              bar-min-width 3)
+                         (bar-make ))
+                       (with (borderwidth 0
+                              fsm imgr-label-fsm)
+                         (plug-make (active-label-make (imgr-smart-icon-name))))
+                       ()))))))
+            (with (borderwidth 1)
+              (bar-make
+               (with (fsm imgr-icon-fsm)
+                 (if (window-iconified)
+                     (plug-make icon-pmap)
+                   (plug-make empty-pmap)))
+               (with (fsm imgr-label-fsm)
+                     (plug-make (active-label-make (imgr-smart-icon-name))))
+               ()))))))
+  
+(defun imgr-create-barlist (imcond)
+    (with (barlist ())
+      (for wob (list-of-windows 'window)
+           (if (eval imcond)
+               (: barlist (+ (list (imgr-make-bar window))
+                             barlist))))
+      (if icon-mgr-sort
+          (sort barlist
+                (lambdaq (e1 e2)
+                  (compare (with (wob (# 0 e1)) (imgr-smart-icon-name))
+                           (with (wob (# 0 e2)) (imgr-smart-icon-name)))))
+        barlist)))
+
+(defun imgr-add-barlist (wind lst)
+  (with (ibar (imgr-make-bar wind))
+    (if icon-mgr-sort
+        (with (i 0
+               len (length lst)
+               name (with (wob wind) (imgr-smart-icon-name)))
+          (while (and (< i len)
+                      (le 0 (compare name 
+                                     (with (wob (# 0 (# i lst)))
+                                           (imgr-smart-icon-name)))))
+            (: i (+ 1 i)))
+          (+ (sublist 0 i lst) (list ibar) (sublist i len lst)))
+      (+ lst (list ibar)))))
+            
+(defun imgr-remove-barlist (wind lst)
+  (with (i 0
+         len (length lst))
+    (while (and (< i len)
+                (not (= wind (# 0 (# i lst)))))
+      (: i (+ 1 i)))
+    (delete-nth i lst)))
+    
+(defun imgr-redraw-focus ()
+  (if (and autofocus icon-mgr-window-feedback)
+      (with (pos (current-mouse-position)
+             wind (wob-at-coords (# 0 pos) (# 1 pos)))
+        (if wind
+            (with (wob wind)
+              (if (not (= window-client-class 'Gwm))
+                  (set-focus window))
+              (icon-mgr-focusin)
+              )))))
+
+(defun imgr-make-header-bar (name)
+  (with (fsm (imgr-header-fsm)
+         font icon-mgr-font
+         plug-separator 0
+         background (or icon-mgr-title-background
+                        icon-mgr-background)
+         foreground (or icon-mgr-title-foreground
+                        icon-mgr-foreground))
+    (if icon-mgr-framed-bars
+        (with (borderwidth 0
+               borderpixel background)
+          (bar-make (bar-make 
+                     (with (borderwidth 2
+                            fsm ())
+                       (bar-make
+                        (with (borderwidth 0)
+                          (bar-make
+                           (with (borderwidth 2
+                                  borderpixel foreground)
+                             (bar-make
+                              ()
+                              (with (borderwidth 0)
+                                (plug-make (active-label-make name)))
+                              ()))))))
+                     (with (borderwidth 0
+                            borderpixel background
+                            bar-min-width 1
+                            background foreground)
+                       (bar-make )))))
+      (with (borderwidth 1
+             borderpixel foreground)
+        (bar-make
+         ()
+         (with (borderpixel background)
+               (plug-make (active-label-make name)))
+         ())))))
+
+(defun imgr-create-menu (name barlist)
+  (with (header (if (not icon-mgr-no-title)
+                    (imgr-make-header-bar))
+         allmenu (with (menu-max-width icon-mgr-width 
+                        menu-min-width icon-mgr-width
+                        direction vertical
+                        borderwidth 0
+                        background (or icon-mgr-title-background
+                                       icon-mgr-background)
+                        foreground (or icon-mgr-title-foreground
+                                       icon-mgr-foreground)
+                        borderpixel foreground
+                        fsm ())
+                   (eval (+ '(menu-make)
+                            (if header (list header)) 
+                            (mapfor ele barlist (# 1 ele))))))
+    (send-user-event 'imgr-install-yourself (menu-wob allmenu))
+    (send-user-event 'imgr-rethink (menu-wob allmenu))
+    (imgr-redraw-focus)
+    allmenu))
+
+(defun imgr-decouple-all ()
+  (for wob (list-of-windows 'window)
+    (if (# 'imgr-bar window)
+        (## 'imgr-bar wob ()))))
+  
+(defun imgr-reconsider-icons ()
+  (for wob (list-of-windows 'window)
+    (if (or (not iconify-by-unmapping)
+            (matches-list iconify-by-icon-list)
+            (and iconify-unmanaged-by-icon
+                 (not (# 'imgr-bar window))))
+        (progn
+          (## 'icon? wob t)
+          (if (and (window-iconified)
+                   (with (wob (window-icon))
+                         (not window-is-mapped)))
+              (iconify-before-icon-mgr))
+          (window-wm-state-icon 0))
+      (progn
+        (## 'icon? wob ())
+        (if (window-iconified)
+            (if (with (wob (window-icon))
+                      (window-is-mapped))
+                (progn
+                  (window-wm-state-icon (window-icon))
+                  (unmap-window (window-icon))
+                  (window-wm-state-update 'icon)))
+          (window-wm-state-icon 0))))))
+
+(defun imgr-xpos (ele)
+  (with (wob (# 0 ele)
+         xpos (or (# 2 ele) icon-mgr-xpos))
+    (if (< xpos 0)
+        (- (+ screen-width xpos) (width wob))
+      xpos)))
+
+(defun imgr-ypos (ele)
+  (with (wob (# 0 ele)
+         ypos (or (# 3 ele) icon-mgr-ypos))
+    (if (< ypos 0)
+        (- (+ screen-height ypos) (height wob))
+      ypos)))
+
+(defun imgr-save-pos (ele)
+  (with (wob (# 0 ele)
+         xpos (# 2 ele)
+         ypos (# 3 ele))
+    (setq xpos (if (< xpos 0)
+                   (+ wob-x window-client-x window-client-borderwidth 
+                      (- screen-width) (width wob))
+                 (+ wob-x window-client-x window-client-borderwidth)))
+    (setq ypos (if (< ypos 0)
+                   (+ wob-y window-client-y window-client-borderwidth
+                      (- screen-height) (height wob))
+                 (+ wob-y window-client-y window-client-borderwidth)))
+    (## 2 ele xpos)
+    (## 3 ele ypos)))
+
+(defun imgr-delete-menu (ele)
+  (if (and (# 0 ele) (wob-is-valid (# 0 ele)))
+      (with (wob (# 0 ele))
+        (imgr-save-pos ele)
+        (if (wob-is-valid wob-parent)
+            (delete-window wob-parent)))))
+
+(defun imgr-show-menu (ele)
+  (with (menuwob (if (and (# 0 ele) (wob-is-valid (# 0 ele))) (# 0 ele))
+         menu ()
+         name (or (# 1 ele) icon-mgr-name)
+         imcond (list 'and 
+                      '(not (= window-client-class 'Gwm))
+                      '(not (# 'imgr-bar window))
+                      (list 'matches-token (list 'quote (# 4 ele))))
+         barlist (# 5 ele)
+         property property
+         reenter-on-opening ())
+     (if (not barlist)
+         (## 5 ele (: barlist (imgr-create-barlist imcond))))
+     (if menuwob
+         (progn
+           (if (and (wob-is-valid menuwob)
+                    (with (wob menuwob) (wob-is-valid wob-parent)))
+               (setq property (with (wob menuwob) 
+                                (with (wob wob-parent)
+                                  wob-property))))
+           (imgr-delete-menu ele)))
+     (if (or (> (length barlist) 0)  ; Get around bug: non-nil empty list
+             (not icon-mgr-hide-if-empty))
+         (progn
+           (## 0 ele (: menuwob
+                        (menu-wob (: menu 
+                                     (imgr-create-menu name barlist)))))
+           (place-menu name
+                       menu
+                       (imgr-xpos ele)
+                       (imgr-ypos ele)))
+       (## 0 ele ()))))
+
+(defun icon-mgr-add ()
+  (if (and (not (= window-status 'icon))
+           (not (= window-client-class 'Gwm)))
+      (progn
+        (tag done
+             (if show-icon-mgr
+                 (for ele icon-mgr-list
+                      (if (and (matches-token (# 4 ele))
+                               (or show-default-icon-mgr
+                                   (not (= ele default-icon-mgr))))
+                          (exit done
+                                (## 5 ele (imgr-add-barlist window (# 5 ele)))
+                                (if setup-done   ; Only if already realised
+                                    (imgr-show-menu ele))))))
+             (if iconify-unmanaged-by-icon
+                 (## 'icon? window t)))
+        (if (or (not iconify-by-unmapping)
+                (matches-list iconify-by-icon-list))
+            (## 'icon? window t))
+        (if (matches-list iconify-on-start-list)
+            (: window-starts-iconic t)))))
+
+(defun icon-mgr-remove ()
+  (with (prop (# 'imgr-bar window))
+    (if (and show-icon-mgr (# 0 prop) (wob-is-valid (# 0 prop)))
+        (tag done
+             (for ele icon-mgr-list
+                  (if (and (= (# 0 prop) (# 0 ele))
+                           (or show-default-icon-mgr
+                               (not (= ele default-icon-mgr))))
+                      (exit done
+                            (## 5 ele (imgr-remove-barlist window
+                                                           (# 5 ele)))
+                            (if setup-done   ; Only if already realised
+                                (imgr-show-menu ele)))))))
+    ))
+
+(defun icon-mgr-show ()
+  (for ele icon-mgr-list
+       (## 5 ele ()))
+  (imgr-decouple-all)
+  (if show-icon-mgr
+      (for ele icon-mgr-list
+           (if (and (not show-default-icon-mgr)
+                    (= ele default-icon-mgr))
+               (imgr-delete-menu default-icon-mgr)
+             (imgr-show-menu ele)))
+    (for ele icon-mgr-list
+         (imgr-delete-menu ele)
+         (## 0 ele ())))
+  (imgr-reconsider-icons))
+
+(defun icon-mgr-toggle ()
+  (: show-icon-mgr (not show-icon-mgr))
+  (icon-mgr-show))
+
+(defun make-icon-mgr (name xpos ypos imcond)
+  (: icon-mgr-list (+ (sublist 0 (- (length icon-mgr-list) 1) icon-mgr-list)
+                      (list (list () name xpos ypos imcond ()))
+                      (list default-icon-mgr)))
+  (icon-mgr-show))
+
+(defun remove-icon-mgr (name)
+  (with (ind 0
+         len (length icon-mgr-list)
+         ele (# 0 icon-mgr-list))
+    (while (and (< ind len)
+                (not (= name (# 1 ele))))
+      (setq ind (+ 1 ind))
+      (setq ele (# ind icon-mgr-list)))
+    (if (and (< ind len))
+        (progn
+          (imgr-delete-menu ele)
+          (delete-nth ind icon-mgr-list)
+          (icon-mgr-show)))))

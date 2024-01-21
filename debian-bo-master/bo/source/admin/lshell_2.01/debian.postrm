@@ -1,0 +1,40 @@
+#! /bin/sh
+
+head -1 /etc/shells > /etc/shells.tmp
+
+tail +2 /etc/shells | 
+while read shell
+do
+	dir=`dirname $shell`
+	if [ `basename $dir` != "lshells" ]
+	then
+		echo $shell >> /etc/shells.tmp
+	else
+		echo `dirname $dir`"/"`basename $shell` >> /etc/shells.tmp
+	fi
+done
+
+mv /etc/shells /etc/shells.old
+mv /etc/shells.tmp /etc/shells
+
+cat /etc/passwd |
+awk '{	FS=":"
+	if ( $1 == "root" ) next
+	if ( $7 == "" || $7 == "/bin/false" || $7 == "/bin/sync" ) next
+	print $1,$7
+     }' |
+while read user shell
+do
+	grep -v $shell /etc/shells.old >& /dev/null
+	if [ $? -eq 0 ]
+	then
+		dir=`dirname $shell`
+	        if [ `basename $dir` = "lshells" ]
+	        then
+			shell=`dirname $dir`"/"`basename $shell`
+			chsh -s $shell $user
+		fi
+	fi
+done
+
+/bin/rm -f /etc/shells.old

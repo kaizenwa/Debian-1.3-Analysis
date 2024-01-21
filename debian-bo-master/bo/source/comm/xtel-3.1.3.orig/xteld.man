@@ -1,0 +1,209 @@
+.\" Copyright (c) 1991-96 Lectra-Systemes
+.\" $Id: xteld.man,v 1.8 1997/01/10 12:28:14 pierre Exp $
+.TH XTELD n "Lectra-Systemes" "09/96"
+.UC 5
+.SH NOM
+xteld \- démon de l'émulateur Minitel XTEL
+.SH SYNOPSIS
+xteld [-w]
+.SH DESCRIPTION
+.I xteld
+est lance par le super-démon \fIinetd\fP en cas d'utilisation de l'emulateur 
+minitel \fIxtel\fP . Si XTEL n'utilise pas le réseau (option NO_NETWORK à la 
+compilation), le démon \fIxteld\fP doit être lancé lors de l'initialisation du 
+système.
+.SH OPTIONS
+.TP
+.B "\-w"
+ Windaube : permet l'utilisation d'un client Windaube à la place de "xtel"
+
+.SH UTILISATION
+.LP
+\fIxteld\fP utilise le fichier \fB"/usr/X11R6/lib/X11/xtel/xtel\.services"\fP
+(sous Xfree86) qui contient la liste des services disponibles sous la forme :
+.sp
+.I "[Nom du device,]"
+.I "Nom de l'entrée du menu"
+,
+.I "Numero de téléphone du service[:nom_service]"
+[,
+.I "login1[:login2...]"
+]
+.sp
+à raison d'une ligne par service. Le premier champ (nom du device) définit un 
+nom symbolique (ou \fIdevice\fP) pour les connexions à un standard donné
+(V.23, V32bis, TVR). Chaque
+device est associé à une configuration particulière de la ligne physique (vitesse,
+nombre de bits, parité) qui sera définie dans \fIxtel.lignes\fP. Si le premier
+champ a la valeur \fI@pipe\fP, cela signifie que l'accès au service se fait
+au travers d'une commande locale (dont le chemin absolu est precisé dans le
+dernier champ) par \fIpipe\fP Unix. On peut ajouter à cette commande le flag
+\fI:crlf\fP qui permet la conversion de CR en LF.
+.PP
+Si le premier champ a la valeur \fI@tcp\fP, l'accès au service se fait avec
+une connexion TCP. Les champs suivant contiennent respectivement le nom de 
+l'entrée du menu puis le nom Internet du serveur puis le numéro de port 
+ou le nom de service TCP (séparé du nom Internet par le caractère ':')
+.sp
+.PP
+Ce premier champ est \fBoptionnel\fP ce qui permet en particulier de supporter
+l'ancienne syntaxe. A ce moment la, les fichier \fIxtel.services\fP et 
+\fIxtel.lignes\fP \fBne doivent pas\fP utiliser la nouvelle syntaxe (pas de 
+mélange possible).
+.PP
+Si le dernier champ est absent, la connexion au service est permise à tous
+les utilisateurs,
+sinon elle est limitée à ceux dont les noms de login sont
+spécifiés. On peut utiliser des caractères 8 bits pour le nom du service (1er
+champ), si le caractère ne peut être saisi directement, on pourra le représenter
+sous la forme d'un code octal \\xyz . Si troisième champ est de la forme
+\fInuméro:nom_service\fP, cela signifie que l'accès est limité au service donné
+(ex: 3615:METEO).
+.PP
+Si les champs séparés pas des ':' sont de la forme :
+.sp
+.in +10
+.nf
+user1=delai
+.in -10
+.fi
+cela signifie que l'utilisateur pourra rester connecté au service pendant la
+durée précisée par le delai (en secondes). Si le nom d'utilisateur n'est pas
+présent, ce delai est alors valable pour tous les utilisateurs. Un délai de
+ce type doit être precisé en \fBavant\fP la définition des utilisateurs 
+autorisés.
+.sp
+.B "Exemple :"
+.sp
+.in +10
+.nf
+v23,Annuaire électronique,3611,=180
+v23,Télétel1,3613
+v23,Télétel2,3614
+tvr,Télétel TVR,3623
+v23,Télétel3,3615,=60,user1:user2=120:user3
+@pipe,Accès ondee,/usr/bin/telnet ondee
+@pipe:crlf,Accès sidonie,/usr/bin/telnet sidonie
+@tcp,Accès Minitel TCP/IP,minitel.fr:513
+v23,Direct,0
+.fi
+.in -10
+.LP
+Dans cet exemple le service, le service d'\fIAnnuaire\fP est autorisé à tous 
+pendant 180 secondes (tant que c'est gratuit !). Le \fITélétel3\fP est 
+accessible à tous les utilisateurs pendant 60 secondes, l'utilisateur 
+\fIuser2\fP y a droit pendant 120 secondes.
+.PP
+La dernière ligne définit une possibilité de numéro de téléphone 
+.I direct
+(mot\-clé \fIDirect\fP), l'utilisateur saisira directement le numéro lors de la 
+composition dans \fIxtel\fP.
+.LP
+On utilise également le fichier \fB"/usr/X11R6/lib/X11/xtel/xtel\.lignes"\fP
+qui définit les lignes disponibles et la procédure de composition. Ce fichier est de
+la forme :
+.sp
+.I "[Nom du device,]"
+.I "Nom de la ligne[:rtscts]"
+,
+.I "[Vitesse en bauds,]"
+.I "[Nombre de bits,]"
+.I "[Parité,]"
+.I "chat-script avec le modem"
+,
+.I "delai maxi de réponse du modem en secondes."
+.sp
+Et ce pour chaque ligne utilisable.
+.sp
+Si la ligne commence par le caractère "/", on considère que l'\fBancienne\fP
+syntaxe est utilisée. On peut ajouter au nom de la ligne la chaine 
+\fI:rtscts\fP qui précise que cette ligne doit être configurée en controle de
+flux hardware \fIRTS/CTS\fP. Cette configuration est généralement utile si la vitesse 
+de ligne est supérieure ou égale a 9600 (cas du TVR par exemple). On \fBdoit\fP alors
+configurer le modem (dans le chat-script) afin qu'il gère
+correctement le RTS/CTS (en général par la commande \fIAT&K3\fP sur un modem
+compatible \fIHAYES\fP).
+.sp
+Les valeurs de vitesse possibles sont :
+\fB 50, 75 110, 134, 150, 200, 300, 600, 1200, 1800, 2400, 4800, 9600, 
+19200, 38400\fP,
+les valeurs de tailles de caractères sont : \fB5, 6, 7, 8\fP, les valeurs de parité
+sont : \fBE, O, N\fP.
+.sp
+Un "chat-script" est une suite de paires chaine_emise/chaine_attendu entre un 
+processus et un modem (voir UUCP).
+.sp
+Si le chat-script est remplace par la chaine \fIminitel2\fP, la ligne est definie
+comme utilisant un \fBMinitel 2\fP comme modem.
+.sp
+Si le chat-script est remplace par la chaine \fIminitel1\fP, la ligne est définie
+comme utilisant un \fBMinitel 1/1B\fI comme modem. A ce moment la, le menu "Services"
+ne sera pas affiché dans xtel et l'utilisateur devra composer son numéro à la main
+(le M1/M1B ne sachant théoriquement pas composer de numéro).
+.sp 2
+.B "Exemples :"
+.in +10
+.nf
+/dev/cua0,\\dat\\r OK atdt\\T\\r CONNECT,30
+v23,/dev/cua1,1200,7,E,\\dat\\r OK atdt\\T\\r CONNECT,30
+tvr,/dev/cua2:rtscts,9600,8,N,\\dat\\r OK atdt\\T\\r CONNECT,30
+.fi
+.in -10
+.sp
+Ce fichier définit la ligne
+.I "/dev/cua0"
+sur laquelle on déroule le chat-script suivant :
+.sp
+.in +5
+.nf
+	\\d			  On attend 1 s pour laisser le modem souffler...  
+	at\\r OK		  On emet at + CR et on attend OK
+	at\\T\\r CONNECT	  On emet at + le numero + CR et on attend
+				  CONNECT
+.fi
+.in -5
+.sp
+Le délai de reponse du modem est de
+.I 30
+secondes maxi. Si le délai est dépassé, \fIxteld\fP essayera sur la ligne suivante du fichier
+jusqu'à un succès ou la fin du fichier.
+.sp
+.B "Remarques :"
+.sp
+Le format du chat-script accepte les séquences suivantes :
+.sp
+.in +5
+.nf
+\\a		BELL
+\\n		envoie LF
+\\r		envoie CR
+\\t		envoie VT
+\\d		tempo de 1 s
+\\T		envoie le numéro de téléphone
+\\abc		envoie le caractère codé en DECIMAL par abc (3 digits obligatoires)
+\\xab		envoie le caractère codé en HEXADECIMAL par ab (2 digits)
+.fi
+.in -5
+.sp
+.PP
+Pour certains modems, il faudra \fBOBLIGATOIREMENT\fP préciser une tempo \\d
+avant la premier commande \fIat\fP.
+.LP
+Dans le cas d'un fonctionnement en réseau, \fIxteld\fP utilise à priori le port 
+TCP numéro 1313 défini dans le fichier "/etc/services" 
+.SH "VOIR AUSSI"
+xtel inetd 
+.SH FICHIERS
+.in +7
+.nf
+/usr/X11R6/lib/X11/xtel/xtel.lignes
+/usr/X11R6/lib/X11/xtel/xtel.services
+/usr/X11R6/lib/X11/xtel/xtel.log
+/etc/services
+/usr/etc/inetd.conf
+.fi
+.in -7
+.SH COPYRIGHT
+Copyright 1992-96, LECTRA-SYSTEMES et Pierre Ficheux
+.SH AUTEUR
+Pierre FICHEUX	  LECTRA-SYSTEMES ZI Marticot 33610 Cestas FRANCE

@@ -1,0 +1,213 @@
+In article <1994Apr8.125725.23355@bcarh54a.bnr.ca>,
+Greg Wesson <lanplscp@bcarh17c.bnr.ca> wrote:
+>In article <2o1n8q$qsl@sbi.sbi.com> bet@std.sbi.com (Bennett Todd) writes:
+>>If you want to use send, it's worth your while to get xauth(1)-based 
+>>authentication working.
+>
+>How does one go about doing that.  I read the man page, but it really wasn't
+>much help.  Is this something that the WGA has to do, or can I do it myself?
+
+You can do it yourself. What you need is some code in a script to kick off
+the X server. In general, you need to stuff a cookie into .Xauthority, then
+start up X with an argument telling it to use that file. I append after my
+sig a helpful note by Vivek Khera describing how to make this work.
+
+-Bennett
+bet@sbi.com
+
+ From: khera@cs.duke.edu (Vivek Khera)
+ Newsgroups: comp.lang.tcl
+ Subject: Re: HELP: xauth?
+ Message-ID: <KHERA.93Oct6094437@thneed.cs.duke.edu>
+ Date: 6 Oct 93 13:44:37 GMT
+ Organization: Duke University CS Dept., Durham, NC
+
+>>>>> "SD" == Scott Deifik <scottd@amgen.com> writes:
+
+SD> I've seen some stuff about xauth in this newsgroup tk3.3 but I
+SD> didn't get a chance to read it.  I just can't seem to get send to
+SD> work (ie. I can't get xauth to work).  How do you do it?  I am
+SD> working on display scott:0.0 and I ran the command: xauth add
+SD> scott:0.0 . 00 I wasn't sure what the hex number shoud be, so I
+SD> just used "00".
+
+Here's my standard blurb on using xauth.  This has nothing
+specifically to do with tcl or tk, so I've redirected followups to the
+appropriate newsgroup.
+
+By the way, using "xauth +" basically opens up your workstation to
+*everyone* on the network to which you are connected.  If you are on
+the Internet, you really open up a can of worms...
+
+
+
+Author: Vivek Khera <khera@cs.duke.edu>		-*- text -*-
+Subject: making your X server more secure
+Originally Written: Tue, 10 Jul 90 12:26:15 -0400
+Time-stamp: "August 10, 1993 12:28:31"
+
+Here's how I have made my X sessions more secure than just the xhost
+way.  It is mostly transparent, and doesn't allow arbitrary users to
+plaster windows on my screen, or to snoop at my keyboard.  Even people
+who log into the machine I'm working on can't connect to the server.
+
+This whole scheme is based on the MIT-MAGIC-COOKIE scheme, where each
+client must present to the server a magic cookie to prove that it is
+allowed to connect.  The cookie is kept in a file in your home
+directory (.Xauthority) which only you are allowed to read.  The
+server reads this file when it starts up, so if you change the cookie
+file, you will have to restart the server to make it read the new
+information.  Normally you don't need to do this.  The .Xauthority
+files can be merged using the xauth program.  See the man page for
+some more details.
+
+Here is how to make yourself "secure":
+
+1. Create a .xserverrc file similar to mine in your home directory.
+The important part is to pass the "-auth $HOME/.Xauthority" option to
+the X server on the last line.  Here is what my .xserverrc file looks
+like:
+
+--cut here--
+#!/bin/sh
+# for Xsun:
+# -ar1 NNN	set keyboard repeat delay to NNN milliseconds
+# -ar2 NNN	set keyboard repeat rate to NNN milliseconds
+
+if test -w /dev/cgthree0 -o -w /dev/cgsix0; then
+  server=Xsun
+else
+  server=XsunMono
+fi
+
+# we *must* do an exec for the server so that signals are handled properly
+exec $server -ar1 250 -ar2 20 -auth $HOME/.Xauthority
+--cut here--
+
+
+2. Before you start the X server, be sure to create the .Xauthority
+file.  I wrote a shell script to do this, called newcookie.  You must
+create a new .Xauthority file when you switch machines, as the name of
+the machine the server is on is part of the authority mechanism.  This
+is how it knows which cookie to send to which server it is connecting
+to.  I run newcookie from my .login file when I am logging into the
+console.  If you run newcookie after you start the X server, you are
+hosed unless you can remember the random number it generated and
+recreate the .Xauthority file by hand; otherwise you will have to quit
+and restart the server.
+
+Here is my newcookie program.  If you have a program that generates
+md5 signatures, you can use it to generate a strong random number by
+passing the -md5 flag.  If you have md4, just edit the script to use
+it instead of md5.  If you don't have md4 or md5, then it assumes you
+have perl to generate random numbers.  If you don't have perl, then
+write your own program to generate a long random number with an even
+number of hexadecimal digits in it, and then run "xauth add" like in
+my program.  Note that md4 and md5 generate values that an even number
+of digits long already.  An implementation of md5 can be found in
+Internet RFC 1321.
+
+--cut here--
+#!/bin/sh
+
+# create new .Xauthority file
+
+PATH=/usr/local/X/bin:/usr/gnu/bin:$PATH
+
+# try some security
+auth=$HOME/.Xauthority
+#cp /dev/null $auth
+
+# generate a nice long random key
+if [ "$1" = "-md5" ]; then
+  # use a random noise source and get a strong checksum of it.
+  # this is probably a stronger random number than the other method.
+  key=`pstat -pfS | md5`
+else
+  # quick and dirty.  can probably be recreated if time can be guessed.
+  key=`perl -e 'srand; printf int(rand(100000000000000000))'`
+  # use $key$key to make sure even length.
+  key=$key$key
+fi
+# add to auth file. 
+xauth add ${HOST}/unix:0 . $key
+xauth add ${HOST}:0 . $key
+--cut here--
+
+3. Make sure any program you run does not do an xhost +<machine>
+command.  This will destroy any security you might gain by using
+xauth.  Notably, the rcmd script does this.
+
+4. Start the X server using startx.  Things should be secure now.  All
+new X clients (from R4 and later) understand this authorization
+scheme, so you should never need to run xhost again. (Unless you are
+using the standard Ultrix libraries -- but then you get what you
+deserve.)  In fact, xhost should report *no* hosts as being allowed
+in.
+
+--
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+Vivek Khera, Gradual Student/Systems Guy  Department of Computer Science
+Internet: khera@cs.duke.edu               Box 90129
+          RIPEM/PGP/MIME spoken here      Durham, NC 27708-0129 (919)660-6528
+
+
+David Herron <david@twg.com> writes:
+   Therefore the trick of putting .Xauthority in $HOME does not work.  X
+   clients on remote systems do not have the same $HOME/.Xauthority as on my
+   workstation making things more difficult.
+
+Yes, X makes things more difficult, but we already knew that. :-)
+
+I'm in the same situation.  My approach is to copy the authority
+information to each machine that needs it after I log in.  If you can
+rsh without typing a password (via kerberos, .rhosts, or whatever) then
+the xauth manpage suggests the following:
+
+	xauth extract - $DISPLAY | rsh other xauth merge -
+
+In other cases I do the rlogin and then paste the right stuff into the
+window to prime that machine for X.  To make that easier, I first run
+the following program, which computes all the right stuff (DISPLAY,
+xauth, launch an xterm, and quit the rlogin session) and then puts it
+into the primary selection, and echos it, so I can easily paste or rsh
+its output.
+
+#!/bin/sh
+# authother -- print commands which prepare the other machine for X
+: ${HOST:=`hostname`}
+HOST=`nslookup $HOST | awk '/Name: / { print $2 }'`
+AUTH=`xauth list $HOST:0` || {
+  echo "authother: cannot read xauth list $HOST:0" 1>&2;
+  exit 1;
+}
+cmd="
+DISPLAY=$HOST:0;
+xauth add $AUTH;
+xterm & exit
+"
+xselection -replace PRIMARY "$cmd"
+echo $cmd
+In article <1994Apr13.103145.12871@pyra.co.uk>,
+Jimmy Aitken <jimmy@pyra.co.uk> wrote:
+>
+>This is fine and I can see how to do this if I start up an X session
+>directly.  However, how do you do this if when you turn on your X terminal,
+>you get an xdm login prompt?  Ay help would be gratefully received.
+
+My experience is with SGI machines (IRIX 4.0.x) but it probably applies
+generally.
+
+When you start a session under xdm it puts a cookie in your .Xauthority and a
+matching cookie in the X server for you.  If its not doing this then you have
+to find the xdm-config file (on SGI machines its in
+/usr/lib/X11/xdm/xdm-config) and edit it to turn authorization on (it will be
+obvious and the xdm man page has more).  Once this is done kill off the X
+server and xdm should start up a new session with authorization enabled.  If
+anyone knows a more elegant way to reinitialize the server with authorization
+I'd love to know.
+
+You should also do 'xhost -'.  I think xauth doesnt work if xhost access is
+enabled (which it is by default on IRIX 4.0.x).
+
+Good luck.

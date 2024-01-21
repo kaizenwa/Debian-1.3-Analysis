@@ -1,0 +1,494 @@
+@node Guile in a library - using libguile.a
+@chapter Guile in a library - using libguile.a
+@iftex
+@nobreak
+@end iftex
+In the previous chapters Guile was used to write programs entirely in
+Scheme, and no C code was seen; but I have been claiming @emph{ad
+nauseam} that Guile is an @emph{extension} language.  Here we see how
+that is done, and how that can be useful.
+@cindex libguile
+@cindex extending C programs
+
+
+@menu
+* Two world views::             
+* What is libguile -- high and low level::  
+* How to get started with libguile::  
+* More interesting programming with libguile::  
+* Further examples::            
+@end menu
+
+@node Two world views
+@section Two world views
+@cindex master world
+
+In this manual I usually jump into examples and explain them as you type
+in the code; here I will digress and ramble for a few paragraphs to set
+some concepts straight, and then let you type (or paste) in fun
+examples.
+
+In 1995 I implemented a large program, @dfn{Gnudl}, using Guile quite
+extensively.  In the design phase of Gnudl I found I had to make a
+choice: should the fundamental data structures be C or Scheme data
+structures?
+@cindex gnudl
+@cindex GNU Data Language
+@cindex Galassi, Mark
+
+Guile allows C to see its data structures (scalar types, lists, vectors,
+strings @dots{}).  C also allows Guile to see its data structures.  As a
+largre program designer, you have to decide which of those capabilities
+to use.  You have two main choices.
+
+You can write your software mostly in Scheme.  In this case, your C
+software will mostly parse the Scheme code with Guile calls, and provide
+some new primitive procedures to be used by Scheme.  This is what Gnudl
+does.
+
+Or you can write your software mostly in C, occasionally allowing Scheme
+code to be parsed by Guile, either to allow the user to modify data
+structures, or to parse a configuration file, @dots{}
+
+Mixing the two approaches seems unwise: the overall layout would be
+confusing.  But who knows?  There might be problems that are best solved
+by a hybrid approach.  Please let me know if you think of such a
+problem.
+
+If you use the former approach, we will say that the @dfn{master world}
+is Scheme, and the C routines serve Scheme and access Scheme data
+structures.  In the latter case, the master world is C, and Scheme
+routines serve the C code and access C data structures.
+
+In both approaches the @code{libguile.a} library is the same, but a
+predominantly different set of routines will be used.  To clarify these
+two approaches further, when we go through examples of libguile use, we
+will point out which is the master world.
+
+
+@node What is libguile -- high and low level
+@section What is libguile -- high and low level
+@cindex libguile
+@cindex gh_
+@cindex scm_
+
+@dfn{Libguile} is the library which can be linked to C programs and
+which allows the C programs to start a Scheme interpreter and execute
+Scheme code.  There are also facilities in libguile to make C data
+structures available to Scheme and vice versa.
+
+Since the underlying C library, whose routines are derived from the SCM
+Scheme interpreter, are very dependent on the architecture of SCM, a
+higher level simplified library is offered on top of libguile.
+
+The low level libguile interface is usually referred to as the
+@code{scm_} interface, since its public calls (API) all have the
+@code{scm_} prefix.
+
+The high level libguile interface is usually referred to as the
+@code{gh_} interface (LibGuile High), and its public calls all have the
+@code{gh_} prefix.  The @code{gh_} library has also been ported to
+other Scheme implementations.
+
+People extending Guile by adding bindings to C libraries (like OpenGL or
+Rx) are encouraged to use the @code{gh_} interface, so their work will
+be portable to other Scheme systems, and because the @code{gh_}
+interface should be more stable, and also because it is simpler.
+
+The @code{scm_} interface is instead necessary if you want to poke into
+the innards of Scheme data structures, and anything else that is not
+offered by the @code{gh_} interface.
+
+This chapter gives a gentle introduction to the @code{gh_} interface,
+presenting some @emph{hello world}-style programs which I wrote while
+teaching myself to use libguile.
+@cindex hello world
+
+The @cite{Guile Programmer's Manual} gives more examples of programs
+written using libguile, illustrating diverse applications.  You can also
+consult my @emph{Gnudl} documentation at
+@url{http://nis-www.lanl.gov/~rosalia/mydocs/} to see a large scale
+project that uses C and Scheme code together.
+
+
+@node How to get started with libguile
+@section How to get started with libguile
+@cindex learn0
+
+Here is an elementary first program, @code{learn0}, to get going with
+libguile.  The program (which uses Scheme as a master world) is in a
+single source file @code{learn0.c}:
+
+@smallexample
+/* @r{test the new libgh.a (Guile High Level library) with a trivial
+   program} */
+
+#include <stdio.h>
+
+#include <gh.h>
+
+void main_prog(int argc, char *argv[]);
+
+main(int argc, char *argv[])
+@{
+  gh_enter(argc, argv, main_prog);
+@}
+
+void main_prog(int argc, char *argv[])
+@{
+  int done;
+  char input_str[200];
+
+  gh_startup();
+
+  gh_eval_str("(display \"hello Guile\")");
+  gh_eval_str("(newline)");
+
+
+  /* @r{for fun, evaluate some simple Scheme expressions here} */
+  gh_eval_str("(define (square x) (* x x))");
+  gh_eval_str("(define (fact n) (if (= n 1) 1 (* n (fact (- n 1)))))");
+  gh_eval_str("(square 9)");
+
+  /* @r{now sit in a Scheme eval loop: I input the expressions, have
+     Guile evaluate them, and then get another expression.} */
+  done = 0;
+  fputs("learn0> ", stdout);
+  while (fgets(input_str, 199, stdin) != NULL) @{
+    gh_eval_str(input_str);
+    fputs("\nlearn0> ", stdout);
+  @}
+
+  exit(0);
+@}
+@end smallexample
+
+If you name this program @code{learn0.c}, it can now be compiled with:
+@smallexample
+gcc -g -c learn0.c -o learn0.o
+gcc -o learn0 learn0.o -lguile -lgh -lm
+@end smallexample
+(remember to fix the paths if you don't use @file{/usr/local} as a
+prefix).  @emph{NOTE: If you are in the Guile development tree, you can
+simply do ``cd doc/examples/c; make; ./learn0''.}
+
+The program is simple: it creates a Scheme interpreter, passes a couple
+of strings to it that define new Scheme functions @code{square} and
+@code{factorial}, and then a couple of strings that invoke those
+functions.
+
+It then goes into a read-eval-print-loop (REPL), so you could type
+one-line Scheme expressions to it and have them evaluated.  For example:
+@smallexample
+<shell-prompt> ./learn0
+welcome to Guile
+hello Guile
+learn0> (display (sin 1.3))
+963.558185417193e-3 
+learn0> (display (fact 10))
+3628800 
+learn0> (quit)
+<shell-prompt> 
+@end smallexample
+
+You should notice the key steps involved in this @code{learn0} program:
+
+@cartouche
+@enumerate
+@item
+@code{#include <gh.h>}
+@item
+You need to invoke the initialization routine @code{gh_enter()}.  This
+starts up a Scheme interpreter, handling many details.
+@item
+Your main() function should be almost empty: the real main program goes
+in a separate function main_prog() which is passed to gh_enter().  This
+rather arcane convention is due to the way Guile's garbage collector
+works: the whole program has to run in the dynamic context of
+@code{gh_enter()}.
+@item
+You pass strings to the Scheme interpreter with the @code{gh_eval_str()}
+routine.
+@item
+You link your program with @code{-lguile -lgh}.
+@end enumerate
+@end cartouche
+
+
+@node More interesting programming with libguile
+@section More interesting programming with libguile
+@cindex learn1
+@cindex callback
+@cindex builtin functions
+
+The @code{learn0} program shows how you can invoke Scheme commands from
+a C program.  This is not such a great achievement: the same could have
+been done by opening a pipe to SCM or any other Scheme interpreter.
+
+A true extension language must allow @dfn{callbacks}.  Callbacks allow
+you to write C routines that can be invoked as Scheme procedures, thus
+adding new primitive procedures to Scheme.  This also means that a
+Scheme procedure can modify a C data structure.
+
+Guile allows you to define new Scheme procedures in C, and provides a
+mechanism to go back and forth between C and Scheme data types.
+
+Here is a second program, @code{learn1}, which demonstrates these
+features.  It is split into three source files: @code{learn1.c},
+@code{c_builtins.h} and @code{c_builtins.c}.  I am including the code
+here, but you might just want to look at the online source code and the
+Makefile.am that come with Guile in the @file{doc/examples/c} directory.
+Notice that @code{learn1} uses a Scheme master world, and the C routines
+in @code{c_builtins.c} are simply adding new primitives to Scheme.
+
+@menu
+* learn1.c::                    
+* c_builtins.h::                
+* c_builtins.c::                
+* What learn1 is doing::        
+* Compiling and running learn1::  
+@end menu
+
+@node learn1.c
+@subsection learn1.c
+
+Here is @file{learn1.c}:
+@smallexample
+#include <stdio.h>
+
+#include <gh.h>
+
+#include "c_builtins.h"
+
+void main_prog(int argc, char *argv[]);
+
+main(int argc, char *argv[])
+@{
+  gh_enter(argc, argv, main_prog);
+@}
+
+void main_prog(int argc, char *argv[])
+@{
+  char input_str[200];		/* @r{ugly hack: assume strlen(line) < 200} */
+  int done;
+
+  gh_startup();
+
+  /* @r{for fun, evaluate some simple Scheme expressions here} */
+  gh_eval_str("(define (square x) (* x x))");
+  gh_eval_str("(define (fact n) (if (= n 1) 1 (* n (fact (- n 1)))))");
+  gh_eval_str("(square 9)");
+  gh_eval_str("(fact 100)");
+
+  /* @r{now try to define some new builtins, coded in C, so that they are
+     available in Scheme.} */
+  gh_new_procedure1_0("c-factorial", c_factorial);
+  gh_new_procedure1_0("c-sin", c_sin);
+  gh_new_procedure1_0("v-t", vector_test);
+
+  /* @r{now sit in a Scheme eval loop: I input the expressions, have
+     Guile evaluate them, and then get another expression.}  */
+  done = 0;
+  fputs("learn1> ", stdout);
+  while (!done) @{
+    if (gets(input_str) == NULL) @{
+      done = 1;
+    @} else @{
+      gh_eval_str(input_str);
+      fputs("learn1> ", stdout);
+    @}
+  @}
+
+  exit(0);
+@}
+@end smallexample
+
+@node c_builtins.h
+@subsection c_builtins.h
+
+Here is @file{c_builtins.h}:
+@smallexample
+/* @r{builtin function prototypes} */
+
+#include <gh.h>
+
+SCM c_factorial(SCM n);
+SCM c_sin(SCM n);
+SCM vector_test(SCM s_length);
+@end smallexample
+
+@node c_builtins.c
+@subsection c_builtins.c
+
+Here is @file{c_builtins.c}:
+@smallexample
+#include <stdio.h>
+#include <math.h>
+
+#include <gh.h>
+
+#include "c_builtins.h"
+
+/* @r{this is a factorial routine in C, made to be callable by Scheme} */
+SCM c_factorial(SCM s_n)
+@{
+  int i;
+  unsigned long result = 1, n;
+
+  n = gh_scm2ulong(s_n);
+
+  gh_defer_ints();
+  for (i = 1; i <= n; ++i) @{
+    result = result*i;
+  @}
+  gh_allow_ints();
+  return gh_ulong2scm(result);
+@}
+
+/* @r{a sin routine in C, callable from Scheme.  it is named c_sin() to
+   distinguish it from the default Scheme sin function} */
+SCM c_sin(SCM s_x)
+@{
+  double x = gh_scm2double(s_x);
+
+  return gh_double2scm(sin(x));
+@}
+
+/* @r{play around with vectors in Guile: this routine creates a vector of
+   the given length, initializes it all to zero except element 2 which
+   is set to 1.9.}  */
+SCM vector_test(SCM s_length)
+@{
+  SCM xvec;
+  unsigned long c_length;
+
+  c_length = gh_scm2ulong(s_length);
+  printf("requested length for vector: %ld\n", c_length);
+
+  /* create a vector */
+  xvec = gh_vector(c_length, gh_double2scm(0.0));
+  /* set the second element in it */
+  gh_vset(xvec, gh_int2scm(2), gh_double2scm(1.9));
+
+  return xvec;
+@}
+@end smallexample
+
+@node What learn1 is doing
+@subsection What learn1 is doing
+@cindex registering callbacks
+@cindex registering C functions
+@cindex primitive procedures
+
+If you compare learn1 to learn0, you will find that learn1 uses a new
+Guile construct: the function @code{gh_new_procedure()}, and its
+siblings:
+
+@smallexample
+  /* @r{now try to define some new builtins, coded in C, so that they are
+     available in Scheme.} */
+  gh_new_procedure1_0("c-factorial", c_factorial);
+  gh_new_procedure1_0("c-sin", c_sin);
+  gh_new_procedure1_0("v-t", vector_test);
+@end smallexample
+
+It is clear that @code{gh_new_procedure()} adds a new builtin
+routine written in C which can be invoked from Scheme.  We can now
+revise our checklist for programming with libguile, so it includes
+adding callbacks.
+@cindex libguile - step by step
+
+@cartouche
+@enumerate
+@item
+@code{#include <gh.h>}
+@item
+You need to invoke the initialization routine @code{gh_enter()}.  This
+starts up a Scheme interpreter, handling many details.
+@item
+Your main() function should be almost empty: the real main program goes
+in a separate function main_prog() which is passed to gh_enter().  This
+rather arcane convention is due to the way Guile's garbage collector
+works: the whole program has to run in the dynamic context of
+@code{gh_enter()}.
+@item
+You pass strings to the Scheme interpreter with the @code{gh_eval_str()}
+routine.
+@item
+@strong{[new]} You can now define new builtin Scheme functions;
+i.e. define new builtin Scheme functions, with the
+@code{gh_new_procedure()} routine.
+@item
+You pass strings to the Scheme interpreter with the
+@code{gh_eval_str()} routine.
+@item
+You link your program with @code{-lguile -lgh}.
+@end enumerate
+@end cartouche
+
+I breezed by the issue of how to write your C routines that are
+registered to be called from Scheme.  This is non-trivial, and is
+discussed at length in the @cite{Guile Programmer's Manual}.
+
+
+@node Compiling and running learn1
+@subsection Compiling and running learn1
+
+@smallexample
+gcc -g -I/usr/local/include/guile   -c learn1.c -o learn1.o
+gcc -g -I/usr/local/include/guile   -c c_builtins.c -o c_builtins.o
+gcc -o learn1 learn1.o c_builtins.o -L/usr/local/lib/scm -L/usr/local/lib -lguile -lgh -lm
+@end smallexample
+
+If you run @code{learn1}, it will prompt you for a one-line Scheme
+expression, just as @code{learn0} did.  The difference is that you can
+use the new C builtin procedures (@code{c-factorial}, @code{c-sin},
+@code{v-t}).
+
+@smallexample
+<shell-prompt> ./learn1
+welcome to Guile
+hello Guile
+learn1> (display (c-factorial 6))
+720 
+learn1> (display (c-factorial 20))
+2192834560 
+learn1> (display (c-factorial 100))
+0 
+learn1> (display (c-sin 1.5))
+997.494986604054e-3 
+learn1> (display (c-sin 1.5))
+997.494986604054e-3 
+learn1> (display (v-t 10))
+requested length for vector: 10
+#(0.0 0.0 1.9 0.0 0.0 0.0 0.0 0.0 0.0 0.0) 
+learn1> (display (v-t 15))
+requested length for vector: 15
+#(0.0 0.0 1.9 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0) 
+learn1> (quit)
+<shell-prompt> 
+@end smallexample
+
+As you see, taking @code{(c-factorial 100)} does not use bignumbers and
+returns a bogus answer.
+
+@node Further examples
+@section Further examples
+
+Further ``idealized'' examples are included in the @code{examples/c}
+distribution.  They include programs to:
+
+@c [FIXME: still have to write some of these; then I will revise the list.]
+
+@itemize @bullet
+@item
+Parse a startup file (C is the master world).
+@item
+Set up initial conditions for an n-body simulation (C is the master
+world).
+@item
+Implement a Scheme interpreter with all of Guile's goodies, @emph{plus}
+the readline library @emph{and} a fast Fourier transform routine
+provided in C (Scheme is the master world).
+
+@end itemize

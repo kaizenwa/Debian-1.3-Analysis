@@ -1,0 +1,537 @@
+<HTML>
+
+<HEAD>
+<TITLE>A la d&eacute;couverte des drivers et modules sous Linux</TITLE>
+</HEAD>
+
+<BODY>
+
+<H1>
+<P>&Agrave; la d&eacute;couverte des drivers et modules sous Linux
+</H1>
+
+<P>
+Article pour l'&Eacute;cho de Linux (<em><b>Septembre 1996</b></em>) 
+<address><a href="mailto:esellin@pratique.fr">Eric Sellin</a>
+(esellin@pratique.fr)</address> 
+
+<P>
+<HR>
+<H1>Sommaire</H1>
+<UL>
+<LI>1 - <A HREF="#1">Introduction</A>
+<LI>2 - <A HREF="#2">Rappel sur les fichiers sp&eacute;ciaux</A>
+<LI>3 - <A HREF="#3">Les drivers</A>
+<LI>4 - <A HREF="#4">Les modules</A>
+<LI>5 - <A HREF="#5">Let's go...</A>
+<LI>6 - <A HREF="#6">Conclusion</A>
+</UL>
+<HR>
+
+<A NAME=1>
+<H1>
+Introduction
+</H1>
+<P>
+
+Avant toute chose, je pr&eacute;cise d'embl&eacute;e que cet article est une
+initiation. Il pourra vous int&eacute;resser si, et seulement si,
+vous ne connaissez rien &agrave; la programmation du noyau de Linux.
+<p>
+Bien &eacute;videmment, nous ne partons pas au hasard, notre but
+est le suivant : cr&eacute;er un fichier sp&eacute;cial
+<em>/dev/glop</em> qui r&eacute;agisse de la fa&ccedil;on suivante :
+
+<pre>
+	eureka:~$ cat /dev/glop
+	A long time ago, in a galaxy far far away...
+	eureka:~$ 
+</pre>
+
+Very easy, isn't it ?
+
+<A NAME=2>
+<H1>
+Rappel sur les fichiers sp&eacute;ciaux
+</H1>
+
+Vous n'&ecirc;tes pas sans savoir que, sous Unix,
+les p&eacute;riph&eacute;riques sont repr&eacute;sent&eacute;s
+par des fichiers, appel&eacute;s fichiers sp&eacute;ciaux et situ&eacute;s
+dans le r&eacute;pertoire /dev. En voici quelques exemples :
+
+<pre>
+crw--w--w-   1 esellin  users      4,   0 Aug 29 18:29 /dev/console
+brw-rw----   1 root     disk       3,  65 Jun 11 22:06 /dev/hdb1
+brw-rw----   1 root     disk       3,  66 Jun 11 22:06 /dev/hdb2
+crw-rw----   1 root     daemon     6,   0 Apr 28  1995 /dev/lp0
+crw-rw----   1 root     daemon     6,   1 Apr 28  1995 /dev/lp1
+brw-rw-rw-   1 root     disk      23,   0 Jul 18  1994 /dev/mcd
+crw-rw-rw-   1 root     root       4,  64 Aug 29 18:46 /dev/ttyS0
+crw-rw-rw-   1 root     root       4,  65 Jul 18  1994 /dev/ttyS1
+</pre>
+
+Trois caract&eacute;ristiques sont associ&eacute;es &agrave; un
+fichier sp&eacute;cial :
+<ul>
+	<li>
+	un <b>mode</b> <em>caract&egrave;re</em> ou <em>bloc</em> qui
+	est signal&eacute; par un <em>c</em> ou un <em>b</em> en
+	premi&egrave;re position dans les droits du fichier. Lorsqu'un
+	p&eacute;riph&eacute;rique est utilis&eacute; en
+	mode caract&eacute;re, une demande de lecture
+	ou d'&eacute;criture est imm&eacute;diatement prise en charge
+	et physiquement effectu&eacute;e. C'est le cas par exemple
+	pour les terminaux, les imprimantes ou les ports s&eacute;ries.
+	&Agrave; l'oppos&eacute;, le mode bloc signifie que les
+	acc&egrave;s au p&eacute;riph&eacute;rique se font de
+	mani&egrave;re diff&eacute;r&eacute;e au travers de buffers
+	caches. Le mode bloc est utilis&eacute; pour les disques
+	durs ou les lecteurs de CD-ROM.
+	<p><li>
+	un <b>num&eacute;ro majeur</b> : il sert &agrave;
+	conna&icirc;tre le type de p&eacute;riph&eacute;rique. Sur
+	les exemples ci-dessus, on constate que le num&eacute;ro
+	majeur 4 est utilis&eacute; pour les terminaux, 3 pour les
+	disques durs IDE, 6 pour les imprimantes, 23 pour le pilote
+	de mon lecteur de CD-ROM Mitsumi et 4 pour les ports
+	s&eacute;ries.
+	<p><li>
+	un <b>num&eacute;ro mineur</b> : il sert &agrave;
+	pr&eacute;ciser le p&eacute;riph&eacute;rique parmi
+	plusieurs du m&ecirc;me type. Par exemple, pour les
+	imprimantes (majeur 6), le mineur 0 est associ&eacute;
+	&agrave; lp0 et le mineur 1 &agrave; lp1.
+</ul>
+<p>
+
+Notez bien que l'attribution des num&eacute;ros majeur et mineur est
+faite </em>arbitrairement</em>. Une liste exhaustive de ces
+attributions est donn&eacute;e dans le fichier Documentation/devices.txt
+des sources du noyau.
+
+<p>
+Pour cr&eacute;er un fichier sp&eacute;cial, on utilise, en tant
+que <em>root</em>,
+la commande <b>mknod</b> de la fa&ccedil;on suivante&nbsp;:
+<pre>
+	mknod fichier {bc} majeur mineur
+</pre>
+Par exemple, la commande <em>mknod /dev/glop c 52 0</em> va cr&eacute;er
+un fichier sp&eacute;cial /dev/glop, en mode caract&egrave;re, de
+num&eacute;ro majeur 52 et de num&eacute;ro mineur 0.
+<p>
+Fort bien, me direz-vous : un fichier sp&eacute;cial donne
+acc&egrave;s &agrave; un p&eacute;riph&eacute;rique.
+Mais que se passe-t-il quand, pour justement acc&eacute;der
+&agrave; ce p&eacute;riph&eacute;rique, on lit ce fichier
+ou on y &eacute;crit ?
+
+<A NAME=3>
+<H1>
+Les drivers
+</H1>
+
+Chaque type de p&eacute;riph&eacute;rique (terminal, disque dur,
+imprimante, ...) est g&eacute;r&eacute;, au niveau de ses acc&egrave;s, par un
+programme particulier qu'on appelle un driver de p&eacute;riph&eacute;rique.
+<p>
+&Agrave; chacun de ces drivers est
+associ&eacute; le mode et le num&eacute;ro majeur
+du type de p&eacute;riph&eacute;rique
+qu'il prend en charge. Par exemple, lorsque le driver des disques
+durs IDE d&eacute;marre, il informe le noyau qu'il va s'occuper de
+tous les fichiers sp&eacute;ciaux en mode bloc et de num&eacute;ro
+majeur &eacute;gal &agrave; 3, puisque 3 est le num&eacute;ro
+majeur qu'on a attribu&eacute; aux disques durs IDE. Le noyau tient
+&agrave; jour une table des drivers et ainsi, il sait quel driver
+appeler lorsqu'un appel syst&egrave;me tel que <em>open()</em>,
+<em>read()</em> ou <em>write()</em> est lanc&eacute; sur un
+fichier sp&eacute;cial.
+<p>
+&Agrave; tout moment, la commande <b>cat /proc/devices</b> vous donne,
+pour les modes caract&egrave;re et bloc, les num&eacute;ros majeurs
+actuellement reconnus par les drivers charg&eacute;s en m&eacute;moire.
+<p>
+Ainsi, par exemple, quand on &eacute;x&eacute;cute la commande 
+<em>cat foobar >/dev/lp1</em>, le noyau regarde les propri&eacute;t&eacute;s
+du fichier /dev/lp1, il constate que c'est un fichier sp&eacute;cial
+en mode caract&egrave;re de num&eacute;ro majeur 6 et de num&eacute;ro
+mineur 1, et il appelle le driver correspondant qui va, de son 
+c&ocirc;t&eacute;, envoyer le fichier <em>foobar</em> vers l'imprimante
+lp1 par une m&eacute;thode qui ne regarde que lui.
+<p>
+Tout &agrave; l'heure, nous avons cr&eacute;&eacute;,
+gr&acirc;ce &agrave; la commande <b>mknod</b>,
+ un fichier /dev/glop
+en mode caract&egrave;re, de num&eacute;ro majeur 52 et de 
+num&eacute;ro mineur 0. Nous allons maintenant cr&eacute;er un
+driver qui sera charg&eacute; de g&eacute;rer ce nouveau
+p&eacute;riph&eacute;rique qui r&eacute;pond au doux nom de
+<em>glop</em>.
+
+<A NAME=4>
+<H1>
+Les modules
+</H1>
+
+Pour l'instant, mes tr&egrave;s maigres connaissances du noyau de
+Linux ne me permettent pas d'y int&eacute;grer un nouveau driver.
+Nous allons donc nous contenter d'un module chargeable. Apr&egrave;s
+tout, &ccedil;a nous donne une occasion d'apprendre comment &ccedil;a
+marche.
+
+<p>
+Sous Linux, les modules sont des fichiers objets (.o) qu'on peut charger
+en m&eacute;moire et d&eacute;charger &agrave; n'importe quel
+moment gr&acirc;ce aux commandes <b>insmod</b> et <b>rmmod</b>
+utilis&eacute;es en tant que <em>root</em>. La commande <b>lsmod</b>,
+quant &agrave; elle,
+donne la liste des modules actuellement charg&eacute;s en m&eacute;moire.
+
+<p>
+Un module doit contenir deux fonctions particuli&egrave;res :
+<ul>
+	<li>
+	<b>int init_module(void)</b> :
+	Cette fonction est appel&eacute;e par le noyau
+	au d&eacute;marrage du
+	module. Son principal but est d'initialiser le
+	p&eacute;riph&eacute;rique et d'installer le driver.
+	Elle renvoie 0 si tout s'est bien pass&eacute;.
+	<p><li>
+	<b>void cleanup_module(void)</b> :
+	Cette fonction est appel&eacute;e par le noyau
+	lorsque le module est d&eacute;charg&eacute; de la
+	m&eacute;moire par la commande <b>rmmod</b>.
+</ul>
+<p>
+Pour compiler un module, utilisez la ligne de commande suivante :
+<pre>
+	gcc -D__KERNEL__ -DMODULE -O2 -c glop.c
+</pre>
+
+Chez moi, sans le flag -O2 d'optimisation, &ccedil;a ne fonctionne pas.
+Si quelqu'un peut m'expliquer :)
+
+<A NAME=5>
+<H1>
+Let's go...
+</H1>
+
+Le code d'un module faisant partie du noyau, quelques recommandations
+s'imposent :
+<ul>
+	<li>les fonctions de la librairie C, d&eacute;crites dans
+	les sections 2 et 3 du manuel, ne sont pas utilisables
+	<li>il faut faire un usage mod&eacute;r&eacute;
+	de la pile (et donc des variables locales)
+	<li>il faut proscrire l'attente active (par des boucles)
+	<li>les "pointeurs fous" sont interdits !
+</ul>
+<p>
+Au cas (plus qu'improbable...) o&ugrave; vous ne vous conformeriez 
+pas &agrave; ces instructions, voici ce qui pourrait vous arriver :
+<p>
+<pre>
+Unable to handle kernel paging request at virtual address c8002990
+current->tss.cr3 = 00fb7000, 
+*pde = 00000000
+Oops: 0002
+CPU:    0
+EIP:    0010:[<0183602f>]
+EFLAGS: 00010207
+eax: 00000041   ebx: 00000fff   ecx: 0099ce58   edx: 08005000
+esi: 08002990   edi: 007534c4   ebp: 00f8df90   esp: 00f8df7c
+ds: 0018   es: 0018   fs: 002b   gs: 002b   ss: 0018
+Process cat (pid: 1576, process nr: 29, stackpage=00f8d000)
+Stack: 00000001 08002990 00001000 00b55280 00001000 08002990 00122dbc 007534c4 
+       00b55280 08002990 00001000 00af8018 08002990 00001000 bffffb44 0010a5e2 
+       00000003 08002990 00001000 08002990 00001000 bffffb44 ffffffda 0805002b 
+Call Trace: [<00122dbc>] [<0010a5e2>] 
+Code: 88 06 46 ff 05 1c 61 83 01 83 3d 1c 61 83 01 2d 75 0a c7 05 
+</pre>
+
+Maintenant que vous &ecirc;tes pr&eacute;venu, voyons un peu comment
+nous allons &eacute;crire notre driver du p&eacute;riph&eacute;rique
+<em>glop</em>.
+<p>
+
+<pre>
+#define __KERNEL__
+#define MODULE
+</pre>
+Ces deux <em>#define</em> permettent d'omettre -D__KERNEL__ et
+-DMODULE dans la ligne d'appel du compilateur gcc.
+ 
+<pre>
+#include &lt;linux/kernel.h&gt;
+#include &lt;linux/module.h&gt;
+#include &lt;linux/errno.h&gt;
+#include &lt;linux/fs.h&gt;
+#include &lt;linux/mm.h&gt;
+</pre>
+
+Quelques <em>#include</em> classiques...
+
+<pre>
+#define GLOP_MAJOR	52
+#define GLOP_ID		"glop"
+</pre>
+
+Nous d&eacute;finissons ici le num&eacute;ro majeur que nous utilisons
+ainsi qu'une cha&icirc;ne de caract&egrave;res qui apparaitra dans le
+fichier <em>/proc/devices</em>.
+
+<pre>
+static char phrase[] = 
+	"A long time ago, in a galaxy far far away...\n";
+</pre>
+
+La phrase qui sera renvoy&eacute;e lors d'une lecture du fichier
+sp&eacute;cial.
+
+<pre>
+static char *ptr;
+</pre>
+
+Ce pointeur indique le prochain caract&egrave;re de la phrase qu'il
+faudra renvoyer lors de la prochaine lecture.
+
+<pre>
+static int glop_read(struct inode *inode, struct file *file, char *buf, int count)
+{
+	int foo;
+</pre>
+
+	<ul>
+	Cette fonction sera appel&eacute;e &agrave; chaque demande
+	de lecture du fichier sp&eacute;cial au travers de l'appel
+	syst&egrave;me <em>read()</em>. En param&egrave;tre,
+	on re&ccedil;oit :
+	<ul>
+		<li>
+		Un pointeur <em>inode</em> sur l'i-node du fichier
+		sp&eacute;cial concern&eacute;.
+		<li>
+		Un pointeur <em>file</em> sur le descripteur de
+		fichier utilis&eacute; par le processus appelant.
+		<li>
+		Un pointeur <em>buf</em> sur une zone m&eacute;moire
+		o&ugrave; on stockera les caract&egrave;res lus.
+		<li>
+		Le nombre <em>count</em> de caract&egrave;res qu'on
+		d&eacute;sire lire.
+	</ul>
+	Vous trouverez la description 
+	compl&egrave;te des structures <em>inode</em> et
+	<em>file</em> dans le fichier <em>/usr/include/linux/fs.h</em>.
+	<p>
+	Afin de simplifier l'&eacute;criture du driver, nous ne lirons
+	qu'un caract&egrave;re par appel de cette fonction, m&ecirc;me
+	si le processus appelant en demande 10 kilos. De toutes
+	mani&egrave;res, un programme bien &eacute;crit doit toujours
+	v&eacute;rifier la valeur renvoy&eacute;e par <em>read()</em>
+	qui repr&eacute;sente le nombre de caract&egrave;res
+	effectivement lus.
+	</ul>
+
+<pre>
+	if ( *ptr == '\0' ) {
+		/* On a atteint la fin de la phrase, donc du fichier */
+		return 0;
+	}
+</pre>
+
+	<ul>
+	On regarde si le pointeur n'est pas arriv&eacute; &agrave;
+	la fin de notre phrase. Si c'est le cas, on retourne une
+	valeur nulle qui marque la fin du fichier (cf.
+	<em>man read</em>).
+	</ul>
+
+<pre>
+	if ( (foo=verify_area(VERIFY_WRITE,buf,1)) != 0 ) {
+		/* On v&eacute;rifie qu'on a le droit d'&eacute;crire &agrave; cet endroit */
+		return foo;
+	}
+</pre>
+
+	<ul>
+	La fonction <em>verify_area</em> sert ici &agrave; 
+	v&eacute;rifier que l'on a bien le droit d'&eacute;crire
+	dans la zone <em>buf</em> pass&eacute;e en param&egrave;tre.
+	</ul>
+
+<pre>
+	/* Ecriture effective du caract&egrave;re */
+	memcpy_tofs(buf,ptr++,1);
+</pre>
+
+	<ul>
+	La fonction <em>memcpy_tofs</em> est un &eacute;quivalent de
+	la fonction
+	<em>memcpy</em> qui, rappelons-le, est indisponible dans
+	ce contexte particulier.
+	On &eacute;crit un caract&egrave;re et on
+	incr&eacute;mente notre pointeur d'une position.
+	</ul>
+
+<pre>
+	/* Et on retourne le nombre de caract&egrave;res lus = 1 */
+	return 1;
+</pre>
+
+	<ul>
+	Finalement, on renvoie le nombre de caract&egrave;res qu'on
+	a lus. C'est cette valeur que le processus appelant lira au
+	retour de son appel &agrave; <em>read()</em>.
+	</ul>
+
+<pre>
+}
+
+static int glop_open(struct inode *inode, struct file *file)
+{
+</pre>
+
+	<ul>
+	Cette fonction sera appel&eacute;e &agrave; chaque
+	ouverture du fichier sp&eacute;cial au travers de l'appel
+	syst&egrave;me <em>open()</em>.
+	</ul>
+
+<pre>
+	/* Repositionne le pointeur au d&eacute;but de la phrase */
+	ptr = phrase;
+</pre>
+
+	<ul>
+	On repositionne le pointeur au d&eacute;but de la phrase...
+	</ul>
+
+<pre>
+	/* Ouverture sans probl&egrave;me */
+	return 0;
+</pre>
+
+	<ul>
+	...et on annonce que tout s'est bien pass&eacute;.
+	</ul>
+
+<pre>
+}
+</pre>
+
+Nous allons maintenant d&eacute;finir la structure <em>glop_fops</em>
+de type <em>struct file_operations</em> (cf. /usr/include/linux/fs.h).
+Cette structure donne la liste des fonctions &agrave; &eacute;x&eacute;cuter lors
+d'un appel syst&egrave;me <em>open()</em>, <em>read()</em>,
+<em>write()</em>, ... effectu&eacute; sur notre fichier sp&eacute;cial.
+Dans notre cas, on n'impl&eacute;mente que les appels <em>read()</em>
+et <em>open()</em>.
+
+<pre>
+static struct file_operations glop_fops = {
+	NULL,		/* seek() */
+	glop_read,	/* read() */
+	NULL,		/* write() */
+	NULL,		/* readdir() */
+	NULL,		/* select() */
+	NULL,		/* ioctl */
+	NULL,		/* mmap */
+	glop_open,	/* open */
+	NULL,		/* release */
+	NULL,		/* fsync */
+	NULL,		/* fasync */
+	NULL,		/* check_media_change */
+	NULL		/* revalidate */
+};
+</pre>
+
+Voici maintenant la fonction <em>init_module</em> qui est appel&eacute;e
+au d&eacute;marrage du module. 
+Son principal but est d'initialiser le
+p&eacute;riph&eacute;rique et d'installer le driver.
+Elle renvoie 0 si tout s'est bien pass&eacute;.
+L'enseignement, c'est l'art de la r&eacute;p&eacute;tition.
+
+<pre>
+int init_module(void)
+{
+
+	if ( register_chrdev(GLOP_MAJOR,GLOP_ID,&glop_fops) ) {
+		printk("glop: unable to get major %d\n",GLOP_MAJOR);
+		return -EIO;
+	}
+</pre>
+
+	<ul>
+	On d&eacute;clare un nouveau driver en mode caract&egrave;re.
+	Pour cela, on utilise la fonction <em>register_chrdev</em> en
+	passant comme param&egrave;tres	:
+	<ul>
+		<li>le num&eacute;ro majeur &agrave; utiliser
+	 	<li>une courte cha&icirc;ne de caract&egrave;res
+		(cf. /proc/devices)
+	 	<li>une structure qui donne la liste des fonctions
+		&agrave; appeler lors d'un appel syst&egrave;me
+		<em>open()</em>, <em>read()</em>, <em>write()</em>, ...
+	</ul>
+	</ul>
+
+<pre>
+	return 0;
+
+}
+</pre>
+
+Pour finir, voici la fonction <em>cleanup_module</em> qui, elle, est
+appel&eacute;e au d&eacute;chargement du module par <b>rmmod</b> :
+
+<pre>
+void cleanup_module(void)
+{
+	unregister_chrdev(GLOP_MAJOR,GLOP_ID);
+}
+</pre>
+
+Voil&agrave;, il suffit de compiler ce petit programme, de charger le
+fichier objet r&eacute;sultant avec <b>insmod</b> et ensuite, vous
+pouvez &eacute;x&eacute;cuter ceci :
+
+<pre>
+	eureka:~$ cat /dev/glop
+	A long time ago, in a galaxy far far away...
+	eureka:~$ 
+</pre>
+<br>
+
+<A NAME=6>
+<H1>
+Conclusion
+</H1>
+
+Bien s&ucirc;r, ceci n'est que le minimum vital au sujet des
+drivers et des modules sous Linux. La meilleure source
+d'informations compl&eacute;mentaires reste tr&egrave;s
+certainement les sources du noyau.
+<p>
+Je compte sur vous pour &eacute;crire tr&egrave;s bient&ocirc;t 
+la suite de cet article.
+<p>
+Bonne chance.
+
+<p>
+<br><br>
+
+--<br>
+Eric SELLIN - <a href="mailto:esellin@pratique.fr">esellin@pratique.fr</a><br>
+<a href="http://www.pratique.fr/~esellin">http://www.pratique.fr/~esellin</a><br>
+C makes it easy for you to shoot yourself in the foot. C++ makes that<br>
+harder but when you do, it blows away your whole leg -- B. Stroustrup
+
+
+</HTML>
+
+

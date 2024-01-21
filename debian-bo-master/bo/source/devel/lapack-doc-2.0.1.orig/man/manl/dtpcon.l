@@ -1,0 +1,86 @@
+.TH DTPCON l "08 October 1994" "LAPACK version 2.0" "LAPACK routine (version 2.0)"
+.TH DTPCON l "08 October 1994" "BLAS routine" "BLAS routine"
+.SH NAME
+DTPCON - estimate the reciprocal of the condition number of a packed triangular matrix A, in either the 1-norm or the infinity-norm
+.SH SYNOPSIS
+.TP 19
+SUBROUTINE DTPCON(
+NORM, UPLO, DIAG, N, AP, RCOND, WORK, IWORK,
+INFO )
+.TP 19
+.ti +4
+CHARACTER
+DIAG, NORM, UPLO
+.TP 19
+.ti +4
+INTEGER
+INFO, N
+.TP 19
+.ti +4
+DOUBLE
+PRECISION RCOND
+.TP 19
+.ti +4
+INTEGER
+IWORK( * )
+.TP 19
+.ti +4
+DOUBLE
+PRECISION AP( * ), WORK( * )
+.SH PURPOSE
+DTPCON estimates the reciprocal of the condition number of a packed
+triangular matrix A, in either the 1-norm or the infinity-norm.
+
+The norm of A is computed and an estimate is obtained for
+norm(inv(A)), then the reciprocal of the condition number is
+computed as
+.br
+   RCOND = 1 / ( norm(A) * norm(inv(A)) ).
+.br
+
+.SH ARGUMENTS
+.TP 8
+NORM    (input) CHARACTER*1
+Specifies whether the 1-norm condition number or the
+infinity-norm condition number is required:
+.br
+= '1' or 'O':  1-norm;
+.br
+= 'I':         Infinity-norm.
+.TP 8
+UPLO    (input) CHARACTER*1
+.br
+= 'U':  A is upper triangular;
+.br
+= 'L':  A is lower triangular.
+.TP 8
+DIAG    (input) CHARACTER*1
+.br
+= 'N':  A is non-unit triangular;
+.br
+= 'U':  A is unit triangular.
+.TP 8
+N       (input) INTEGER
+The order of the matrix A.  N >= 0.
+.TP 8
+AP      (input) DOUBLE PRECISION array, dimension (N*(N+1)/2)
+The upper or lower triangular matrix A, packed columnwise in
+a linear array.  The j-th column of A is stored in the array
+AP as follows:
+if UPLO = 'U', AP(i + (j-1)*j/2) = A(i,j) for 1<=i<=j;
+if UPLO = 'L', AP(i + (j-1)*(2n-j)/2) = A(i,j) for j<=i<=n.
+If DIAG = 'U', the diagonal elements of A are not referenced
+and are assumed to be 1.
+.TP 8
+RCOND   (output) DOUBLE PRECISION
+The reciprocal of the condition number of the matrix A,
+computed as RCOND = 1/(norm(A) * norm(inv(A))).
+.TP 8
+WORK    (workspace) DOUBLE PRECISION array, dimension (3*N)
+.TP 8
+IWORK   (workspace) INTEGER array, dimension (N)
+.TP 8
+INFO    (output) INTEGER
+= 0:  successful exit
+.br
+< 0:  if INFO = -i, the i-th argument had an illegal value

@@ -1,0 +1,2162 @@
+--- ../man2html.c	Thu Mar 21 17:35:39 1996
++++ ./man2html.c	Sat Aug  3 18:08:54 1996
+@@ -5,6 +5,28 @@
+ ** Permission is granted to distribute, modify and use this program as long
+ ** as this comment is not removed or changed.
+ */
++
++/* 
++ * man2html-linux-1.0/1.1
++ * This version modified for Redhat/Caldera linux - March 1996.
++ * Michael Hamilton <michael@actrix.gen.nz>.
++ *
++ * man2html-linux-1.2
++ * Added support for BSD mandoc pages - I didn't have any documentation
++ * on the mandoc macros, so I may have missed some.
++ * Michael Hamilton <michael@actrix.gen.nz>.
++ *
++ * vh-man2html-1.3
++ * Renamed to avoid confusion (V for Verhoeven, H for Hamilton).
++ *
++ * vh-man2html-1.4
++ * Now uses /etc/man.config
++ * Added support for compressed pages.
++ * Added "length-safe" string operations for client input parameters.
++ * More secure, -M secured, and client input string lengths checked.
++ *
++ */
++
+ /*
+ ** If you want to use this program for your WWW server, adjust the line
+ ** which defines the CGIBASE or compile it with the -DCGIBASE='"..."' option.
+@@ -91,15 +113,35 @@
+ #include <sys/types.h>
+ #include <time.h>
+ #include <sys/time.h>
++#include <errno.h>
++
++#define NULL_TERMINATED(n) ((n) + 1)
++
++#define HUGE_STR_MAX  10000
++#define LARGE_STR_MAX 2000
++#define MED_STR_MAX   500
++#define SMALL_STR_MAX 100
++#define TINY_STR_MAX  10
++
++#define MAX_MAN_PATHS 100	/* Max number of directories */
++#define MAX_ZCATS     10	/* Max number of zcat style programs */
++#define MAX_WORDLIST  100
++
++
++#ifndef TOPLEVELDOC
++#define TOPLEVELDOC "/home/httpd/html/man.html"
++#endif
+ 
+ #ifndef CGIBASE
+-#define CGIBASE "http://wsinwp01.win.tue.nl:1234/cgi-bin/man2html"
++#define CGIBASE "http://localhost/cgi-bin/man2html"
+ #endif
+ 
+ #ifndef NROFF
+ #define NROFF 1
+ #endif
+ 
++static char location_base[NULL_TERMINATED(MED_STR_MAX)] = "";
++
+ char *signature = "<HR>\n"
+ "This document was created by\n"
+ "<A HREF=\""CGIBASE"\">man2html</A>,\n"
+@@ -109,7 +151,26 @@
+ /* timeformat for signature */
+ #define TIMEFORMAT "%T GMT, %B %d, %Y"
+ 
+-char *manpath[] = { "/",
++/* BSD mandoc Bl/El lists to HTML list types */
++#define BL_DESC_LIST   1
++#define BL_BULLET_LIST 2
++#define BL_ENUM_LIST   4
++
++/* BSD mandoc Bd/Ed example(?) blocks */
++#define BD_LITERAL  1
++#define BD_INDENT   2
++
++/* Don't bother with free(), it will just slow us down, the ultimate
++   free will be exit() anyway.  Hack to fix a malloc bug that I couldn't
++   track down (michael@actrix.gen.nz).
++   */
++#define free(x)
++
++static char *manpath[MAX_MAN_PATHS + 1] = { 
++                    "/",	/* for searches when path is absolute
++				 * But will be constrained by UNSECURE_MANPATH
++				 * setting.
++				 */
+ 		    "/usr/X11/man/",
+ 		    "/usr/man/",
+ 		    "/usr/local/man/",
+@@ -126,32 +187,173 @@
+ 		    "/usr/newsprint/man/",
+ 		    NULL };
+ 
+-char *sections = "123456789nl";
++#ifndef DISABLE_ZCATS
++static char *zcats[MAX_ZCATS + 1] = {
++                    ".Z\0/bin/zcat",
++                    ".gz\0/bin/gzip -d -c",
++                    NULL };
++#endif
++
++static char *sections = "123456789nl";
++
++
++static char *strgrow(char *old, int len) 
++{
++  char *new = realloc(old, (strlen(old) + len + 1) * sizeof(char));
++  if (!new) {
++    fprintf(stderr, "man2html: out of memory");
++    exit(EXIT_FAILURE);
++  }
++  return new;  
++}
++
++static char *stralloc(int len)
++{					
++  /* allocate enough for len + NULL */
++  char *new = malloc((len + 1) * sizeof(char));
++  if (!new) {
++    fprintf(stderr, "man2html: out of memory");
++    exit(EXIT_FAILURE);
++  }
++  return new;
++}
++
++static char *strduplicate(char *from)
++{				
++/* Some systems don't have strdup so lets use our own - which can also
++ * check for out of memory. 
++ */
++  char *new = stralloc(strlen(from));
++  strcpy(new, from);
++  return new;
++}
++
++static char *strmaxcpy(char *to, char *from, int n)
++{				/* Assumes space for n plus a null */
++  int len = strlen(from);
++  strncpy(to, from, n);
++  to[(len <= n) ? len : n] = '\0';
++  return to;
++}
++
++static char *strmaxcat(char *to, char *from, int n)
++{				/* Assumes space for n plus a null */
++  int to_len = strlen(to);
++  if (to_len < n) {
++    int from_len = strlen(from);
++    int cp = (to_len + from_len <= n) ? from_len : n - to_len;
++    strncpy(to + to_len, from, cp);
++    to[to_len + cp] = '\0';
++  }
++  return to;
++}
++
++static char *strlimitcpy(char *to, char *from, int n, int limit)
++{                               /* Assumes space for limit plus a null */
++  int len = n > limit ? limit : n;
++  strmaxcpy(to, from, len);
++  to[len] = '\0';
++  return to;
++}
+ 
+-void usage(void)
++static char *escape_input(char *str)
++/* takes string and escapes all metacharacters.  should be used before
++   including string in system() or similar call. */
+ {
+-    printf("Content-type: text/html\n\n"
+-	   "<HTML><HEAD>\n"
+-	   "<TITLE>Manual Pages</TITLE>\n"
+-	   "</HEAD><BODY>\n"
+-	   "<H1>Manual Pages</H1>\n"
+-	   "This is a HyperText interface to the UNIX manpages.\n"
+-	   "You can enter a program name, the section, an extra\n"
+-	   "directory (using -M) or a full name. For example\n"
+-	   "<UL><LI><TT>elm</TT>\n"
+-	   "<LI><TT>elm 1</TT>\n"
+-	   "<LI><TT>-M /usr/local/man elm</TT>\n"
+-	   "<LI><TT>/local/gcc/man/man1/gperf.1</TT>\n"
+-	   "</UL>\n"
+-	   "<ISINDEX>\n"
+-	   "<P>\n"
+-	   "This man2html converter was written by \n"
+-	   "<A HREF=\"http://wsinwp01.win.tue.nl:1234/index.html\">"
+-	   "Richard Verhoeven</A>\n"
+-	   "</BODY></HTML>\n");
++  int i,j = 0;
++  static char new[NULL_TERMINATED(MED_STR_MAX)];
++
++  if (strlen(str) * 2 + 1 > MED_STR_MAX) {
++    fprintf(stderr, 
++	    "man2html: escape_input - str too long:\n%-80s...\n",
++	    str);
++    exit(EXIT_FAILURE);
++  }
++
++  for (i = 0; i < strlen(str); i++) {
++    if (!( ((str[i] >= 'A') && (str[i] <= 'Z')) ||
++           ((str[i] >= 'a') && (str[i] <= 'z')) ||
++           ((str[i] >= '0') && (str[i] <= '9')) )) {
++      new[j] = '\\';
++      j++;
++    }
++    new[j] = str[i];
++    j++;
++  }
++  new[j] = '\0';
++  return new;
++}                      
++
++static FILE *pipe_open(char *cmd, char *filename)
++{
++  FILE *pipe_stream = NULL;
++  char cmdline[NULL_TERMINATED(LARGE_STR_MAX)];
++
++  if (strlen(filename) * 2 + 1 + strlen(cmd) + 1 > LARGE_STR_MAX) {
++    fprintf(stderr, "man2html: pipe_open - str too long:\n%-80s...\n", 
++	    filename);
++    return NULL;
++  }
++  strmaxcpy(cmdline, cmd, LARGE_STR_MAX);
++  strmaxcat(cmdline, " ", LARGE_STR_MAX);
++  strmaxcat(cmdline, escape_input(filename), LARGE_STR_MAX);  
++
++  pipe_stream = popen(cmdline, "r");	/* Potentially dangerious - CGI access to sh */
++  /* fprintf(stderr, "openned %s %s\n", cmdline, filename);  */
++  return pipe_stream;
++}
++
++static int pipe_close(FILE *f)
++{
++  return pclose(f);
++}
++
++
++static void usage(void)
++{
++    char buffer[NULL_TERMINATED(LARGE_STR_MAX)];
++    FILE *toplevel = fopen(TOPLEVELDOC, "r");
++    
++    if (!toplevel && errno == ENOENT) {
++      fputs("Content-type: text/html\n\n"
++	     "<HTML><HEAD>\n"
++	     "<TITLE>Manual Pages</TITLE>\n"
++	     "</HEAD><BODY>\n"
++	     "<H1>Manual Pages</H1>\n"
++	     "This is a HyperText interface to the UNIX manpages.\n"
++	     "You can enter a program name, the section, an extra\n"
++	     "directory (using -M) or a full name. For example\n"
++	     "<UL><LI><TT>elm</TT>\n"
++	     "<LI><TT>elm 1</TT>\n"
++	     "<LI><TT>-M /usr/local/man elm</TT>\n"
++	     "<LI><TT>/local/gcc/man/man1/gperf.1</TT>\n"
++	     "</UL>\n"
++	     "<ISINDEX>\n"
++	     "<P>\n"
++	     "This man2html converter was written by \n"
++	     "<A HREF=\"http://wsinwp01.win.tue.nl:1234/index.html\">"
++	     "Richard Verhoeven</A>\n"
++	     "</BODY></HTML>\n", stdout);
++      exit(0);      
++    }
++
++    if (!toplevel) {
++      fprintf(stderr, "man2html: error openning %s: %s\n", TOPLEVELDOC, strerror(errno));
++      exit(EXIT_FAILURE);
++    }
++    while (fgets(buffer, LARGE_STR_MAX, toplevel)) {
++        fputs(buffer,stdout);
++    }
++    if (!feof(toplevel)) {
++        fprintf(stderr, "man2html: error reading %s: %s\n", TOPLEVELDOC, strerror(errno));
++	exit(EXIT_FAILURE);
++    }
++    fclose(toplevel);
+     exit(0);
+ }
+ 
++
++
+ /* below this you should not change anything unless you know a lot
+ ** about this program or about troff.
+ */
+@@ -177,15 +379,15 @@
+ 
+ #define INDEXFILE "/tmp/manindex.list"
+ 
+-char *fname;
+-FILE *idxfile;
++static char *fname;
++static FILE *idxfile;
+ 
+-STRDEF *chardef, *strdef, *defdef;
+-INTDEF *intdef;
++static STRDEF *chardef, *strdef, *defdef;
++static INTDEF *intdef;
+ 
+ #define V(A,B) ((A)*256+(B))
+ 
+-INTDEF standardint[] = {
++static INTDEF standardint[] = {
+     { V('n',' '), NROFF,0, NULL },
+     { V('t',' '), 1-NROFF,0, NULL },
+     { V('o',' '), 1,0, NULL },
+@@ -197,7 +399,7 @@
+     { V('.','V'), 1,0, NULL }, /* the me package tests for this */
+     { 0, 0, 0, NULL } };
+ 
+-STRDEF standardstring[] = {
++static STRDEF standardstring[] = {
+     { V('R',' '), 1, "&#174;", NULL },
+     { V('l','q'), 2, "``", NULL },
+     { V('r','q'), 2, "''", NULL },
+@@ -205,7 +407,7 @@
+ };
+ 
+ 
+-STRDEF standardchar[] = {
++static STRDEF standardchar[] = {
+     { V('*','*'), 1, "*", NULL  },
+     { V('*','A'), 1, "A", NULL  },
+     { V('*','B'), 1, "B", NULL  },
+@@ -307,40 +509,41 @@
+ /* default: print code */
+ 
+ 
+-char eqndelimopen=0, eqndelimclose=0;
+-char escapesym='\\', nobreaksym='\'', controlsym='.', fieldsym=0, padsym=0;
++static char eqndelimopen=0, eqndelimclose=0;
++static char escapesym='\\', nobreaksym='\'', controlsym='.', fieldsym=0, padsym=0;
+ 
+-char *buffer=NULL;
+-int buffpos=0, buffmax=0;
+-int scaninbuff=0;
+-int itemdepth=0;
+-int dl_set[20]= { 0 };
+-int still_dd=0;
+-int tabstops[20] = { 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96 };
+-int maxtstop=12;
+-int curpos=0;
++static char *buffer=NULL;
++static int buffpos=0, buffmax=0;
++static int scaninbuff=0;
++static int itemdepth=0;
++static int dl_set[20]= { 0 };
++static int still_dd=0;
++static int tabstops[20] = { 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96 };
++static int maxtstop=12;
++static int curpos=0;
+ 
+-extern char *scan_troff(char *c, int san, char **result);
++static char *scan_troff(char *c, int san, char **result);
++static char *scan_troff_mandoc(char *c, int san, char **result);
+ 
+ static char **argument=NULL;
+ 
+-static char charb[3];
++static char charb[TINY_STR_MAX];
+ 
+-void print_sig(void)
++static void print_sig(void)
+ {
+-    char datbuf[500];
++    char datbuf[NULL_TERMINATED(MED_STR_MAX)];
+     struct tm *timetm;
+     time_t clock;
+     datbuf[0]='\0';
+ #ifdef TIMEFORMAT
+     clock=time(NULL);
+     timetm=gmtime(&clock);
+-    strftime(datbuf,500,TIMEFORMAT, timetm);
++    strftime(datbuf,MED_STR_MAX,TIMEFORMAT, timetm);
+ #endif
+     printf(signature, datbuf);
+ }
+ 
+-char *expand_char(int nr)
++static char *expand_char(int nr)
+ {
+   STRDEF *h;
+   h=chardef;
+@@ -353,12 +556,17 @@
+ 	  h=h->next;
+   charb[0]=nr/256;
+   charb[1]=nr%256;
+-  charb[2]='\0';
++  charb[2]='\0';  
++  if (charb[0] == '<') {	/* Fix up <= */
++    charb[4] = charb[1];
++    strncpy(charb, "&lt;", 4);
++    charb[5] = '\0';
++  }
+   curpos+=2;
+   return charb;
+ }
+ 
+-char *expand_string(int nr)
++static char *expand_string(int nr)
+ {
+   STRDEF *h=strdef;
+   if (!nr) return NULL;
+@@ -371,15 +579,97 @@
+   return NULL;
+ }
+ 
++static char *trim_compress_suffix(char *filename) 
++{
++  static char result[NULL_TERMINATED(MED_STR_MAX)];
++  int trim;
++  if (strcmp(filename + strlen(filename) - 3, ".gz") == 0) {
++    trim = 3;
++  }
++  else if (strcmp(filename + strlen(filename) - 2, ".Z") == 0
++	   || strcmp(filename + strlen(filename) - 2, ".z") == 0) {
++    trim = 2;
++  }
++  else 
++    trim = 0;
++
++  strlimitcpy(result, filename, strlen(filename) - trim, MED_STR_MAX);
++  result[strlen(filename) - trim + 1] = '\0';
++  return result;
++}
++
++static char *read_man_page(char *filename) 
++{
++  int man_pipe = 0;
++  char *man_buf = NULL;
++  int i;
++
++#ifndef DISABLE_ZCATS
++  for (i = 0; zcats[i]; i++) {
++    if (strcmp(filename + strlen(filename) - strlen(zcats[i]), zcats[i]) == 0) {
++      man_pipe = 1;
++      break;
++    }
++  }
++#endif
++
++  if (man_pipe) {  /* Input from a pipe */
++#ifndef DISABLE_ZCATS
++    FILE *man_stream = NULL;
++    int upto;
++    int len;
++    man_stream = pipe_open(zcats[i] + strlen(zcats[i]) + 1, filename);  
++    /* fprintf(stderr, "openned .%s.\n", filename); */
++    if (man_stream) {
++      man_buf = stralloc(LARGE_STR_MAX + 5);
++      man_buf[0] = '\n';
++      for (upto = 1; 
++	   (len = fread(man_buf + upto, 1, LARGE_STR_MAX, man_stream)) > 0;
++	   upto += len) { 
++	man_buf = strgrow(man_buf, LARGE_STR_MAX);
++      }      
++      man_buf[upto] = '\n';
++      man_buf[upto + 1] = man_buf[upto + 2] = '\0';
++      pipe_close(man_stream);
++    }
++#endif
++  }
++  else { /* Non-pipe input */
++    FILE *man_stream = NULL;
++    struct stat stbuf;
++    int buf_size;
++    if (stat(filename, &stbuf) == -1) { 
++      return NULL;
++    }
++    buf_size = stbuf.st_size;
++    man_buf = stralloc(buf_size+5);
++    man_pipe = 0;
++    man_stream = fopen(filename, "r");
++    if (man_stream) {
++      man_buf[0] = '\n';
++      if (fread(man_buf+1, 1, buf_size, man_stream) == buf_size) {
++	man_buf[buf_size] = '\n';
++	man_buf[buf_size + 1] = man_buf[buf_size + 2] = '\0';
++      }
++      else {
++	man_buf = NULL;
++      }
++      fclose(man_stream);
++    }
++  }
++  /* fprintf(stderr, "read .%s.\n", filename); */
++  return man_buf;
++}
++
+ 
+-char outbuffer[1024];
+-int obp=0;
+-int no_newline_output=0;
+-int newline_for_fun=0;
+-int output_possible=0;
+-int out_length=0;
++static char outbuffer[NULL_TERMINATED(HUGE_STR_MAX)];
++static int obp=0;
++static int no_newline_output=0;
++static int newline_for_fun=0;
++static int output_possible=0;
++static int out_length=0;
+ 
+-void add_links(char *c)
++static void add_links(char *c)
+ {
+     /*
+     ** Add the links to the output.
+@@ -423,13 +713,13 @@
+ 		char t;
+ 		t=*g;
+ 		*g='\0';
+-		printf("%s",c);
++		fputs(c, stdout);
+ 		*g=t;*h='\0';
+ 		printf("<A HREF=\"file:/usr/include/%s\">%s</A>&gt;", g,g);
+ 		c=f+6;
+ 	    } else {
+ 		f[5]='\0';
+-		printf("%s",c);
++		fputs(c, stdout);
+ 		f[5]=';';
+ 		c=f+5;
+ 	    }
+@@ -460,22 +750,26 @@
+ 			h--;
+ 		    t=*h;
+ 		    *h='\0';
+-		    printf("%s", c);
++		    fputs(c, stdout);
+ 		    *h=t;
+ 		    t=*e;
+ 		    *e='\0';
+ 		    if (subsec)
+-			printf("<A HREF=\"../man%c/%s.%c%c\">%s</A>",
++			printf("<A HREF=\""
++			       CGIBASE
++			       "?man%c/%s.%c%c\">%s</A>",
+ 			       sec, h, sec, tolower(subsec), h);
+ 		    else
+-			printf("<A HREF=\"../man%c/%s.%c\">%s</A>",
++			printf("<A HREF=\""
++			       CGIBASE
++			       "?man%c/%s.%c\">%s</A>",
+ 			       sec, h, sec, h);
+ 		    *e=t;
+ 		    c=e;
+ 		}
+ 	    }
+ 	    *f='\0';
+-	    printf("%s", c);
++	    fputs(c, stdout);
+ 	    *f='(';
+ 	    idtest[4]=f-1;
+ 	    c=f;
+@@ -489,7 +783,7 @@
+ 	    if (g-f>4) {
+ 		char t;
+ 		t=*f; *f='\0';
+-		printf("%s",c);
++		fputs(c, stdout);
+ 		*f=t; t=*g;*g='\0';
+ 		printf("<A HREF=\"%s://%s\">%s</A>", (j==3?"ftp":"http"),
+ 		       f,f);
+@@ -497,7 +791,7 @@
+ 		c=g;
+ 	    } else {
+ 		f[3]='\0';
+-		printf("%s",c);
++		fputs(c, stdout);
+ 		c=f+3;
+ 		f[3]='.';
+ 	    }
+@@ -514,14 +808,14 @@
+ 		char t;
+ 		t=*g;
+ 		*g='\0';
+-		printf("%s",c);
++		fputs(c, stdout);
+ 		*g=t;t=*h;*h='\0';
+ 		printf("<A HREF=\"mailto:%s\">%s</A>",g,g);
+ 		*h=t;
+ 		c=h;
+ 	    } else {
+ 		*f='\0';
+-		printf("%s",c);
++		fputs(c, stdout);
+ 		*f='@';
+ 		idtest[1]=c;
+ 		c=f;
+@@ -537,14 +831,14 @@
+ 		char t;
+ 		t=*g;
+ 		*g='\0';
+-		printf("%s", c);
++		fputs(c, stdout);
+ 		*g=t; t=*h; *h='\0';
+ 		printf("<A HREF=\"%s\">%s</A>", g,g);
+ 		*h=t;
+ 		c=h;
+ 	    } else {
+ 		f[1]='\0';
+-		printf("%s", c);
++		fputs(c, stdout);
+ 		f[1]='/';
+ 		c=f+1;
+ 	    }
+@@ -561,14 +855,14 @@
+ 	if (idtest[5] && idtest[5]<c) idtest[5]=strstr(c+1,".h&gt;");
+ 	for (i=0; i<6; i++) nr += (idtest[i]!=NULL);
+     }
+-    printf("%s", c);
++    fputs(c, stdout);
+ }
+ 
+-int current_font=0;
+-int current_size=0;
+-int fillout=1;
++static int current_font=0;
++static int current_size=0;
++static int fillout=1;
+ 
+-void out_html(char *c)
++static void out_html(char *c)
+ {
+   if (!c) return;
+   if (no_newline_output) {
+@@ -596,7 +890,7 @@
+       if (output_possible) {
+ 	  while (*c) {
+ 	      outbuffer[obp++]=*c;
+-	      if (*c=='\n' || obp>1000) {
++	      if (*c=='\n' || obp > HUGE_STR_MAX) {
+ 		  outbuffer[obp]='\0';
+ 		  add_links(outbuffer);
+ 		  obp=0;
+@@ -615,12 +909,12 @@
+ #define FO3 "<TT>"
+ #define FC3 "</TT>"
+ 
+-char *switchfont[16] = { ""     , FC0 FO1, FC0 FO2, FC0 FO3,
++static char *switchfont[16] = { ""     , FC0 FO1, FC0 FO2, FC0 FO3,
+ 			 FC1 FO0, ""     , FC1 FO2, FC1 FO3,
+ 			 FC2 FO0, FC2 FO1, ""     , FC2 FO3,
+ 			 FC3 FO0, FC3 FO1, FC3 FO2, ""      };
+ 
+-char *change_to_font(int nr)
++static char *change_to_font(int nr)
+ {
+   int i;
+   switch (nr) {
+@@ -641,7 +935,7 @@
+ 
+ static char sizebuf[200];
+ 
+-char *change_to_size(int nr)
++static char *change_to_size(int nr)
+ {
+   int i;
+   switch (nr) {
+@@ -669,15 +963,15 @@
+   return sizebuf;
+ }
+ 
+-int asint=0;
+-int intresult=0;
++static int asint=0;
++static int intresult=0;
+ 
+ #define SKIPEOL while (*c && *c++!='\n')
+ 
+ static int skip_escape=0;
+ static int single_escape=0;
+ 
+-char *scan_escape(char *c)
++static char *scan_escape(char *c)
+ {
+     char *h=NULL;
+     char b[5];
+@@ -853,7 +1147,8 @@
+     TABLEITEM *next;
+ };
+ 
+-static TABLEITEM emptyfield = {NULL,0,0,0,1,1,0,0,0,0,NULL};
++static TABLEITEM emptyfield = {NULL,0,0,0,1,1,0,0,0,0,0,NULL};
++
+ typedef struct TABLEROW TABLEROW;
+ 
+ struct TABLEROW {
+@@ -887,7 +1182,7 @@
+     }
+ }
+ 
+-char *scan_expression(char *c, int *result);
++static char *scan_expression(char *c, int *result);
+ 
+ static char *scan_format(char *c, TABLEROW **result, int *maxcol)
+ {
+@@ -983,7 +1278,7 @@
+     return c;
+ }
+ 
+-TABLEROW *next_row(TABLEROW *tr)
++static TABLEROW *next_row(TABLEROW *tr)
+ {
+     if (tr->next) {
+ 	tr=tr->next;
+@@ -1010,9 +1305,9 @@
+     }
+ }
+ 
+-char itemreset[20]="\\fR\\s0";
++static char itemreset[20]="\\fR\\s0";
+ 
+-char *scan_table(char *c)
++static char *scan_table(char *c)
+ {
+     char *t, *h, *g;
+     int center=0, expand=0, box=0, border=0, linesize=1;
+@@ -1285,7 +1580,7 @@
+     return c;
+ }
+ 
+-char *scan_expression(char *c, int *result)
++static char *scan_expression(char *c, int *result)
+ {
+     int value=0,value2,j=0,sign=1,opex=0;
+     char oper='c';
+@@ -1411,7 +1706,7 @@
+ 		case '=': case '='+16: value=(value==value2); break;
+ 		case '&': value = (value && value2); break;
+ 		case ':': value = (value || value2); break;
+-		default: fprintf(stderr, "Unknown operator %c.\n", oper);
++		default: fprintf(stderr, "man2html: unknown operator %c.\n", oper);
+ 		}
+ 		oper=0;
+ 	    }
+@@ -1422,7 +1717,7 @@
+     return c;
+ }
+ 
+-void trans_char(char *c, char s, char t)
++static void trans_char(char *c, char s, char t)
+ {
+     char *sl=c;
+     int slash=0;
+@@ -1437,7 +1732,7 @@
+     }
+ }
+ 
+-char *fill_words(char *c, char *words[], int *n)
++static char *fill_words(char *c, char *words[], int *n)
+ {
+     char *sl=c;
+     int slash=0;
+@@ -1474,7 +1769,7 @@
+     return sl;
+ }
+ 
+-char *abbrev_list[] = {
++static char *abbrev_list[] = {
+     "GSBG", "Getting Started ",
+     "SUBG", "Customizing SunOS",
+     "SHBG", "Basic Troubleshooting",
+@@ -1519,7 +1814,7 @@
+     "KR", "The C Programming Language",
+     NULL, NULL };
+ 
+-char *lookup_abbrev(char *c)
++static char *lookup_abbrev(char *c)
+ {
+     int i=0;
+ 
+@@ -1529,7 +1824,7 @@
+     else return c;
+ }
+ 
+-char *section_list[] = {
++static char *section_list[] = {
+     "1", "User Commands ",
+     "1C", "User Commands",
+     "1G", "User Commands",
+@@ -1638,7 +1933,7 @@
+     NULL, NULL
+ };
+ 
+-char *section_name(char *c)
++static char *section_name(char *c)
+ {
+     int i=0;
+ 
+@@ -1648,12 +1943,12 @@
+     else return c;
+ }
+ 
+-char manidx[20000];
+-int subs=0;
+-int mip=0;
+-char label[5]="lbAA";
++static char manidx[NULL_TERMINATED(HUGE_STR_MAX)];
++static int subs=0;
++static int mip=0;
++static char label[5]="lbAA";
+ 
+-void add_to_index(int level, char *item)
++static void add_to_index(int level, char *item)
+ {
+     char *c=NULL;
+     label[3]++;
+@@ -1663,10 +1958,10 @@
+     }
+     if (level != subs) {
+ 	if (subs) {
+-	    strcpy(manidx+mip, "</DL>\n");
++	    strmaxcpy(manidx+mip, "</DL>\n", HUGE_STR_MAX - mip);
+ 	    mip+=6;
+ 	} else {
+-	    strcpy(manidx+mip, "<DL>\n");
++	    strmaxcpy(manidx+mip, "<DL>\n", HUGE_STR_MAX - mip);
+ 	    mip+=5;
+ 	}
+     }
+@@ -1677,7 +1972,7 @@
+     while (manidx[mip]) mip++;
+ }
+ 
+-char *skip_till_newline(char *c)
++static char *skip_till_newline(char *c)
+ {
+     int lvl=0;
+ 
+@@ -1696,13 +1991,18 @@
+     return c;
+ }
+ 
+-int ifelseval=0;
++static int ifelseval=0;
+ 
+-char *scan_request(char *c)
++static char *scan_request(char *c)
+ {
++				  /* BSD Mandoc stuff */
++    static int mandoc_synopsis=0; /* True if we are in the synopsis section */
++    static int mandoc_command=0;  /* True if this is mandoc page */
++    static int mandoc_bd_options; /* Only copes with non-nested Bd's */
++
+     int i,j,mode=0;
+     char *h;
+-    char *wordlist[20];
++    char *wordlist[MAX_WORDLIST];
+     int words;
+     char *sl;
+     STRDEF *owndef;
+@@ -1725,9 +2025,9 @@
+ 	    *h='\0';
+ 	    if (scaninbuff && buffpos) {
+ 		buffer[buffpos]='\0';
+-		printf("%s\n", buffer);
++		puts(buffer);
+ 	    }
+-	    fprintf(stderr, "%s\n", c+2);
++	    /* fprintf(stderr, "%s\n", c+2); */
+ 	    exit(0);
+ 	    break;
+ 	case V('d','i'):
+@@ -1939,7 +2239,7 @@
+ 		if (*c!='\n') {
+ 		    endwith=c-1;i=1;
+ 		    c[-1]='.';
+-		    while (*c!='\n') c++,i++;
++		    while (*c && *c!='\n') c++,i++;
+ 		}
+ 		c++;
+ 		while (*c && strncmp(c,endwith,i)) while (*c++!='\n');
+@@ -1982,7 +2282,8 @@
+ 	    {
+ 		FILE *f;
+ 		struct stat stbuf;
+-		int l;char *buf;
++		int l = 0;
++		char *buf;
+ 		char *name=NULL;
+ 		curpos=0;
+ 		c=c+j;
+@@ -1999,7 +2300,7 @@
+ 		scan_troff(h,1, &name);
+ 		if (name[3]=='/') h=name+3; else h=name;
+ 		if (stat(h, &stbuf)!=-1) l=stbuf.st_size;
+-		buf = (char*) malloc((l+4)*sizeof(char));
++		buf = stralloc(l+4);
+ #if NOCGI
+                 if (!out_length) {
+ 		    char *t,*s;
+@@ -2016,13 +2317,17 @@
+ #endif
+                 {
+ 		    /* this works alright, except for section 3 */
+-		    f=fopen(h,"r");
+-		    if (!f || !buf || !l)
+-			fprintf(stderr, "Unable to open or read file %s.\n",
++		    buf=read_man_page(h);
++		    if (!buf) {
++		      
++			fprintf(stderr, "man2html: unable to open or read file %s.\n",
+ 				h); 
++			out_html("<BLOCKQUOTE>"
++				 "man2html: unable to open or read file.\n");
++			out_html(h);
++			out_html("</BLOCKQUOTE>\n");
++		    } 
+ 		    else {
+-			i=fread(buf+1,1,l,f);
+-			fclose(f);
+ 			buf[0]=buf[l]='\n';
+ 			buf[l+1]=buf[l+2]='\0';
+ 			scan_troff(buf+1,0,NULL);
+@@ -2063,7 +2368,7 @@
+ 	    h=c;
+ 	    while (*c!='\n') c++;
+ 	    *c='\0';
+-	    fprintf(stderr,"%s\n", h);
++	    /* fprintf(stderr,"%s\n", h); */
+ 	    *c='\n';
+ 	    break;
+ 	case V('B',' '):
+@@ -2094,7 +2399,8 @@
+ 	case V('R','B'):
+ 	case V('R','I'):
+ 	    {
+-		char font[2] = { c[0], c[1] };
++		char font[2] ;
++		font[0] = c[0]; font[1] = c[1];
+ 		c=c+j;
+ 		if (*c=='\n') c++;
+ 		sl=fill_words(c, wordlist, &words);
+@@ -2193,7 +2499,10 @@
+ 	    c=skip_till_newline(c);
+ 	    curpos=0;
+ 	    break;
+-	case V('P','D'): c=skip_till_newline(c); break;
++	case V('P','D'): 
++	    c=skip_till_newline(c); 
++	    break;
++	case V('R','s'):	/* BSD mandoc */
+ 	case V('R','S'):
+ 	    sl=fill_words(c+j, wordlist, &words);
+ 	    j=1;
+@@ -2206,8 +2515,9 @@
+ 		curpos=0;
+ 		break;
+ 	    }
++	case V('R','e'):	/* BSD mandoc */
+ 	case V('R','E'):
+-	    if (itemdepth) {
++	    if (itemdepth > 0) {
+ 		if (dl_set[itemdepth]) out_html("</DL>");
+ 		out_html("</DL>\n");
+ 		itemdepth--;
+@@ -2230,15 +2540,20 @@
+ 	    c=scan_troff(c,1,NULL);
+ 	    out_html(change_to_size('0'));
+ 	    break;
++	case V('S','s'):	/* BSD mandoc */
++	    mandoc_command = 1;
+ 	case V('S','S'):
+ 	    mode=1;
++	case V('S','h'):	/* BSD mandoc */
++				/* hack for fallthru from above */
++	    mandoc_command = !mode || mandoc_command; 
+ 	case V('S','H'):
+ 	    c=c+j;
+ 	    if (*c=='\n') c++;
+ 	    while (itemdepth || dl_set[itemdepth]) {
+ 		out_html("</DL>\n");
+ 		if (dl_set[itemdepth]) dl_set[itemdepth]=0;
+-		else itemdepth--;
++		else if (itemdepth > 0) itemdepth--;
+ 	    }
+ 	    out_html(change_to_font(0));
+ 	    out_html(change_to_size(0));
+@@ -2253,7 +2568,8 @@
+ 	    /* &nbsp; for mosaic users */
+ 	    if (mode) out_html("\">&nbsp;</A>\n<H3>");
+ 	    else out_html("\">&nbsp;</A>\n<H2>");
+-	    c=scan_troff(c,1,NULL);
++	    mandoc_synopsis = strncmp(c, "SYNOPSIS", 8) == 0;
++	    c = mandoc_command ? scan_troff_mandoc(c,1,NULL) : scan_troff(c,1,NULL);
+ 	    if (mode) out_html("</H3>\n");
+ 	    else out_html("</H2>\n");
+ 	    curpos=0;
+@@ -2261,6 +2577,8 @@
+ 	case V('T','S'):
+ 	    c=scan_table(c);
+ 	    break;
++	case V('D','t'):	/* BSD mandoc */
++	    mandoc_command = 1;
+ 	case V('T','H'):
+ 	    if (!output_possible) {
+ 		sl = fill_words(c+j, wordlist, &words);
+@@ -2284,7 +2602,11 @@
+ 		    } else out_html(")");
+ 		    out_html("<BR><A HREF=\"#index\">Index</A>\n");
+ 		    *sl='\n';
++		    fputs("<BR><A HREF=\""
++			  CGIBASE
++			  "\">Return to Main Contents</A>\n", stdout);
+ 		    out_html("<HR>\n");
++		    if (mandoc_command) out_html("<BR>BSD mandoc<BR>");
+ 		}
+ 		c=sl+1;
+ 	    } else c=skip_till_newline(c);
+@@ -2387,7 +2709,7 @@
+ 		while (de && de->nr!= i) de=de->next;
+ 		if (mode && de) olen=strlen(de->st);
+ 		j=olen+c-sl;
+-		h= (char*) malloc((j*2+4)*sizeof(char));
++		h = stralloc(j*2+4);
+ 		if (h) {
+ 		    for (j=0; j<olen; j++)
+ 			h[j]=de->st[j];
+@@ -2415,6 +2737,462 @@
+ 	    }
+ 	    c=skip_till_newline(c);
+ 	    break;
++	case V('B','l'):	/* BSD mandoc */
++	  {
++	    char list_options[NULL_TERMINATED(MED_STR_MAX)]; 
++	    char *nl = strchr(c,'\n');
++	    c=c+j;
++	    if (dl_set[itemdepth]) {  /* These things can nest. */
++	        itemdepth++;
++	    }
++	    if (nl) {		  /* Parse list options */
++	        strlimitcpy(list_options, c, nl - c, MED_STR_MAX);
++	    }
++	    if (strstr(list_options, "-bullet")) { /* HTML Unnumbered List */
++	        dl_set[itemdepth] = BL_BULLET_LIST;
++	        out_html("<UL>\n");
++	    }
++	    else if (strstr(list_options, "-enum")) { /* HTML Ordered List */
++	        dl_set[itemdepth] = BL_ENUM_LIST;
++	        out_html("<OL>\n");
++	    }
++	    else {		  /* HTML Descriptive List */
++	        dl_set[itemdepth] = BL_DESC_LIST;
++	        out_html("<DL COMPACT>\n");
++	    }
++	    if (fillout) out_html("<P>\n"); else {
++		out_html(NEWLINE);
++		NEWLINE[0]='\n';
++	    }
++	    curpos=0;
++	    c=skip_till_newline(c);
++	    break;
++	  }
++	case V('E','l'):	/* BSD mandoc */
++	    c=c+j;
++	    if (dl_set[itemdepth] & BL_DESC_LIST) {
++		out_html("</DL>\n");
++	    }
++	    else if (dl_set[itemdepth] & BL_BULLET_LIST) {
++		out_html("</UL>\n");
++	    }
++	    else if (dl_set[itemdepth] & BL_ENUM_LIST) {
++		out_html("</OL>\n");
++	    }
++	    dl_set[itemdepth]=0;
++	    if (itemdepth > 0) itemdepth--;
++	    if (fillout) out_html("<P>\n"); else {
++		out_html(NEWLINE);
++		NEWLINE[0]='\n';
++	    }
++	    curpos=0;
++	    c=skip_till_newline(c);
++	    break;
++	case V('I','t'):	/* BSD mandoc */
++	    c=c+j;
++	    if (strncmp(c, "Xo", 2) == 0 && isspace(*(c+2))) {
++	        c = skip_till_newline(c); 
++	    }
++	    if (dl_set[itemdepth] & BL_DESC_LIST) {
++	        out_html("<DT>");
++		out_html(change_to_font('B'));
++	        if (*c=='\n') {	  /* Don't allow embedded comms after a newline */
++		    c++;	  
++		    c=scan_troff(c,1,NULL);
++		}
++		else {		  /* Do allow embedded comms on the same line. */
++		    c=scan_troff_mandoc(c,1,NULL);
++		}
++		out_html(change_to_font('R'));
++		out_html(NEWLINE);
++		out_html("<DD>");
++	    }
++	    else if (dl_set[itemdepth] & (BL_BULLET_LIST | BL_ENUM_LIST)) {
++	        out_html("<LI>");
++		c=scan_troff_mandoc(c,1,NULL);
++		out_html(NEWLINE);
++	    }
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('B','k'):	/* BSD mandoc */
++	case V('E','k'):	/* BSD mandoc */
++	case V('D','d'):	/* BSD mandoc */
++	case V('O','s'):	/* BSD mandoc */
++	    trans_char(c,'"','\a');
++	    c=c+j;
++	    if (*c=='\n') c++;
++	    c=scan_troff_mandoc(c, 1, NULL);
++	    out_html(NEWLINE);
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('B','t'):	/* BSD mandoc */
++	    trans_char(c,'"','\a');
++	    c=c+j;
++	    out_html(" is currently in beta test.");
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('B','x'):	/* BSD mandoc */
++	    trans_char(c,'"','\a');
++	    c=c+j;
++	    if (*c=='\n') c++;
++	    out_html("BSD ");
++	    c=scan_troff_mandoc(c, 1, NULL);
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('D','l'):	/* BSD mandoc */
++	    c=c+j;
++	    out_html(NEWLINE);
++	    out_html("<BLOCKQUOTE>");	    
++	    out_html(change_to_font('L'));
++	    if (*c=='\n') c++;
++	    c=scan_troff_mandoc(c, 1, NULL);	    
++	    out_html(change_to_font('R'));
++	    out_html("</BLOCKQUOTE>");	    
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('B','d'):	/* BSD mandoc */
++	  {			/* Seems like a kind of example/literal mode */
++	    char bd_options[NULL_TERMINATED(MED_STR_MAX)]; 
++	    char *nl = strchr(c,'\n');
++	    c=c+j;
++	    if (nl) {
++	      strlimitcpy(bd_options, c, nl - c, MED_STR_MAX);
++	    }
++	    out_html(NEWLINE);
++	    mandoc_bd_options = 0; /* Remember options for terminating Bl */
++	    if (strstr(bd_options, "-offset indent")) {
++	        mandoc_bd_options |= BD_INDENT;
++	        out_html("<BLOCKQUOTE>\n");
++	    }
++	    if (   strstr(bd_options, "-literal")
++		|| strstr(bd_options, "-unfilled")) {
++	        if (fillout) {
++		    mandoc_bd_options |= BD_LITERAL;
++		    out_html(change_to_font(0));
++		    out_html(change_to_size('0'));
++		    out_html("<PRE>\n");
++		}
++		curpos=0;
++		fillout=0;
++	    }
++	    c=skip_till_newline(c);
++	    break;
++	  }
++	case V('E','d'):	/* BSD mandoc */
++	    if (mandoc_bd_options & BD_LITERAL) {
++	        if (!fillout) {
++		    out_html(change_to_font(0));
++		    out_html(change_to_size('0'));
++		    out_html("</PRE>\n");
++		}
++	    }
++	    if (mandoc_bd_options & BD_INDENT)
++	        out_html("</BLOCKQUOTE>\n");
++	    curpos=0;
++	    fillout=1;
++	    c=skip_till_newline(c);
++	    break;
++	case V('B','e'):	/* BSD mandoc */
++	    c=c+j;
++	    if (fillout) out_html("<P>"); else {
++		out_html(NEWLINE);
++		NEWLINE[0]='\n';
++	    }
++	    curpos=0;
++	    c=skip_till_newline(c);
++	    break;
++	case V('X','r'):	/* BSD mandoc */
++	    {
++	      /* Translate xyz 1 to xyz(1) 
++	       * Allow for multiple spaces.  Allow the section to be missing.
++	       */
++	      char buff[NULL_TERMINATED(MED_STR_MAX)];
++	      char *bufptr;
++	      trans_char(c,'"','\a');
++	      bufptr = buff;
++	      c = c+j;
++	      if (*c == '\n') c++; /* Skip spaces */
++	      while (isspace(*c) && *c != '\n') c++;
++	      while (isalnum(*c)) { /* Copy the xyz part */
++		*bufptr = *c;
++		bufptr++; if (bufptr >= buff + MED_STR_MAX) break;
++		c++;
++	      }
++	      while (isspace(*c) && *c != '\n') c++;	/* Skip spaces */
++	      if (isdigit(*c)) { /* Convert the number if there is one */
++		*bufptr = '(';
++		bufptr++; 
++		if (bufptr < buff + MED_STR_MAX) {
++		  while (isalnum(*c)) { 
++		    *bufptr = *c; 
++		    bufptr++; if (bufptr >= buff + MED_STR_MAX) break;
++		    c++;
++		  }
++		  if (bufptr < buff + MED_STR_MAX) {
++		    *bufptr = ')';
++		    bufptr++;
++		  }
++		}
++	      }
++
++	      while (*c != '\n') { /* Copy the remainder */
++		if (!isspace(*c)) {
++		  *bufptr = *c;
++		  bufptr++; if (bufptr >= buff + MED_STR_MAX) break;
++		}
++		c++;
++	      }
++	      *bufptr = '\n';
++	      scan_troff_mandoc(buff, 1, NULL);
++
++	      out_html(NEWLINE);
++	      if (fillout) curpos++; else curpos=0;
++	    }
++	    break;	  
++	case V('F','l'):	/* BSD mandoc */
++	    trans_char(c,'"','\a');
++	    c=c+j;
++	    out_html("-");
++	    if (*c!='\n') {
++	        out_html(change_to_font('B'));
++	        c=scan_troff_mandoc(c, 1, NULL);
++	        out_html(change_to_font('R'));
++            }
++	    out_html(NEWLINE);
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('P','a'):	/* BSD mandoc */
++	case V('P','f'):	/* BSD mandoc */
++	    trans_char(c,'"','\a');
++	    c=c+j;
++	    if (*c=='\n') c++;
++	    c=scan_troff_mandoc(c, 1, NULL);
++	    out_html(NEWLINE);
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('P','p'):	/* BSD mandoc */
++	    if (fillout) out_html("<P>\n"); else {
++		out_html(NEWLINE);
++		NEWLINE[0]='\n';
++	    }
++	    curpos=0;
++	    c=skip_till_newline(c);
++	    break;
++	case V('D','q'):	/* BSD mandoc */
++	    trans_char(c,'"','\a');
++	    c=c+j;
++	    if (*c=='\n') c++;
++	    out_html("``");
++	    c=scan_troff_mandoc(c, 1, NULL);
++	    out_html("''");
++	    out_html(NEWLINE);
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('O','p'):	/* BSD mandoc */
++	    trans_char(c,'"','\a');
++	    c=c+j;
++	    if (*c=='\n') c++;
++	    out_html(change_to_font('R'));
++	    out_html("[");
++	    c=scan_troff_mandoc(c, 1, NULL);
++	    out_html(change_to_font('R'));
++	    out_html("]");
++	    out_html(NEWLINE);
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('O','o'):	/* BSD mandoc */
++	    trans_char(c,'"','\a');
++	    c=c+j;
++	    if (*c=='\n') c++;
++	    out_html(change_to_font('R'));
++	    out_html("[");
++	    c=scan_troff_mandoc(c, 1, NULL);
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('O','c'):	/* BSD mandoc */
++	    trans_char(c,'"','\a');
++	    c=c+j;
++	    c=scan_troff_mandoc(c, 1, NULL);
++	    out_html(change_to_font('R'));
++	    out_html("]");
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('P','q'):	/* BSD mandoc */
++	    trans_char(c,'"','\a');
++	    c=c+j;
++	    if (*c=='\n') c++;
++	    out_html("(");
++	    c=scan_troff_mandoc(c, 1, NULL);
++	    out_html(")");
++	    out_html(NEWLINE);
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('Q','l'):	/* BSD mandoc */
++	  {			/* Single quote first word in the line */
++	    char *sp;
++	    trans_char(c,'"','\a');
++	    c=c+j;
++	    if (*c=='\n') c++;
++	    sp = c;	  
++	    do {		/* Find first whitespace after the 
++				 * first word that isn't a mandoc macro 
++				 */
++	      while (*sp && isspace(*sp)) sp++;	    
++	      while (*sp && !isspace(*sp)) sp++;
++	    } while (*sp && isupper(*(sp-2)) && islower(*(sp-1)));
++
++				/* Use a newline to mark the end of text to 
++				 * be quoted 
++				 */
++	    if (*sp) *sp = '\n';
++	    out_html("`");	/* Quote the text */
++	    c=scan_troff_mandoc(c, 1, NULL);
++	    out_html("'");
++	    out_html(NEWLINE);
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	  }
++	case V('S','q'):	/* BSD mandoc */
++	    trans_char(c,'"','\a');
++	    c=c+j;
++	    if (*c=='\n') c++;
++	    out_html("`");
++	    c=scan_troff_mandoc(c, 1, NULL);
++	    out_html("'");
++	    out_html(NEWLINE);
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('A','r'):	/* BSD mandoc */
++            /* parse one line in italics */
++	    out_html(change_to_font('I'));
++	    trans_char(c,'"','\a');
++	    c=c+j;
++	    if (*c=='\n') {	/* An empty Ar means "file ..." */
++	        out_html("file ...");
++	    }
++	    else {
++	        c=scan_troff_mandoc(c, 1, NULL);
++	    }
++	    out_html(change_to_font('R'));
++	    out_html(NEWLINE);
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('A','d'):	/* BSD mandoc */
++	case V('E','m'):	/* BSD mandoc */
++	case V('V','a'):	/* BSD mandoc */
++	case V('X','c'):	/* BSD mandoc */
++            /* parse one line in italics */
++	    out_html(change_to_font('I'));
++	    trans_char(c,'"','\a');
++	    c=c+j;
++	    if (*c=='\n') c++;
++	    c=scan_troff_mandoc(c, 1, NULL);
++	    out_html(change_to_font('R'));
++	    out_html(NEWLINE);
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('N','d'):	/* BSD mandoc */
++	    trans_char(c,'"','\a');
++	    c=c+j;
++	    if (*c=='\n') c++;
++	    out_html(" - ");
++	    c=scan_troff_mandoc(c, 1, NULL);
++	    out_html(NEWLINE);
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('N','m'):	/* BSD mandoc */
++	  {
++	    static char mandoc_name[NULL_TERMINATED(SMALL_STR_MAX)] = "";
++	    trans_char(c,'"','\a');
++	    c=c+j;
++	    if (mandoc_synopsis) {    /* Break lines only in the Synopsis. 
++				       * The Synopsis section seems to be treated
++				       * as a special case - Bummer!
++				       */
++	        static int count = 0; /* Don't break on the first Nm */
++	        if (count) {
++		    out_html("<BR>");
++		}
++		else {
++		    char *end = strchr(c, '\n');
++		    if (end) {	/* Remember the name for later. */
++		        strlimitcpy(mandoc_name, c, end - c, SMALL_STR_MAX);
++		    }
++		}
++		count++;
++	    }			
++	    out_html(change_to_font('B'));
++	    while (*c == ' '|| *c == '\t') c++;
++	    if (*c == '\n') {	/* If Nm has no argument, use one from an earlier
++				 * Nm command that did have one.  Hope there aren't
++				 * too many commands that do this.
++				 */
++	        out_html(mandoc_name);
++	    } 
++	    else {
++	        c=scan_troff_mandoc(c, 1, NULL);
++	    }
++	    out_html(change_to_font('R'));
++	    out_html(NEWLINE);
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	  }
++	case V('C','d'):	/* BSD mandoc */
++	case V('C','m'):	/* BSD mandoc */
++	case V('I','c'):	/* BSD mandoc */
++	case V('M','s'):	/* BSD mandoc */
++	case V('O','r'):	/* BSD mandoc */
++	case V('S','y'):	/* BSD mandoc */
++            /* parse one line in bold */
++	    out_html(change_to_font('B'));
++	    trans_char(c,'"','\a');
++	    c=c+j;
++	    if (*c=='\n') c++;
++	    c=scan_troff_mandoc(c, 1, NULL);
++	    out_html(change_to_font('R'));
++	    out_html(NEWLINE);
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('D','v'):	/* BSD mandoc */
++	case V('E','v'):	/* BSD mandoc */
++	case V('F','r'):	/* BSD mandoc */
++	case V('L','i'):	/* BSD mandoc */
++	case V('N','o'):	/* BSD mandoc */
++	case V('N','s'):	/* BSD mandoc */
++	case V('T','n'):	/* BSD mandoc */
++	case V('n','N'):	/* BSD mandoc */
++	    trans_char(c,'"','\a');
++	    c=c+j;
++	    if (*c=='\n') c++;
++	    out_html(change_to_font('B'));
++	    c=scan_troff_mandoc(c, 1, NULL);
++	    out_html(change_to_font('R'));
++	    out_html(NEWLINE);
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('%','A'):	/* BSD mandoc biblio stuff */
++	case V('%','D'):
++	case V('%','N'):
++	case V('%','O'):
++	case V('%','P'):
++	case V('%','Q'):
++	case V('%','V'):
++	    c=c+j;
++	    if (*c=='\n') c++;
++	    c=scan_troff(c, 1, NULL); /* Don't allow embedded mandoc coms */
++	    if (fillout) curpos++; else curpos=0;
++	    break;
++	case V('%','B'):
++	case V('%','J'):
++	case V('%','R'):
++	case V('%','T'):
++	    c=c+j;
++	    out_html(change_to_font('I'));
++	    if (*c=='\n') c++;
++	    c=scan_troff(c, 1, NULL); /* Don't allow embedded mandoc coms */
++	    out_html(change_to_font('R'));
++	    if (fillout) curpos++; else curpos=0;
++	    break;
+ 	default:
+             /* search macro database of self-defined macros */
+ 	    owndef = defdef;
+@@ -2429,7 +3207,12 @@
+ 		for (i=1;i<words; i++) wordlist[i][-1]='\0';
+ 		for (i=0; i<words; i++) {
+ 		    char *h=NULL;
+-		    scan_troff(wordlist[i],1,&h);
++		    if (mandoc_command) {
++		      scan_troff_mandoc(wordlist[i],1,&h);
++		    }
++		    else {
++		      scan_troff(wordlist[i],1,&h);
++		    }
+ 		    wordlist[i]=h;
+ 		}
+ 		for (i=words;i<20; i++) wordlist[i]=NULL;
+@@ -2438,13 +3221,40 @@
+ 		oldargument=argument;
+ 		argument=wordlist;
+ 		onff=newline_for_fun;
+-		scan_troff(owndef->st+deflen+2, 0, NULL);
++		if (mandoc_command) {
++		  scan_troff_mandoc(owndef->st+deflen+2, 0, NULL);
++		}
++		else {
++		  scan_troff(owndef->st+deflen+2, 0, NULL);
++		}
+ 		newline_for_fun=onff;
+ 		argument=oldargument;
+ 		for (i=0; i<words; i++) if (wordlist[i]) free(wordlist[i]);
+ 		*sl='\n';
+-	    } else
++	    }
++	    else if (mandoc_command && 
++		     ((isupper(*c) && islower(*(c+1)))
++		      || (islower(*c) && isupper(*(c+1))))
++		     ) {	/* Let through any BSD mandoc commands that haven't
++				 * been delt with.
++				 * I don't want to miss anything out of the text.
++				 */
++	        char buf[4];
++		strncpy(buf,c,2);
++		buf[2] = ' ';	
++		buf[3] = '\0';
++		out_html(buf);	/* Print the command (it might just be text). */
++	        c=c+j;
++	        trans_char(c,'"','\a');
++		if (*c=='\n') c++;
++		out_html(change_to_font('R'));
++		c=scan_troff(c, 1, NULL);
++		out_html(NEWLINE);
++		if (fillout) curpos++; else curpos=0;
++	    }
++	    else {
+ 		c=skip_till_newline(c);
++	    }
+ 	    break;
+ 	}
+     }
+@@ -2453,16 +3263,19 @@
+     return c;
+ }
+ 
+-void flush(void)
++static void flush(void)
+ {
+ }
+ 
+ static int contained_tab=0;
++static int mandoc_line=0;	/* Signals whether to look for embedded mandoc
++				 * commands.
++				 */
+ 
+-char *scan_troff(char *c, int san, char **result)
++static char *scan_troff(char *c, int san, char **result)
+ {   /* san : stop at newline */
+     char *h;
+-    char intbuff[500];
++    char intbuff[NULL_TERMINATED(MED_STR_MAX)];
+     int ibp=0;
+     int i;
+ #define FLUSHIBP  if (ibp) { intbuff[ibp]=0; out_html(intbuff); ibp=0; }
+@@ -2482,15 +3295,17 @@
+ 	    buffpos=strlen(buffer);
+ 	    buffmax=buffpos;
+ 	} else {
+-	    buffer=(char *) malloc(1000*sizeof(char));
++	    buffer = stralloc(LARGE_STR_MAX);
+ 	    buffpos=0;
+-	    buffmax=1000;
++	    buffmax=LARGE_STR_MAX;
+ 	}
+ 	scaninbuff=1;
+     }
+     h=c;
+     /* start scanning */
++
+     while (*h && (!san || newline_for_fun || *h!='\n')) {
++
+ 	if (*h==escapesym) {
+ 	    h++;
+ 	    FLUSHIBP;
+@@ -2500,6 +3315,14 @@
+ 	    FLUSHIBP;
+ 	    h = scan_request(h);
+ 	    if (san && h[-1]=='\n') h--;
++	} else if (mandoc_line
++		   && *(h) && isupper(*(h))
++		   && *(h+1) && islower(*(h+1)) 
++		   && *(h+2) && isspace(*(h+2))) {
++	    /* BSD imbedded command eg ".It Fl Ar arg1 Fl Ar arg2" */
++	    FLUSHIBP;
++	    h = scan_request(h);
++	    if (san && h[-1]=='\n') h--;
+ 	} else if (*h==nobreaksym && h[-1]=='\n') {
+ 	    h++;
+ 	    FLUSHIBP;
+@@ -2611,7 +3434,7 @@
+ 		curpos++;
+ 		break;
+ 	    }
+-	    if (ibp>480) FLUSHIBP;
++	    if (ibp > (MED_STR_MAX - 20)) FLUSHIBP;
+ 	    h++;
+ 	}
+     }
+@@ -2629,24 +3452,60 @@
+     return h;
+ }
+ 
+-char *sectionname=NULL;
+-STRDEF *foundpages=NULL;
+ 
+-int search_manpath_all(char *name)
++static char *scan_troff_mandoc(char *c, int san, char **result)
+ {
+-    char smfbuf[1000];
+-    char cmpbuf[100];
++    char *ret, *end = c;
++    int oldval = mandoc_line;
++    mandoc_line = 1;
++    while (*end && *end != '\n') {
++        end++;
++    }
++
++    if (end > c + 2
++        && ispunct(*(end - 1)) 
++	&& isspace(*(end - 2)) && *(end - 2) != '\n') {
++      /* Don't format lonely punctuation E.g. in "xyz ," format
++       * the xyz and then append the comma removing the space.
++       */
++        *(end - 2) = '\n';
++	ret = scan_troff(c, san, result);
++        *(end - 2) = *(end - 1);
++        *(end - 1) = ' ';
++    }
++    else {
++	ret = scan_troff(c, san, result);
++    }
++    mandoc_line = oldval;
++    return ret;
++}
++
++
++static char *sectionname=NULL;
++static STRDEF *foundpages=NULL;
++
++static int search_manpath_all(char *name)
++{
++    char smfbuf[NULL_TERMINATED(LARGE_STR_MAX)];
++    char cmpbuf[NULL_TERMINATED(MED_STR_MAX)];
+     int i,j,n,l,nr=0;
+     DIR *dr;
+     struct dirent *de;
+     STRDEF *h=NULL;
+ 
+-    strcpy(cmpbuf,name);
++    strmaxcpy(cmpbuf,name, MED_STR_MAX - 2);
++    if (strlen(name) > MED_STR_MAX) {
++      fprintf(stderr, 
++	      "man2html: search_manpath_all - name too long: \n%-80s...\n",
++	      name);
++      exit(EXIT_FAILURE);
++    }
++
+     n=strlen(name);
+     cmpbuf[n++]='.';
+     cmpbuf[n+1]='\0';
+     for (i=0; manpath[i]; i++) {
+-	strcpy(smfbuf, manpath[i]);
++	strmaxcpy(smfbuf, manpath[i], LARGE_STR_MAX - 10);
+ 	l=strlen(smfbuf);
+ 	strcpy(smfbuf+l, "man");
+ 	l+=3;
+@@ -2656,18 +3515,15 @@
+ 	    cmpbuf[n]=sections[j];
+ 	    if ((dr=opendir(smfbuf))) {
+ 		while ((de=readdir(dr))) {
+-		    if (!strncmp(de->d_name, cmpbuf, n+1)) {
+-			int stlen;
++		    if (!strncasecmp(de->d_name, cmpbuf, n+1)) {
+ 			if (h) {
+ 			    h->next=(STRDEF*) malloc(sizeof(STRDEF));
+ 			    h=h->next;
+ 			} else
+ 			    h=foundpages=(STRDEF*) malloc(sizeof(STRDEF));
+ 			h->nr=i*256+j;
+-			stlen=strlen(de->d_name)+1;
+-			h->st=(char*) malloc(stlen*sizeof(char));
+ 			nr++;
+-			strcpy(h->st, de->d_name);
++			h->st = strduplicate(de->d_name);
+ 			h->next=NULL;
+ 		    }
+ 		}
+@@ -2678,10 +3534,10 @@
+     return nr;
+ }
+ 
+-int search_manpath_section(char *name, char* section)
++static int search_manpath_section(char *name, char* section)
+ {
+-    char smfbuf[1000];
+-    char cmpbuf[100];
++    char smfbuf[NULL_TERMINATED(LARGE_STR_MAX)];
++    char cmpbuf[NULL_TERMINATED(SMALL_STR_MAX)];
+     int i,j,n,l,nr=0;
+     DIR *dr;
+     struct dirent *de;
+@@ -2691,13 +3547,19 @@
+     j=0;
+     while (sections[j] && sections[j]!=section[0]) j++;
+     if (!sections[j]) return search_manpath_all(name);
+-    strcpy(cmpbuf,name);
++    if (strlen(name) > SMALL_STR_MAX) {
++      fprintf(stderr, 
++	      "man2html: search_manpath_section - name too long: \n%-80s...\n",
++	      name);
++      exit(EXIT_FAILURE);
++    }
++    strmaxcpy(cmpbuf,name, SMALL_STR_MAX);
+     n=strlen(name);
+     cmpbuf[n++]='.';
+     cmpbuf[n++]=section[0];
+     cmpbuf[n]='\0';
+     for (i=0; manpath[i]; i++) {
+-	strcpy(smfbuf, manpath[i]);
++	strmaxcpy(smfbuf, manpath[i], LARGE_STR_MAX - 10);
+ 	l=strlen(smfbuf);
+ 	strcpy(smfbuf+l, "man");
+ 	l+=3;
+@@ -2705,7 +3567,7 @@
+ 	smfbuf[l+1]='\0';
+ 	if ((dr=opendir(smfbuf))) {
+ 	    while ((de=readdir(dr))) {
+-		if (!strncmp(de->d_name, cmpbuf, n)) {
++		if (!strncasecmp(de->d_name, cmpbuf, n)) {
+ 		    int stlen;
+ 		    if (h) {
+ 			h->next=(STRDEF*) malloc(sizeof(STRDEF));
+@@ -2713,10 +3575,8 @@
+ 		    } else
+ 			h=foundpages=(STRDEF*) malloc(sizeof(STRDEF));
+ 		    h->nr=i*256+j;
+-		    stlen=strlen(de->d_name)+1;
+-		    h->st=(char*) malloc(stlen*sizeof(char));
+ 		    nr++;
+-		    strcpy(h->st, de->d_name);
++		    h->st = strduplicate(de->d_name);
+ 		    h->next=NULL;
+ 		}
+ 	    }
+@@ -2726,25 +3586,106 @@
+     return nr;
+ }
+ 
+-static char smfbuf[1000];
++static char smfbuf[NULL_TERMINATED(LARGE_STR_MAX)];
+ 
+-char *search_manpath(char *name)
++static char *search_manpath(char *name)
+ {
+     int i,j,n,l,nr=0;
+     struct stat stbuf;
+ 
+     for (i=0; manpath[i]; i++) {
+-	strcpy(smfbuf, manpath[i]);
+-	strcat(smfbuf, name);
++	if (strlen(name) + strlen(manpath[i]) > LARGE_STR_MAX) {
++	    fprintf(stderr, 
++		    "man2html: search_manpath - name too long: \n%-80s...\n",
++		    name);
++	    exit(EXIT_FAILURE);
++        }
++	strmaxcpy(smfbuf, manpath[i], LARGE_STR_MAX);
++	strmaxcat(smfbuf, name, LARGE_STR_MAX);
+ 	if (stat(smfbuf, &stbuf) !=-1) return smfbuf;
+     }
+     return NULL;
+ }
+ 
+-int main(int argc, char **argv)
++static void get_man_config()
++{
++#ifdef MAN_CONFIG
++  FILE *config = NULL;
++  int num_paths = 1;			/* Zero is reserved for searches */
++  int num_zcats = 0;
++  char buffer[NULL_TERMINATED(MED_STR_MAX + 1)]; /* Allow for adding a "/" */
++
++  config = fopen(MAN_CONFIG, "r");
++  if (!config) {
++    return;				/* Assume no config. */
++  }
++
++  while (fgets(buffer, MED_STR_MAX, config)) {
++    char *dir, *line = buffer;
++    line = line + strspn(line, " \t"); /* Skip spaces and tabs */
++    if (num_paths < MAX_MAN_PATHS 
++	&& strncmp("MANPATH", line, 7) == 0 
++	&& (dir = strchr(line, '/'))) {	/* dir points to start of dir-name */
++      char *end_dir = strpbrk(dir, " \t\n") ;
++      if (end_dir) {			/* End of dir name. */
++	(*end_dir) = '/';		/* Replace newline/space with "/" */
++        (*(end_dir + 1)) = '\0';
++      }
++      manpath[num_paths] = strduplicate(dir);
++      num_paths++;
++    }
++#ifndef DISABLE_ZCATS
++    else if (num_zcats < MAX_ZCATS
++	     && *line == '.') {
++      char *sp, *new;
++      line[strlen(line) - 1] = '\0';	/* Remove newline */
++      zcats[num_zcats] = strduplicate(line);
++      sp = strpbrk(zcats[num_zcats], " \t");
++      if (sp) {				/* Chop off trailing spaces */
++	(*sp) = '\0';
++	num_zcats++;
++      }
++      else {
++	free(zcats[num_zcats]);
++      }
++    }
++#endif
++  }
++  if (num_paths != 0) {			/* Mark new end of paths list */
++    manpath[num_paths] = NULL;
++  }
++#ifndef DISABLE_ZCATS
++  if (num_zcats != 0) {			/* Mark new end of zcats list */
++    zcats[num_zcats] = NULL;
++  }
++#endif
++
++#ifndef UNSECURE_MANPATH
++					/* Make sure settable first path is
++					 * a valid path.
++					 */
++
++  if (strcmp(manpath[0], "/") != 0) {   /* Something other than default */
++    int i;
++    for (i = 1; manpath[i]; i++) {	/* Set - see if it is a valid prefix */
++      if (strncmp(manpath[i], manpath[0], strlen(manpath[i])) == 0) {
++	break;				/* valid */
++      }
++    }
++					/* Also check for .. */
++    if (!manpath[i] || strstr(manpath[0], "..") != NULL) { /* invalid */
++      fprintf(stderr, "man2html: invalid -M path: %s\n", manpath[0]);
++      manpath[0] = manpath[1];
++    }
++  }
++#endif
++  fclose(config);
++#endif
++}
++
++void main(int argc, char **argv)
+ {
+     FILE *f;
+-    struct stat stbuf;
+     char *t=NULL;
+     int l,i;char *buf;
+     int mopt=0;
+@@ -2753,18 +3694,19 @@
+     STRDEF *stdf;
+ 
+     t = getenv("PATH_INFO");
++
+     if (!t || !*t) /* not :  cgi/man2html/mani/name.i */ {
+ 	i=1;
+ 	while (i<argc) {
+ 	    switch (argv[i][0]) {
+ 	    case '-':
+-		if (argv[i][1]=='M') {
++		if (argv[i][1]=='M') {	/* First path to search */
+ 		    mopt=1;
+ 		    if (i+1<argc) {
+ 			char *s1, *s2;
+ 			i++;
+ 			l=strlen(argv[i]);
+-			manpath[0]=(char*) malloc(l+2);
++			manpath[0] = stralloc(l+2);
+ 			s1=manpath[0];
+ 			s2=argv[i];
+ 			while ((*s1=*s2)) {
+@@ -2786,6 +3728,7 @@
+ 		break;
+ 	    case '1': case '2': case '3': case '4': case '5': case '6':
+ 	    case '7': case '8': case '9': case 'n': case 'l':
++					/* Section name eg 1 or 1n */
+ 		if (!argv[i][1]) {
+ 		    sectionname=argv[i];
+ 		    break;
+@@ -2802,12 +3745,11 @@
+ 	    }
+ 	    i++;
+ 	}
+-	if (t) {
++	if (t) {			/* Man page name */
+ 	    char *s1, *s2;
+ 	    i++;
+-	    l=strlen(t);
+ 	    s2=t;
+-	    t=s1=(char*) malloc(l);
++	    t = s1 = stralloc(strlen(t));
+ 	    while ((*s1=*s2)) {
+ 		if (*s2=='%') {
+ 		    s2++;
+@@ -2823,17 +3765,48 @@
+ 	    }
+ 	}
+     }
+-    if (!t || !*t) usage();
++    if (!t || !*t) usage();		/* No man page requested */
++
++    get_man_config();
++
+     i=0;
+     h=t;
++
++    if (strncmp(CGIBASE, "http:", 5) == 0 && strncmp(CGIBASE, "http://", 7) != 0 
++	&& getenv("SERVER_NAME")) {	
++
++        /* Work out name for any redirect */
++
++        char *ptr = CGIBASE;
++	char *s = getenv("SERVER_NAME");
++	if (strlen(s) > MED_STR_MAX - strlen(CGIBASE) - 7) {
++	  fprintf(stderr, 
++		  "man2html: error - server name is too long: \n%-80s...\n",
++		  s);
++	  exit(EXIT_FAILURE);
++	}
++        strmaxcpy(location_base, "http://", MED_STR_MAX);
++        strmaxcat(location_base, getenv("SERVER_NAME"), MED_STR_MAX);
++        strmaxcat(location_base, ptr + 5, MED_STR_MAX);	    
++    }
++    else {
++        strcpy(location_base, CGIBASE);
++    }
++
+     while (*h) i=i+(*h++ == '/');
+     if (i==0) {
+ 	if (sectionname) {
+-	    char fname[1000];
++	    char fname[NULL_TERMINATED(LARGE_STR_MAX)];
++	    if (strlen(t) + strlen(sectionname) + 6 > LARGE_STR_MAX) {
++	        fprintf(stderr, 
++			"man2html: error - name too long: man%c/%-80s.%-80s\n",
++			sectionname[0],t,sectionname);
++	        exit(EXIT_FAILURE);
++	    }
+ 	    sprintf(fname, "man%c/%s.%s", sectionname[0],t,sectionname);
+ 	    h=search_manpath(fname);
+ 	    if (h) {
+-		printf("Location: " CGIBASE "%s\n\n", h);
++		printf("Location: %s%s\n\n", location_base, h);
+ 		exit(0);
+ 	    } else {
+ 		if (sectionname[1]) fname[strlen(fname)-1]='\0';
+@@ -2843,7 +3816,8 @@
+ 	}
+ 	if (!i) i=search_manpath_all(t);
+ 	if (i==1 || (i>1 && mopt)) {
+-	    printf("Location: " CGIBASE "%sman%c/%s\n\n",
++	    printf("Location: %s%sman%c/%s\n\n",
++		   location_base,
+ 		   manpath[foundpages->nr/256],
+ 		   sections[foundpages->nr%256],
+ 		   foundpages->st);
+@@ -2858,40 +3832,61 @@
+ 	    printf("Sorry, no manpages available for %s.\n", t);
+ 	else {
+ 	    STRDEF *strd;
+-	    printf("<UL>\n");
++	    fputs("<UL>\n", stdout);
+ 	    strd=foundpages;
+ 	    while (strd) {
+ 		printf("<LI><A HREF=\"" CGIBASE "%sman%c/%s\">"
+ 		       "%s</A> (%s)\n", manpath[strd->nr/256],
+-		       sections[strd->nr%256], strd->st, strd->st,
++		       sections[strd->nr%256], strd->st, trim_compress_suffix(strd->st),
+ 		       manpath[strd->nr/256]);
+ 		strd=strd->next;
+ 	    }
+-	    printf("</UL>\n");
++	    fputs("</UL>\n", stdout);
+ 	}
+-	printf("</BODY></HTML>\n");
++	fputs("</BODY></HTML>\n", stdout);
+ 	exit(0);
+     }
+-    printf("Content-type: text/html\n\n");
+-    h=strstr(t, "man");
+-    if (!h) {
++    fputs("Content-type: text/html\n\n", stdout);
++
++    if (*t == '/') {
++      for (i = 1; manpath[i]; i++) {
++	if (strncmp(manpath[i], t, strlen(manpath[i])) == 0) {
++	  break;
++	}
++      }
++      if (!manpath[i]) {
++	fprintf(stderr, "man2html: request for non man file %s\n", t);
++	printf("<HTML><HEAD><TITLE>Manpage: Error</TITLE>\n"
++	       "</HEAD><BODY>\n<H1>Only manpages are allowed.</H1>\n"
++	       "To view the file you wanted, use this\n"
++	       "<A HREF=\"file:%s\">link</A> instead\n"
++	       "</BODY></HTML>\n", t);
++	exit(0);
++      }
++    }
++    else {
++      fprintf(stderr, "man2html: request for non man file %s\n", t);
++      h=strstr(t, "man"); 
++      if (!h || strchr(h, '/') == NULL) {
+ 	printf("<HTML><HEAD><TITLE>Manpage: Error</TITLE>\n"
+ 	       "</HEAD><BODY>\n<H1>Only manpages are allowed</H1>\n"
+-	       "You specified a file which did not contain the keyword\n"
+-	       "<B>man</B>. To view the file you wanted, use this\n"
++	       "To view the file you wanted, use this\n"
+ 	       "<A HREF=\"file:%s\">link</A> instead\n"
+ 	       "</BODY></HTML>\n", t);
+ 	exit(0);
++      }
+     }
++
+     h=strstr(t,"/../");
+     if (h) {
+-	printf("<HTML><HEAD><TITLE>Manpage: Error</TITLE>\n"
+-	       "</HEAD><BODY>\n<H1>Warning.</H1>\n"
+-	       "You still try to get files which are manpages. Using the\n"
+-	       "<B>..</B> construction to get to a different directory will\n"
+-	       "<B>not</B> work either. If you try this very often, you\n"
+-	       "will end up in a black list.\n"
+-	       "</BODY></HTML>\n");
++        fprintf(stderr, "man2html: attempt to use .. in man2html: %s\n", t);
++	fputs("<HTML><HEAD><TITLE>Manpage: Error</TITLE>\n"
++	      "</HEAD><BODY>\n<H1>Warning.</H1>\n"
++	      "You still try to get files which are manpages. Using the\n"
++	      "<B>..</B> construction to get to a different directory will\n"
++	      "<B>not</B> work either. If you try this very often, you\n"
++	      "will end up in a black list.\n"
++	      "</BODY></HTML>\n", stdout);
+ 	exit(0);
+     }
+     h=search_manpath(t);
+@@ -2919,13 +3914,14 @@
+        	i=search_manpath_all(h);
+ 	if (!i) {
+ 	    if (sectionname)
+-		printf(",nor in any other section.\n");
++	      fputs(", nor in any other section.\n", stdout);
+ 	    else
+-		printf("in any section.\n");
+-	    printf("<HR>\n"
+-		   "The links to other manual pages are not always correct.\n"
+-		   "Normally you will get a list of possible replacements,\n"
+-		   "but in this case the manual page just can't be found.\n");
++	      fputs("in any section.\n", stdout);
++	    fputs("<HR>\n"
++		  "The links to other manual pages are not always correct.\n"
++		  "Normally you will get a list of possible replacements,\n"
++		  "but in this case the manual page just can't be found.\n",
++		  stdout);
+ 	} else {
+ 	    STRDEF *strd;
+ 	    printf(".\nMaybe you can use %s instead.\n<UL>\n",
+@@ -2934,13 +3930,13 @@
+ 	    while (strd) {
+ 		printf("<LI><A HREF=\"" CGIBASE "%sman%c/%s\">"
+ 		       "%s</A> (%s)\n", manpath[strd->nr/256],
+-		       sections[strd->nr%256], strd->st, strd->st,
++		       sections[strd->nr%256], strd->st, trim_compress_suffix(strd->st),
+ 		       manpath[strd->nr/256]);
+ 		strd=strd->next;
+ 	    }
+-	    printf("</UL>\n");
++	    fputs("</UL>\n", stdout);
+ 	}
+-	printf("</BODY></HTML>\n");
++	fputs("</BODY></HTML>\n", stdout);
+ 	exit(0);
+     }
+     fullname=h;
+@@ -2951,10 +3947,8 @@
+ 	    h=t+1;
+ 	*t='/';
+     }
+-    if (stat(h, &stbuf)!=-1) l=stbuf.st_size;
+-    buf = (char*) malloc((l+5)*sizeof(char));
+-    f=fopen(h,"r");
+-    if (!f || !buf || !l) {
++    buf=read_man_page(h);
++    if (!buf) {
+ 	t=strrchr(h,'.');
+ 	if (t) *t='\0';
+ 	t=strrchr(h,'/');
+@@ -2965,8 +3959,6 @@
+ 	       "</BODY></HTML>\n", t,t,t);
+ 	exit(0);
+     }
+-    i=fread(buf+1,1,l,f);
+-    fclose(f);
+     fname=h;
+ #ifdef MAKEINDEX
+     idxfile=fopen(INDEXFILE, "a");
+@@ -2996,14 +3988,11 @@
+     }
+     intdef=&standardint[0];
+     defdef=NULL;
+-    buf[0]='\n';
+-    buf[l]='\n';
+-    buf[l+1]=buf[l+2]='\0';
+     scan_troff(buf+1,0,NULL);
+     while (itemdepth || dl_set[itemdepth]) {
+ 	out_html("</DL>\n");
+ 	if (dl_set[itemdepth]) dl_set[itemdepth]=0;
+-	else itemdepth--;
++	else if (itemdepth > 0) itemdepth--;
+     }
+     out_html(change_to_font(0));
+     out_html(change_to_size(0));
+@@ -3014,13 +4003,14 @@
+     out_html(NEWLINE);
+     if (output_possible) {
+ 	/* &nbsp; for mosaic users */
+-	printf("<HR>\n<A NAME=\"index\">&nbsp;</A><H2>Index</H2>\n<DL>\n");
++	fputs("<HR>\n<A NAME=\"index\">&nbsp;</A><H2>Index</H2>\n<DL>\n", 
++	      stdout);
+ 	manidx[mip]=0;
+-	printf(manidx);
+-	if (subs) printf("</DL>\n");
+-	printf("</DL>\n");
++	fputs(manidx,stdout);
++	if (subs) fputs("</DL>\n", stdout);
++	fputs("</DL>\n", stdout);
+ 	print_sig();
+-	printf("</BODY>\n</HTML>\n");
++	fputs("</BODY>\n</HTML>\n", stdout);
+     } else {
+ 	printf("<HTML><HEAD><TITLE>Invalid Manpage</TITLE></HEAD>\n"
+ 	       "<BODY><H1>Invalid Manpage</H1>\n"
+@@ -3033,7 +4023,7 @@
+ 	       "<A HREF=\"file://localhost%s\">plain file</A>\n",
+ 	       fullname);
+ 	print_sig();
+-	printf("</BODY>\n</HTML>\n");
++	fputs("</BODY>\n</HTML>\n", stdout);
+     }
+ #ifdef MAKEINDEX
+     if (idxfile) fclose(idxfile);

@@ -1,0 +1,715 @@
+#!	/bin/sh
+# Please make sure this file can be executed by both "bash" and "ash".
+
+umask 022
+readonly rm=rm
+
+readonly bold='[1m'
+readonly clear='[H[J'
+readonly norm='[0;10m'
+
+readonly ModuleHelp=/usr/lib/module_help
+
+readonly TempFile="/tmp/`echo $0|sed -e 's/^.*\///'`.$$"
+
+count_words () {
+	echo "$#"
+}
+
+first () {
+	echo "$1"
+}
+
+second () {
+	echo "$2"
+}
+
+third () {
+	echo "$3"
+}
+
+fourth () {
+	echo "$4"
+}
+
+last () {
+	eval echo $"$#"
+}
+
+write_it_down () {
+	local reply
+	echo ""
+	echo "$1"
+	echo ""
+	echo "$bold"\
+"Something went wrong. You might want to write down the error messages
+before you continue. Please press ENTER when you are ready.$norm"
+	read reply
+	return $?
+}
+
+# Shell interface to "dialog"
+# Bruce Perens, November 1995
+# This is free software under the GNU General Public License.
+
+# Global options
+#	The variable $BACKTITLE specifies the back title.
+#	The variable $DIALOG_OPTIONS, initialized here to --clear, provides
+#	options you want on the command line of each dialog invocation.
+#	The variable $DIALOG_TEST can be set to "echo" to see the calls
+#	to dialog without executing them.
+
+DIALOG_OPTIONS=""
+
+# Make any dialogue box, with default settings and backtitle from
+# $BACKTITLE in the environment.
+#
+# dialog --type arg arg ...
+#
+dialogBox () {
+	local type="$1"
+	shift
+	local title=""
+	local backtitle=""
+
+	local text="$1"
+	shift
+
+	if [ $# -ge 1 ]; then
+		title="$1"
+		shift
+	fi
+
+	if [ -n "$BACKTITLE" ]; then
+		backtitle="$BACKTITLE"
+	fi
+
+	$DIALOG_TEST dialog $DIALOG_OPTIONS --title "$title" --backtitle \
+	 "$backtitle" "$type" "$text" 0 0 "$@" 2>&1 1>/dev/tty
+	return $?
+}
+
+# Display a file.
+#
+# fileBox filename [title]
+#
+fileBox () {
+	dialogBox --textbox "$1" "$2"
+}
+
+# textBox takes presents its standard input in a dialog box. This
+# is useful for "here documents" and pipes.
+#
+# textBox [title]
+#
+textBox () {
+	cat >$TempFile
+
+	if [ $? -ne 0 ]; then
+		echo "Can't make temporary file for dialog box." 1>&2
+		return -1
+	fi
+
+	# Note that dialog needs stdin to be the terminal, so I redirect here.
+	< /dev/tty dialogBox --textbox $TempFile "$1"
+	local result=$?
+	${rm} -f $TempFile
+	return $result
+}
+
+msgBox () {
+	dialogBox --msgbox "$1" "$2"
+}
+
+infoBox () {
+	dialogBox --infobox "$1" "$2"
+}
+
+yesNoBox () {
+	dialogBox --yesno "$1" "$2"
+	return $?
+}
+
+inputBox () {
+	dialogBox --inputbox "$1" "$2" "$3"
+	return $?
+}
+
+# menu text title tag1 item1 ...
+menu () {
+	local text="$1"
+	shift
+	local title="$1"
+	shift
+	dialogBox --menu "$text" "$title" 0 "$@"
+	return $?
+}
+
+# menu text title tag1 item1 status1 ...
+checklist () {
+	local text="$1"
+	shift
+	local title="$1"
+	shift
+	dialogBox --checklist "$text" "$title" 0 "$@"
+	return $?
+}
+
+# menu text title tag1 item1 status1 ...
+radiolist () {
+	local text="$1"
+	shift
+	local title="$1"
+	shift
+	dialogBox --radiolist "$text" "$title" 0 "$@"
+	return $?
+}
+
+build_lists () {
+	installed_module_list="`sed -e '/#.*$/d' -e 's/[ 	].*$//' \
+	 < $Target/etc/modules`"
+	return 0;
+}
+
+in_list ()
+{
+	local a=$1
+	shift
+
+	for i in $*; do
+		if [ $i = $a ]; then
+			return 0
+		fi
+	done
+	return 1
+}
+
+module_is_installed () {
+	in_list $1 "$installed_module_list"
+	local status=$?
+	return $status
+}
+
+module_args () {
+	local module=$1
+
+	zcat < $ModuleHelp/descr.gz | sed -e 's/^#.*//' \
+		| (IFS=\n; retcode=0;
+		    while read line ; do
+			case $line in
+			"Module: $module")
+				while read line; do
+					case "$line" in
+					" "*)
+						echo "$line"
+						;;
+					"NoParams:")
+#						retcode=2
+						;;
+					*)
+						return $retcode
+						;;
+					esac
+				done
+				return $retcode
+			esac
+		done
+		return 1)
+	return $?;
+}
+
+module_summary () {
+	local summary=""
+	local varname
+
+	varname=`echo $1 | sed 's/[-+,]/_/g'`
+	eval "summary=$`echo summary_$varname`"
+	echo -n "$summary".
+}
+
+build_module_directory_menu () {
+	local directory="$1"
+	local list
+
+	if [ $Source = floppy ]; then
+		eval "list=$`echo dir_content_$directory`"
+	else
+		list="$Dir_Prefix/$directory/*.o"
+	fi
+
+	for i in $list; do
+		local module="`echo $i | sed -e 's:^.*/::' -e 's/\.o$//'`"
+		if [ "$module" != '*' ]; then
+			local selected="-"
+
+			if module_is_installed $module; then
+				selected="+"
+			fi
+
+			echo -n \"
+			echo -n $module |sed -e 's/^\(............\).*$/\1/'
+			echo -n \" \"$selected" "
+			module_summary $module
+			echo \" \\
+		fi
+	done
+	echo ""
+}
+
+module_directory_menu () {
+	local directory="$1"
+	local text="$2"
+	local title="$3"
+
+	while true; do
+
+		build_lists
+
+		echo 'menu "$text" "$title" \' > $TempFile.1
+		echo '"Exit" \
+		 "  Finished with these modules. Return to previous menu." \' \
+		 >> $TempFile.1
+		echo '" " " " \' >> $TempFile.1
+		
+		infoBox "Please wait while modules are detected." "Please wait"
+
+		build_module_directory_menu $directory >> $TempFile.1
+
+		local result
+		result="$(. $TempFile.1)"
+		if [ $? -ne 0 ]; then return 1; fi
+
+		case "$result" in
+		" ")
+			;;
+		Exit)
+			return 0;;
+		*)
+			if [ $Source = floppy ]; then
+				local list
+				eval "list=$`echo dir_content_$directory`"
+				for i in $list; do
+					case "$i" in
+					$result*)
+						result=$i;
+						break;
+						;;
+					esac
+				done
+			else
+				set `echo $Dir_Prefix/$directory/$result*.o`
+				result=`echo "$1" | \
+					sed -e 's/^.*\///' \
+						-e 's/\.o//'`
+			fi
+
+			edit_module "$result"
+			;;
+		esac
+		${rm} -f $TempFile.1
+	done
+}
+
+edit_module () {
+	local module="$1"
+	local help="`module_summary $module`"
+	local selected="-"
+	local text="$help
+The $module module is not currently installed."
+
+	if module_is_installed $module; then
+		selected="+"
+		text="$help""The $module module is currently installed."
+	fi
+
+	cat > $TempFile.2 << EOF
+	menu "$text" "Module $module $selected" \\
+	"Exit" "Finished with this module. Return to previous menu" \\
+EOF
+	
+	if [ "$selected" = "+" ]; then
+		echo '"Remove" "Remove the module from the kernel." \' >> $TempFile.2
+	else
+		echo '"Install" "Install the module in the kernel." \' >> $TempFile.2
+	fi
+
+	echo "" >> $TempFile.2
+
+	local result
+	result="$(. $TempFile.2)"
+	local status=$?
+	${rm} -f $TempFile.2
+
+	if [ $status -ne 0 -o -z "$result" ]; then return 1; fi
+
+	case "$result" in
+	Exit)
+		return 0
+		;;
+	Install)
+		install_module $module
+		return 0
+		;;
+	Remove)
+		remove_module $module
+		return 0
+		;;
+	esac
+	return 1
+}
+
+edit_arguments ()
+{
+	local module="$1"
+	local old_arguments="`cat /etc/conf.modules | \
+		( while read line; do \
+			set -- $line; \
+			if [ "$1" = options -a "$2" = "$module" ]; then \
+				shift; shift; echo $@; break; \
+			fi; \
+		done )`"
+
+	local arguments
+	module_args $module >$TempFile.3
+	local status=$?
+	if [ $status -eq 1 ]; then
+		cat > $TempFile.2 << EOF
+msgBox "Paramter documentation for this module is unavailable" "Error"
+EOF
+		arguments="`. $TempFile.2`"
+#		return 1
+	elif [ $status -eq 2 ]; then
+		echo -n "msgBox \"" >$TempFile.2
+		cat $TempFile.3 >>$TempFile.2
+		echo "\" \"Module info\"">>$TempFile.2
+		arguments="`. $TempFile.2`"
+		return 0
+	fi
+	echo -n "inputBox \"" >$TempFile.2
+	cat $TempFile.3 >>$TempFile.2 
+	echo "">>$TempFile.2
+	echo "Please enter any command-line arguments for the $module module.\" \\
+\"Enter Command-Line Arguments\" $old_arguments" >>$TempFile.2
+
+	arguments="`. $TempFile.2`"
+	if [ $? -ne 0 ]; then return 1; fi
+
+	if [ "$old_arguments" != "$arguments" ]; then
+		${rm} -f $Target/etc/conf.modules.new
+		cat /etc/conf.modules | ( while read line; do \
+			set -- $line; \
+			if [ "$1" = options -a "$2" = "$module" ]; then \
+				if [ -n "$arguments" ] ; then \
+					shift; shift; done=true; \
+					echo options $module "$arguments" ; \
+				fi; \
+			else echo $line; \
+			fi; \
+		    done; \
+		        if [ -z "$done" -a -n "$arguments" ]; then \
+				echo options $module "$arguments"; \
+			fi; \
+		    )   > $Target/etc/conf.modules.new
+
+		chown root.root $Target/etc/conf.modules.new
+		chmod 644 $Target/etc/conf.modules.new
+		sync
+		${rm} -f $Target/etc/conf.modules.old
+		ln $Target/etc/conf.modules $Target/etc/conf.modules.old
+		mv -f $Target/etc/conf.modules.new $Target/etc/conf.modules
+		sync
+		${rm} -f $Target/etc/conf.modules.old
+		sync
+	fi
+}
+
+install_module () {
+	local module="$1"
+	sync
+
+	edit_arguments $module
+	if [ $? -ne 0 ]; then return 1; fi	
+
+	echo $clear$bold\
+"Installing module $module. If the device isn't there, or isn't configured
+correctly, this could cause your system to pause for up to a minute."$norm
+	echo ""
+	sync
+
+	get_and_insmod $module
+	local status=$?
+
+	echo ""
+	if [ $status -eq 0 ]; then
+		echo "Installation succeeded."
+		echo "$module" >> $Target/etc/modules
+	else
+		echo "Installation failed."
+	fi
+
+	echo ""
+	echo "$bold""Please press ENTER when you are ready to continue.$norm"
+	local reply
+	read reply
+
+}
+
+get_and_insmod () {
+	local module=$1
+	local file
+	local i
+
+	case $Source in
+	floppy)
+# mounting done in dinstall
+
+#		if in_list $module $rescue_content; then
+#			msgBox \
+#"Please place the Rescue Floppy in the first floppy drive" \
+#				"Please Insert Disk"
+#		elif [ -f /etc/revision_ext.lowmem ]; then
+#			msgBox \
+#"Please place the Low Memory Driver Floppy in the first floppy drive" \
+#				"Please Insert Disk"
+#		else
+#			msgBox \
+#"Please place the the Driver Floppy in the first floppy drive" \
+#				"Please Insert Disk"
+#		fi
+		echo -n $clear "Extracting $module module from floppy ... "
+#		mount -t msdos /dev/fd0 /mnt
+		if [ ! -f /floppy/modules.tgz ]; then
+			write_it_down "/floppy/modules.tgz does not exist"
+		fi
+		(cd /; zcat < /floppy/modules.tgz | cpio -i -d \*/$module.o)
+		file="/lib/modules/*/*/$module.o"
+#		umount /mnt
+		echo "done."
+		depmod -a
+		modprobe $module
+		local status=$?
+		rm -f $file
+		;;
+	mounted)
+		modprobe $module
+		local status=$?
+		;;
+	esac
+
+	for i in $Run_Shell; do
+		local script
+		eval "script=$`echo shell_${i}_$module`"
+		if [ -n "$script" ]; then
+			echo 
+			echo "Executing module post-install script \`$i' ..."
+			echo script: $script
+			eval $script
+			if [ $? -ne 0 ]; then
+				write_it_down \
+					"Executing shell_$i_$module failed"
+			fi
+			echo "Post-install \`$i' scripts done."
+		fi
+	done
+	return $status
+}
+
+remove_module () {
+	sync
+	local module="$1"
+
+	echo $clear$bold\
+"Removing module $module..."$norm
+	echo ""
+	sync
+	modprobe -r $module
+	if [ $? -ne 0 ]; then
+		write_it_down "$module was not removed."
+		return 1
+	fi
+	${rm} -f $Target/etc/modules.tmp
+	sed -e /^$module\$/d < $Target/etc/modules >$Target/etc/modules.tmp
+	if [ $? -ne 0 ]; then return 1; fi
+	chmod 644 $Target/etc/modules.tmp
+	chown root.root $Target/etc/modules.tmp
+	sync
+	${rm} -f $Target/etc/modules.old
+	ln $Target/etc/modules $Target/etc/modules.old
+	mv $Target/etc/modules.tmp $Target/etc/modules
+	sync
+
+	return 0
+}
+
+interactive_main () {
+
+#		if [ -f $ModuleHelp/$KernelVersion/directories/$directory ]
+#		then
+#		elif [ -f $ModuleHelp/directories/$directory ]; then
+#		fi
+
+	local text=\
+"Modules are loadable device drivers. Please go through the menus
+for each category and look for devices, network protocols, filesystems,
+etc. that you would like to have supported by your system. You should
+not install modules for devices that aren't installed in your system,
+as they will sometimes cause the system to pause for a long time while
+it is searching for the device. Also, drivers for devices that you
+don't have use memory that you could put to better use.
+
+Please select the category of modules."
+
+	echo 'menu "$text" "Select Category" \' > $TempFile
+
+	echo '"Exit" \
+	 " Finished with modules. Return to previous menu." \' \
+	 >> $TempFile
+	echo '" " " " \' >> $TempFile
+
+	local directory
+	for directory in $dir_descrs; do
+		if [ ! -d $Target/lib/modules/$KernelVersion/$directory -a \
+				$Source = mounted ]; then 
+			continue;
+		fi
+
+		if [ -n "$Restrict_Section" ]; then
+			if in_list $directory $Restrict_Section; then
+				true
+			else
+				continue
+			fi
+		fi
+
+		local help=""
+		local summary=""
+
+		eval "summary=$`echo dir_descr_$directory`"
+
+		echo "\"$directory\"" \\ >> $TempFile
+		echo "\"$summary."\" \\ >> $TempFile
+	done
+	echo "" >> $TempFile
+
+	while true; do
+		local directory status
+		if [ -n "$One_Restricted_Section" ]; then
+			directory=$One_Restricted_Section
+		else
+			directory="`. $TempFile`"
+			if [ $? -ne 0 ]; then return 1; fi
+		fi
+
+		case "$directory" in
+		" ")
+			;;
+		Exit)
+			return 0;;
+		*)
+			module_directory_menu \
+			 "$directory" \
+"The modules that are currently installed on your system have
+a \"+\" character to the right of their name. Modules that aren't
+installed have a \"-\" to the right of their name. You can read a
+page about the purpose of any module and then you can enable
+or disable it. To do so, use the up and down arrow keys to move
+the cursor to the line for the module, and then press ENTER." \
+"Select $directory modules"
+			if [ -n "$One_Restricted_Section" ]; then
+				return 0;
+			fi
+			;;
+		esac
+	done
+	${rm} -f $TempFile
+}
+
+
+Source=mounted
+
+KernelVersion=$(third `cat /proc/version`)
+if [ $? -ne 0 -o -z "$KernelVersion" ]; then
+	msgBox \
+"I couldn't find the kernel version.
+Please make sure /proc is mounted." "Problem"
+	return 1
+fi
+
+while [ $# -ne 0 ]; do
+	case $1 in
+	--source)
+		Source=$2
+		shift
+		;;
+	--target)
+		Target=$2
+		shift
+		;;
+	--restrict-section)
+		Restrict_Section="$Restrict_Section $2"
+		shift
+		;;
+	--load-after)
+		Load_After="$Load_After $2"
+		shift
+		;;
+	--load-before)
+		Load_Before="$Load_Before $2"
+		shift
+		;;
+	--load-only)
+		Load_Only="$Load_Only $2"
+		shift
+		;;
+	--run-shell)
+		Run_Shell="$Run_Shell $2"
+		shift
+		;;
+	*)
+		write_it_down "Invalid option"
+	esac
+	shift
+done
+
+Dir_Prefix=$Target/lib/modules/$KernelVersion/
+
+. $ModuleHelp/eval
+
+if [ $Source = floppy ]; then
+	if [ -f $ModuleHelp/modcont ]; then
+		. $ModuleHelp/modcont
+	else
+		echo "Cannot open $ModuleHelp/modcont"
+		exit 1
+	fi
+else
+	dir_descrs=""
+	for i in `cd $Dir_Prefix; echo *`; do
+		if [ -d $Dir_Prefix/$i -a \
+				-f `first $Dir_Prefix/$i/*.o ` ]; then
+			dir_descrs="$dir_descrs $i"
+		fi
+	done
+fi
+
+s=`second $Restrict_Section`
+if [ -n "$Restrict_Section" -a -z "$s" ]; then
+    One_Restricted_Section=`first $Restrict_Section`
+fi
+
+for i in $Load_Before; do
+	get_and_insmod $i;
+done
+
+if [ -z "$Load_Only" ]; then
+	interactive_main
+else
+	Load_After=$Load_Only
+fi
+
+for i in $Load_After; do
+	get_and_insmod $i
+done
+
+${rm}  -f $TempFile $TempFile.1 $TempFile.2
+exit 0

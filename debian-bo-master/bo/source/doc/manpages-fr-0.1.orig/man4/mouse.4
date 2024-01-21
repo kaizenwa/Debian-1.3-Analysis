@@ -1,0 +1,180 @@
+'\" t
+.\"{{{roff}}}.\"{{{ Copyright
+.\" This manpage is Copyright (C) 1996 Michael Haardt.
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\"}}}
+.\"{{{ Title
+.\"
+.\" Traduction 18/10/1996 par Christophe Blaess (ccb@club-internet.fr)
+.\"
+.TH MOUSE 4 "18 Octobre 1996" Linux "Manuel du programmeur Linux"
+.\"}}}
+.\"{{{ Nom
+.SH NOM
+mouse \- Interface de souris serie.
+.\"}}}
+.\"{{{ Configuration
+.SH CONFIGURATION
+Les souris series sont connectees sur une ligne d'interface RS232/V24 
+voir
+\fIcua\fP(4) pour la description de ces lignes.
+.\"}}}
+.\"{{{ Description
+.SH DESCRIPTION
+.\"{{{ Introduction
+.SS Introduction
+Le brochage de la prise DB9 classique utilisee pour les souris est le suivant :
+
+.TS
+center;
+r c l.
+broche	nom	utilisation
+2	RX	Donnees
+3	TX	-12 V, Imax = 10 mA
+4	DTR	+12 V, Imax = 10 mA
+7	RTS	+12 V, Imax = 10 mA
+5	GND	Masse
+.TE
+
+Il ne s'agit que de specifications, en realite 9 V suffisent avec la plupart
+des souris.
+.PP
+Le driver peut s'assurer de la presence d'une souris en abaissant la tension sur
+la broche RTS. Environ 14 ms plus tard, la souris enverra l'octet 0x4D sur la
+ligne RX. Encore 63 ms plus tard, les souris compatible Microsoft enverront
+0x33 sur RX. D'autres types de souris enverront d'autres valeurs.
+.PP
+Le mouvement relatif de la souris est transmis en tant que \fIdx\fP (positif vers 
+la droite) et \fIdy\fP (positif vers le bas).  
+Diverses souris peuvent travailler avec des vitesses diferentes. 
+Pour selectionner la vitesse, il faut parcourir le cycle 9600, 4800, 2400 et
+1200 bit/sec, en envoyant chaque fois les deux caracteres de la table
+ci-dessous, et attendre 0,1 seconde.
+La table ci-dessous montre les differentes vitesses, et les deux caracteres
+correspondants :
+
+.TS
+center;
+l l.
+bit/sec	message
+9600	*q
+4800	*p
+2400	*o
+1200	*n
+.TE
+
+Comme on peut le voir, le premier octet peut etre utilise pour se synchroniser.
+.\"}}}
+.\"{{{ Protocole Microsoft
+.SS "Protocole Microsoft"
+Le protocole \fBMicrosoft\fP utilise 1 bit de Start, 7 bits de donnees, pas de
+parite, et 1 bit de Stop, ceci a 1200 bits/sec. Les donnees sont envoyees sur
+RX par paquets de 3 octets.
+Les mouvements \fIdx\fP et \fIdy\fP sont envoyes sous forme de complement a 2.
+\fIlb\fP (\fIrb\fP) vaut 1 quand le bouton gauche (droit) est presse :
+
+.TS
+center;
+r c c c c c c c.
+octet	d6	d5	d4	d3	d2	d1	d0
+1	1	lb	rb	dy7	dy6	dx7	dx7
+2	0	dx5	dx4	dx3	dx2	dx1	dx0
+3	0	dy5	dy4	dy3	dy2	dy1	dy0
+.TE
+
+Les souris Microsoft originales n'avaient que 2 boutons. Neanmoins, il
+existe plusieurs souris a 3 boutons qui utilisent le protocole Microsoft.
+Une pression sur le 3eme bouton (milieu) est indiquee par un paquet
+sans aucun mouvement et sans bouton presse.
+.\"}}}
+.\"{{{ Protocole Mousesystems
+.SS "Protocole Mousesystems"
+Le protocole \fBMousesystems\fP utilise 1 bit de Start, 8 bits de donnees, 
+pas de parite et 2 bits de Stop, ceci a la vitesse de 1200 bits/sec.  
+Les donnees sont envoyees sur RX par paquets de 5 octets.
+\fIdx\fP est emis comme la somme des deux valeurs en complement a 2.
+\fIdy\fP est emis comme inverse de la somme des deux valeurs en complement a 2.
+\fIlb\fP (\fImb\fP, \fIrb\fP) sont mis a zero quand le bouton gauche (central,
+droit) est presse :
+
+.TS
+center;
+r c c c c c c c c.
+octet	d7	d6	d5	d4	d3	d2	d1	d0
+1	1	?	?	?	?	lb	mb	rb
+2	0	dxa6	dxa5	dxa4	dxa3	dxa2	dxa1	dxa0
+3	0	dxb6	dxb5	dxb4	dxb3	dxb2	dxb1	dxb0
+4	0	dya6	dya5	dya4	dya3	dya2	dya1	dya0
+5	0	dyb6	dyb5	dyb4	dyb3	dyb2	dyb1	dyb0
+.TE
+
+.\"}}}
+.\"{{{ Protocole Sun
+.SS "Protocole Sun"
+Le protocole \fBSun\fP utilise 1 bit de Start, 8 bits de donnees, 
+pas de parite et 2 bits de Stop, ceci a la vitesse de 1200 bits/sec.  
+Les donnees sont envoyees sur RX par paquets de 3 octets.
+\fIdx\fP est emis en complement a 2.
+\fIdy\fP est emis en complement a 2 inverse.
+\fIlb\fP (\fImb\fP, \fIrb\fP) sont mis a zero quand le bouton gauche (central,
+droit) est presse :
+
+.TS
+center;
+r c c c c c c c c.
+octet	d7	d6	d5	d4	d3	d2	d1	d0
+1	1	?	?	?	?	lb	mb	rb
+2	0	dx6	dx5	dx4	dx3	dx2	dx1	dx0
+3	0	dy6	dy5	dy4	dy3	dy2	dy1	dy0
+.TE
+
+.\"}}}
+.\"{{{ Protocol MM
+.SS "Protocole MM"
+Le protocole \fBMM\fP utilise 1 bit de Start, 8 bits de donnees, 
+parite impaire et 1 bit de Stop, ceci a la vitesse de 1200 bits/sec.
+Les donnees sont envoyees sur RX par paquets de 5 octets.
+\fIdx\fP et \fIdy\fP sont emis comme des valeurs signees, le bit de signe
+indiquant une valeur negative.
+\fIlb\fP (\fImb\fP, \fIrb\fP) sont mis a zero quand le bouton gauche (central,
+droit) est presse :
+
+.TS
+center;
+r c c c c c c c c.
+octet	d7	d6	d5	d4	d3	d2	d1	d0
+1	1	?	?	dxs	dys	lb	mb	rb
+2	0	dx6	dx5	dx4	dx3	dx2	dx1	dx0
+3	0	dy6	dy5	dy4	dy3	dy2	dy1	dy0
+.TE
+
+.\"}}}
+.\"}}}
+.\"{{{ Fichiers
+.SH FICHIER
+/dev/mouse	Un lien symbolique habituellement utilise 
+pour pointer sur le peripherique souris.
+.\"}}}
+.\"{{{ Voir aussi
+.SH "VOIR AUSSI"
+cua(4), bm(4)
+.\"}}}

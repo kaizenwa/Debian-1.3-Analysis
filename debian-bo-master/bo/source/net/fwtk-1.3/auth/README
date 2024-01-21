@@ -1,0 +1,177 @@
+PLEASE READ THIS COMPLETELY
+
+
+Database Concurrency and Issues
+-------------------------------
+	Databases in this software are opened and closed each
+time before they're used. This is because some versions of
+dbm cache things they shouldn't, and locking them just is not
+reliable. Also, since multiple instances of the auth server
+may get launched at once, this is by far the easiest way to
+implement the required functionality. On a reasonably fast
+system, performance will be fine. Do not put the auth code
+in the critical loop of routines that are called very very
+frequently, or performance will be a problem. As all the
+database routines are in db.c, you may completely replace
+them without having to touch anything else. authdump.c is
+a useful utility for dumping databases for backup.
+
+
+Initializing a Database
+-----------------------
+	To initialize a database, su to root, and run authsrv
+to create the administrative user record. A sample session
+follows:
+#
+# authsrv
+
+-administrator mode-
+authsrv# list
+authsrv# adduser admin "Auth DB admin"
+ok - user added initially disabled
+authsrv# ena admin
+enabled
+authsrv# proto admin pass
+changed
+authsrv# pass admin "plugh"
+Password changed.
+authsrv# superwiz admin
+set wizard
+authsrv# list
+Report for users in database
+user       group      longname        ok?  proto      last
+----       -----      --------        ---  -----      ----
+admin                 Auth DB admin   ena  passw      never                   
+authsrv# display admin
+Report for user admin (Auth DB admin)
+Authentication protocol: password
+Flags: WIZARD
+authsrv# ^D
+EOT
+#
+#
+
+	For more details on how authsrv and its clients work,
+see the administrator's guide for the firewall toolkit, and
+authsrv.8
+
+
+Authentication Protocols
+------------------------
+	pass.o skey.o snk.o and secid.o are the "glue" libraries
+that link other authentication tools into the server. The
+jump table that contains the protocol types is in proto.c
+
+	To configure authentication protocols, edit auth.h and
+enable or disable the #defines for the protocols you wish to
+support. Some of the protocol specific modules will require
+changes to the Makefile, to provide the location for application
+specific libraries and include files to link against. If you are
+using anything other than the default password encryption scheme,
+additional libraries will be required.
+
+	skey:	requires the S/key library available for anonymous
+		FTP from thumper.bellcore.com, pub/nmh/skey
+		before building the auth server, compile and
+		build the skey library in another directory. then
+		adjust the Makefile entries to reflect its
+		location. E.g:
+		SKEYDIR=/someplace/skey
+		SKEYINC= -I$(SKEYDIR)
+		SKEYLIB= $(SKEYDIR)/libskey.a
+
+	securid: requires the ACE client software libraries from
+		Security Dynamics. (Contact
+			Security Dynamics
+			One Alewife Center
+			Cambridge, MA  02140
+
+			Tel: (617) 547-7820
+			Fax: (617) 354-8836
+		)
+		before building the auth server, compile the
+		ACE client library, then adjust the Makefile entries
+		to reflect their location. E.g:
+		SECURDIR=/someplace/sun4clien
+		SECURLIB= $(SECURDIR)/sdconf.o $(SECURDIR)/sdclient.a
+		SECURINC= -I$(SECURDIR)
+
+	WARNING:
+		Securid and S/key have naming conflicts in their
+		function libraries. To build both systems together,
+		you may need to rename a few functions in the
+		S/key sources.
+
+
+	snk: requires the snk.c module from the US-only release, as it
+		interfaces with the DES library. to install the 
+		snk library, simply copy snk.c from the US-only
+		crypto routines library, and edit the Makefile to
+		reflect its presence. This module also requires
+		a compatible DES library implementation. (See the
+		section on "DES Libraries" below)  To configure
+		use of the snk module, you must first build the
+		DES library and then configure the following
+		options in the Makefile:
+		SNKOBJ= snk.o
+		DESLIB= /someplace/libdes/libdes.a
+		DESINC= -I/someplace/libdes
+
+		Digital Pathways provides the SNK-004 encrypting
+		calculator. ( Contact
+			Digital Pathways
+			201 Ravendale Drive
+			Mountain View, CA  94043
+
+			Tel: (415) 964-0707
+			Tel: (415) 961-7487
+		)
+
+		Note that getpass() is used to read passwords
+		in authmgr when changing user passwords. Since most
+		versions of getpass() truncate after the first 8 chars
+		are read, setting user shared secrets must be done with
+		authsrv, or a replacement version of getpass must be
+		used.
+
+Encrypted client/server communications
+--------------------------------------
+	cliio.c and srvio.c implement client/server communications.
+There is a distressing amount of code duplication, but it seems
+like the best way to do it while keeping as many functions as
+possible hidden.
+
+	Replacement versions of cliio.c and srvio.c that use DES
+encryption for security are available to US users. (see below) To
+build a version of authsrv with encrypted I/O support, replace the
+versions of cliio.c and srvio.c with the ones from the US-only
+cryptography library.
+
+
+Cryptography and DES support
+----------------------------
+	The encrypted client communications library routines and
+the SNK authentication routines both rely on a compatible DES
+library. The version this software has been tested with is the
+Australian DES version by Eric Young, which is available for
+FTP from psych.psy.uq.oz.au.   If you use these routines with
+the SNK authentication, ensure that the setkey function is
+compiled to use old-style UNIX crypt() setkey's approach for
+setting the key. (set the OLD_STR_TO_KEY option in the Makefile).
+
+	If you are using cryptography with the toolkit, the
+first step you should make is to obtain and compile a DES
+library, then obtain the US-only components of the toolkit
+and install them as specified by the README that is included
+in the US-only kit.
+
+
+Snkkey
+------
+	snkkey.c is a quick hack for generating digital pathways
+shared secrets without relying on the administrator to pull good
+random values out of thin air. It is included with the US-only
+cryptography library.
+
+
+mjr.

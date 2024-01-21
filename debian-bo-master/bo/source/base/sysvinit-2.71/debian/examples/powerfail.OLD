@@ -1,0 +1,64 @@
+#! /bin/sh
+#
+# powerfail	This script is run when the UPS tells the system
+#		the power has gone. Tell everybody, sync the disks
+#		and drop into single user mode as fast as possible.
+#		This script is also being run when the power comes
+#		up again (if it does in time!)
+#
+# Version:	@(#) /etc/powerfail 1.10 13-Nov-1996
+#
+# NOTE:		THIS IS AN EXAMPLE SCRIPT. It doesn't actually work.
+#
+# Author:	Miquel van Smoorenburg, <miquels@cistron.nl>
+#
+
+  # See what happened.
+  case "$1" in
+    start)
+	# Tell everybody.
+	wall "THE POWER IS DOWN! SHUTTING DOWN SYSTEM!"
+
+	if [ -f /etc/init.d/netstd_nfs ]
+	then
+		# Stop NFS services.
+		echo "Stopping NFS services.."
+		/etc/init.d/netstd_nfs stop
+	fi
+
+	# Don't allow users to login.
+	echo "POWER FAILURE" > /etc/nologin
+
+	# Tell init to go single user.
+	trap "" SIGTERM
+	/sbin/init -t5 S
+
+	# Sync disks and go single user.
+	# Pray no process writes to disk anymore..
+	sync ; sleep 4 ; sync
+
+	exit 0
+	;;
+  stop)
+	# Ok, power is good again. Say so on the console.
+	echo "THE POWER IS BACK, GOING MULTI USER"
+
+	# If we're not single user don't try to restore.
+	[ $RUNLEVEL != S ] && exit 0
+
+	# Go back to previous runlevel.
+	/sbin/init $PREVLEVEL 2> /dev/null
+
+	# And allow users to log in.
+	rm -f /etc/nologin
+	;;
+  poweroff)
+	# Put commands here to let your UPS cut the power.
+	;;
+  *)
+	echo "Usage: /sbin/powerfail {start|stop|poweroff}"
+	exit 1
+	;;
+  esac
+
+  exit 0

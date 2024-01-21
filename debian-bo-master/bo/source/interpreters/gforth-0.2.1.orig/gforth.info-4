@@ -1,0 +1,990 @@
+This is Info file gforth.info, produced by Makeinfo-1.55 from the input
+file gforth.texi.
+
+   This file documents Gforth 0.2
+
+   Copyright (C) 1995,1996 Free Software Foundation, Inc.
+
+   Permission is granted to make and distribute verbatim copies of
+this manual provided the copyright notice and this permission notice
+ are preserved on all copies.
+
+   Permission is granted to copy and distribute modified versions of
+this      manual under the conditions for verbatim copying, provided
+also that the      sections entitled "Distribution" and "General Public
+License" are      included exactly as in the original, and provided
+that the entire      resulting derived work is distributed under the
+terms of a permission      notice identical to this one.
+
+   Permission is granted to copy and distribute translations of this
+manual      into another language, under the above conditions for
+modified versions,      except that the sections entitled
+"Distribution" and "General Public      License" may be included in a
+translation approved by the author instead      of in the original
+English.
+
+
+File: gforth.info,  Node: Integrating Gforth,  Next: Emacs and Gforth,  Prev: Model,  Up: Top
+
+Integrating Gforth into C programs
+**********************************
+
+   This is not yet implemented.
+
+   Several people like to use Forth as scripting language for
+applications that are otherwise written in C, C++, or some other
+language.
+
+   The Forth system ATLAST provides facilities for embedding it into
+applications; unfortunately it has several disadvantages: most
+importantly, it is not based on ANS Forth, and it is apparently dead
+(i.e., not developed further and not supported). The facilities
+provided by Gforth in this area are inspired by ATLASTs facilities, so
+making the switch should not be hard.
+
+   We also tried to design the interface such that it can easily be
+implemented by other Forth systems, so that we may one day arrive at a
+standardized interface. Such a standard interface would allow you to
+replace the Forth system without having to rewrite C code.
+
+   You embed the Gforth interpreter by linking with the library
+`libgforth.a' (give the compiler the option `-lgforth').  All global
+symbols in this library that belong to the interface, have the prefix
+`forth_'. (Global symbols that are used internally have the prefix
+`gforth_').
+
+   You can include the declarations of Forth types and the functions and
+variables of the interface with `#include <forth.h>'.
+
+   Types.
+
+   Variables.
+
+   Data and FP Stack pointer. Area sizes.
+
+   functions.
+
+   forth_init(imagefile) forth_evaluate(string) exceptions?
+forth_goto(address) (or forth_execute(xt)?) forth_continue() (a
+corountining mechanism)
+
+   Adding primitives.
+
+   No checking.
+
+   Signals?
+
+   Accessing the Stacks
+
+
+File: gforth.info,  Node: Emacs and Gforth,  Next: Internals,  Prev: Integrating Gforth,  Up: Top
+
+Emacs and Gforth
+****************
+
+   Gforth comes with `gforth.el', an improved version of `forth.el' by
+Goran Rydqvist (included in the TILE package). The improvements are a
+better (but still not perfect) handling of indentation. I have also
+added comment paragraph filling (`M-q'), commenting (`C-x \') and
+uncommenting (`C-u C-x \') regions and removing debugging tracers (`C-x
+~', *note Debugging::.). I left the stuff I do not use alone, even
+though some of it only makes sense for TILE. To get a description of
+these features, enter Forth mode and type `C-h m'.
+
+   In addition, Gforth supports Emacs quite well: The source code
+locations given in error messages, debugging output (from `~~') and
+failed assertion messages are in the right format for Emacs'
+compilation mode (*note Running Compilations under Emacs:
+(emacs)Compilation.) so the source location corresponding to an error
+or other message is only a few keystrokes away (`C-x `' for the next
+error, `C-c C-c' for the error under the cursor).
+
+   Also, if you `include' `etags.fs', a new `TAGS' file (*note Tags
+Tables: (emacs)Tags.) will be produced that contains the definitions of
+all words defined afterwards. You can then find the source for a word
+using `M-.'. Note that emacs can use several tags files at the same
+time (e.g., one for the Gforth sources and one for your program, *note
+Selecting a Tags Table: (emacs)Select Tags Table.). The TAGS file for
+the preloaded words is `$(datadir)/gforth/$(VERSION)/TAGS' (e.g.,
+`/usr/local/share/gforth/0.2.0/TAGS').
+
+   To get all these benefits, add the following lines to your `.emacs'
+file:
+
+     (autoload 'forth-mode "gforth.el")
+     (setq auto-mode-alist (cons '("\\.fs\\'" . forth-mode) auto-mode-alist))
+
+
+File: gforth.info,  Node: Internals,  Next: Bugs,  Prev: Emacs and Gforth,  Up: Top
+
+Internals
+*********
+
+   Reading this section is not necessary for programming with Gforth. It
+should be helpful for finding your way in the Gforth sources.
+
+   The ideas in this section have also been published in the papers
+`ANS fig/GNU/??? Forth' (in German) by Bernd Paysan, presented at the
+Forth-Tagung '93 and `A Portable Forth Engine' by M. Anton Ertl,
+presented at EuroForth '93; the latter is available at
+`http://www.complang.tuwien.ac.at/papers/ertl93.ps.Z'.
+
+* Menu:
+
+* Portability::
+* Threading::
+* Primitives::
+* System Architecture::
+* Performance::
+
+
+File: gforth.info,  Node: Portability,  Next: Threading,  Prev: Internals,  Up: Internals
+
+Portability
+===========
+
+   One of the main goals of the effort is availability across a wide
+range of personal machines. fig-Forth, and, to a lesser extent, F83,
+achieved this goal by manually coding the engine in assembly language
+for several then-popular processors. This approach is very
+labor-intensive and the results are short-lived due to progress in
+computer architecture.
+
+   Others have avoided this problem by coding in C, e.g., Mitch Bradley
+(cforth), Mikael Patel (TILE) and Dirk Zoller (pfe). This approach is
+particularly popular for UNIX-based Forths due to the large variety of
+architectures of UNIX machines. Unfortunately an implementation in C
+does not mix well with the goals of efficiency and with using
+traditional techniques: Indirect or direct threading cannot be expressed
+in C, and switch threading, the fastest technique available in C, is
+significantly slower. Another problem with C is that it's very
+cumbersome to express double integer arithmetic.
+
+   Fortunately, there is a portable language that does not have these
+limitations: GNU C, the version of C processed by the GNU C compiler
+(*note Extensions to the C Language Family: (gcc.info)C Extensions.).
+Its labels as values feature (*note Labels as Values: (gcc.info)Labels
+as Values.) makes direct and indirect threading possible, its `long
+long' type (*note Double-Word Integers: (gcc.info)Long Long.)
+corresponds to Forth's double numbers(1). GNU C is available for free
+on all important (and many unimportant) UNIX machines, VMS, 80386s
+running MS-DOS, the Amiga, and the Atari ST, so a Forth written in GNU
+C can run on all these machines.
+
+   Writing in a portable language has the reputation of producing code
+that is slower than assembly. For our Forth engine we repeatedly looked
+at the code produced by the compiler and eliminated most
+compiler-induced inefficiencies by appropriate changes in the
+source-code.
+
+   However, register allocation cannot be portably influenced by the
+programmer, leading to some inefficiencies on register-starved
+machines. We use explicit register declarations (*note Variables in
+Specified Registers: (gcc.info)Explicit Reg Vars.) to improve the speed
+on some machines. They are turned on by using the `gcc' switch
+`-DFORCE_REG'. Unfortunately, this feature not only depends on the
+machine, but also on the compiler version: On some machines some
+compiler versions produce incorrect code when certain explicit register
+declarations are used. So by default `-DFORCE_REG' is not used.
+
+   ---------- Footnotes ----------
+
+   (1)  Unfortunately, long longs are not implemented properly on all
+machines (e.g., on alpha-osf1, long longs are only 64 bits, the same
+size as longs (and pointers), but they should be twice as long
+according to *Note Double-Word Integers: (gcc.info)Long Long). So, we
+had to implement doubles in C after all. Still, on most machines we can
+use long longs and achieve better performance than with the emulation
+package.
+
+
+File: gforth.info,  Node: Threading,  Next: Primitives,  Prev: Portability,  Up: Internals
+
+Threading
+=========
+
+   GNU C's labels as values extension (available since `gcc-2.0', *note
+Labels as Values: (gcc.info)Labels as Values.) makes it possible to
+take the address of LABEL by writing `&&LABEL'.  This address can then
+be used in a statement like `goto *ADDRESS'. I.e., `goto *&&x' is the
+same as `goto x'.
+
+   With this feature an indirect threaded NEXT looks like:
+     cfa = *ip++;
+     ca = *cfa;
+     goto *ca;
+   For those unfamiliar with the names: `ip' is the Forth instruction
+pointer; the `cfa' (code-field address) corresponds to ANS Forths
+execution token and points to the code field of the next word to be
+executed; The `ca' (code address) fetched from there points to some
+executable code, e.g., a primitive or the colon definition handler
+`docol'.
+
+   Direct threading is even simpler:
+     ca = *ip++;
+     goto *ca;
+
+   Of course we have packaged the whole thing neatly in macros called
+`NEXT' and `NEXT1' (the part of NEXT after fetching the cfa).
+
+* Menu:
+
+* Scheduling::
+* Direct or Indirect Threaded?::
+* DOES>::
+
+
+File: gforth.info,  Node: Scheduling,  Next: Direct or Indirect Threaded?,  Prev: Threading,  Up: Threading
+
+Scheduling
+----------
+
+   There is a little complication: Pipelined and superscalar processors,
+i.e., RISC and some modern CISC machines can process independent
+instructions while waiting for the results of an instruction. The
+compiler usually reorders (schedules) the instructions in a way that
+achieves good usage of these delay slots. However, on our first tries
+the compiler did not do well on scheduling primitives. E.g., for `+'
+implemented as
+     n=sp[0]+sp[1];
+     sp++;
+     sp[0]=n;
+     NEXT;
+   the NEXT comes strictly after the other code, i.e., there is nearly
+no scheduling. After a little thought the problem becomes clear: The
+compiler cannot know that sp and ip point to different addresses (and
+the version of `gcc' we used would not know it even if it was
+possible), so it could not move the load of the cfa above the store to
+the TOS. Indeed the pointers could be the same, if code on or very near
+the top of stack were executed. In the interest of speed we chose to
+forbid this probably unused "feature" and helped the compiler in
+scheduling: NEXT is divided into the loading part (`NEXT_P1') and the
+goto part (`NEXT_P2'). `+' now looks like:
+     n=sp[0]+sp[1];
+     sp++;
+     NEXT_P1;
+     sp[0]=n;
+     NEXT_P2;
+   This can be scheduled optimally by the compiler.
+
+   This division can be turned off with the switch `-DCISC_NEXT'. This
+switch is on by default on machines that do not profit from scheduling
+(e.g., the 80386), in order to preserve registers.
+
+
+File: gforth.info,  Node: Direct or Indirect Threaded?,  Next: DOES>,  Prev: Scheduling,  Up: Threading
+
+Direct or Indirect Threaded?
+----------------------------
+
+   Both! After packaging the nasty details in macro definitions we
+realized that we could switch between direct and indirect threading by
+simply setting a compilation flag (`-DDIRECT_THREADED') and defining a
+few machine-specific macros for the direct-threading case.  On the
+Forth level we also offer access words that hide the differences
+between the threading methods (*note Threading Words::.).
+
+   Indirect threading is implemented completely machine-independently.
+Direct threading needs routines for creating jumps to the executable
+code (e.g. to docol or dodoes). These routines are inherently
+machine-dependent, but they do not amount to many source lines. I.e.,
+even porting direct threading to a new machine is a small effort.
+
+
+File: gforth.info,  Node: DOES>,  Prev: Direct or Indirect Threaded?,  Up: Threading
+
+DOES>
+-----
+
+   One of the most complex parts of a Forth engine is `dodoes', i.e.,
+the chunk of code executed by every word defined by a
+`CREATE'...`DOES>' pair. The main problem here is: How to find the
+Forth code to be executed, i.e. the code after the `DOES>' (the
+DOES-code)? There are two solutions:
+
+   In fig-Forth the code field points directly to the dodoes and the
+DOES-code address is stored in the cell after the code address (i.e. at
+cfa cell+). It may seem that this solution is illegal in the Forth-79
+and all later standards, because in fig-Forth this address lies in the
+body (which is illegal in these standards). However, by making the code
+field larger for all words this solution becomes legal again. We use
+this approach for the indirect threaded version. Leaving a cell unused
+in most words is a bit wasteful, but on the machines we are targetting
+this is hardly a problem. The other reason for having a code field size
+of two cells is to avoid having different image files for direct and
+indirect threaded systems (*note System Architecture::.).
+
+   The other approach is that the code field points or jumps to the cell
+after `DOES'. In this variant there is a jump to `dodoes' at this
+address. `dodoes' can then get the DOES-code address by computing the
+code address, i.e., the address of the jump to dodoes, and add the
+length of that jump field. A variant of this is to have a call to
+`dodoes' after the `DOES>'; then the return address (which can be found
+in the return register on RISCs) is the DOES-code address. Since the
+two cells available in the code field are usually used up by the jump
+to the code address in direct threading, we use this approach for
+direct threading. We did not want to add another cell to the code field.
+
+
+File: gforth.info,  Node: Primitives,  Next: System Architecture,  Prev: Threading,  Up: Internals
+
+Primitives
+==========
+
+* Menu:
+
+* Automatic Generation::
+* TOS Optimization::
+* Produced code::
+
+
+File: gforth.info,  Node: Automatic Generation,  Next: TOS Optimization,  Prev: Primitives,  Up: Primitives
+
+Automatic Generation
+--------------------
+
+   Since the primitives are implemented in a portable language, there
+is no longer any need to minimize the number of primitives. On the
+contrary, having many primitives is an advantage: speed. In order to
+reduce the number of errors in primitives and to make programming them
+easier, we provide a tool, the primitive generator (`prims2x.fs'), that
+automatically generates most (and sometimes all) of the C code for a
+primitive from the stack effect notation.  The source for a primitive
+has the following form:
+
+FORTH-NAME	STACK-EFFECT	CATEGORY	[PRONOUNC.]
+[`""'GLOSSARY ENTRY`""']
+C CODE
+[`:'
+FORTH CODE]
+
+   The items in brackets are optional. The category and glossary fields
+are there for generating the documentation, the Forth code is there for
+manual implementations on machines without GNU C. E.g., the source for
+the primitive `+' is:
+     +    n1 n2 -- n    core    plus
+     n = n1+n2;
+
+   This looks like a specification, but in fact `n = n1+n2' is C code.
+Our primitive generation tool extracts a lot of information from the
+stack effect notations(1): The number of items popped from and pushed
+on the stack, their type, and by what name they are referred to in the
+C code. It then generates a C code prelude and postlude for each
+primitive. The final C code for `+' looks like this:
+
+     I_plus:	/* + ( n1 n2 -- n ) */  /* label, stack effect */
+     /*  */                          /* documentation */
+     {
+     DEF_CA                          /* definition of variable ca (indirect threading) */
+     Cell n1;                        /* definitions of variables */
+     Cell n2;
+     Cell n;
+     n1 = (Cell) sp[1];              /* input */
+     n2 = (Cell) TOS;
+     sp += 1;                        /* stack adjustment */
+     NAME("+")                       /* debugging output (with -DDEBUG) */
+     {
+     n = n1+n2;                      /* C code taken from the source */
+     }
+     NEXT_P1;                        /* NEXT part 1 */
+     TOS = (Cell)n;                  /* output */
+     NEXT_P2;                        /* NEXT part 2 */
+     }
+
+   This looks long and inefficient, but the GNU C compiler optimizes
+quite well and produces optimal code for `+' on, e.g., the R3000 and the
+HP RISC machines: Defining the `n's does not produce any code, and
+using them as intermediate storage also adds no cost.
+
+   There are also other optimizations, that are not illustrated by this
+example: Assignments between simple variables are usually for free (copy
+propagation). If one of the stack items is not used by the primitive
+(e.g.  in `drop'), the compiler eliminates the load from the stack
+(dead code elimination). On the other hand, there are some things that
+the compiler does not do, therefore they are performed by `prims2x.fs':
+The compiler does not optimize code away that stores a stack item to
+the place where it just came from (e.g., `over').
+
+   While programming a primitive is usually easy, there are a few cases
+where the programmer has to take the actions of the generator into
+account, most notably `?dup', but also words that do not (always) fall
+through to NEXT.
+
+   ---------- Footnotes ----------
+
+   (1)  We use a one-stack notation, even though we have separate data
+and floating-point stacks; The separate notation can be generated
+easily from the unified notation.
+
+
+File: gforth.info,  Node: TOS Optimization,  Next: Produced code,  Prev: Automatic Generation,  Up: Primitives
+
+TOS Optimization
+----------------
+
+   An important optimization for stack machine emulators, e.g., Forth
+engines, is keeping  one or more of the top stack items in registers.
+If a word has the stack effect IN1...INX `--' OUT1...OUTY, keeping the
+top N items in registers
+   * is better than keeping N-1 items, if X>=N and Y>=N, due to fewer
+     loads from and stores to the stack.
+
+   * is slower than keeping N-1 items, if X<>Y and X<N and Y<N, due to
+     additional moves between registers.
+
+   In particular, keeping one item in a register is never a
+disadvantage, if there are enough registers. Keeping two items in
+registers is a disadvantage for frequent words like `?branch',
+constants, variables, literals and `i'. Therefore our generator only
+produces code that keeps zero or one items in registers. The generated
+C code covers both cases; the selection between these alternatives is
+made at C-compile time using the switch `-DUSE_TOS'. `TOS' in the C
+code for `+' is just a simple variable name in the one-item case,
+otherwise it is a macro that expands into `sp[0]'. Note that the GNU C
+compiler tries to keep simple variables like `TOS' in registers, and it
+usually succeeds, if there are enough registers.
+
+   The primitive generator performs the TOS optimization for the
+floating-point stack, too (`-DUSE_FTOS'). For floating-point operations
+the benefit of this optimization is even larger: floating-point
+operations take quite long on most processors, but can be performed in
+parallel with other operations as long as their results are not used.
+If the FP-TOS is kept in a register, this works. If it is kept on the
+stack, i.e., in memory, the store into memory has to wait for the
+result of the floating-point operation, lengthening the execution time
+of the primitive considerably.
+
+   The TOS optimization makes the automatic generation of primitives a
+bit more complicated. Just replacing all occurrences of `sp[0]' by
+`TOS' is not sufficient. There are some special cases to consider:
+   * In the case of `dup ( w -- w w )' the generator must not eliminate
+     the store to the original location of the item on the stack, if
+     the TOS optimization is turned on.
+
+   * Primitives with stack effects of the form `--' OUT1...OUTY must
+     store the TOS to the stack at the start.  Likewise, primitives
+     with the stack effect IN1...INX `--' must load the TOS from the
+     stack at the end. But for the null stack effect `--' no stores or
+     loads should be generated.
+
+
+File: gforth.info,  Node: Produced code,  Prev: TOS Optimization,  Up: Primitives
+
+Produced code
+-------------
+
+   To see what assembly code is produced for the primitives on your
+machine with your compiler and your flag settings, type `make engine.s'
+and look at the resulting file `engine.s'.
+
+
+File: gforth.info,  Node: System Architecture,  Next: Performance,  Prev: Primitives,  Up: Internals
+
+System Architecture
+===================
+
+   Our Forth system consists not only of primitives, but also of
+definitions written in Forth. Since the Forth compiler itself belongs
+to those definitions, it is not possible to start the system with the
+primitives and the Forth source alone. Therefore we provide the Forth
+code as an image file in nearly executable form. At the start of the
+system a C routine loads the image file into memory, sets up the memory
+(stacks etc.) according to information in the image file, and starts
+executing Forth code.
+
+   The image file format is a compromise between the goals of making it
+easy to generate image files and making them portable. The easiest way
+to generate an image file is to just generate a memory dump. However,
+this kind of image file cannot be used on a different machine, or on
+the next version of the engine on the same machine, it even might not
+work with the same engine compiled by a different version of the C
+compiler. We would like to have as few versions of the image file as
+possible, because we do not want to distribute many versions of the
+same image file, and to make it easy for the users to use their image
+files on many machines. We currently need to create a different image
+file for machines with different cell sizes and different byte order
+(little- or big-endian)(1).
+
+   Forth code that is going to end up in a portable image file has to
+comply to some restrictions: addresses have to be stored in memory with
+special words (`A!', `A,', etc.) in order to make the code relocatable.
+Cells, floats, etc., have to be stored at the natural alignment
+boundaries(2), in order to avoid alignment faults on machines with
+stricter alignment. The image file is produced by a metacompiler
+(`cross.fs').
+
+   So, unlike the image file of Mitch Bradleys `cforth', our image file
+is not directly executable, but has to undergo some manipulations
+during loading. Address relocation is performed at image load-time, not
+at run-time. The loader also has to replace tokens standing for
+primitive calls with the appropriate code-field addresses (or code
+addresses in the case of direct threading).
+
+   ---------- Footnotes ----------
+
+   (1)  We are considering adding information to the image file that
+enables the loader to change the byte order.
+
+   (2)  E.g., store floats (8 bytes) at an address dividable by~8. This
+happens automatically in our system when you use the ANS Forth
+alignment words.
+
+
+File: gforth.info,  Node: Performance,  Prev: System Architecture,  Up: Internals
+
+Performance
+===========
+
+   On RISCs the Gforth engine is very close to optimal; i.e., it is
+usually impossible to write a significantly faster engine.
+
+   On register-starved machines like the 386 architecture processors
+improvements are possible, because `gcc' does not utilize the registers
+as well as a human, even with explicit register declarations; e.g.,
+Bernd Beuster wrote a Forth system fragment in assembly language and
+hand-tuned it for the 486; this system is 1.19 times faster on the
+Sieve benchmark on a 486DX2/66 than Gforth compiled with `gcc-2.6.3'
+with `-DFORCE_REG'.
+
+   However, this potential advantage of assembly language
+implementations is not necessarily realized in complete Forth systems:
+We compared Gforth (direct threaded, compiled with `gcc-2.6.3' and
+`-DFORCE_REG') with Win32Forth 1.2093, LMI's NT Forth (Beta, May 1994)
+and Eforth (with and without peephole (aka pinhole) optimization of the
+threaded code); all these systems were written in assembly language. We
+also compared Gforth with three systems written in C: PFE-0.9.14
+(compiled with `gcc-2.6.3' with the default configuration for Linux:
+`-O2 -fomit-frame-pointer -DUSE_REGS -DUNROLL_NEXT'), ThisForth Beta
+(compiled with gcc-2.6.3 -O3 -fomit-frame-pointer; ThisForth employs
+peephole optimization of the threaded code) and TILE (compiled with
+`make opt'). We benchmarked Gforth, PFE, ThisForth and TILE on a
+486DX2/66 under Linux. Kenneth O'Heskin kindly provided the results for
+Win32Forth and NT Forth on a 486DX2/66 with similar memory performance
+under Windows NT. Marcel Hendrix ported Eforth to Linux, then extended
+it to run the benchmarks, added the peephole optimizer, ran the
+benchmarks and reported the results.
+
+   We used four small benchmarks: the ubiquitous Sieve; bubble-sorting
+and matrix multiplication come from the Stanford integer benchmarks and
+have been translated into Forth by Martin Fraeman; we used the versions
+included in the TILE Forth package, but with bigger data set sizes; and
+a recursive Fibonacci number computation for benchmarking calling
+performance. The following table shows the time taken for the benchmarks
+scaled by the time taken by Gforth (in other words, it shows the speedup
+factor that Gforth achieved over the other systems).
+
+     relative      Win32-    NT       eforth       This-
+       time  Gforth Forth Forth eforth  +opt   PFE Forth  TILE
+     sieve     1.00  1.39  1.14   1.39  0.85  1.58  3.18  8.58
+     bubble    1.00  1.31  1.41   1.48  0.88  1.50        3.88
+     matmul    1.00  1.47  1.35   1.46  0.74  1.58        4.09
+     fib       1.00  1.52  1.34   1.22  0.86  1.74  2.99  4.30
+
+   You may find the good performance of Gforth compared with the systems
+written in assembly language quite surprising. One important reason for
+the disappointing performance of these systems is probably that they are
+not written optimally for the 486 (e.g., they use the `lods'
+instruction). In addition, Win32Forth uses a comfortable, but costly
+method for relocating the Forth image: like `cforth', it computes the
+actual addresses at run time, resulting in two address computations per
+NEXT (*note System Architecture::.).
+
+   Only Eforth with the peephole optimizer performs comparable to
+Gforth. The speedups achieved with peephole optimization of threaded
+code are quite remarkable. Adding a peephole optimizer to Gforth should
+cause similar speedups.
+
+   The speedup of Gforth over PFE, ThisForth and TILE can be easily
+explained with the self-imposed restriction to standard C, which makes
+efficient threading impossible (however, the measured implementation of
+PFE uses a GNU C extension: *Note Defining Global Register Variables:
+(gcc.info)Global Reg Vars).  Moreover, current C compilers have a hard
+time optimizing other aspects of the ThisForth and the TILE source.
+
+   Note that the performance of Gforth on 386 architecture processors
+varies widely with the version of `gcc' used. E.g., `gcc-2.5.8' failed
+to allocate any of the virtual machine registers into real machine
+registers by itself and would not work correctly with explicit register
+declarations, giving a 1.3 times slower engine (on a 486DX2/66 running
+the Sieve) than the one measured above.
+
+   In `Translating Forth to Efficient C' by M. Anton Ertl and Martin
+Maierhofer (presented at EuroForth '95), an indirect threaded version of
+Gforth is compared with Win32Forth, NT Forth, PFE, and ThisForth; that
+version of Gforth is 2\%-8\% slower on a 486 than the version used
+here. The paper available at
+`http://www.complang.tuwien.ac.at/papers/ertl&maierhofer95.ps.gz'; it
+also contains numbers for some native code systems. You can find
+numbers for Gforth on various machines in `Benchres'.
+
+
+File: gforth.info,  Node: Bugs,  Next: Origin,  Prev: Internals,  Up: Top
+
+Bugs
+****
+
+   Known bugs are described in the file BUGS in the Gforth distribution.
+
+   If you find a bug, please send a bug report to
+`bug-gforth@gnu.ai.mit.edu'. A bug report should describe the Gforth
+version used (it is announced at the start of an interactive Gforth
+session), the machine and operating system (on Unix systems you can use
+`uname -a' to produce this information), the installation options (send
+the `config.status' file), and a complete list of changes you (or your
+installer) have made to the Gforth sources (if any); it should contain
+a program (or a sequence of keyboard commands) that reproduces the bug
+and a description of what you think constitutes the buggy behaviour.
+
+   For a thorough guide on reporting bugs read *Note How to Report
+Bugs: (gcc.info)Bug Reporting.
+
+
+File: gforth.info,  Node: Origin,  Next: Word Index,  Prev: Bugs,  Up: Top
+
+Authors and Ancestors of Gforth
+*******************************
+
+Authors and Contributors
+========================
+
+   The Gforth project was started in mid-1992 by Bernd Paysan and Anton
+Ertl. The third major author was Jens Wilke.  Lennart Benschop (who was
+one of Gforth's first users, in mid-1993) and Stuart Ramsden inspired us
+with their continuous feedback. Lennart Benshop contributed
+`glosgen.fs', while Stuart Ramsden has been working on automatic
+support for calling C libraries. Helpful comments also came from Paul
+Kleinrubatscher, Christian Pirker, Dirk Zoller, Marcel Hendrix, John
+Wavrik, Barrie Stott and Marc de Groot.
+
+   Gforth also owes a lot to the authors of the tools we used (GCC, CVS,
+and autoconf, among others), and to the creators of the Internet: Gforth
+was developed across the Internet, and its authors have not met
+physically yet.
+
+Pedigree
+========
+
+   Gforth descends from BigForth (1993) and fig-Forth. Gforth and PFE
+(by Dirk Zoller) will cross-fertilize each other. Of course, a
+significant part of the design of Gforth was prescribed by ANS Forth.
+
+   Bernd Paysan wrote BigForth, a descendent from TurboForth, an
+unreleased 32 bit native code version of VolksForth for the Atari ST,
+written mostly by Dietrich Weineck.
+
+   VolksForth descends from F83. It was written by Klaus Schleisiek,
+Bernd Pennemann, Georg Rehfeld and Dietrich Weineck for the C64 (called
+UltraForth there) in the mid-80s and ported to the Atari ST in 1986.
+
+   Henry Laxen and Mike Perry wrote F83 as a model implementation of the
+Forth-83 standard. !! Pedigree? When?
+
+   A team led by Bill Ragsdale implemented fig-Forth on many processors
+in 1979. Robert Selzer and Bill Ragsdale developed the original
+implementation of fig-Forth for the 6502 based on microForth.
+
+   The principal architect of microForth was Dean Sanderson. microForth
+was FORTH, Inc.'s first off-the-shelf product. It was developped in
+1976 for the 1802, and subsequently implemented on the 8080, the 6800
+and the Z80.
+
+   All earlier Forth systems were custom-made, usually by Charles Moore,
+who discovered (as he puts it) Forth during the late 60s. The first full
+Forth existed in 1971.
+
+   A part of the information in this section comes from `The Evolution
+of Forth' by Elizabeth D. Rather, Donald R. Colburn and Charles H.
+Moore, presented at the HOPL-II conference and preprinted in SIGPLAN
+Notices 28(3), 1993.  You can find more historical and genealogical
+information about Forth there.
+
+
+File: gforth.info,  Node: Word Index,  Next: Node Index,  Prev: Origin,  Up: Top
+
+Word Index
+**********
+
+   This index is as incomplete as the manual. Each word is listed with
+stack effect and wordset.
+
+* Menu:
+
+* !  W A-ADDR -   core:                 Stack-Memory transfers.
+* '  "NAME" - XT     core:              Tokens for Words.
+* (local)  ADDR U -     local:          ANS Forth locals.
+* )  -     gforth:                      Assertions.
+* *  N1 N2 - N   core:                  Single precision.
+* */  N1 N2 N3 - N4     core:           Mixed precision.
+* */mod  N1 N2 N3 - N4 N5     core:     Mixed precision.
+* +  N1 N2 - N   core:                  Single precision.
+* +!  N A-ADDR -   core:                Stack-Memory transfers.
+* +DO  COMPILATION - DO-SYS ; RUN-TIME N1 N2 - | LOOP-SYS     gforth: Arbitrary control structures.
+* +LOOP  COMPILATION DO-SYS - ; RUN-TIME LOOP-SYS1 N - | LOOP-SYS2     core: Arbitrary control structures.
+* -  N1 N2 - N   core:                  Single precision.
+* -DO  COMPILATION - DO-SYS ; RUN-TIME N1 N2 - | LOOP-SYS     gforth: Arbitrary control structures.
+* -LOOP  COMPILATION DO-SYS - ; RUN-TIME LOOP-SYS1 U - | LOOP-SYS2     gforth: Arbitrary control structures.
+* -rot  W1 W2 W3 - W3 W1 W2   gforth:   Data stack.
+* /  N1 N2 - N   core:                  Single precision.
+* /does-handler  - N   gforth:          Threading Words.
+* /mod  N1 N2 - N3 N4   core:           Single precision.
+* 2!  W1 W2 A-ADDR -   core:            Stack-Memory transfers.
+* 2*  N1 - N2   core:                   Bitwise operations.
+* 2/  N1 - N2   core:                   Bitwise operations.
+* 2>r  W1 W2 -   core-ext:              Return stack.
+* 2@  A-ADDR - W1 W2   core:            Stack-Memory transfers.
+* 2Constant  W1 W2 "NAME" -     double: Simple Defining Words.
+* 2drop  W1 W2 -   core:                Data stack.
+* 2dup  W1 W2 - W1 W2 W1 W2   core:     Data stack.
+* 2nip  W1 W2 W3 W4 - W3 W4   gforth:   Data stack.
+* 2over  W1 W2 W3 W4 - W1 W2 W3 W4 W1 W2   core: Data stack.
+* 2r>  - W1 W2   core-ext:              Return stack.
+* 2r@  - W1 W2   core-ext:              Return stack.
+* 2rdrop  -   gforth:                   Return stack.
+* 2rot  W1 W2 W3 W4 W5 W6 - W3 W4 W5 W6 W1 W2   double-ext: Data stack.
+* 2swap  W1 W2 W3 W4 - W3 W4 W1 W2   core: Data stack.
+* 2tuck  W1 W2 W3 W4 - W3 W4 W1 W2 W3 W4   gforth: Data stack.
+* 2VARIABLE  "NAME" -     double:       Simple Defining Words.
+* :  "NAME" - COLON-SYS     core:       Colon Definitions.
+* :noname  - XT COLON-SYS     core-ext: Supplying names.
+* ;  COMPILATION COLON-SYS - ; RUN-TIME NEST-SYS     core: Colon Definitions.
+* ;code  COMPILATION. COLON-SYS1 - COLON-SYS2     tools-ext: Assembler and Code words.
+* ;s  -   gforth:                       Calls and returns.
+* <compilation  COMPILATION. ORIG COLON-SYS -     gforth: Interpretation and Compilation Semantics.
+* <interpretation  COMPILATION. ORIG COLON-SYS -     gforth: Interpretation and Compilation Semantics.
+* >body  XT - A-ADDR   core:            User-defined Defining Words.
+* >code-address  XT - C-ADDR   gforth:  Threading Words.
+* >does-code  XT - A-ADDR   gforth:     Threading Words.
+* >l  W -   gforth:                     Implementation.
+* >r  W -   core:                       Return stack.
+* ?DO  COMPILATION - DO-SYS ; RUN-TIME W1 W2 - | LOOP-SYS     core-ext: Arbitrary control structures.
+* ?dup  W - W   core:                   Data stack.
+* ?DUP-0=-IF  COMPILATION - ORIG ; RUN-TIME N - N|     gforth: Arbitrary control structures.
+* ?DUP-IF  COMPILATION - ORIG ; RUN-TIME N - N|     gforth: Arbitrary control structures.
+* ?LEAVE  COMPILATION - ; RUN-TIME F | F LOOP-SYS -     gforth: Arbitrary control structures.
+* @  A-ADDR - W   core:                 Stack-Memory transfers.
+* @local#  - W   gforth:                Implementation.
+* abs  N1 - N2   core:                  Single precision.
+* ADDRESS-UNIT-BITS  - N     environment: Address arithmetic.
+* AGAIN  COMPILATION DEST - ; RUN-TIME -     core-ext: Arbitrary control structures.
+* AHEAD  COMPILATION - ORIG ; RUN-TIME -     tools-ext: Arbitrary control structures.
+* align  -     core:                    Address arithmetic.
+* aligned  C-ADDR - A-ADDR   core:      Address arithmetic.
+* and  W1 W2 - W   core:                Bitwise operations.
+* assembler  -     tools-ext:           Assembler and Code words.
+* assert(  -     gforth:                Assertions.
+* assert-level  - A-ADDR     gforth:    Assertions.
+* assert0(  -     gforth:               Assertions.
+* assert1(  -     gforth:               Assertions.
+* assert2(  -     gforth:               Assertions.
+* assert3(  -     gforth:               Assertions.
+* ASSUME-LIVE  ORIG - ORIG     gforth:  Where are locals visible by name?.
+* BEGIN  COMPILATION - DEST ; RUN-TIME -     core: Arbitrary control structures.
+* blank  ADDR LEN -     string:         Memory block access.
+* c!  C C-ADDR -   core:                Stack-Memory transfers.
+* c@  C-ADDR - C   core:                Stack-Memory transfers.
+* case  COMPILATION  - CASE-SYS ; RUN-TIME  -     core-ext: Arbitrary control structures.
+* catch  X1 .. XN XT - Y1 .. YM 0 / Z1 .. ZN ERROR     exception: Exception Handling.
+* cell+  A-ADDR1 - A-ADDR2   core:      Address arithmetic.
+* cells  N1 - N2   core:                Address arithmetic.
+* cfalign  -     gforth:                Address arithmetic.
+* cfaligned  ADDR1 - ADDR2     gforth:  Address arithmetic.
+* char+  C-ADDR1 - C-ADDR2   core:      Address arithmetic.
+* chars  N1 - N2     core:              Address arithmetic.
+* cmove  C-FROM C-TO U -   string:      Memory block access.
+* cmove>  C-FROM C-TO U -   string:     Memory block access.
+* code  "NAME" - COLON-SYS     tools-ext: Assembler and Code words.
+* code-address!  C-ADDR XT -   gforth:  Threading Words.
+* common-list  LIST1 LIST2 - LIST3     gforth-internal: Implementation.
+* COMP'  "NAME" - W XT     gforth:      Tokens for Words.
+* compilation>  COMPILATION. - ORIG COLON-SYS     gforth: Interpretation and Compilation Semantics.
+* compile,  XT -     core-ext:          Tokens for Words.
+* compile-@local  N -     gforth:       Implementation.
+* compile-f@local  N -     gforth:      Implementation.
+* compile-lp+!  N -     gforth:         Implementation.
+* compile-only  -     gforth:           Interpretation and Compilation Semantics.
+* Constant  W "NAME" -     core:        Simple Defining Words.
+* Create  "NAME" -     core:            Simple Defining Words.
+* create-interpret/compile  "NAME" -     gforth: Interpretation and Compilation Semantics.
+* CS-PICK  ... U - ... DESTU     tools-ext: Arbitrary control structures.
+* CS-ROLL  DESTU/ORIGU .. DEST0/ORIG0 U - .. DEST0/ORIG0 DESTU/ORIGU     tools-ext: Arbitrary control structures.
+* d+  D1 D2 - D   double:               Double precision.
+* d-  D1 D2 - D   double:               Double precision.
+* dabs  D1 - D2     double:             Double precision.
+* Defer  "NAME" -     gforth:           Simple Defining Words.
+* df!  R DF-ADDR -   float-ext:         Stack-Memory transfers.
+* df@  DF-ADDR - R   float-ext:         Stack-Memory transfers.
+* dfalign  -     float-ext:             Address arithmetic.
+* dfaligned  C-ADDR - DF-ADDR   float-ext: Address arithmetic.
+* dfloat+  DF-ADDR1 - DF-ADDR2     float-ext: Address arithmetic.
+* dfloats  N1 - N2   float-ext:         Address arithmetic.
+* dmax  D1 D2 - D     double:           Double precision.
+* dmin  D1 D2 - D     double:           Double precision.
+* dnegate  D1 - D2   double:            Double precision.
+* DO  COMPILATION - DO-SYS ; RUN-TIME W1 W2 - LOOP-SYS     core: Arbitrary control structures.
+* docol:  - ADDR     gforth:            Threading Words.
+* docon:  - ADDR     gforth:            Threading Words.
+* dodefer:  - ADDR     gforth:          Threading Words.
+* does-code!  A-ADDR XT -   gforth:     Threading Words.
+* does-handler!  A-ADDR -   gforth:     Threading Words.
+* DOES>  COMPILATION COLON-SYS1 - COLON-SYS2 ; RUN-TIME NEST-SYS -     core: User-defined Defining Words.
+* dofield:  - ADDR     gforth:          Threading Words.
+* DONE  COMPILATION ORIG - ; RUN-TIME -     gforth: Arbitrary control structures.
+* douser:  - ADDR     gforth:           Threading Words.
+* dovar:  - ADDR     gforth:            Threading Words.
+* drop  W -   core:                     Data stack.
+* dup  W - W W   core:                  Data stack.
+* ELSE  COMPILATION ORIG1 - ORIG2 ; RUN-TIME F -     core: Arbitrary control structures.
+* end-code  COLON-SYS -     gforth:     Assembler and Code words.
+* endcase  COMPILATION CASE-SYS - ; RUN-TIME X -     core-ext: Arbitrary control structures.
+* ENDIF  COMPILATION ORIG - ; RUN-TIME -     gforth: Arbitrary control structures.
+* endof  COMPILATION CASE-SYS1 OF-SYS - CASE-SYS2 ; RUN-TIME  -     core-ext: Arbitrary control structures.
+* endscope  COMPILATION SCOPE - ; RUN-TIME  -     gforth: Where are locals visible by name?.
+* erase  ADDR LEN -     core-ext:       Memory block access.
+* execute  XT -   core:                 Tokens for Words.
+* EXIT  COMPILATION - ; RUN-TIME NEST-SYS -     core: Calls and returns.
+* f!  R F-ADDR -   float:               Stack-Memory transfers.
+* f*  R1 R2 - R3   float:               Floating Point.
+* f**  R1 R2 - R3   float-ext:          Floating Point.
+* f+  R1 R2 - R3   float:               Floating Point.
+* f-  R1 R2 - R3   float:               Floating Point.
+* f/  R1 R2 - R3   float:               Floating Point.
+* f>l  R -   gforth:                    Implementation.
+* f@  F-ADDR - R   float:               Stack-Memory transfers.
+* f@local#  - R   gforth:               Implementation.
+* fabs  R1 - R2   float-ext:            Floating Point.
+* facos  R1 - R2   float-ext:           Floating Point.
+* facosh  R1 - R2   float-ext:          Floating Point.
+* falign  -     float:                  Address arithmetic.
+* faligned  C-ADDR - F-ADDR   float:    Address arithmetic.
+* falog  R1 - R2   float-ext:           Floating Point.
+* fasin  R1 - R2   float-ext:           Floating Point.
+* fasinh  R1 - R2   float-ext:          Floating Point.
+* fatan  R1 - R2   float-ext:           Floating Point.
+* fatan2  R1 R2 - R3   float-ext:       Floating Point.
+* fatanh  R1 - R2   float-ext:          Floating Point.
+* fconstant  R "NAME" -     float:      Simple Defining Words.
+* fcos  R1 - R2   float-ext:            Floating Point.
+* fcosh  R1 - R2   float-ext:           Floating Point.
+* fdrop  R -   float:                   Floating point stack.
+* fdup  R - R R   float:                Floating point stack.
+* fexp  R1 - R2   float-ext:            Floating Point.
+* fexpm1  R1 - R2   float-ext:          Floating Point.
+* fill  C-ADDR U C -   core:            Memory block access.
+* find-name  C-ADDR U - NT/0     gforth: Tokens for Words.
+* fln  R1 - R2   float-ext:             Floating Point.
+* flnp1  R1 - R2   float-ext:           Floating Point.
+* float+  F-ADDR1 - F-ADDR2   float:    Address arithmetic.
+* floats  N1 - N2   float:              Address arithmetic.
+* flog  R1 - R2   float-ext:            Floating Point.
+* floor  R1 - R2   float:               Floating Point.
+* flush-icache  C-ADDR U -   gforth:    Assembler and Code words.
+* fm/mod  D1 N1 - N2 N3   core:         Mixed precision.
+* fmax  R1 R2 - R3   float:             Floating Point.
+* fmin  R1 R2 - R3   float:             Floating Point.
+* fnegate  R1 - R2   float:             Floating Point.
+* fnip  R1 R2 - R2   gforth:            Floating point stack.
+* FOR  COMPILATION - DO-SYS ; RUN-TIME U - LOOP-SYS     gforth: Arbitrary control structures.
+* fover  R1 R2 - R1 R2 R1   float:      Floating point stack.
+* fp!  F-ADDR -   gforth:               Stack pointer manipulation.
+* fp@  - F-ADDR   gforth:               Stack pointer manipulation.
+* frot  R1 R2 R3 - R2 R3 R1   float:    Floating point stack.
+* fround  R1 - R2   float:              Floating Point.
+* fsin  R1 - R2   float-ext:            Floating Point.
+* fsincos  R1 - R2 R3   float-ext:      Floating Point.
+* fsinh  R1 - R2   float-ext:           Floating Point.
+* fsqrt  R1 - R2   float-ext:           Floating Point.
+* fswap  R1 R2 - R2 R1   float:         Floating point stack.
+* ftan  R1 - R2   float-ext:            Floating Point.
+* ftanh  R1 - R2   float-ext:           Floating Point.
+* ftuck  R1 R2 - R2 R1 R2   gforth:     Floating point stack.
+* fvariable  "NAME" -     float:        Simple Defining Words.
+* IF  COMPILATION - ORIG ; RUN-TIME F -     core: Arbitrary control structures.
+* immediate  -     core:                Interpretation and Compilation Semantics.
+* interpret/compile:  INTERP-XT COMP-XT "NAME" -     gforth: Interpretation and Compilation Semantics.
+* interpretation>  COMPILATION. - ORIG COLON-SYS     gforth: Interpretation and Compilation Semantics.
+* invert  W1 - W2   core:               Bitwise operations.
+* IS  ADDR "NAME" -     gforth:         Simple Defining Words.
+* laddr#  - C-ADDR   gforth:            Implementation.
+* lastxt  - XT     gforth:              Tokens for Words.
+* lastxt  - XT     gforth:              Supplying names.
+* LEAVE  COMPILATION - ; RUN-TIME LOOP-SYS -     core: Arbitrary control structures.
+* list-size  LIST - U     gforth-internal: Implementation.
+* LOOP  COMPILATION DO-SYS - ; RUN-TIME LOOP-SYS1 - | LOOP-SYS2     core: Arbitrary control structures.
+* lp!  C-ADDR -   gforth:               Implementation.
+* lp!  C-ADDR -   gforth:               Stack pointer manipulation.
+* lp+!#  -   gforth:                    Implementation.
+* lp@  - ADDR     gforth:               Stack pointer manipulation.
+* m*  N1 N2 - D   core:                 Mixed precision.
+* m*/  D1 N2 U3 - DQOUT     double:     Mixed precision.
+* m+  D1 N - D2   double:               Mixed precision.
+* max  N1 N2 - N   core:                Single precision.
+* maxalign  -     gforth:               Address arithmetic.
+* maxaligned  ADDR1 - ADDR2     gforth: Address arithmetic.
+* min  N1 N2 - N   core:                Single precision.
+* mod  N1 N2 - N   core:                Single precision.
+* move  C-FROM C-TO UCOUNT -   core:    Memory block access.
+* name>comp  NT - W XT     gforth:      Tokens for Words.
+* name>int  NT - XT     gforth:         Tokens for Words.
+* name>string  NT - ADDR COUNT     gforth: Tokens for Words.
+* name?int  NT - XT     gforth:         Tokens for Words.
+* negate  N1 - N2   core:               Single precision.
+* NEXT  COMPILATION DO-SYS - ; RUN-TIME LOOP-SYS1 - | LOOP-SYS2     gforth: Arbitrary control structures.
+* nextname  C-ADDR U -     gforth:      Supplying names.
+* nip  W1 W2 - W2   core-ext:           Data stack.
+* noname  -     gforth:                 Supplying names.
+* of  COMPILATION  - OF-SYS ; RUN-TIME X1 X2 - |X1     core-ext: Arbitrary control structures.
+* or  W1 W2 - W   core:                 Bitwise operations.
+* over  W1 W2 - W1 W2 W1   core:        Data stack.
+* pick  U - W   core-ext:               Data stack.
+* postpone,  W XT -     unknown:        Tokens for Words.
+* printdebugdata  -     gforth:         Debugging.
+* printdebugline  ADDR -     gforth:    Debugging.
+* r>  - W   core:                       Return stack.
+* r@  - W   core:                       Return stack.
+* rdrop  -   gforth:                    Return stack.
+* REPEAT  COMPILATION ORIG DEST - ; RUN-TIME -     core: Arbitrary control structures.
+* restrict  -     gforth:               Interpretation and Compilation Semantics.
+* roll  X0 X1 .. XN N - X1 .. XN X0     core-ext: Data stack.
+* rot  W1 W2 W3 - W2 W3 W1   core:      Data stack.
+* rp!  A-ADDR -   gforth:               Stack pointer manipulation.
+* rp@  - A-ADDR   gforth:               Stack pointer manipulation.
+* scope  COMPILATION  - SCOPE ; RUN-TIME  -     gforth: Where are locals visible by name?.
+* sf!  R SF-ADDR -   float-ext:         Stack-Memory transfers.
+* sf@  SF-ADDR - R   float-ext:         Stack-Memory transfers.
+* sfalign  -     float-ext:             Address arithmetic.
+* sfaligned  C-ADDR - SF-ADDR   float-ext: Address arithmetic.
+* sfloat+  SF-ADDR1 - SF-ADDR2     float-ext: Address arithmetic.
+* sfloats  N1 - N2   float-ext:         Address arithmetic.
+* sm/rem  D1 N1 - N2 N3   core:         Mixed precision.
+* sp!  A-ADDR -   gforth:               Stack pointer manipulation.
+* sp@  - A-ADDR   gforth:               Stack pointer manipulation.
+* sub-list?  LIST1 LIST2 - F     gforth-internal: Implementation.
+* swap  W1 W2 - W2 W1   core:           Data stack.
+* THEN  COMPILATION ORIG - ; RUN-TIME -     core: Arbitrary control structures.
+* throw  Y1 .. YM ERROR/0 - Y1 .. YM / Z1 .. ZN ERROR     exception: Exception Handling.
+* TO  ADDR "NAME" -     core-ext:       Simple Defining Words.
+* tuck  W1 W2 - W2 W1 W2   core-ext:    Data stack.
+* U+DO  COMPILATION - DO-SYS ; RUN-TIME U1 U2 - | LOOP-SYS     gforth: Arbitrary control structures.
+* U-DO  COMPILATION - DO-SYS ; RUN-TIME U1 U2 - | LOOP-SYS     gforth: Arbitrary control structures.
+* um*  U1 U2 - UD   core:               Mixed precision.
+* um/mod  UD U1 - U2 U3   core:         Mixed precision.
+* unloop  -   core:                     Arbitrary control structures.
+* UNTIL  COMPILATION DEST - ; RUN-TIME F -     core: Arbitrary control structures.
+* User  "NAME" -     gforth:            Simple Defining Words.
+* value  W "NAME" -     core-ext:       Simple Defining Words.
+* Variable  "NAME" -     core:          Simple Defining Words.
+* WHILE  COMPILATION DEST - ORIG DEST ; RUN-TIME F -     core: Arbitrary control structures.
+* xor  W1 W2 - W   core:                Bitwise operations.
+* [']  COMPILATION. "NAME" - ; RUN-TIME. - XT     core: Tokens for Words.
+* [COMP']  COMPILATION "NAME" - ; RUN-TIME - W XT     gforth: Tokens for Words.
+* ~~  COMPILATION  - ; RUN-TIME  -     gforth: Debugging.
+
+
+File: gforth.info,  Node: Node Index,  Prev: Word Index,  Up: Top
+
+Node Index
+**********
+
+   This index is even less complete than the manual.
+
+

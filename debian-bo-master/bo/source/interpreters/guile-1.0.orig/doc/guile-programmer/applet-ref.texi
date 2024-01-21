@@ -1,0 +1,183 @@
+@node Guile applet specification
+@chapter Guile applet specification
+@cindex applets
+@cindex Guile applets
+
+@strong{[NOTE: this chapter was written for Cygnus Guile and has not yet
+been updated for the Guile 1.0 release.]}
+
+This chapter has been written by Gordon Irlam, gordoni@@cygnus.com, at
+Cygnus Support, February 28, 1996.  It is included here almost verbatim.
+@cindex Irlam, Gordon
+
+This section provides the specification for writing Guile applets for
+use with the SurfIt!  demo browser.
+@cindex SurfIt! web browser
+
+
+@menu
+* HTML applet extension::       
+* Applet requirements::         
+* Applet API::                  
+* Applet behavior::             
+* Browser behavior::            
+@end menu
+
+@node HTML applet extension
+@section HTML applet extension
+
+Guile Scheme applets are denoted by the mime type
+application/guile. This is the default type for the file extension .scm.
+@cindex mime types
+
+An applet can be inlined within a HTML document.
+@cindex applets, inline
+
+@table @code
+@item <a href="applet.scm" rel=embed>
+@itemx fallback_html
+@itemx </a>
+The applet applet.scm will be loaded, inserted into the page, and run
+when the document containing it is first loaded. fallback_html will be
+displayed by browsers that don't support Guile applets.
+@end table
+
+An applet may also be invoked when a hyperlink is followed.
+@cindex applets, hyperlinks
+
+@table @code
+@item <a href="applet.scm">
+@itemx fallback_html 
+@itemx </a>
+When the hyperlink is selected the applet applet.scm will be loaded and
+executed.  The original document will be cleared from the page only if
+the applet explicitly requests it to be. fallback_html will be displayed
+by browsers that don't support Guile applets.
+@end table
+
+
+@node Applet requirements
+@section Applet requirements
+@cindex applet requirements
+
+An applet is required to be a syntactically well formed Guile scheme
+program. When an applet is invoked the corresponding Guile program is
+retrieved, loaded, and executed.
+
+Every applet is required to include the applet library:
+@cindex applet library
+
+@table @code
+@item (require 'applet)
+@vindex 'applet
+Incorporate the applet library into a Guile application. This is needed
+as a prerequisite to performing any of the other applet commands.
+@end table
+
+Every applet is required to define a routine to be called by the browser
+when the browser requires the applet to terminate execution:
+
+@deffn {Applet API} define-applet-terminate routine
+@var{routine} is the name of a routine that will be invoked by the
+browser when the applet is required to terminate execution. If the
+applet is visible it should destroy the Tk canvas upon which it is
+visible and then exit.
+@end deffn
+
+An applet will persist for as long as it is accessible -- either
+externally through it's being displayed on a page, or internally through
+the scheme environment.
+
+
+@node Applet API
+@section Applet API
+@cindex applet API
+@cindex API, applet
+
+All applets reside in the same top level environment. This allows state
+to be shared between applets and to persist between applet invocations.
+
+An applet has access to all the features of a regular Guile scheme
+program and to the gtcl/gtk Guile extensions. The features of gtk allow
+the Guile applet to interactively display itself within the parent
+document.
+
+Note: While Guile provides the ability to control namespaces, and this
+is necessary to provide a secure environment within which applets can be
+run, this has not been done for the SurfIt! Guile demo browser. The
+SurfIt! Guile demo browser is mainly intended as a research prototype,
+not a production web browser.
+@cindex applet limitations
+
+@defvar browser-window-name
+@end defvar
+
+@deffn {Applet API} browser-window args
+@var{browser-window-name} is a string containing the Tk window name of
+the browser window. @code{browser-window} is the corresponding Tcl proc
+to which window commands can be sent.
+@end deffn
+
+
+@defvar applet-window-name
+@end defvar
+@deffn {Appplet API} applet-window args
+@var{applet-window-name} is a string containing a Tk window name for a
+frame that can be used to contain the applet. @code{applet-window} is
+the corresponding Tcl proc to which window commands can be sent. The
+frame still needs inserting into the browser window, assuming the applet
+is visible.
+@end deffn
+
+
+@defvar applet-embedindex 
+@var{applet-embedindex} is a string containing the offset within the
+browser window of the applet's anchor. Most commonly this is used when
+insert the applet into the browser window at the same location as the
+original html:
+@smallexample
+(browser-window 'window 'create applet-embedindex :window
+                applet-window-name).
+@end smallexample
+@end defvar
+
+
+@deffn {Applet API} applet-newpage
+This routine clears the current contents of the browser window.
+@end deffn
+
+@deffn {Applet API} applet-parsehtml html
+This routine parses the html specified by html and renders the result
+adding it to bottom of the browser window.
+@end deffn
+@cindex applet data retrieval
+
+@deffn {Applet API} applet-loadurl url
+This routine loads and renders the contents of the object specified by URL url
+inserting it into the applet window. 
+@end deffn
+
+@deffn {Applet API} applet-loaddata url
+This routine loads and returns the contents of the object specified by
+URL url. Note: This particular routine will probably not be present in
+guile-r0. Its suggested incorporation into the API, and it's syntax are
+still tentative.
+@end deffn
+
+
+@node Applet behavior
+@section Applet behavior
+@cindex applet behaviour
+@cindex applet event loop
+
+Applets should not monopolize the cpu. Instead they should be written
+using a callback or event loop polling based style so that the Tk event
+handler can continues to operate, and the user can continue to interact
+with the browser.
+
+@node Browser behavior
+@section Browser behavior
+@cindex browser behaviour
+
+Any run time error occurring within an applet that goes uncaught will
+cause the applet to exit, but the browser will continue to function.

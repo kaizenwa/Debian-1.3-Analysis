@@ -1,0 +1,81 @@
+#!/bin/sh
+set -e
+
+PATH=@@@pathlibdir@@@:$PATH
+export PATH
+
+[ "$DEBIANDOCSGMLLIB" ] || DEBIANDOCSGMLLIB=@@@sgmllibdir@@@
+[ "$DEBIANDOCSGMLSPEC" ] || DEBIANDOCSGMLSPEC=@@@speclibdir@@@
+
+usageversion () {
+	cat >&2 <<'END'
+debiandoc2@@@type@@@ version @@@version@@@; Copyright (C)1996 Ian Jackson.
+This is free software; see the GNU General Public Licence
+version 2 or later for copying conditions.  There is NO warranty.
+
+usage: debiandoc2@@@type@@@ [options] <filename>.sgml
+options:  -k      keep intermediate files
+@@@stdout@@@
+          -O      send output to stdout instead of <filename>.@@@type@@@
+@@@endstdout@@@
+END
+}
+
+usageerror () { echo >&2 "debiandoc2@@@type@@@: $@"; usageversion; exit 2; }
+
+keep=false
+stdout=false
+
+while [ $# != 0 ]
+do
+	case "$1" in
+	-k)	keep=true	;;
+@@@stdout@@@
+	-O)	stdout=true	;;
+@@@endstdout@@@
+	-?*)	usageerror "unknown option \`$1'" ;;
+	--)	shift; break	;;
+	*)	break		;;
+	esac
+	shift
+done
+
+[ $# = 1 ] || usageerror "need exactly one input filename"
+
+case "$1" in
+-)	nsgmlsi="-"
+@@@stdout@@@
+	stdout=true
+@@@endstdout@@@
+	$stdout || usageerror "stdin not allowed with debiandoc2@@@type@@@"
+	! $keep || usageerror "-k not allowed with input from stdin"
+	;;
+-?*)	nsgmlsi="./$1"
+	bn="`basename \"$1\" .sgml`"
+	;;
+*)	nsgmlsi="$1"
+	bn="`basename \"$1\" .sgml`"
+	;;
+esac
+
+case "$bn" in -*) bn="./$bn" ;; esac
+
+rc=2
+if $keep
+then
+	tf="$bn"
+else
+	tfd=/tmp/$$
+	trap 'rm -rf $tfd; exit $rc' 0
+	mkdir "$tfd"
+	tf="$tfd/y"
+fi
+
+nsgmls -l -D"$DEBIANDOCSGMLLIB" -ccatalog "$nsgmlsi" >"$tf.sasp"
+saspconvert @@@toc@@@ @@@fnotes@@@ <"$tf.sasp" >"$tf.sasp-@@@sasp@@@"
+@@@stdout@@@
+$stdout || exec >"$bn.@@@type@@@"
+@@@endstdout@@@
+sgmlspl "$DEBIANDOCSGMLSPEC"/@@@spec@@@ <"$tf.sasp-@@@sasp@@@" "@@@argument@@@"
+
+rc=0

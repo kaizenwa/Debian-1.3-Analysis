@@ -1,0 +1,77 @@
+#
+# Gr_monitor/gr_gather Makefile.
+# ------------------------------
+#
+# Set these to your desires...
+#
+BINDIR = /usr/local/bin
+MANDIR = /usr/local/man/man1
+OWNER = root.sys
+MANOWNER = root.sys
+CFLAGS = -O2 -DGATHER_COMMAND='"$(BINDIR)/gr_gather"'
+#
+# Uncomment and edit appropriate macro defs for Linux or IRIX 5.x.
+#
+#------------------------------------------------------------------------
+# Linux
+# -----
+#
+INCLUDES = -Iproc
+GL_LIBS = -lglut -lMesaaux -lMesatk -lMesaGLU -lMesaGL -lXmu -lm $(XLIBS) 
+#GL_LIBS = /usr/lib/libglut.a \
+#	/usr/lib/libMesaaux.a \
+#	/usr/lib/libMesatk.a \
+#	/usr/lib/libMesaGLU.a \
+#	/usr/lib/libMesaGL.a -lXmu -lm $(XLIBS)
+PPS_LIBS = proc/libproc.a
+GR_GATHER_SRC = gr_gather.c
+INSTALL = install
+#
+#------------------------------------------------------------------------
+# SGI IRIX 5.x
+# ------------
+#
+# You will probably have to change the references to ../GLUT to
+# point to where ever you have put GLUT.
+#
+#INCLUDES = -I../GLUT
+#GL_LIBS = -L../GLUT/lib/glut -lglut -lGLU -lGL -lXmu -lm $(XLIBS) 
+#PPS_LIBS = 
+#GR_GATHER_SRC = gr_gather_sgi.c
+#INSTALL = cp
+#LIBPROC =
+# 
+#------------------------------------------------------------------------
+
+XLIBS = -L/usr/X11/lib -lX11
+
+PROGS = gr_monitor gr_gather
+
+targets: $(PROGS)
+
+gr_gather: $(GR_GATHER_SRC) $(PPS_LIBS) 
+	$(CC) $(INCLUDES) $(CFLAGS) $< $(PPS_LIBS) -o $@
+
+gr_monitor: gr_monitor.c
+	$(CC) $(INCLUDES) $(CFLAGS) $< $(GL_LIBS) -o $@
+
+proc/libproc.a:
+	cd proc; make
+
+install: targets
+	for i in $(PROGS); do \
+	  $(INSTALL) $$i $(BINDIR) ; \
+	  chown $(OWNER) $(BINDIR)/$$i ; \
+	done ; \
+	$(INSTALL) gr_monitor.1 $(MANDIR) ; \
+	chown $(MANOWNER) $(MANDIR)/gr_monitor.1
+	ln -sf $(MANDIR)/gr_monitor.1 $(MANDIR)/gr_gather.1
+
+clean:
+	-rm *.o *~; cd proc; make clean
+
+realclean: clean
+	-rm $(PROGS)
+
+
+

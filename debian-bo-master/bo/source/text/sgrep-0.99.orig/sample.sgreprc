@@ -1,0 +1,158 @@
+## File: example.macros
+# Author: PK & JJ March 1995
+# Description: general m4 macro definitions for sgrep
+# For documentation on these macros see
+#         http://www.cs.helsinki.fi/~jjaakkol/sgrepsamplerc.html
+# Use this macro to find out which macros there are in a file
+define(MACRO_NAMES,("efine" not in ("(" .. ")") .. "(" __ ( "," .. ")" )))
+
+# These are general macros used by other macros
+
+# Character macros
+define(NUMERAL,( "1" or "2" or "3" or "4" or "5" or "6" or "7" or "8" or
+"9" or "0" ))
+define(BLANK,( " " or "\t" or "\n" or "\r"))
+define(LOWER,("a"or"b"or"c"or"d"or"e"or"f"or"g"or"h"or"i"or"j"or"k"or"l"
+	or"m"or"n"or"o"or"p"or"q"or"r"or"s"or"t"or"u"or"v"or"x"or"y"or"z"))
+define(UPPER,("A"or"B"or"C"or"D"or"E"or"F"or"G"or"H"or"I"or"J"or"K"or"L"
+	or"M"or"N"or"O"or"P"or"Q"or"T"or"S"or"Y"or"U"or"V"or"X"or"Y"or"Z"))
+
+# Lines
+define(LEND,( "\n" or end ))
+define(LSTART,( "\n" or start))
+define(LINE,( (LSTART) _. (LEND) ))
+
+# Ordering and containment macros
+
+# First $1 regions of $2 right after $3
+define(REGS_AFTER,( $2 in (($3) .. join($1,$2))))
+# First $1 regions of $2 right before $3
+define(REGS_BEFORE,( $2 in ( join($1,$2) .. ($3))))
+# First possible index in regions
+define(FIRST_I,( (start in ($1)) or (chars ._ ($1))))
+# First $1 in $2:
+define(FIRST_IN,( $1 in ($2) not in
+                  (($1) _. ($1) in ($1 .. ($1) in ($2))) 
+                  or ($1 in ($2) in 
+                  ($1 not in ($2) .. ($1 in ($2)) in ($1 .. ($1))))
+))
+# Second $1 in $2:
+define(SECOND_IN,( $1 in (FIRST_IN($1,$2) .. ($1) in ($2) 
+                           extracting FIRST_IN($1,$2)) ))
+# Third $1 in $2:
+define(THIRD_IN,( $1 in (SECOND_IN($1,$2) .. ($1) in ($2) 
+                           extracting SECOND_IN($1,$2)) ))
+# Last $1 in $2:
+define(LAST_IN,( $1 in ($2) not in
+                  ($1 ._ ($1) in ($1 .. ($1) in ($2))) ))
+# $1 immediately followed by $2:
+define(FBY,( $1 .. ($2) not containing ($1 __ ($2)) ))
+define(ALL,( start .. end ) )
+define(NEXTTO,( ($1) .. ($2) not containing (($1)__($2)) ) )
+define(WORDS,(concat(LOWER or UPPER)))
+define(WORD,(($1) containing WORDS))
+
+# mail macros
+define(MAIL_HSTART,( FBY("F" in start, "rom ") or 
+              ("From " in ("\nFrom " extracting "\n" .. ":" .. ":" in LINE) ) ))
+define(MAIL_HEND,( "\n\n" or end ))
+define(MAIL_HEADER,( MAIL_HSTART .. MAIL_HEND ))
+define(MAIL_MESS,( MAIL_HSTART ._ MAIL_HSTART or (MAIL_HSTART .. end) ))
+define(MAIL_BODY, (MAIL_MESS extracting MAIL_HEADER ))
+define(MAIL_FROM,( "\nFrom: " .. LEND extracting ("\n" in "\nFrom: ") ))
+define(MAIL_SUBJ,( "\nSubject: " .. LEND extracting ("\n" in "\nSubject: ") ))
+define(MAIL_TO,( "\nTo: " ._ (LINE containing ":" or MAIL_HEND)
+              extracting ("\n" in "\nTo: ") ))
+define(MAIL_DATE,( "\nDate: " .. LEND extracting ("\n" in "\nDate: ") ))
+
+# News macros
+define(NEWS_START, ( start or (("\n\nFrom ") extracting ("\n\n" in "\n\nFrom "))))
+define(NEWS_ARTICLE,( NEWS_START ._ (NEWS_START or end) ) )
+define(NEWS_HEADER,( NEWS_START .. ("\n" in "\n\n")))
+define(NEWS_BODY,( NEWS_HEADER _. (NEWS_START or end) ))
+define(NEWS_HLINE,("\n$1 " in NEWS_HEADER extracting ("\n" in "\n$1 ") .. LEND))
+define(NEWS_FROM,(NEWS_HLINE(From:)))
+define(NEWS_SUBJ,(NEWS_HLINE(Subject:)))
+define(NEWS_PATH,(NEWS_HLINE(Path:)))
+define(NEWS_GROUPS,(NEWS_HLINE(Newsgroups:)))
+define(NEWS_DATE,(NEWS_HLINE(Date:)))
+define(NEWS_ORG,(NEWS_HLINE(Organization)))
+
+# C macros
+define(C_COMMENTS,( "/*" quote "*/" ) )
+define(C_PREPROCS,(
+changecom(%,%) 
+start in "#" or "\n#" .. ( ("\n" not in "\\\n") or end )
+changecom(#,#)
+) )
+define(C_BLOCKS,("{".."}") not in ( C_COMMENTS ) )
+define(C_PAREN,( "("..")" not in (C_COMMENTS or C_PREPROCS) ))
+
+define(C_FUNCS,( ALL extracting C_BLOCKS extracting C_COMMENTS extracting C_PREPROCS containing C_PAREN not containing ";" ) )
+changecom()
+
+#
+# File: sgml.macros
+# Author: PK, March-April 1996
+#  	(First version in March 1995)
+# Description: m4 macro definitions for querying fully tagged SGML 
+# document files using sgrep text search tool
+#
+define(ETAGO, "</" ) 			# End-TAG Open
+define(MDO, "<!" ) 			# Markup Declaration Open
+define(PIO, "<?" ) 			# Proc. Instruction Open
+# Start-TAG Open:
+define(STAGO, ("<" not in (ETAGO or MDO or PIO)) )
+define(TAGC, ">" )	 		# TAG Close
+define(MDC, ">" )	 		# Markup Declaration Close
+define(PIC, ">" )	 		# Proc. Instruction Close
+define(STAG, inner(STAGO .. TAGC) ) 	# Start TAG
+define(ETAG, inner(ETAGO .. TAGC) )	# End TAG
+define(GI, (STAGO __ (BLANK or TAGC) in STAG)) 	# Generic Identifier
+define(ATTRS, (BLANK __ TAGC in (STAG extracting GI)) )	# Attributes
+define(NAMED_ATTRS, ( ATTRS containing "$1="
+		._ (BLANK or ">")))
+# Properties of elements (GI plus attributes): 
+define(ELEM_PROPS, (STAGO __ TAGC in STAG) ) 	
+define(ELEMS,(STAG .. ETAG) )   	# All elements
+define(CONTENTS,(STAG __ ETAG) )   	# Element contents
+define(NAMED_STAG,( "<$1>" or ( ("<$1 " or "<$1\t" or "<$1\n")  .. ">"))) 
+define(NAMED_ETAG,( "</$1>" ))
+define(NAMED_ELEMS,( NAMED_STAG($1) .. NAMED_ETAG($1) ))
+define(NAMED_CONTENTS,( NAMED_STAG($1) __ NAMED_ETAG($1) ))
+# Dn_ELEMS - all elements at depth n:
+define(D1_ELEMS, outer(ELEMS) )
+define(D2_ELEMS, outer(ELEMS in D1_ELEMS) )
+define(D3_ELEMS, outer(ELEMS in D2_ELEMS) )
+define(D4_ELEMS, outer(ELEMS in D3_ELEMS) )
+define(D5_ELEMS, outer(ELEMS in D4_ELEMS) )
+define(D6_ELEMS, outer(ELEMS in D5_ELEMS) )
+define(D7_ELEMS, outer(ELEMS in D6_ELEMS) )
+define(D8_ELEMS, outer(ELEMS in D7_ELEMS) )
+define(D9_ELEMS, outer(ELEMS in D8_ELEMS) )
+define(D10_ELEMS, outer(ELEMS in D9_ELEMS) )
+# $1 elements immediately within $2 elements:
+define(IMM_IN,( NAMED_ELEMS($1) in outer(ELEMS in NAMED_ELEMS($2)) ))
+
+
+# These HTML macros are strongly based on SGML macros
+
+# Macros for locating HTML elements
+
+define(HTML_HEAD,((NAMED_ELEMS(HEAD))))
+define(HTML_BODY,(NAMED_ELEMS(BODY)))
+define(HTML_TITLE,(NAMED_ELEMS(TITLE)))
+define(HTML_ADDRESS,(NAMED_ELEMS(ADDRESS)))
+define(HTML_ANCHOR,(NAMED_ELEMS(A)))
+define(HTML_H1,(NAMED_ELEMS(H1)))
+define(HTML_H2,(NAMED_ELEMS(H2)))
+define(HTML_H3,(NAMED_ELEMS(H3)))
+define(HTML_H4,(NAMED_ELEMS(H4)))
+define(HTML_H5,(NAMED_ELEMS(H5)))
+define(HTML_H6,(NAMED_ELEMS(H6)))
+
+# Macros for locating HTML attributes
+
+define(HTML_HREF,(NAMED_ATTRS(HREF)))
+define(HTML_NAME, (NAMED_ATTRS(NAME)))
+define(HTML_SRC, (NAMED_ATTRS(IMG)))

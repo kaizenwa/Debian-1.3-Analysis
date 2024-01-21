@@ -1,0 +1,344 @@
+diff -ru tar-1.11.2/ChangeLog tar-1.11.2.1/ChangeLog
+--- tar-1.11.2/ChangeLog	Thu Mar 25 19:54:56 1993
++++ tar-1.11.2.1/ChangeLog	Mon Oct  3 21:07:15 1994
+@@ -1,3 +1,16 @@
++Sat Jun 19 14:00:00 1994 J"org Weule (weule@cs.uni-duesseldorf.de)
++
++        * version.c: version 1.11.2 (added --record-file)
++
++        * create.c: print header before incrementing the record #
++
++	* tar.c: inserted the option --record-file
++
++	* buffer.c: opens the record file
++
++	* list.c: writes the record information to rec_files instead of
++	msg_file
++
+ Thu Mar 25 13:32:40 1993  Michael I Bushnell  (mib@geech.gnu.ai.mit.edu)
+ 
+ 	* version.c: Released version 1.11.2.
+diff -ru tar-1.11.2/buffer.c tar-1.11.2.1/buffer.c
+--- tar-1.11.2/buffer.c	Fri Mar 19 21:05:11 1993
++++ tar-1.11.2.1/buffer.c	Thu Feb  9 23:01:33 1995
+@@ -62,6 +62,8 @@
+ /* Either stdout or stderr:  The thing we write messages (standard msgs, not
+    errors) to.  Stdout unless we're writing a pipe, in which case stderr */
+ FILE *msg_file = stdout;
++FILE *rec_file = stdout;
++char *rec_file_name = NULL ;
+ 
+ #define	STDIN	0		/* Standard input  file descriptor */
+ #define	STDOUT	1		/* Standard output file descriptor */
+@@ -115,7 +117,7 @@
+ /*
+  * Record number of the start of this block of records
+  */
+-long baserec;
++long baserec = 0 ;
+ 
+ /*
+  * Error recovery stuff
+@@ -534,7 +536,44 @@
+ open_archive (reading)
+      int reading;
+ {
+-  msg_file = f_exstdout ? stderr : stdout;
++  time_t start_time = time(0);
++  rec_file = msg_file = f_exstdout ? stderr : stdout;
++  if ( rec_file_name != NULL )
++    {
++#define INSERT_TIMESTAMP
++#ifdef INSERT_TIMESTAMP
++      /*
++       * A record-file name with '%T' will be expanded with a decimal
++       * value for the timestamp of the archive. This is the time value
++       * stored in the label record.
++       * If you are using only one computer, this should be a unique number.
++       * You are able to create different rec-files for all your archives,
++       * as well as finding the index of your archive in a reliable way.
++       *
++       * Another way would be to let us set the timestamp by another option.
++       * tar --timestamp <ts-number> ...
++       */
++      char rfn[256];
++      if ( reading == 0 ) {
++        char*p= rec_file_name ;
++        int i = 0 ;
++        int n;
++        while ( p[0] != '\0' ) {
++          if ( p[0] == '%' && p[1] == 'T' ) {
++            i += sprintf(rfn+i,"%d",start_time), p += 2 ;
++          } else { rfn[i++] = *p++ ; }
++        }
++        rfn[i] = '\0' ;
++      } else strcpy(rfn,rec_file_name);
++#else
++      char*rfn=rec_file_name;
++#endif
++      if ( ( rec_file = fopen(rfn,"w")) == NULL )
++        {
++          fprintf(rec_file,"Cannot open %s.\n",rec_file_name);
++          exit(1);
++        }
++    }
+ 
+   if (blocksize == 0)
+     {
+@@ -542,6 +581,19 @@
+       exit (EX_ARGSBAD);
+     }
+ 
++  if ( ( f_sayblock ) && ( f_volhdr ) )
++    {
++      fprintf(rec_file,
++        "loc             timestamp is %d \n",
++        start_time);
++    }
++  if ( f_sayblock && (blocksize != 10240) )
++    {
++      fprintf(rec_file,
++        "loc             block length is %d bytes = %d * 512 bytes \n",
++        blocksize,blocksize>>9);
++    }
++
+   if (n_ar_files == 0)
+     {
+       msg ("No archive name given, what should I do?");
+@@ -648,6 +700,38 @@
+   setmode (archive, O_BINARY);
+ #endif
+ 
++#if defined(MTTELL)
++  /* Prints the file number of the archive */
++  if ( f_sayblock )
++    {
++      struct mtget get ;
++      int i ;
++      i = ioctl(archive,MTIOCGET,&get);
++      if (( i == 0 ) && ( get.mt_fileno >= 0 ))
++        {
++          fprintf(rec_file,
++            "loc             number of the file is %d \n",
++            get.mt_fileno );
++        }
++    }
++#endif
++
++#if defined(MTIOCPOS)
++  /* Prints the tape block number on every Linux SCSI-device */
++  if ( f_sayblock )
++    {
++      struct mtpos pos ;
++      int i ;
++      i = ioctl(archive,MTIOCPOS,&pos);
++      if ( i == 0 )
++        {
++          fprintf(rec_file,
++            "loc             number of the first block is %d\n",
++            pos.mt_blkno );
++        }
++    }
++#endif
++
+   if (reading)
+     {
+       ar_last = ar_block;	/* Set up for 1st block = # 0 */
+@@ -700,7 +784,7 @@
+ 	strcpy (ar_block->header.arch_name, f_volhdr);
+       current_file_name = ar_block->header.arch_name;
+       ar_block->header.linkflag = LF_VOLHDR;
+-      to_oct (time (0), 1 + 12, ar_block->header.mtime);
++      to_oct (start_time, 1 + 12, ar_block->header.mtime);
+       finish_header (ar_block);
+       /* ar_record++; */
+     }
+diff -ru tar-1.11.2/create.c tar-1.11.2.1/create.c
+--- tar-1.11.2/create.c	Thu Mar 25 19:32:31 1993
++++ tar-1.11.2.1/create.c	Mon Oct  3 21:06:01 1994
+@@ -1340,7 +1340,10 @@
+   to_oct ((long) sum, 8, header->header.chksum);
+   header->header.chksum[6] = '\0';	/* Zap the space */
+ 
+-  userec (header);
++  /* print header first to get the same output with 'tar -tvR'
++   * and 'tar -cvR'
++   */
++  /* userec (header); */
+ 
+   if (f_verbose)
+     {
+@@ -1353,6 +1356,8 @@
+       head_standard = f_standard;
+       print_header ();
+     }
++
++  userec (header);
+ 
+   return;
+ }
+diff -ru tar-1.11.2/list.c tar-1.11.2.1/list.c
+--- tar-1.11.2/list.c	Tue Mar 16 20:56:01 1993
++++ tar-1.11.2.1/list.c	Wed Oct 12 14:01:01 1994
+@@ -48,6 +48,7 @@
+ #include "port.h"
+ 
+ extern FILE *msg_file;
++extern FILE *rec_file;
+ 
+ long from_oct ();		/* Decode octal number */
+ void demode ();			/* Print file mode */
+@@ -563,7 +564,7 @@
+   extern long baserec;
+ 
+   if (f_sayblock)
+-    fprintf (msg_file, "rec %10d: ", baserec + (ar_record - ar_block));
++    fprintf (rec_file, "rec %10d: ", baserec + (ar_record - ar_block));
+   /* annofile(msg_file, (char *)NULL); */
+ 
+   if (f_verbose <= 1)
+@@ -574,7 +575,7 @@
+       name = quote_copy_string (current_file_name);
+       if (name == 0)
+ 	name = current_file_name;
+-      fprintf (msg_file, "%s\n", name);
++      fprintf (rec_file, "%s\n", name);
+       if (name != current_file_name)
+ 	free (name);
+     }
+@@ -585,6 +586,11 @@
+       switch (head->header.linkflag)
+ 	{
+ 	case LF_VOLHDR:
++          /* dirty bug fix to display the header processing
++           * tar cvvf /dev/null --label 'hello world' blah...
++           * J"org Weule weule@cs.uni-duesseldorf.de
++           */
++          hstat.st_mtime = from_oct(1 + 12 , head->header.mtime);
+ 	  modes[0] = 'V';
+ 	  break;
+ 
+@@ -689,7 +695,7 @@
+       name = quote_copy_string (current_file_name);
+       if (!name)
+ 	name = current_file_name;
+-      fprintf (msg_file, "%s %s/%s %*s%s %s %s %s",
++      fprintf (rec_file, "%s %s/%s %*s%s %s %s %s",
+ 	       modes,
+ 	       user,
+ 	       group,
+@@ -707,7 +713,7 @@
+ 	  name = quote_copy_string (current_link_name);
+ 	  if (!name)
+ 	    name = current_link_name;
+-	  fprintf (msg_file, " -> %s\n", name);
++	  fprintf (rec_file, " -> %s\n", name);
+ 	  if (name != current_link_name)
+ 	    free (name);
+ 	  break;
+@@ -716,13 +722,13 @@
+ 	  name = quote_copy_string (current_link_name);
+ 	  if (!name)
+ 	    name = current_link_name;
+-	  fprintf (msg_file, " link to %s\n", current_link_name);
++	  fprintf (rec_file, " link to %s\n", current_link_name);
+ 	  if (name != current_link_name)
+ 	    free (name);
+ 	  break;
+ 
+ 	default:
+-	  fprintf (msg_file, " unknown file type '%c'\n",
++	  fprintf (rec_file, " unknown file type '%c'\n",
+ 		   head->header.linkflag);
+ 	  break;
+ 
+@@ -735,23 +741,23 @@
+ 	case LF_FIFO:
+ 	case LF_CONTIG:
+ 	case LF_DUMPDIR:
+-	  putc ('\n', msg_file);
++	  putc ('\n', rec_file);
+ 	  break;
+ 
+ 	case LF_VOLHDR:
+-	  fprintf (msg_file, "--Volume Header--\n");
++	  fprintf (rec_file, "--Volume Header--\n");
+ 	  break;
+ 
+ 	case LF_MULTIVOL:
+-	  fprintf (msg_file, "--Continued at byte %ld--\n", from_oct (1 + 12, head->header.offset));
++	  fprintf (rec_file, "--Continued at byte %ld--\n", from_oct (1 + 12, head->header.offset));
+ 	  break;
+ 
+ 	case LF_NAMES:
+-	  fprintf (msg_file, "--Mangled file names--\n");
++	  fprintf (rec_file, "--Mangled file names--\n");
+ 	  break;
+ 	}
+     }
+-  fflush (msg_file);
++  fflush (rec_file);
+ }
+ 
+ /*
+@@ -774,12 +780,12 @@
+       demode ((unsigned) mode, modes + 1);
+ 
+       if (f_sayblock)
+-	fprintf (msg_file, "rec %10d: ", baserec + (ar_record - ar_block));
++	fprintf (rec_file, "rec %10d: ", baserec + (ar_record - ar_block));
+       /* annofile(msg_file, (char *)NULL); */
+       name = quote_copy_string (pathname);
+       if (!name)
+ 	name = pathname;
+-      fprintf (msg_file, "%s %*s %.*s\n",
++      fprintf (rec_file, "%s %*s %.*s\n",
+ 	       modes,
+ 	       ugswidth + DATEWIDTH,
+ 	       "Creating directory:",
+diff -ru tar-1.11.2/tar.c tar-1.11.2.1/tar.c
+--- tar-1.11.2/tar.c	Wed Mar 17 16:30:46 1993
++++ tar-1.11.2.1/tar.c	Thu Oct 13 00:48:14 1994
+@@ -71,6 +71,8 @@
+ 
+ 
+ extern FILE *msg_file;
++extern FILE *rec_file;
++extern char *rec_file_name;
+ 
+ int check_exclude ();
+ void add_exclude ();
+@@ -122,6 +124,7 @@
+   {"null", 0, 0, 16},
+   {"directory", 1, 0, 'C'},
+   {"record-number", 0, &f_sayblock, 1},
++  {"record-file",1,0,19},
+   {"files-from", 1, 0, 'T'},
+   {"label", 1, 0, 'V'},
+   {"exclude-from", 1, 0, 'X'},
+@@ -361,6 +364,11 @@
+ 	  f_compressprog = optarg;
+ 	  break;
+ 
++	case 19:
++	  rec_file_name = optarg ;
++	  f_sayblock++;		/* Print block #s for debug */
++	  break;
++
+ 	case 'g':		/* We are making a GNU dump; save
+ 				   directories at the beginning of
+ 				   the archive, and include in each
+@@ -731,6 +739,7 @@
+ ", stdout);			/* KLUDGE */
+   fputs ("\
+ -R, --record-number	show record number within archive with each message\n\
++--record-file           print the record information to file, enable -R\n\
+ --remove-files		remove files after adding them to the archive\n\
+ -s, --same-order,\n\
+     --preserve-order	list of names to extract is sorted to match archive\n\
+diff -ru tar-1.11.2/version.c tar-1.11.2.1/version.c
+--- tar-1.11.2/version.c	Thu Mar 25 19:35:25 1993
++++ tar-1.11.2.1/version.c	Mon Oct  3 16:01:59 1994
+@@ -1 +1 @@
+-char version_string[] = "GNU tar version 1.11.2";
++char version_string[] = "GNU tar version 1.11.2 (added --record-file)";

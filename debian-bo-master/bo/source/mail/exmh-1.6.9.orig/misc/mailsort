@@ -1,0 +1,154 @@
+Return-Path: exmh-mail-errors@parc.xerox.com
+Return-Path: <exmh-mail-errors@parc.xerox.com>
+Received: from Eng.Sun.COM (engmail1.Eng.Sun.COM) by sage.Eng.Sun.COM (5.x/SMI-SVR4)
+	id AA00278; Fri, 27 Oct 1995 13:18:09 -0700
+Received: from mercury.Sun.COM (mercury.EBay.Sun.COM) by Eng.Sun.COM (5.x/SMI-5.3)
+	id AA13719; Fri, 27 Oct 1995 13:14:46 -0700
+Received: from alpha.xerox.com by mercury.Sun.COM (Sun.COM)
+	id NAA04275; Fri, 27 Oct 1995 13:14:45 -0700
+Received: from mu.parc.xerox.com ([13.2.116.81]) by alpha.xerox.com with SMTP id <15664(8)>; Fri, 27 Oct 1995 12:50:06 PDT
+Received: by mu.parc.xerox.com id <162704>; Fri, 27 Oct 1995 12:24:24 -0700
+Received: from alpha.xerox.com ([13.1.64.93]) by mu.parc.xerox.com with SMTP id <162701>; Fri, 27 Oct 1995 12:24:01 -0700
+Received: from protocol.zycad.com ([192.195.24.2]) by alpha.xerox.com with SMTP id <15721(1)>; Fri, 27 Oct 1995 12:23:38 PDT
+Received: from zycad.zycad.com by protocol.zycad.com (4.1/SMI-4.1)
+	id AA05335; Fri, 27 Oct 95 15:23:50 EDT
+Received: from dylan.zycad.com by zycad.zycad.com (4.1/SMI-4.1)
+	id AA06745; Fri, 27 Oct 95 12:22:51 PDT
+Received: from localhost by dylan.zycad.com (4.1/SMI-4.1)
+	id AA01995; Fri, 27 Oct 95 12:22:18 PDT
+Message-Id: <9510271922.AA01995@dylan.zycad.com>
+X-Mailer: exmh version 1.6.4 10/10/95
+To: exmh-users@parc.xerox.com
+Subject: archiving script
+X-Face: ">yuo)@,|JK{&H8/6`D<C3x-{s78]+cJ5UA-^.+x-{Bl^le6GqgDuCdD6$.YHXw>bjy1MyN
+ {'[Wrs#IjHn0&%z5|cn<blv8+/l<SM<E2Z&o.
+Mime-Version: 1.0
+	boundary="===_0_Fri_Oct_27_12:20:00_PDT_1995"
+Date: Fri, 27 Oct 1995 12:22:17 PDT
+From: Olly Stephens <olly@dylan.zycad.com>
+Sender: exmh-mail-errors@parc.xerox.com
+Precedence: bulk
+X-Comment: (Un)subscription requests to exmh-users-request@parc.xerox.com
+Content-Type: multipart/mixed ;
+	boundary="===_0_Fri_Oct_27_12:20:00_PDT_1995"
+Content-Length: 3491
+
+This is a multipart MIME message.
+
+--===_0_Fri_Oct_27_12:20:00_PDT_1995
+Content-Type: text/plain; charset=us-ascii
+
+
+I mentioned in passing on the exmh-workers mailing list a script that I
+use via cron to archive my mail.  I had a couple of requests for it so
+I thought I'd send it out to all exmh-users.
+
+It goes through all folders (that don't look like archive folders) moving
+any messages older than a month (actually 28 days) into sub-folders which
+are named by the month.  I use this to keep the folder sizes nice and small.
+So, for example, a typical folder hierarchy looks like:
+
+	% folder +exmh -fast -recurse
+	exmh
+	exmh/Sep-95
+	exmh/Aug-95
+	exmh/Jul-95
+	exmh/Jun-95
+	exmh/May-95
+	exmh/Apr-95
+        ....
+
+Once the script has archived messages, it packs the main folder to keep
+things neat.
+
+To use it, you'll probably have to modify a few paths and it's written
+in perl so you'll need that (a tcl or sh version would be fairly simple
+as it doesn't really use anything uniquely perlesque).
+
+It's fairly trivial;  it's only claim to intelligence is the use of
+a custom scan format to calculate the archive folder, saving us the
+trouble of trying to find the date in the message.
+
+A word of warning before using it though;  it currently confuses exmh
+somewhat.  This is why I mentioned it in a previous mail - I was describing
+the bug.  It's nothing that a quick "Rescan folder" won't fix but bear
+it in mind.  Rewriting it in tcl and getting it to "send" a rescan command
+to exmh might not be a bad idea....
+
+Enjoy,
+
+Olly
+
+
+
+--===_0_Fri_Oct_27_12:20:00_PDT_1995
+Content-Type: application/octet-stream
+Content-Description: mailsort
+
+#!/usr/local/bin/perl
+#
+# mailsort - sorts all MH mail folders moving mail older than a month
+#            (well, 28 days actually) into sub-folders called "Jun-94" etc.
+#            then packs the main folder
+#
+# Usage: mailsort [folder-list]
+#          defaults to sorting all folders (including sub folders) that
+#          don't look like archive folders and which have more than 100 msgs
+#          useful if called from a cron job (say once a week)
+#
+# Caveat: if you have regular folders called mmm-yy where mmm is a month
+#         and yy is a year, you may want to modify the scan format used
+#
+# Olly Stephens <olly@zycad.com>
+#
+
+# you may want to modify the following paths
+
+$mh = '/usr/local/bin/mh' ;
+$yes = '/usr/ucb/yes' ;
+
+if ($#ARGV >= 0) {
+  @folders = @ARGV ;
+} else {
+  open(FOLDERS, "$mh/folder -all -recurse |") || die "couldn't run folder\n" ;
+  while (<FOLDERS>) {
+    chop ;
+    if ((/(\S+)\+?\s+has\s+(\d+)\smessage/) && ($2 > 100) &&
+        ($1 !~ /\/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d\d$/)) {
+      push(@folders, $1) ;
+      print "pushing $1\n" ;
+    }
+  }
+  close(FOLDERS) ;
+}
+
+$scanfmt = '%(msg) %(month{date})-%(void(year{date}))%02(modulo 100)' ;
+
+foreach $f (@folders) {
+  print "scanning $f...\n" ;
+  open(SCAN, "$mh/scan -format '$scanfmt' +$f \`$mh/pick +$f -before -28\` |")
+                         || die "couldn't run scan or pick\n" ;
+  undef %subfolders ;
+  undef %subcount ;
+  while (<SCAN>) {
+    chop ;
+    @line = split ;
+    $subfolders{$line[1]} .= " $line[0]" ;
+    $subcount{$line[1]}++ ;
+  }
+  close(SCAN) ;
+
+  $pack = 0 ;
+  foreach $s (keys(%subfolders)) {
+    print "  adding $subcount{$s} messages to $s...\n" ;
+    `$yes | $mh/refile -src +$f +$f/$s $subfolders{$s}` ;
+    $pack = 1 ;
+  }
+
+  `$mh/folder -pack +$f` if ($pack) ;
+}
+
+--===_0_Fri_Oct_27_12:20:00_PDT_1995--
+
+
+

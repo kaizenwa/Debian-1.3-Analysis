@@ -1,0 +1,102 @@
+#! /usr/bin/make -f
+#debian.rules file for APSfilter
+#Copyright 1996 by Doug Geiger.
+# modify and relicense this file, provided that you do not remove
+# my name from the file itself.  (I assert my moral right of
+# paternity under the Copyright, Designs and Patents Act 1988.)
+
+package=apsfilter
+version=4.9.1
+debian=10
+arch=all
+
+build:
+#Build the binaries APSFilter uses        
+	./compile
+	touch stamp-build
+binary: build
+#Build's the .deb package
+	install -d -g root -m 755 -o root debian-tmp
+	chmod g-s debian-tmp
+	install -d -g root -m 755 -o root debian-tmp/DEBIAN
+	#install -d -g root -m 755 -o root debian-tmp/usr/lib/$(package)/contrib/okidisplay/RCS
+	install -d -g root -m 755 -o root debian-tmp/usr/lib/$(package)/filter
+	install -d -g root -m 755 -o root debian-tmp/usr/lib/$(package)/global
+	install -d -g root -m 755 -o root debian-tmp/usr/lib/$(package)/printcap
+	install -d -g root -m 755 -o root debian-tmp/usr/lib/$(package)/setup
+	install -d -g root -m 755 -o root debian-tmp/usr/lib/$(package)/template
+	install -d -g root -m 755 -o root debian-tmp/usr/lib/$(package)/test
+	install -d -g root -m 755 -o root debian-tmp/usr/lib/$(package)/bin
+	install -d -g root -m 755 -o root debian-tmp/usr/man/man1
+	install -d -g root -m 755 -o root debian-tmp/usr/doc/$(package)
+	install -d -g root -m 755 -o root debian-tmp/usr/doc/copyright
+	install -d -g root -m 755 -o root debian-tmp/etc
+	install -g root -m 644 -o root printcap.dpkg-dist debian-tmp/etc/printcap
+	touch debian-tmp/etc/apsfilterrc
+	install -g root -m 644 -o root COPYRIGHT debian-tmp/usr/doc/copyright/$(package)
+	cp doc/* debian-tmp/usr/doc/$(package)/
+	gzip -9rf debian-tmp/usr/doc/$(package)/*|true
+	install -g root -m 644 -o root debian.control debian-tmp/DEBIAN/control	
+	install -g root -m 644 -o root debian.conffiles debian-tmp/DEBIAN/conffiles
+	install -g root -m 755 -o root debian.postinst debian-tmp/DEBIAN/postinst
+	install -g root -m 755 -o root debian.postrm debian-tmp/DEBIAN/postrm
+	#install -g root -m 644 -o root contrib/* debian-tmp/usr/lib/apsfilter/contrib/
+	#install -g root -m 644 -o root contrib/okidisplay/* debian-tmp/usr/lib/apsfilter/contrib/okidisplay/
+	#install -g root -m 644 -o root contrib/okidisplay/RCS/* debian-tmp/usr/lib/apsfilter/contrib/okidisplay/RCS/
+	install -g root -m 755 -o root bin/* debian-tmp/usr/lib/apsfilter/bin/
+	install -g root -m 755 -o root filter/* debian-tmp/usr/lib/apsfilter/filter/
+	install -g root -m 755 -o root global/* debian-tmp/usr/lib/apsfilter/global/
+	install -g root -m 644 -o root printcap/* debian-tmp/usr/lib/apsfilter/printcap/
+	install -g root -m 755 -o root setup/* debian-tmp/usr/lib/apsfilter/setup/
+	install -g root -m 644 -o root template/* debian-tmp/usr/lib/apsfilter/template/
+	install -g root -m 644 -o root test/* debian-tmp/usr/lib/apsfilter/test/
+	src/a2ps-4.2-akl-new/install_it
+	src/rewind-stdin/install_it
+	dpkg-deb --build debian-tmp/ ../$(package)-$(version)-$(debian).$(arch).deb
+
+clean:
+#Clean everything out
+	rm -rf *.o
+	rm -f stamp-build
+	rm -rf debian-tmp
+
+
+source:
+# Makes a source package.
+	-test -f stamp-build && make -f debian.rules clean
+	( cd .. && tar cf - $(package)-$(version) | gzip -9f > $(package)-$(version)-$(debian).tar.gz )
+
+diff:
+# Makes a context diff.
+	-test -f stamp-build && make -f debian.rules clean
+	-test -d ../$(package)-$(version).orig -o -f ../$(package)-$(version)-`expr $(debian) - 1`.diff.gz \
+          || ( echo "Original source package is not available." ; false )
+	-test -d ../$(package)-$(version).orig || make -f debian.rules orig
+	( cd .. && diff -cNr $(package)-$(version).orig $(package)-$(version) | gzip -9f \
+          > $(package)-$(version)-$(debian).diff.gz )
+	-test -f stamp-orig \
+          && rm -rf ../$(package)-$(version).orig && rm -f stamp-orig
+
+dist: binary source diff
+# Prepares the package for distribution.
+
+orig:
+# Prepares the original package from the previous
+# Debian revision source package and context diff.
+	( cd .. \
+          && mkdir $(package).orig \
+          && cd $(package).orig \
+          && tar xzf ../$(package)-$(version)-`expr $(debian) - 1`.tar.gz \
+          && cd $(package)-$(version) \
+          && ( zcat ../../$(package)-$(version)-`expr $(debian) - 1`.diff.gz \
+            | patch -sER -p1 ) \
+          && find . -name "*.orig" -exec rm -f {} \; \
+          && cd .. \
+          && mv $(package)-$(version) ../$(package)-$(version).orig \
+          && cd .. \
+          && rmdir $(package).orig )
+	touch stamp-orig
+
+
+
+

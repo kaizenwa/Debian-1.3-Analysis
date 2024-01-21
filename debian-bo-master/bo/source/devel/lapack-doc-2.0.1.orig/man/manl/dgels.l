@@ -1,0 +1,117 @@
+.TH DGELS l "08 October 1994" "LAPACK version 2.0" "LAPACK driver routine (version 2.0)"
+.TH DGELS l "08 October 1994" "BLAS routine" "BLAS routine"
+.SH NAME
+DGELS - solve overdetermined or underdetermined real linear systems involving an M-by-N matrix A, or its transpose, using a QR or LQ factorization of A
+.SH SYNOPSIS
+.TP 18
+SUBROUTINE DGELS(
+TRANS, M, N, NRHS, A, LDA, B, LDB, WORK, LWORK,
+INFO )
+.TP 18
+.ti +4
+CHARACTER
+TRANS
+.TP 18
+.ti +4
+INTEGER
+INFO, LDA, LDB, LWORK, M, N, NRHS
+.TP 18
+.ti +4
+DOUBLE
+PRECISION A( LDA, * ), B( LDB, * ), WORK( LWORK )
+.SH PURPOSE
+DGELS solves overdetermined or underdetermined real linear systems
+involving an M-by-N matrix A, or its transpose, using a QR or LQ
+factorization of A.  It is assumed that A has full rank.
+
+The following options are provided:
+.br
+
+1. If TRANS = 'N' and m >= n:  find the least squares solution of
+   an overdetermined system, i.e., solve the least squares problem
+                minimize || B - A*X ||.
+.br
+
+2. If TRANS = 'N' and m < n:  find the minimum norm solution of
+   an underdetermined system A * X = B.
+.br
+
+3. If TRANS = 'T' and m >= n:  find the minimum norm solution of
+   an undetermined system A**T * X = B.
+.br
+
+4. If TRANS = 'T' and m < n:  find the least squares solution of
+   an overdetermined system, i.e., solve the least squares problem
+                minimize || B - A**T * X ||.
+.br
+
+Several right hand side vectors b and solution vectors x can be
+handled in a single call; they are stored as the columns of the
+M-by-NRHS right hand side matrix B and the N-by-NRHS solution
+matrix X.
+.br
+
+.SH ARGUMENTS
+.TP 8
+TRANS   (input) CHARACTER
+= 'N': the linear system involves A;
+.br
+= 'T': the linear system involves A**T.
+.TP 8
+M       (input) INTEGER
+The number of rows of the matrix A.  M >= 0.
+.TP 8
+N       (input) INTEGER
+The number of columns of the matrix A.  N >= 0.
+.TP 8
+NRHS    (input) INTEGER
+The number of right hand sides, i.e., the number of
+columns of the matrices B and X. NRHS >=0.
+.TP 8
+A       (input/output) DOUBLE PRECISION array, dimension (LDA,N)
+On entry, the M-by-N matrix A.
+On exit,
+if M >= N, A is overwritten by details of its QR
+factorization as returned by DGEQRF;
+if M <  N, A is overwritten by details of its LQ
+factorization as returned by DGELQF.
+.TP 8
+LDA     (input) INTEGER
+The leading dimension of the array A.  LDA >= max(1,M).
+.TP 8
+B       (input/output) DOUBLE PRECISION array, dimension (LDB,NRHS)
+On entry, the matrix B of right hand side vectors, stored
+columnwise; B is M-by-NRHS if TRANS = 'N', or N-by-NRHS
+if TRANS = 'T'.
+On exit, B is overwritten by the solution vectors, stored
+columnwise:
+if TRANS = 'N' and m >= n, rows 1 to n of B contain the least
+squares solution vectors; the residual sum of squares for the
+solution in each column is given by the sum of squares of
+elements N+1 to M in that column;
+if TRANS = 'N' and m < n, rows 1 to N of B contain the
+minimum norm solution vectors;
+if TRANS = 'T' and m >= n, rows 1 to M of B contain the
+minimum norm solution vectors;
+if TRANS = 'T' and m < n, rows 1 to M of B contain the
+least squares solution vectors; the residual sum of squares
+for the solution in each column is given by the sum of
+squares of elements M+1 to N in that column.
+.TP 8
+LDB     (input) INTEGER
+The leading dimension of the array B. LDB >= MAX(1,M,N).
+.TP 8
+WORK    (workspace/output) DOUBLE PRECISION array, dimension (LWORK)
+On exit, if INFO = 0, WORK(1) returns the optimal LWORK.
+.TP 8
+LWORK   (input) INTEGER
+The dimension of the array WORK.
+LWORK >= min(M,N) + MAX(1,M,N,NRHS).
+For optimal performance,
+LWORK >= min(M,N) + MAX(1,M,N,NRHS) * NB
+where NB is the optimum block size.
+.TP 8
+INFO    (output) INTEGER
+= 0:  successful exit
+.br
+< 0:  if INFO = -i, the i-th argument had an illegal value

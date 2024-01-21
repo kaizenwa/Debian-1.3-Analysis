@@ -1,0 +1,310 @@
+#!/bin/bash
+#
+# bug @VER@: Generates a bug report (needs bash >=2.0)
+#
+# Christoph Lameter, October 26, 1996
+#
+# Modified by Nicolás Lichtmaier
+#
+set -e
+
+if [ $BASH_VERSION \< 2 ] ; then
+	echo "$0: Needs Bash >=2.0" >&2
+	exit 1
+fi
+
+if [ -z "$EMAIL" ] ; then
+	CC="`id -un`"
+	CC=`sed -ne "s/^$CC:[^:]*:[^:]*:[^:]*:\\([^,:]*\\),*:.*/\\1/p" \
+		< /etc/passwd`" <$CC@`cat /etc/mailname`>"
+else
+	CC="$EMAIL"
+fi
+
+FROM="$CC"
+
+while getopts "cdh:mpqs:vzx-" OPT; do
+	case $OPT in
+		c)	NOCONFIG=1;;
+		d)	DEBUG=1;;
+		h)	CUSTOM_HEADER[${#CUSTOM_HEADER[*]}]=$OPTARG;;
+		m)	MAINT=1;;
+		p)	PRINT=1;;
+		q)	QUIET=1;;
+		s)	SUBJECT="$OPTARG";;
+		v)	echo "bug @VER@" >&2
+			exit 1;;
+		x)	CC="";;
+		z)	NOZAP=1;;
+	        -)	break;;
+	  	*)	echo "Usage: $0 [options] <packagename> [<text>] .." >&2
+		    	exit 1;;
+        esac
+done
+shift $(($OPTIND - 1))
+
+if [ "$UID" = "0" ]; then
+	echo "$0: Filing bug reports with superuser priviledges is insecure and" >&2
+	echo "not supported." >&2
+	exit 1
+fi
+
+if [ "$1" = "" ]; then
+	echo "$0: Packagename not specified" >&2
+	exit 1
+fi
+
+i=$((${#1}-1))
+while [ $i -gt 0 -o $i -eq 0 ]; do
+	case ${1:$i:1} in
+		" ")
+			echo "$0: Package name goes first, bug report last" >&2
+			exit 1
+			;;
+		[A-Z])
+			echo "$0: Packages names are formed with lower case letters" >&2
+			exit 1
+			;;
+		[^-a-z0-9.+])
+			echo "$0: Invalid package name" >&2
+			exit 1
+			;;
+	esac
+	i=$(($i - 1))
+done
+
+PACKAGE="$1"
+shift
+
+
+if [ "$VISUAL" = "" ]; then
+	VISUAL="$EDITOR"
+	if [ "$VISUAL" = "" ]; then
+		if [ -x /usr/bin/joe ]; then
+			VISUAL="joe"
+		else
+			if [ ! -x /bin/ae ]; then
+				echo "$0: Cannot locate a texteditor" >&2
+				exit 1
+			fi
+			VISUAL="ae"
+		fi
+	fi
+fi
+function checkconf()
+{ 
+# Takes two parameters filename and md5sum and checks if the file was modified
+# If so outputs the filename
+	if [ -r "$1" ]; then
+		SUM=`md5sum $1`
+		if [ "${SUM:0:32}" != "$2" ]; then
+			echo "$1"
+		fi
+	else
+		echo $1
+	fi
+}
+
+function checkconfs()
+{
+	read X
+	while [ "$X" ]; do
+		if [ `expr match "$X" ".*:"` = 0 ]; then
+			checkconf $X
+		fi
+		if ! read X ; then
+			return
+		fi
+	done
+}
+
+function pinfo()
+{
+	sed -n </var/lib/dpkg/status -e "/^Package: $1$/,/^Description: /p"
+}
+
+function setsubject()
+{
+	if [ "$SUBJECT" = "" ]; then
+		while [ "$SUBJECT" = "" ]; do
+#			dialog --backtitle "Bug Reporting Tool - Debian/GNU Linux" \
+#				--inputbox "Please describe your problems using $PACKAGE" \
+#				8 78 2> /tmp/bugtmp...
+#			SUBJECT=`cat /tmp/bugtmp...`
+			echo "Please describe your problems using $PACKAGE in one line"
+			read -er SUBJECT ;
+		done
+		SUBJECT="$PACKAGE: $SUBJECT"
+	fi
+}
+
+function template()
+{
+ 	cat <<-EOF
+		Subject: $SUBJECT
+		Package: $PACKAGE
+		Version: $VERSION
+
+		$*
+
+		-- System Information
+		Debian Release: `cat /etc/debian_version`
+		Kernel Version: `uname -a`
+
+	EOF
+}
+
+if [ -f /var/lib/dpkg/info/$PACKAGE.list ]; then
+	pinfo $PACKAGE >/tmp/bug.$$
+	VERSION=`grep ^Version: /tmp/bug.$$`
+	VERSION=${VERSION#Version: }
+	DEPS=`grep Depends: /tmp/bug.$$` || DEPS=""
+	if [ "$NOCONFIG" = "" ]; then
+		if grep -q "Conffiles:" /tmp/bug.$$; then
+			MODCONF=`sed -n </tmp/bug.$$  -e '/Conffiles:/,/Description:/p'|checkconfs`
+		fi
+	fi
+	setsubject
+	template "$*" >/tmp/bug.$$
+
+	if [ "$DEPS" != "" ]; then
+		echo "Versions of the packages $PACKAGE depends on:" >>/tmp/bug.$$
+		DEPS=`echo "$DEPS"|tr "|,\n" "  "|sed -e "s/ ([^)]*)//g" -e "s/Pre-Depends://g" -e "s/Depends://g" -e "s/  / /g" `
+		for i in $DEPS; do
+			if [ -f /var/lib/dpkg/info/$i.list ]; then
+				echo "$i	`pinfo $i|grep 'Version:'`" >>/tmp/bug.$$
+			else
+				X=${i//+/\\\\+}
+				perl -n000e "print if /^Provides:.* $X/mo && !/^Status: +[^ ]+ +[^ ]+ +config-files/mo" /var/lib/dpkg/status >/tmp/bug.$$v
+				if [ -s /tmp/bug.$$v ]; then
+					REALPACKAGE=`head -1 /tmp/bug.$$v`
+					REALPACKAGE=${REALPACKAGE#Package: }
+					echo "$REALPACKAGE	`grep '^Version:' /tmp/bug.$$v` (Provides Virtual Package $i)" >>/tmp/bug.$$
+				else
+					echo "$i	Not installed or no info" >>/tmp/bug.$$
+				fi
+				rm /tmp/bug.$$v
+			fi
+		done
+	fi
+
+	if [ "$MODCONF" != "" ]; then
+		for i in $MODCONF; do
+			echo -e "\n--- Begin $i (modified conffile)" >>/tmp/bug.$$
+			if [ -r $i ]; then
+				if file -L $i | grep -q "text"; then
+					if [ "$NOZAP" ]; then
+						cp $i /tmp/bug.$$
+					else
+						sed -e '/^#/d' -e '/^$/d' <$i >>/tmp/bug.$$
+					fi
+				else
+					echo "*** Contents not text ***" >>/tmp/bug.$$
+				fi
+			else
+				echo "Config file not present or no permissions for access" >>/tmp/bug.$$
+			fi
+			echo -e "\n--- End $i" >>/tmp/bug.$$
+		done
+	fi
+else
+	VIRT=nop
+	for i in base bootdisk rootdisk bugs.debian.org ftp.debian.org www.debian.org manual project general kernel lists.debian.org ; do
+		if [ "$PACKAGE" = "$i" ]; then
+			PSEUDO=yep
+		fi
+	done
+	if [ "$PSEUDO" != "yep" ] && ! grep -q "^Package: $PACKAGE" /var/lib/dpkg/available; then
+		echo "Package $PACKAGE doesn't seem to exist!"
+		echo -n "Submit bug anyway? [y|N] "
+		read
+		if [ ! "${REPLY:0:1}" = "y" -a ! "${REPLY:0:1}" = "Y" ]; then
+			echo "Bug report not sent"
+			exit 1;
+		fi
+	fi
+	VERSION="N/A"
+	setsubject
+	template "$*" >/tmp/bug.$$
+fi
+
+if [ "$1" = "" ]; then
+	X=""
+	while [ "$X" = "" ]; do
+		cp /tmp/bug.$$ /tmp/bug.$$backup
+		if [ $VISUAL = "/usr/bin/joe" ]; then
+			echo -ne \\033[2J\\033[1\;1H
+			echo "Reporting bug for package: $PACKAGE $VERSION"
+			$VISUAL -skiptop 1 +5 /tmp/bug.$$
+		else
+			$VISUAL /tmp/bug.$$
+		fi
+		if [ $? ]; then
+			if cmp /tmp/bug.$$ /tmp/bug.$$backup >/dev/null; then
+				echo "No changes: No Bug report sent"
+				rm /tmp/bug.$$ /tmp/bug.$$backup
+				exit 1;
+			fi
+		else
+			echo "Editor Aborted: No Bug report sent"
+			rm /tmp/bug.$$ /tmp/bug.$$backup
+			exit 1;
+		fi
+		rm /tmp/bug.$$backup
+		X="`head -1 /tmp/bug.$$`"
+		X=${X#Subject: }
+	done
+	SUBJECT=$X
+else
+	if [ "$SUBJECT" = "" ]; then
+		SUBJECT="$PACKAGE $VERSION"
+	fi
+fi
+
+if [ "$PRINT" ]; then
+	cat /tmp/bug.$$
+	rm /tmp/bug.$$
+	exit 0
+fi
+
+MADDR="submit@bugs.debian.org"
+
+if [ "$QUIET" ]; then
+	MADDR="quiet@bugs.debian.org"
+fi
+
+if [ "$MAINT" ]; then
+	MADDR="maintonly@bugs.debian.org"
+fi
+
+if [ "$DEBUG" ]; then
+	MADDR="postmaster"
+fi
+
+{
+	echo "From: $FROM"
+	echo "Subject: $SUBJECT"
+	echo "To: $MADDR"
+	test "$CC" && echo "Bcc: $CC"
+	echo "X-Mailer: bug @VER@"
+	test "$REPLYTO" && echo "Reply-To: $REPLYTO"
+	i=0
+	while [ $i -lt ${#CUSTOM_HEADER[*]} ] ; do
+		echo ${CUSTOM_HEADER[$i]}
+		i=$((i+1))
+	done
+	echo
+	sed </tmp/bug.$$ -e "1d"
+} |
+{
+	{
+		test -x /usr/sbin/sendmail && /usr/sbin/sendmail -t
+	} ||
+	{ 
+		tee /var/tmp/${PACKAGE}.bug | grep -q zazazaz
+		echo "Bug report saved in /var/tmp/${PACKAGE}.bug"
+	}
+}
+
+rm /tmp/bug.$$*
+echo "Bug Report submitted to $MADDR $CC"

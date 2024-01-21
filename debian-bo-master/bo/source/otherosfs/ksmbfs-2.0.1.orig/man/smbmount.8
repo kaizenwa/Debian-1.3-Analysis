@@ -1,0 +1,344 @@
+.TH SMBMOUNT 8 11/23/1996 smbmount smbmount
+.SH NAME
+smbmount \- mount program for smbfs
+.SH SYNOPSIS
+.B smbmount
+.B servicename mount-point
+[
+.B -h
+]
+[
+.B -C
+]
+[
+.B -n
+.I
+] [
+.B -P
+.I password
+] [
+.B -s
+.I server name
+] [
+.B -c
+.I client name
+] [
+.B -I
+.I hostname/IP
+] [
+.B -U
+.I user name
+] [
+.B -D
+.I domain name
+] [
+.B -u
+.I uid
+] [
+.B -g
+.I gid
+] [
+.B -f
+.I file mode
+] [
+.B -d
+.I dir mode
+] [
+.B -m
+.I max xmit
+] [
+.B -p 
+.I port
+] 
+
+.SH DESCRIPTION
+This program is an interface to the SMB filesystem.
+
+.B smbfs
+is a filesystem which understands the SMB protocol. This is the
+protocol Windows for Workgroups, Windows NT or Lan Manager use to talk
+to each other. It was inspired by
+.B samba,
+the program by Andrew Tridgell that turns any unix site into a file
+server for DOS or Windows clients.
+See ftp://nimbus.anu.edu.au/pub/tridge/samba/ for this interesting
+program suite and lots of more information on SMB and NetBIOS over
+TCP/IP. There you also find explanation for conceps like netbios name
+or share.
+
+.SH OPTIONS
+.B servicename
+.RS 3
+.B servicename
+is the name of the service you want to use on the server. It 
+takes the form
+.B "//server/service/rootdir"
+where
+.B server
+is the name of the Lan Manager server offering the desired service and
+.B service
+is the name of the service offered. 
+.B rootdir
+is a directory below the offered service. This can be convenient when
+complete disks are exported by a server, but only a small part of the
+hierarchy should be available for the client.
+Thus to connect to the directory "util" below the service "c" 
+on the Lan Manager server "wfw", you would use the servicename
+
+.RS 10
+.B "//wfw/c/util"
+.RE
+
+Note that the notation is different from the DOS conventions, where
+the same service would be given as \\\\wfw\\c\\util. This was done to
+get rid of difficulties with the shell using \\ as an escape
+character.
+
+To make smbmount compatible with the automounter, only one leading '/'
+is required, although any number of '/'s is accepted.
+
+Currently smbmount uses gethostbyname() to find the IP number of the
+desired host. It is thus not really compatible with Lan Manager
+conventions, where the netbios name of the server is not necessarily
+the same as the hostname. In environments which enforce a netbios name
+that's different than the hostname, you should use
+.B -s
+and
+.B -c
+to simulate appropriate behaviour.
+.RE
+
+.B mount-point
+.RS 3
+.B mount-point
+is the directory you want to mount the filesystem over. It's the same
+as in the normal mount command.
+
+If the real uid of the caller is not root,
+.B smbmount
+checks whether the user is allowed to mount a filesystem on the
+mount-point. So it should be safe to make smbmount setuid root. In the
+filesystem, the real uid of the caller is stored, so that
+.B smbumount
+can check whether the caller is allowed to unmount the filesystem.
+.RE
+
+.B -h
+.RS 3
+.B -h
+is used to print out a short help text.
+.RE
+
+.B -C
+.RS 3
+By default, passwords are converted to uppercase before they are sent
+to the server, because most servers require this. You can turn off
+this conversion by
+.B -C.
+.RE
+
+.B -n
+.RS 3
+.B -n
+should be given to mount shares which do not require a password to log in.
+.RE
+
+.B -P
+.I password
+.RS 3
+You may want to give the password required by the server on the
+command line. You should be careful to use passwords in scripts.
+
+If neither
+.B -n
+nor
+.B -P
+are given, smbmount prompts for a password. This makes it difficult to
+use in scripts such as /etc/rc. But that's not smbmount's fault, but a
+general problem with the Lan Manager security model. If anybody has a
+satisfying solution to this problem, please tell me.
+.RE
+
+.B -s
+.I server name
+.RS 3
+If the server has a different netbios name than its hostname, you
+should give its netbios name by 
+.B -s.
+This option should only be used if the server refuses your login
+attempt without telling him about his netbios name.
+
+This option does not alter the way smbmount finds the server's IP
+address. It always uses gethostbyname().
+
+The default value for this option is the server name given in the
+service.
+.RE
+
+.B -c
+.I client name
+.RS 3
+Like 
+.B -s, -c
+should be used when netbios names and hostnames differ and the server
+refuses login with the default value for the netbios name: your hostname.
+.RE
+
+.B -I
+.I hostname/IP of the server
+.RS 3
+Like 
+.B -c
+should be used when netbios names and hostnames differ on the server.
+This sets the hostname to contact on the network, the netbios name of
+the server still preceeds the service name.
+.RE
+
+.B -U
+.I user name
+.RS 3
+If the user name you Lan Manager administrator gave to you differs
+from your unix user-id, you should use
+.B -U
+to tell the server about you Lan Manager user name.
+.RE
+
+.B -D
+.I domain name
+.RS 3
+If your server requires a domain name at login time, you can use
+.B -D
+to specify it. The default value is '?', which should work fine for
+most setups. Please note that your kernel has to support this
+feature.
+.RE
+
+.B -u
+.I uid,
+.B -g
+.I gid
+.RS 3
+A Lan Manager server does not tell us anything about the owner of a
+file. Unix requires that each file has an owner and a group it belongs
+to. With 
+.B -u
+and
+.B -g
+you can tell smbmount which id's it should assign to the files in the
+mounted direcory.
+
+The defaults for these values are the current uid and gid.
+.RE
+
+.B -f
+.I file mode,
+.B -d
+.I dir mode
+.RS 3
+Like 
+.B -u
+and
+.B -g,
+these options are also used to bridge differences in concepts between
+Lan Manager and unix. Lan Manager does not know anything about file
+permissions. So smbmount has to be told which permissions it should
+assign to the mounted files and direcories. The values have to be
+given as octal numbers. The default values are taken from the current
+umask, where the file mode is the current umask, and the dir mode adds
+execute permissions where the file mode gives read permissions.
+
+Note that these permissions can differ from the rights the server
+gives to us. If you do not have write permissions on the server, you
+can very well choose a file mode that tells that you have. This
+certainly cannot override the restrictions imposed by the server.
+.RE
+
+.B -p
+.I port
+.RS 3
+The port is the TCP port smbmount tries to connect on the server. The
+default for this value is 139, as specified in RFC 1001/1002 (NetBIOS
+over TCP/IP). Normally it should not be altered, as all commercial
+servers offer their services on this port.
+
+I use it in my testing environment, where samba runs as a normal user
+and cannot bind() to the privileged port 139.
+.RE
+
+.B -m
+.I max xmit
+.RS 3
+With 
+.B -m
+you can tell smbmount that it should offer some special maximum packet
+size that it can transfer in one SMB packet. Normally this option
+should not be used.
+.RE
+
+.SH MOUNT FAILURES
+The mount(2) system call does not return any sensible error code, so
+you have to guess what failed when you could not mount a share.
+
+Some servers are fussy about the case of supplied usernames, passwords, share
+names (aka service names) and machine names. If you fail to connect try
+giving all parameters in uppercase.
+
+It is often necessary to use the
+.B -n
+option when connecting to some types
+of servers. For example OS/2 LanManager insists on a valid netbios name
+being used, so you need to supply a valid name that would be known to
+the server.
+
+Starting with smbfs-0.8 it is possible that your smbmount program is
+newer than the kernel you are currently using. You can fix this by
+recompiling smbmount with the correct kernel sources installed.
+
+.SH NOTES
+.B smbfs
+supports long file names where the server supports the LANMAN2
+protocol.
+
+.SH ENVIRONMENT VARIABLES
+.B USER / LOGNAME
+.RS 3
+The variables USER or LOGNAME may contain the username of the person
+using the client.  USER is tried first. If it's emtpy, LOGNAME is
+tried. This information is used only if the protocol level is high
+enough to support session-level passwords.
+.RE
+
+.SH DIAGNOSTICS
+
+Most diagnostics issued by smbfs are logged by syslogd. Normally
+nothing is printed, only error situations are logged there.
+
+If you have problems with smbfs, a good diagnostic tool is the program
+smbclient from the samba package. If your problem does not occur with
+smbclient, then it's definitely a problem with smbfs. If smbclient
+also shows the problem, it can print lots of debugging information to
+help you to find the problem.
+
+.SH BUGS
+make does not find the Makefile in a smb-mounted direcory. Why??? If
+you type make -f Makefile, everything works fine.
+
+There might be lots of race conditions in the kernel code. Anybody
+more experienced in kernel hacking might take a look at it and tell me
+about problems. I will do my best. For example I do not know which
+routines smbfs calls in the kernel might call schedule(). Can kmalloc
+call the scheduler? Does kfree?
+
+You might see the use of gethostbyname() to find the server in a way
+not conforming to Lan Manager as a bug.
+
+.SH SEE ALSO
+.B syslogd(8), smbumount(8)
+
+.SH CREDITS
+The original smbfs kernel code was a mixture of user-level smbfs and
+the nfs code. It was put together by Paal-Kr. Engstad
+(pke@engstad.ingok.hitos.no) and later polished by Volker Lendecke (lendecke@namu01.gwdg.de)
+
+The original Samba software and related utilities were created by 
+Andrew Tridgell (Andrew.Tridgell@anu.edu.au).

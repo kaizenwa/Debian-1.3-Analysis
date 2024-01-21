@@ -1,0 +1,59 @@
+#! /bin/sh
+# dodelayed - handle delayed control messages, if they still exist
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/relay:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+lock LOCK $$ || exit 1
+trap 'unlock LOCK ; trap 0 ; exit 0' 0 1 2 15
+
+cd $NEWSARTS
+
+# if there is nothing to do, don't try to do it
+if test ! -s $NEWSCTL/delayed
+then
+	exit 0
+fi
+
+# first, which ones are due?
+now="`now`"
+awk 'BEGIN { now = '$now' }
+	{
+		if ($1 > now)
+			print $1, $2
+		else
+			print "do", $2
+	}' $NEWSCTL/delayed >/tmp/delayed$$
+
+# second, which of those still exist?
+sed -n '/^do /s///p' /tmp/delayed$$ | dbz -x $NEWSCTL/history |
+	awk -F'	' 'NF == 3 { print $3 }' | tr . / |
+	while read first rest
+	do
+		if test -r "$first"
+		then
+			echo "$first"
+		fi
+	done >/tmp/delaydo$$
+
+# do them
+if test -s /tmp/delaydo$$
+then
+	for f in `cat /tmp/delaydo$$`
+	do
+		canonhdr $f | 
+			sed -n 's;^Control:[	 ]*;'$NEWSBIN/relay/del';p' |
+			egrep -v '/^(cancel|ihave|sendme) ' >/tmp/ctl$$
+		# It might seem as if we need to duplicate relaynews's
+		# security checks -- for .. or metacharacters -- but a
+		# control message never gets into NEWSCTL/delayed unless
+		# relaynews approves of it.
+		sh /tmp/ctl$$ <$f
+	done
+fi
+
+# and clean up
+egrep -v '^do' /tmp/delayed$$ >$NEWSCTL/delayed
+rm -f /tmp/ctl$$ /tmp/delayed$$ /tmp/delaydo$$

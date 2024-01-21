@@ -1,0 +1,103 @@
+#! /usr/bin/make -f
+#
+# Last updated: Sat Dec 17 10:52:20 EST 1994 by imurdock.
+#
+# To make the binary distribution package, the ``Debianized'' source package
+# and the context diff to the original package, type `./debian.rules dist'.
+# Make sure that `debian.rules' is executable before the final distribution
+# is made.
+#
+# Invoke each target with `./debian.rules <target>'.  All targets should be
+# invoked with the package root as the current directory.
+#
+# The `binary' target must be run as root, as it needs to install files with
+# specific ownerships.  The `diff' target assumes that you have the original
+# source package available, unpacked, in ../$(p)-$(v).orig, or that you have
+# the previous revision of the ``Debianized'' source package and context diff
+# in the parent directory.
+
+CC = gcc
+CFLAGS = -O2 -DDEBIAN -I.
+LDFLAGS = -s
+
+# The name of the package (for example, `emacs').
+p = pmake
+# The version of the package (for example, `19.28').
+v = 1.0
+# The Debian revision of the package (for example, `2').
+d = 13
+# The target architecture.
+a = $(shell dpkg --print-architecture)
+
+build:
+# Builds the binary package.
+	make -f Makefile.dist CC="$(CC)" CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)"
+	strip pmake
+	touch stamp-build
+
+clean:
+# Undoes the effect of `make -f debian.rules build'.
+	make -f Makefile.dist clean
+	rm -f stamp-build
+	rm -rf debian-tmp
+
+binary:
+# Makes a binary package.
+	test -f stamp-build || make -f debian.rules build
+	install -d -g root -m 755 -o root debian-tmp
+	chmod g-s debian-tmp
+	install -d -g root -m 755 -o root debian-tmp/DEBIAN
+	install -d -g root -m 755 -o root debian-tmp/usr/bin
+	install -g root -m 755 -o root pmake debian-tmp/usr/bin/pmake
+	install -d -g root -m 755 -o root debian-tmp/usr/lib/mk
+	for file in Makefile bsd.README bsd.doc.mk bsd.lib.mk \
+	  bsd.man.mk bsd.prog.mk bsd.subdir.mk sys.mk; \
+	do \
+	  install -g root -m 644 -o root mk/$$file \
+	    debian-tmp/usr/lib/mk/$$file; \
+	done
+	install -d -g root -m 755 -o root debian-tmp/usr/man/man1
+	install -g root -m 644 -o root make.1 debian-tmp/usr/man/man1/pmake.1
+	install -d -g root -m 755 -o root debian-tmp/usr/doc/copyright
+	install -g root -m 644 -o root debian.README \
+	  debian-tmp/usr/doc/copyright/$(p)
+	sed -e '4s/=V-=D/$(v)-$(d)/' -e '8s/=A/$(a)/' debian.control \
+	  > debian-tmp/DEBIAN/control
+	chmod 644 debian-tmp/DEBIAN/control
+	dpkg --build debian-tmp && dpkg-name -o -s .. debian-tmp.deb
+
+source:
+# Makes a source package.
+	-test -f stamp-build && make -f debian.rules clean
+	( cd .. && tar cf - $(p)_$(v) | gzip -9f > $(p)_$(v)-$(d).tar.gz )
+
+diff:
+# Makes a context diff.
+	-test -f stamp-build && make -f debian.rules clean
+	-test -d ../$(p)_$(v).orig -o -f ../$(p)_$(v)-`expr $(d) - 1`.diff.gz \
+	  || ( echo "Original source package is not available." ; false )
+	-test -d ../$(p)_$(v).orig || make -f debian.rules orig
+	( cd .. && diff -cNr $(p)_$(v).orig $(p)_$(v) | gzip -9f \
+	  > $(p)_$(v)-$(d).diff.gz )
+	-test -f stamp-orig \
+	  && rm -rf ../$(p)_$(v).orig && rm -f stamp-orig
+
+dist: binary source diff
+# Prepares the package for distribution.
+
+orig:
+# Prepares the original package from the previous
+# Debian revision source package and context diff.
+	( cd .. \
+	  && mkdir $(p).orig \
+	  && cd $(p).orig \
+	  && tar xzf ../$(p)_$(v)-`expr $(d) - 1`.tar.gz \
+	  && cd $(p)_$(v) \
+	  && ( zcat ../../$(p)_$(v)-`expr $(d) - 1`.diff.gz \
+	    | patch -sER -p1 ) \
+	  && find . -name "*.orig" -exec rm -f {} \; \
+	  && cd .. \
+	  && mv $(p)_$(v) ../$(p)_$(v).orig \
+	  && cd .. \
+	  && rmdir $(p).orig )
+	touch stamp-orig

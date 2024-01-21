@@ -1,0 +1,58 @@
+#!/bin/sh
+
+VAULT=@@RELEASE_VAULT@@
+
+GNUTAR=/usr/latest/bin/tar
+BLOCKSIZE=62k
+
+if [ $# != 5 ] ; then
+	echo Usage: $0 release bundle host target /dev/norewindtape
+	exit 1
+fi
+
+set -e
+
+release=$1
+bundle=$2
+host=$3
+target=$4
+tape=$5
+
+RELDIR=$VAULT/$release/$bundle/$host
+SRCDIR=$VAULT/$release/$bundle
+
+if [ ! -f $RELDIR/${target}.tar.Z ]; then
+	echo "$0: can't find executable image: $RELDIR/{target}.tar.Z" 1>&2
+	exit 1
+fi
+
+if [ ! -f $SRCDIR/src.tar.Z ]; then
+	echo "$0: can't find source image: $SRCDIR/src.tar.Z" 1>&2
+	exit 1
+fi
+
+# Rewind tape
+mt -t ${tape} rew
+
+# 1st hunk, the Install script
+cd $RELDIR
+$GNUTAR cf ${tape} Install
+
+# 2nd hunk, the executables
+dd conv=sync if=$RELDIR/${target}.tar.Z of=${tape} obs=${BLOCKSIZE}
+
+# 3rd hunk, the sources
+dd conv=sync if=$SRCDIR/src.tar.Z of=${tape} obs=${BLOCKSIZE}
+
+mt -t ${tape} rewind
+tar tvvf ${tape}
+
+mt -t ${tape} rewind
+mt -t ${tape} fsf 1
+dd if=${tape} ibs=${BLOCKSIZE} | compress -d | /bin/tar tvvf -
+
+mt -t ${tape} rewind
+mt -t ${tape} fsf 2
+dd if=${tape} ibs=${BLOCKSIZE} | compress -d | /bin/tar tvvf -
+
+echo "this tape for $host $target is written"

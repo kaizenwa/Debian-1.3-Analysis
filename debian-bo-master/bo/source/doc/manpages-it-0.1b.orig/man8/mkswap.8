@@ -1,0 +1,109 @@
+.\" Copyright 1992, 1993 Rickard E. Faith (faith@cs.unc.edu)
+.\" May be distributed under the GNU General Public License
+.\" Modified with suggestions from Linus, Mon Feb  1 21:40:49 1993
+.\" Modified with patches from Kai, Wed Jun 22 21:54:56 1994
+.\" Patches from jaggy@purplet.demon.co.uk (Mike Jagdis), Wed Feb 8 1995
+.\" Added comments from Nick Holloway, Sat Feb 11 1995, faith@cs.unc.edu
+.\"
+.\" Traduzione in italiano di Giovanni Bortolozzo <borto@dei.unipd.it>
+.\" Agosto 1996
+.\"
+.\" " for hilit19
+.TH MKSWAP 8 "8 Febbraio 1995" "Linux 1.0" "Linux Programmer's Manual"
+.SH NOME
+mkswap \- predispone una area di swap di Linux
+.SH SINTASSI
+.B "mkswap [ \-c ]"
+.IB device  " [" dimensione-in-blocchi "]"
+.SH DESCRIZIONE
+.B mkswap
+predispone un'area di swap di Linux su un device o in un file.
+
+Il 
+.I device
+è di solito del tipo seguente:
+
+.nf
+.RS
+/dev/hda[1-8]
+/dev/hdb[1-8]
+/dev/sda[1-8]
+/dev/sdb[1-8]
+.RE
+.fi
+
+Il parametro
+.I dimensione-in-blocchi
+è la dimensione desiderata, in blocchi, del file system. Tale informazione, se
+omessa, è automaticamente determinata da
+.BR mkswap .
+Il numero di blocchi è arrotondato per difetto in modo tale che la dimensione
+totale sia un multiplo della dimensione della pagina della macchina. Sono 
+permessi solo numeri di blocchi compresi tra MINCOUNT e MAXCOUNT. Se il numero 
+di blocchi eccede MAXCOUNT, è troncato a questo valore e viene generato un
+warning.
+
+I valori di MINCOUNT e MAXCOUNT per l'area di swap sono:
+
+.RS
+MINCOUNT = 10 * PAGE_SIZE / 1024
+.br
+MAXCOUNT = (PAGE_SIZE - 10) * 8 * PAGE_SIZE / 1024
+.RE
+
+Per esempio, su macchine con pagine da 4kB (p. es., x86), si ha:
+
+.RS
+MINCOUNT = 10 * 4096 / 1024 = 40
+.br
+MAXCOUNT = (4096 - 10) * 8 * 4096 / 1024 = 130752
+.RE
+
+Se ogni blocco è grande 1kB, le area di swap in questo esempio possono avere 
+dimensione qualsiasi compresa fra 40kB e 127.6875MB.
+
+Se non si conosce la dimensione delle pagine usata dalla propria macchina, si
+dovrebbe essere in grado di scoprirla con "cat /proc/cpuinfo".
+
+La ragione del limite su MAXCOUNT è che è usata una sola pagina all'inizio 
+dell'area di swap per tenere la mappa di tutto lo swap, e ogni bit rappresenta
+una pagina. La ragione del -10, è che l'etichetta identificativa è "SWAP-SPACE"
+-- 10 caratteri.
+
+Per predisporre un file di swap, è necessario crearlo prima di eseguire
+.BR mkswap .
+Tale scopo può essere ragionevole una sequenza di comandi simile alla seguente:
+
+.nf
+.RS
+# dd if=/dev/zero of=swapfile bs=1024 count=8192
+# mkswap swapfile 8192
+# sync
+# swapon swapfile
+.RE
+.fi
+
+Si noti che il file di swap non deve contenere nessun buco (perciò non è
+accettabile usare 
+.BR cp (1)
+per creare il file).
+
+.SH OPZIONI
+.TP
+.B \-c
+Cerca i bad block del device prima di creare il file system. Se ne è trovato
+qualcuno, ne è stampato il numero. Questa opzione è stata pensata per essere
+usata 
+.B solo 
+per le partizioni di swap, e 
+.B non 
+dovrebbe essere usata per i file normali! Per essere sicuri che un file normale
+non contenga bad block, la partizione che contiene il file regolare dovrebbe
+essere stata creata con
+.BR "mkfs -c" .
+.SH "VEDERE ANCHE"
+.BR fsck (8),
+.BR mkfs (8),
+.BR fdisk (8)
+.SH AUTORE
+Linus Torvalds (torvalds@cs.helsinki.fi)

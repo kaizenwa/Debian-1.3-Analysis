@@ -1,0 +1,273 @@
+Documentation for GWM Emulation of MWM, Version 1.1
+
+July 1, 1992
+
+Glen Whitney  -- UCLA Math Dept.
+
+This version of MWM emulation represents an intermediate stage between
+the original version, which was very WOOL oriented and could only be
+customized by modifying several .gwm files, and the "ultimate"
+emulator, which would behave exactly as the mwm(1X) specification in
+the OSF/Motif Programmer's Reference (pp. 1-2 through 1-50) dictates.
+(Some actual changes to GWM are needed for the latter goal, for
+example to be able to parse "extraneous" command-line options within
+Wool code.) This document lists all differences between version 1.1 of
+Mwm emulation and the official Mwm specification. The format is the
+same as that specification, but only differences are mentioned.
+
+gwm -qf mwm
+-----------
+
+Purpose
+   To emulate the Motif Window Manager
+
+Synopsis
+   gwm -qf mwm
+
+Description
+   Options
+     Only a "-d" option giving the display to be managed, emulating
+the "-display" option of mwm, is supported. Note also that the "q" may
+be left out to generate some diagnostic output to stdout which is not
+produced by  mwm. The emulation behaves as if all other command-line
+options to mwm were unspecified.
+
+   Appearance
+     Essentially the same.
+
+   Screens
+     Only one screen may be managed by the emulation.
+
+   Windows
+     Essentially the same.
+
+   Icons
+     Essentially the same.
+
+   Icon Box
+     The icon box is not supported by the emulation.
+
+   Input Focus
+     Essentially the same.
+
+   X Defaults
+     The resource database for configuring the gwm emulation of mwm is
+built from only the following two sources, not all of the sources mwm
+would consult. 
+     RESOURCE_MANAGER root window property
+     XENVIRONMENT environment variable
+(The latter source takes precedence over the former.)
+     The resource name and class used to look up resources are `mwm' and
+`Mwm', respectively.
+
+     Component Appearance resources
+        No resources of the form Mwm*client*title* may be specified;
+the Mwm*client* values are used. Similarly, no resources of the form
+Mwm*menu*_menu_name_* are handled; only the the global Mwm*menu*
+options.  Furthermore, no resource containing the string "Pixmap" is
+handled, nor is "saveUnder". Otherwise, all resources should operate
+as specified for mwm.
+        In addition, one resource, name `cursor' class `Cursor', is
+understood by the emulation but not by mwm. The *menu*, *client*, and
+*feedback* values specify the cursor glyph for the mouse cursor when
+it is over window manager menus, client window decorations, and
+feedback windows, respectively. Currently, icons use the same cursor
+as client windows, so the *icon* value is ignored.
+
+     Specific Appearance and Behavior resources:
+	The following resources are not handled by the emulation:
+	bitmapDirectory     - the value of GWMPATH is used
+	cleanText           - irrelevant, as backgroundPixmap cannot
+				be specified 
+	colormapFocusPolicy - behaves as with value of "keyboard"
+	configFile          - the emulation looks first for a file
+				named .gwmMwmrc, then system.gwmMwmrc,
+				both in the GWMPATH search path.
+	enableWarp          - behaves as if True
+        fadeNormalIcon	      -\
+        iconBoxGeometry        |
+        iconBoxName             > irrelevant, as icon box not supported
+        iconBoxSBDisplayPolicy |
+        iconBoxTitle          -/
+        iconDecoration      - only partially implemented; the presence
+				or not of "activelabel" is detected,
+				but "label" and "image" are always
+				assumed.
+        iconImageMinimum    - no minimum is enforced.
+        limitResize         - behaves as if False.
+        multiScreen         - behaves as if False.
+        passButtons         - behaves as if False.
+	quitTimeout         - the emulation does not support the
+				SAVE_YOURSELF protocol; it only uses
+				XKillCLient to kill clients.
+	screens             - the emulation only handles one screen
+	showFeedback        - only partially implemented; "move",
+				"placement", and "resize" are the only
+				supported feedbacks.
+	transientFunctions  - behaves as with value of "all".
+        useIconBox          - behaves as if False.
+
+        The following additional resources not available in mwm are
+supported by the emulation:
+	cursor            - gives the root cursor.
+        menuShadeColor    - specifies the color to use to display menu
+				options which are currently not available.
+	clientAutoXOffset - specifies the number of pixels to move a
+				window to the right if it obscures
+				another window when trying to autoplace it.
+	clientAutoYOffset - similarly specifies the amount to move down.
+	tooClose          - specifies the Euclidean distance that is
+				too close for the upper left corner of
+				windows. 
+
+     Client Specific Resources
+        None of the resources containing the string "Pixmap" or
+"matte" are implemented. Neither are "maximumClientSize" or
+"useClientIcon"; no maximum size is enforced, and the emulation
+behaves as if "useClientIcon" were True.
+
+   Resource Description File
+     As mentioned above, the resource description file cannot be
+selected with the "configFile" resource. The emulation always looks
+first for ".gwmMwmrc" and faling that, "system.gwmMwmrc".
+
+   mwm Emulation Resource Description File Syntax
+     The syntax for these files is completely different for the
+emulation from that described for mwm, since they must be
+interpretable as Wool code. However, the syntax is fairly simple, and
+completely described here. Hopefully, a future version of the
+emulation will support the original mwm sytax.
+     First, it is vital to note that the resource description file
+currently allows NO forward reference; thus a menu must be described
+*before* it can be bound to a key.
+     The comment and quoting syntax is the same as that for Wool code;
+in particular, an unquoted semicolon (;) anywhere in a line causes the
+remainder of that line to be treated as a comment.
+     The following mwm functions are not supported: f.focus_color,
+f.focus_key, f.next_cmap, f.next_key, f.normalize_and_raise,
+f.pass_keys, f.prev_cmap, f.prev_key, f.send_msg, f.set_behavior.
+     The following additional functions, not supported by mwm, are
+provided in the emulation:
+	f.identify      - pops up a window showing various characteristics
+of the given window: its geometry, name, class, title, etc.
+	f.delete 	- asks a client to delete the current window,
+if it participates in the WM_DELETE_WINDOW protocol.
+	f.load "file"   - loads the Wool code file "file".
+        f.show_sel      - pops up a window displaying the current
+contents of the X cut buffer.
+        f.eval_sel      - evaluate the contents of the X cut buffer as
+Wool code and pop up a window displaying the value. (KNOWN BUG: if the
+value is a function, the pop-up never appears even though the
+evaluation occurs.)
+        f.raise_move    - raises and moves the current window.
+        f.warpto "name" - warps the cursor to a window named "name".
+        f.exec_cut      - merely evaluate the contents of the X cut
+buffer, without displaying anything. (The value is written to stdout.)
+        f.termcap       - sends keystrokes to an XTerm window which
+should inform the shell running there of any changes to window size,
+etc.
+
+   Window Manager Event Specification
+     Button events have the following syntax:
+	_button_ = 
+		(_button_event_type_ _button_number_ _modifier_spec_)
+        _button_event_type_ =
+		button | buttonpress | buttonrelease | double-button |
+		double-buttonpress
+	_modifier_spec_ =
+		_modifier_name_ | (together _modifier_list_)
+	_modifier_list_ =
+		_modifier_name_ {_modifier_name_}
+	_modifier_name_ =
+		alone | any | with-shift | with-control | with-alt | 
+		with-lock | with-modifier-[2|3|4|5] | with-button-[1|2|3|4|5]
+
+where _button_event_type_ specifies what sort of button event the
+corresponding action will be triggered by: a button press and release,
+a button press, a button release, a button pressed and released twice,
+or a button pressed, released, and pressed (repsectively to the above
+list).  The _button_number_ can be any number from 1 through 5,
+indicating which button the event refers to. Finally, the
+_modifier_spec_ determines which modifiers may be present when the
+event occurs: "alone" for none, "any" for any, and the others
+("with-shift", etc.) for the corresponding keys or buttons pressed.
+The "(together _modifier_name_ ... _modifier_name_)" syntax can be
+used to describe an event in which more than one modifier must be
+present simultaneously. Finally, to give an example, the button
+description
+
+    (buttonrelease 3 (together with-alt with-control))
+
+can be used to assign a function to be triggered when button 3 is
+released while holding down the Alt and Control keys, as described in
+general below.
+     Key events have the following syntax:
+	_key_ = ("_key_name_" _modifier_spec_)
+where _modifier_spec_ is as above and _key_name_ is an X KeySym.
+
+   Button Bindings
+     The button binding syntax is:
+
+(: _bindings_set_name_
+ (button-bindings-make
+   ( _button_ (_context_list_) (_function_) )
+   ( _button_ (_context_list_) (_function_) )
+         . . .
+   ( _button_ (_context_list_) (_function_) )
+))
+	_context_list_ =
+		_context_ {_context_}
+	_context_ = root | icon | window | title | frame | border | app
+
+where _button_ is as above and _function_ is any of the functions
+listed above (or listed in the mwm specification and not excluded
+above), together with any arguments that function might have.
+
+   Key Bindings
+     The key binding syntax is:
+(: _bindings_set_name
+  (key-bindings-make
+    ( _key_ (_context_list_) (_function_) ) 
+    ( _key_ (_context_list_) (_function_) )
+         . . .
+    ( _key_ (_context_list_) (_function_) )
+))
+
+
+   Menu Panes
+     The menu pane specification syntax is:
+(: _menu_name_
+  (mwm-menu.make
+    ("_label_" _mnemonic_ (_accelerator_) (_function_))
+    ("_label_" _mnemonic_ (_accelerator_) (_function_))
+        . . .
+    ("_label_" _mnemonic_ (_accelerator_) (_function_))
+))
+where _label_ is either the text labeling an entry of the menu, or
+@filename, where "filename" is the name of a file which contains a
+bitmap which should be used to label the entry. The _mnemonic_ is
+either open and close parentheses "()" signifying that there is no
+mnemonic, or a single quoted character (e.g., `"M"') giving the
+mnemonic character. Finally, the _accelerator_ is either nothing,
+signifying that there is no accelerator, or a _key_ giving the
+accelerator. Note that none of these fields are optional, as in Mwm.
+
+   Note that examples of all of Key bindings, Button bindings, and
+Menu panes can be found in the file "mwm-typical.gwmMwmrc".
+
+
+   Environment
+      The emulation uses the environment variable GWMPATH when
+searching for files, like .gwmMwmrc, and bitmaps. 
+      It also uses XENVIRONMENT to read resources configuring its
+behavior.
+
+
+Files
+   .gwmMwmrc, system.gwmMwmrc -- Menu, key, and button description
+					files.
+   mwm-*.gwm                  -- The Wool code of the emulation.
+
+Related Information
+  "mwm(1X)" in _OSF/Motif Programmer's Reference_.
+  GWM Manual

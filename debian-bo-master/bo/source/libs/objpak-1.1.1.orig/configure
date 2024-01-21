@@ -1,0 +1,201 @@
+#! /bin/sh
+# Script to install files and to create a Makefile for each directory
+
+root=`pwd`
+if test ! -f ${root}/include/objpak/objpak.h; then
+    echo "configure: must be ran from objpak top directory";exit 1;
+fi
+
+while :
+do
+  case $# in
+    0)  break ;;
+  esac
+
+  arg="$1" ;
+  case $arg in
+    -hierarchy=*) hierarchy=`expr $arg : '-hierarchy=\(.*\)'`;;
+    -prefix=*) prefix=`expr $arg : '-prefix=\(.*\)'`;;
+    -objcc=*) objcc=`expr $arg : '-objcc=\(.*\)'`;;
+    *)	echo -help : print this message;
+	echo -prefix=path : set installation directory prefix;
+	echo -hierarchy=system : set directory hierarchy to Unix or NextStep;
+	echo -objcc=compiler : use specific objc compiler;exit 2;;
+  esac
+
+  shift
+done
+
+#
+# Directory hierarchy organization.
+# Controls the default value of ${prefix} and controls the search path for
+# header files, libraries etc. (either /usr/local/xxx or /LocalDeveloper/xxx)
+#
+# The default value is controlled by the resident directory hierarchy system.
+# On NextStep we prefer the hierarchy with the fully spelled names.
+#
+# Override default e.g by -hierarchy=NextStep or -hierarchy=Unix
+#
+
+if test -d /NextApps; then
+   hierarchy=${hierarchy-NextStep};
+else
+   hierarchy=${hierarchy-Unix};
+fi
+echo Setting directory hierarchy to ${hierarchy}
+
+#
+# Installation directory prefix.
+#
+# The default value is controlled by the directory hierarchy system.
+# On NextStep, we prefer installing things in ~/Developer, while on other
+# Unixes we simply take the user's home directory.
+#
+# Override default e.g. by -prefix=/usr/local or -prefix=/LocalDeveloper
+#
+
+prefix=`eval echo ${prefix-${root}}`
+echo Setting installation directory prefix to ${prefix}
+if test ! -d ${prefix}; then echo Cant find ${prefix};exit 1;fi
+
+#
+# Installation directories.
+# The values are controlled by the prefix and the directory hierarchy system.
+#
+
+case ${prefix} in
+    ${root}) libdir=${prefix}/lib;hdrdir=${prefix}/include;;
+    *)       case ${hierarchy} in
+	        Unix)     libdir=${prefix}/lib;hdrdir=${prefix}/include;;
+	        NextStep) libdir=${prefix}/Libraries;hdrdir=${prefix}/Headers;;
+	        *) echo "configure: ${hierarchy} unknown hierarchy";exit 1;;
+             esac
+esac
+
+#
+# Installing Header Files (if necessary)
+#
+
+case ${hdrdir} in
+    ${root}/include)	;;
+    *)	echo Installing Header Files in ${hdrdir}/objpak;
+        if test ! -d ${hdrdir}/objpak; then mkdir ${hdrdir}/objpak; fi;
+	cp ${root}/include/objpak/* ${hdrdir}/objpak;;
+esac
+
+#
+# Creating Directory of Library (if necessary)
+#
+
+if test ! -d $libdir; then echo Creating Directory ${libdir};mkdir ${libdir};fi
+
+#
+# Finding an Objective C compiler.
+#
+# By default, search ${PATH} for any of "gcc, objcc or cc" (in that order)
+# Actually, it would be better to pick out the cc that understands
+# Objective C.
+#
+# Override by -objcc=gcc, -objcc=objcc or -objcc=cc
+#
+
+binpath=`echo ${PATH} | sed '
+s/^:/.:/g
+s/::/:.:/g
+s/:$/:./g
+s/:/ /g'`
+
+for dir in ${binpath}
+do if test -f ${dir}/gcc; then objcc=${objcc-gcc};fi;done
+for dir in ${binpath}
+do if test -f ${dir}/objcc; then objcc=${objcc-objcc};fi;done
+for dir in ${binpath}
+do if test -f ${dir}/cc; then objcc=${objcc-cc};fi;done
+echo Setting compiler to ${objcc}
+
+#
+# Configuring compiler flags given a compiler ${objcc}
+#
+# The situation when using gcc instead of cc on NextStep is a bit
+# complicated because we have to tell it to use the NeXT runtime and fix
+# the include path.
+#
+# On the other hand, gcc is installed as cc on some systems. And the NeXT cc
+# of course is derived from gcc.  Makes you appreciate Stepstone's precompiler
+# approach ...
+#
+
+cat > test.c <<EOF
+#ifdef __NeXT__
+yes;
+#endif
+EOF
+echo Testing the compiler...
+if ${objcc} -E test.c | egrep yes >/dev/null 2>&1; then
+    __NeXT__=true;
+else
+    __NeXT__=false;
+fi
+rm -f test.c
+
+CFLAGS="-O -DNDEBUG"
+GFLAGS="-g"
+
+case ${objcc} in
+    objcc) DEFS="-D__STPSTN__";
+	   CFLAGS="-q ${CFLAGS}";
+	   GFLAGS="-q ${GFLAGS}";
+	   LDFLAGS="-ldOpt:L${libdir} -lobjpak";;
+    cc) case ${__NeXT__} in
+	true)
+           LDFLAGS="-L${libdir} -lobjpak";;
+	false)
+           DEFS="-D__GNUOBJC__";
+	   CFLAGS="-fgnu-runtime ${CFLAGS}";
+	   GFLAGS="-fgnu-runtime ${GFLAGS}";
+           LDFLAGS="-L${libdir} -lobjpak -lobjc";;
+	esac;;
+    gcc) case ${__NeXT__} in
+	true)
+	   CPPFLAGS="-I/usr/include ${CPPFLAGS}";
+	   CFLAGS="-fnext-runtime ${CFLAGS}";
+	   GFLAGS="-fnext-runtime ${GFLAGS}";
+           LDFLAGS="-L${libdir} -lobjpak";;
+	false)
+           DEFS="-D__GNUOBJC__";
+	   CFLAGS="-fgnu-runtime ${CFLAGS}";
+	   GFLAGS="-fgnu-runtime ${GFLAGS}";
+           LDFLAGS="-L${libdir} -lobjpak -lobjc";;
+	esac;;
+    *) echo "configure: unknown compiler type";exit 1;;
+esac
+
+# for some weird reason gnu objc on Linux currently needs -lieee
+if test -f /usr/lib/libieee.a; then LDFLAGS="${LDFLAGS} -lieee";fi
+
+echo Setting DEFS to ${DEFS-"(none)"}
+echo Setting CPPFLAGS to ${CPPFLAGS-"(none)"}
+echo Setting CFLAGS to ${CFLAGS}
+echo Setting LDFLAGS to ${LDFLAGS}
+
+#
+# Generating Makefiles
+#
+
+echo Generating Makefile from Makefile.in for all subdirectories
+
+files='Makefile src/Makefile src/ObjCltn/Makefile src/ObjDic/Makefile src/ObjPak/Makefile src/ObjSet/Makefile src/ObjSeq/Makefile src/ObjSort/Makefile src/ObjStr/Makefile words/Makefile'
+
+for file in ${files}
+do
+sed "
+s%@objcc@%${objcc}%g
+s%@DEFS@%${DEFS}%g
+s%@CPPFLAGS@%${CPPFLAGS}%g
+s%@CFLAGS@%${CFLAGS}%g
+s%@GFLAGS@%${GFLAGS}%g
+s%@LDFLAGS@%${LDFLAGS}%g
+s%@hdrdir@%${hdrdir}%g
+s%@libdir@%${libdir}%g
+" < ${file}.in > ${file}
+done

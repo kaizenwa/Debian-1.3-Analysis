@@ -1,0 +1,242 @@
+.TH HASH 3 "7 November 1991"
+.SH NAME
+hash: hashcreate, hashdestroy, hashstore, hashentry, hashfetch,
+hashdelete, hashwalk \- string interface to
+general-purpose in-memory hashed lookup
+.br
+hash: hdbmcreate, hdbmdestroy, hdbmstore, hdbmentry, hdbmfetch,
+hdbmdelete, hdbmwalk \- dbm interface to
+general-purpose in-memory hashed lookup
+.SH SYNOPSIS
+.ft B
+.nf
+#include <hdbm.h>
+#include <hash.h>
+.sp 0.3v
+HASHTABLE *hashcreate(size, hashfunc)
+unsigned size;
+unsigned (*hashfunc)();
+.sp 0.3v
+hashdestroy(tbl)
+HASHTABLE *tbl;
+.sp 0.3v
+int hashstore(tbl, key, data)
+HASHTABLE *tbl;
+HASHDATUM key, data;
+.sp 0.3v
+HASHDATUM hashentry(tbl, key, allocator)
+HASHTABLE *tbl;
+HASHDATUM key;
+HASHDATUM (*allocator)();
+.sp 0.3v
+HASHDATUM hashfetch(tbl, key)
+HASHTABLE *tbl;
+HASHDATUM key;
+.sp 0.3v
+int hashdelete(tbl, key)
+HASHTABLE *tbl;
+HASHDATUM key;
+.sp 0.3v
+hashwalk(tbl, nodefunc, hook)
+HASHTABLE *tbl;
+int (*nodefunc)();
+char *hook;
+.fi
+.DA 
+.ft
+.SH DESCRIPTION
+This package maintains,
+searches,
+and
+enumerates
+multiple hash tables in memory simultaneously.
+(Hashing is a technique to map a
+`key'
+to the data corresponding to that key very quickly
+by use of a
+.I hash
+function.)
+This package implements hashing with chaining.
+.PP
+.I Hash.h
+defines some data types:
+HASHDATUM
+is the type of keys and data objects
+manipulated by these routines;
+(HASHTABLE *)
+is a magic cookie returned by
+.I hashcreate
+and used by the other routines:
+.PP
+.ft B
+.nf
+.in +0.5i
+typedef char *HASHDATUM;
+.in -0.5i
+.fi
+.ft
+.PP
+.I Hashcreate
+allocates a fresh hash table of
+.I size
+entries
+and set up to use the hashing function
+.IR hashfunc .
+It returns a magic cookie which refers to the new hash table,
+for use with the other routines.
+The precise value of
+.I size
+doesn't matter;
+it only affects efficiency:
+larger values consume more memory
+but generally result in faster lookups.
+Some theoreticians believe that prime numbers make better sizes,
+but it's not clear that it really matters in practice.
+If
+.I hashfunc
+is a null pointer,
+a default hash function will be used.
+Otherwise,
+.I hashfunc(key)
+will be called for each
+HASHDATUM
+.I key
+that must be hashed;
+the result will be taken modulus the hash table size
+to determine the hash chain to search for the corresponding
+.IR data .
+.I Hashdestroy
+destroys utterly the hash table corresponding to
+.IR tbl .
+.PP
+.I Hashstore
+associates the
+.I data
+pointer with
+.I key
+in the table corresponding to
+.IR tbl .
+Any prior association with
+.I key
+in this table is lost.
+.I Hashstore
+assumes that data pointed to by a
+.I key
+HASHDATUM remains constant,
+and that data pointed to by a
+.I data
+HASHDATUM
+does not move in memory and is not
+.IR free d,
+during the life of the table.
+.I Hashentry
+returns the data
+associated with
+.I key
+in the table corresponding to
+.IR tbl ,
+if any,
+else invokes
+.IB allocator ( key )
+and associates the result with
+.IR key ,
+and returns the result.
+.I Hashentry
+is primarily an optimisation
+for symbol table maintenance.
+.I Hashfetch
+returns
+the data
+associated with
+.I key
+in the table corresponding to
+.IR tbl ,
+if any,
+else 0.
+.I Hashdelete
+removes any entry for
+.IR key .
+.PP
+.I Hashwalk
+visits each entry in the table corresponding to
+.I tbl
+in no particularly useful order
+and executes
+.IR nodefunc( "key, data, " hook);
+for each,
+where
+.I key
+and
+.I data
+are the values of the mapping for that entry.
+.I Hook
+is a crude attempt to allow side effects in
+.I nodefunc
+with reentrancy.
+.PP
+There exists a parallel set of routines
+with whose names are the same except that
+the prefix
+.B hash
+is replaced with
+.BR hdbm .
+These routines operate on the data type
+HDBMDATUM
+rather than
+HASHDATUM;
+HDBMDATUM
+is a (pointer, size) pair
+defined by
+.I hdbm.h
+and contains these members:
+.PP
+.ft B
+.nf
+	char	*dat_ptr;
+	unsigned dat_len;
+.fi
+.ft
+.PP
+An implementation of
+.IR hsearch (3)
+is also provided;
+see
+.IR hsearch (3)
+for details.
+.SH DIAGNOSTICS
+Functions which return a value
+return 0 on failure,
+except for
+.I hdbmfetch
+and
+.IR hdbmentry ,
+which return an HDBMDATUM whose
+.I dat_ptr
+is set to 0.
+.SH EXAMPLE
+.ft B
+.nf
+static char Unix[] = "UNIX", plan9[] = "Plan 9";
+HASHTABLE *tbl = hashcreate(100, (unsigned (*)())NULL);
+if (tbl == 0)
+	error("can't hash", "");
+if (!hashstore(tbl, Unix, "is a registered trademark of AT&T, etc."))
+	error("can't install %s", Unix);
+if (!hashstore(tbl, plan9, "is probably a trademark of MCA"))
+	error("can't install %s", plan9);
+printf("%s %s\en", Unix, hashfetch(tbl, Unix));
+printf("%s %s\en", plan9, hashfetch(tbl, plan9));
+hashdestroy(tbl);
+.fi
+.ft
+.SH SEE ALSO
+.IR hsearch (3),
+.IR tsearch (3)
+.br
+The Art of Computer Programming,
+Donald E. Knuth
+.SH HISTORY
+Written by Geoff Collyer of Software Tool & Die
+because
+.IR hsearch (3)
+is inadequate for serious hashing.

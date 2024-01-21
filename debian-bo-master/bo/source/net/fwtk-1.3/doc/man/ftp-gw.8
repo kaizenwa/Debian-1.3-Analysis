@@ -1,0 +1,303 @@
+.\" Marcus J. Ranum, 1993
+.\" Copyright (C) Trusted Information Systems, Inc.
+.\" All rights reserved
+.TH FTP-GW 8 "26 August 1993"
+.SH NAME
+ftp-gw - FTP proxy server
+.SH SYNOPSIS
+.B ftp-gw \[-a autheduser\] \[-u user@host\]
+[invoked from inetd]
+.SH DESCRIPTION
+.IX  "ftp-gw"  ""  "\(em ftp proxy server"
+.LP
+.B ftp-gw
+provides pass-through FTP proxy services with logging and
+access control.
+When
+.B ftp-gw
+is invoked from
+.B inetd(8),
+it reads its configuration and checks to see if the
+system that has just connected is permitted to use the
+proxy. If not, it shuts down with a message and logs
+the connection. If the peer is permitted to use the
+proxy,
+.B ftp-gw
+enters a command loop in which it parses all FTP requests
+and passes them to a remote FTP server. Any FTP request
+can be selectively logged or blocked by the proxy.
+.LP
+There are two mechanisms supported to permit users to
+specify the system they with to FTP to through the
+proxy. The most commonly used is encoding the destination
+system name in the username:
+.nf
+.na
+.sp 1
+% \fBftp gatekeeper\fP
+Connected to gatekeeper.
+220 gatekeeper FTP proxy (Version 1.0) ready.
+Name (host:user): \fBuser@someplace\fP
+331-(----GATEWAY CONNECTED TO someplace----)
+331-(220 someplace FTP server (Version 5.60/mjr) ready.)
+331 Password required for user.
+Password:
+230 User user logged in.
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp> \fBquit\fP
+221 Goodbye.
+%
+.sp 1
+.fi
+.ad
+.LP
+A second means of specifying the remote through the
+proxy is via the
+.B passerve servername
+option, which causes the proxy to immediately connect
+to the specified remote system. This is useful in
+supporting modified
+.B ftp(1)
+clients that "understand" the proxy.
+.SH OPTIONS
+.LP
+.B \-a autheduser
+this option is provided for versions of
+.B ftpd
+that may
+exec() the proxy if given a user@host type address,
+where the user has already authenticated to the ftpd.
+If this option is provided,
+.B ftp-gw
+will treat the session as if it has been authenticated
+as belonging to the specified user. If this option is
+enabled, care should be taken to ensure that the FTP
+gateway is running on a host with restricted access,
+to prevent local users from attempting to spoof the
+authentication. The version of
+.B ftpd
+used should only pass this parameter when the user has
+been adequately authenticated using strong authentication.
+.LP
+.B \-u user@host
+this option provides a means for directly passing a
+user@host destination to the proxy, for versions of
+.B ftpd
+that recognize user@host addresses.
+.LP
+.B ftp-gw
+reads its configuration rules and permissions
+information from the firewall configuration
+table
+.B netperm-table,
+retrieving all rules specified for "ftp-gw".
+The following configuration rules are recognized:
+.TP
+.B userid user
+specify a numeric user-id or the name of a password file entry.
+If this value is specified,
+.B ftp-gw
+will set its user-id before providing service. Note that this
+option is included mostly for completeness, as
+.B ftp-gw
+performs no local operations that are likely to introduce a
+security hole.
+.TP
+.B directory pathname
+specifies a directory to which
+.B ftp-gw
+will chroot(2) prior to providing service.
+.TP
+.B denial-msg filename
+specifies the name of a file to display to the remote user
+if they are denied permission to use the proxy. If this
+option is not set, a default message is generated. When
+the denial-msg file is displayed to the remote user, each
+line is prefixed with the FTP codes for permission denied.
+.TP
+.B welcome-msg filename
+specifies the name of a file to display as a welcome banner
+upon successful connection. If this option is not set, a
+default message is generated.
+.TP
+.B help-msg filename
+specifies the name of a file to display if the "help"
+command is issued. If this option is not set, a listing
+of the internal commands is printed.
+.TP
+.B denydest-msg filename
+specifies the name of a file to display if a user
+attempts to connect to a remote server that they are
+not permitted to. If this option is not set, a default
+message is generated.
+.TP
+.B timeout secondsvalue
+specifies the idle timeout value in seconds. When the
+specified number of seconds elapses with no activity
+through the proxy server, it will disconnect. If this
+value is not set, no timeout is enforced.
+.TP
+.B hosts host-pattern [host-pattern2...] [options]
+rules specify host and access permissions. Typically, a
+hosts rule will be in the form of:
+.na
+.sp 1
+ftp-gw:	deny-hosts unknown
+ftp-gw:	hosts 192.33.112.* 192.94.214.*  -log { retr stor }
+.ad
+.sp 1
+There may be several host patterns following the "hosts"
+keyword, ending with the first optional parameter beginning
+with '-'. Optional parameters permit the selective enabling
+or disabling of logging information, etc. Sub-options are:
+.IP
+.B \-noinput
+specifies that no matter what, the proxy should not accept
+input over a PORT. Attempts to do so result in the port
+being closed.
+.IP
+.B \-nooutput
+specifies that no matter what, the proxy should not transmit
+output over a PORT. Attempts to do so result in the port
+being closed.
+.IP
+.B \-log operation
+.br
+.B \-log { operation1 operation2 ... }
+.br
+specifies that a log entry to the system log should be made
+whenever the listed operations are performed through the
+proxy. (See
+.B ftpd(8)
+for a list of known FTP operations)
+.IP
+.B \-authall
+specifies that the proxy should permit no operation (other
+than the
+.I quit
+command) until the user has authenticated to the server.
+.IP
+.B \-auth operation
+.br
+.B \-auth { operation1 operation2 ... }
+.br
+specifies that the operations listed should not be permitted
+until the user has authenticated to the server.
+.IP
+.B \-dest pattern
+.br
+.B \-dest { pattern1 pattern2 ... }
+.br
+specifies a list of valid destinations. If no list is specified,
+all destinations are considered valid. The -dest list is processed
+in order as it appears on the options line. -dest entries preceeded
+with a '!' character are treated as negation entries. Therefore the
+rule:
+.sp
+.nf
+.na
+-dest !*.mit.edu -dest *
+.fi
+.ad
+.sp
+will permit hosts that are not in the domain "mit.edu" to be
+connected to.
+.IP
+.B \-deny operation
+.br
+.B \-deny { operation1 operation2 ... }
+specifies a list of FTP operations to deny. By default, all
+operations are permitted.
+.SH AUTHENTICATION
+.PP
+Unless the user is employing a version of the FTP client
+program that has support for authentication via challenge/response,
+the user will be required to employ the
+.I quote
+command to communicate directly with the proxy. For authentication,
+the proxy recognizes the following options:
+.sp
+.B authorize username
+.br
+.B auth username
+(shorthand form)
+.sp
+.B response password
+.br
+.B resp password
+(shorthand form)
+.PP
+If the proxy requires authentication, attempts to use the service
+requested will not be permitted.
+.nf
+.na
+.sp
+% \fBftp gatekeeper\fP
+Connected to gatekeeper.
+220 gatekeeper FTP proxy (Version 1.0 stable) ready.
+Name (host:user): \fBuser@someplace\fP
+500 command requires user authentication
+Login failed.
+ftp> \fBquote auth mjr\fP
+331 Challenge "655968"
+ftp> \fBquote response 822113\fP
+230 Login Accepted
+ftp> \fBuser user@someplace\fP
+331-(----GATEWAY CONNECTED TO someplace----)
+331-(220 someplace FTP server (Version 5.60/mjr) ready.)
+331 Password required for user.
+Password: 
+.I [...]
+.fi
+.ad
+.PP
+It is an unfortunate side effect of using the
+.I quote
+command that passwords will be visible. If authentication is
+being used, it should be of a changing-password or token
+authentication form, to eliminate the threat of passwords
+being seen or tapped via a network.
+.SH INSTALLATION
+.LP
+To install
+.B ftp-gw
+first place the executable in a system area, then modify
+.B /etc/inetd.conf.
+The TCP service port on which to install the FTP proxy
+will depend on local site configuration. If the gateway
+machine that is to run the proxy does not require having
+local FTP service, then the proxy can be installed on
+the FTP service port. If this is not the case (e.g.: the
+firewall doubles as an anonymous FTP archive) then the
+proxy should be installed at another port. In order to
+use it there, the FTP client application
+.B ftp(1)
+must support use of an alternate service port. Most
+BSD UNIX versions of the FTP client do, but some PC or
+MacIntosh versions do not.
+Once inetd.conf has been modified, restart or reload
+.B inetd.
+Verify installation by attempting a connection, and
+monitoring the system logs.
+.LP
+Typical configuration of the proxy in a firewall situation
+involves rules to block all systems that are not in the
+DNS from using the proxy, but to permit all systems on
+the internal protected network to use the proxy. I.e.:
+.na
+.sp 1
+ftp-gw:	deny-hosts unknown
+ftp-gw:	hosts 192.33.112.* 192.94.214.*  -log { retr stor }
+.ad
+.sp 1
+.SH FILES
+.PD 0
+.TP 20
+.B /etc/inetd.conf
+.B netperm-table
+.SH SEE ALSO
+.BR netperm-table (5)
+.BR inetd (8)
+.BR authd (8)
+.SH BUGS

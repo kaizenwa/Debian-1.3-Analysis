@@ -1,0 +1,128 @@
+#!@SHELL@
+#
+# faxq program 
+#
+# like "lpq" or "mailq", show jobs waiting in the output queue
+#
+# SCCS: @(#)faxq.in	4.1 97/01/12 Copyright (C) 1994 Gert Doering
+#
+FAX_SPOOL=@FAX_SPOOL@
+FAX_SPOOL_OUT=@FAX_SPOOL_OUT@
+
+#
+# echo program that will accept escapes (bash: "echo -e", sun: /usr/5bin/echo)
+#
+echo="@ECHO@"
+
+#
+# an awk that is not stone-old-brain-dead (that is, not oawk...)
+#
+AWK=@AWK@
+
+if cd $FAX_SPOOL_OUT 
+then :
+else
+    $echo "cannot chdir to $FAX_SPOOL_OUT..." >&2
+    exit 1
+fi
+
+jobs="*/JOB"
+requeue=""
+
+for flag
+do
+    case $flag in
+	-v) verbose="true" ;;
+	-o) jobs="*/JOB.done" ;;
+	-s) jobs="*/JOB.s*" ;;
+	-a) jobs="*/JOB*" ;;
+	-r) jobs="*/JOB.s*"; requeue="true" ;;
+	*) cat <<EOF_MSG >&2
+$0: invalid option: $flag
+valid options:
+  -o: show old jobs
+  -s: show suspended jobs
+  -a: show all jobs
+  -v: verbose output
+  -r: restart suspended jobs
+EOF_MSG
+	   exit 1 ;;
+    esac
+done
+
+jobs=`ls $jobs 2>/dev/null`
+[ -z "$jobs" ] && $echo "no jobs."
+for i in $jobs
+do
+    USER=""; PHONE=""; PAGES=""; MAILTO=""; VERBTO=""; ACCT=""; INPUT=""; RE=""
+
+    if [ -z "$verbose" ]
+    then
+	eval `$AWK '$1=="user" { printf "USER=%s;", $2 }
+		   $1=="phone" { printf "PHONE=%s;", $2 }
+		   $1=="pages" { printf "PAGES=%d;", NF-1 }' $i`
+	$echo "$i: queued by $USER. $PAGES page(s) to $PHONE"
+    else
+	eval `$AWK '$1=="user" { printf "USER=%s;", $2 }
+		   $1=="mail"  { printf "MAILTO=\"%s\";", substr( $0, 6 ) }
+		   $1=="phone" { printf "PHONE=%s;", $2 }
+		   $1=="verbose_to" \
+			       { printf "VERBTO=\"%s\";", substr( $0, 12 ) }
+		   $1=="acct_handle" \
+			       { printf "ACCT=\"%s\";", substr( $0, 13 ) }
+		   $1=="input" { printf "INPUT=\"%s\";", substr( $0, 7 ) }
+		   $1=="time"  { printf "TIME=\"%s:%s\";",
+				 substr( $0, 6, 2 ), substr( $0, 8,2 ) }
+		   $1=="subject"{ printf "RE=\"%s\";", substr( $0, 9 ) }
+		   $1=="pages" { if ( NF==2 ) printf "PAGES=\"%s\";", $2
+				 else if ( NF==3 )
+                                     printf "PAGES=\"%s %s\";", $2, $3
+				 else
+                                     printf "PAGES=\"%s ... %s\";", $2, $NF
+			       }' $i`
+	$echo "$i:"
+	$echo "\tQueued by: $USER"
+       if [ -z "$VERBTO" ]
+       then
+	$echo "\t       to: $PHONE"
+       else
+	$echo "\t       to: $VERBTO ($PHONE)"
+       fi
+       test ! -z "$RE" && \
+	$echo "\t       Re: $RE"
+       test ! -z "$MAILTO" && \
+	$echo "\t   E-Mail: $MAILTO"
+       test ! -z "$INPUT" && \
+	$echo "\t    Input: $INPUT"
+	$echo "\t    Pages: $PAGES"
+       test ! -z "$TIME" && \
+	$echo "\tSend time: $TIME"
+       test ! -z "$ACCT" && \
+	$echo "\tAcct info: $ACCT"
+
+	sed -e '/Status/!d' -e 's/Status/           Status:/' $i
+       if [ -f "$i.locked" ] ; then
+        $echo "\t   Status: LOCKED (being sent right now)"
+       else
+	expr $i : ".*done$" >/dev/null ||
+	$echo "\t   Status: not sent yet"
+       fi
+    fi
+
+# if "requeue", requeue *.suspended-Jobs
+    if [ -n "$requeue" ] && expr "$i" : ".*JOB.s" >/dev/null
+    then
+	d=`dirname $i`
+	if [ ! -w $d ] ; then
+	    $echo "$i: not owner, can't restart"
+	else
+	    $echo "Status "`date`" - reactivated by $LOGNAME" >>$i
+	    mv $i $d/JOB
+	fi
+    fi
+
+done
+
+test -n "$verbose" -a -n "$jobs" -a -r .last_run &&
+    $echo "\nLast \`\`faxrunq'' run at: `cat .last_run`"
+

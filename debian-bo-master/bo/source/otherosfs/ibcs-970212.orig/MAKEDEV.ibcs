@@ -1,0 +1,67 @@
+#!/bin/sh
+
+SOCKSYS_MAJOR=30
+if [ -r /proc/devices ]; then
+	exec 3</proc/devices
+	while read major device <&3
+	do
+		if [ "${device}" = "socksys" ]; then
+			SOCKSYS_MAJOR="${major}"
+		fi
+	done
+	exec 3<&-
+fi
+
+rm -f socksys nfsd
+mknod -m 0666 socksys c ${SOCKSYS_MAJOR} 0
+ln socksys nfsd
+rm -f spx X0R
+mknod -m 0666 spx c ${SOCKSYS_MAJOR} 1
+ln spx X0R
+
+rm -fr inet
+rm -f ip icmp ggp ipip tcp egp pup udp idp rawip arp rip
+mkdir -m 0755 inet
+
+mknod -m 0666 inet/ip c ${SOCKSYS_MAJOR} 32
+mknod -m 0666 inet/icmp c ${SOCKSYS_MAJOR} 33
+mknod -m 0666 inet/ggp c ${SOCKSYS_MAJOR} 34
+mknod -m 0666 inet/ipip c ${SOCKSYS_MAJOR} 35
+mknod -m 0666 inet/tcp c ${SOCKSYS_MAJOR} 36
+mknod -m 0666 inet/egp c ${SOCKSYS_MAJOR} 37
+mknod -m 0666 inet/pup c ${SOCKSYS_MAJOR} 38
+mknod -m 0666 inet/udp c ${SOCKSYS_MAJOR} 39
+mknod -m 0666 inet/idp c ${SOCKSYS_MAJOR} 40
+mknod -m 0666 inet/rawip c ${SOCKSYS_MAJOR} 41
+ln inet/udp inet/arp
+ln inet/udp inet/rip
+for i in ip icmp ggp ipip tcp egp pup udp idp rawip arp rip
+do
+	ln inet/$i $i
+done
+
+
+# SCO compatible pseudo terminal names:
+n=0
+for a in p q r # s t u v w x y z a b c d e
+do
+	for b in 0 1 2 3 4 5 6 7 8 9 a b c d e f
+	do
+		if [ ! -e ptyp$n -a ! -e ttyp$n ] || [ -L ptyp$n -a -L ttyp$n ]
+		then
+			rm -f ptyp$n ttyp$n
+			ln -s pty$a$b ptyp$n
+			ln -s tty$a$b ttyp$n
+		fi
+		n=`expr $n + 1`
+	done
+done
+
+# UnixWare 1.1 mappings for local X server STREAMS pipes to Linux Unix
+# domain sockets. (Enough for X servers :0 to :7. Make more if you want)
+mkdir -m 0755 X 2> /dev/null
+for n in 0 1 2 3 4 5 6 7
+do
+	rm -f X/Nserver.$n
+	ln -s /tmp/.X11-unix/X$n X/Nserver.$n
+done

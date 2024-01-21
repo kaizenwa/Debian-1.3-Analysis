@@ -1,0 +1,146 @@
+.\" Marcus J. Ranum, 1993
+.\" Copyright (C) Trusted Information Systems, Inc.
+.\" All rights reserved
+.TH SMAPD 8 "23 August 1993"
+.SH NAME
+smapd - sendmail wrapper daemon
+.SH SYNOPSIS
+.B smapd
+[invoked from rc.local]
+.SH DESCRIPTION
+.IX  "smap daemon"  ""  "\fLsmapd\fP \(em sendmail wrapper security"
+.LP
+The
+.B smapd
+daemon periodically scans the mail spool area maintained by
+.B smap,
+and delivers any messages that have been gathered and stored.
+Mail is delivered via
+.B sendmail,
+and the spool file is deleted. If the mail cannot be delivered
+normally,
+.B smapd
+can be configured to store spooled files to an area for later
+examination.
+.SH OPTIONS
+.LP
+.B smap
+takes no command line options, reading its configuration
+information from the firewall toolkit configuration
+file
+.B netperm-table(5)
+All configuration rules in
+.B netperm-table
+for application "smapd" are read, and the following clauses
+and parameters are recognized:
+.TP
+.B executable pathname
+Specifies the pathname of the
+.B smapd
+executable itself. For historical reasons,
+.B smapd
+forks and execs copies of itself to handle delivering
+each individual message.
+.B THIS ENTRY IS MANDATORY
+.TP
+.B sendmail pathname
+Specifies an alternate pathname for the sendmail executable.
+.B Smapd
+assumes the use of sendmail but does not require it. An alternate
+mail delivery system can replace sendmail, but it should be able
+to accept arguments in the form of:
+.br
+.I executable -f fromname recip1 [recip2 ... recipN]
+.br
+Since the exit code from the mailer is used to determine the
+status of delivery, replacements for sendmail should use
+similar exit codes.
+.TP
+.B baddir pathname
+specifies a directory where
+.B smapd
+should move any spooled mail that cannot be delivered
+normally. This directory must be on the same device as
+the spool directory, since the rename(2) system call
+is employed. The pathname specified should not contain
+a trailing '/'.
+.TP
+.B userid name
+specify the userid that
+.B smapd
+should run under. The name can be either a name from the
+password database, or a numeric user-ID. This userid should
+be the same as that under which
+.B smap
+runs, and should have write permission to the spool directory.
+.TP
+.B directory pathname
+Specifies the spool directory in which
+.B smapd
+should search for files.
+.B smapd
+should have write permission to this directory.
+.TP
+.B wakeup value
+specifies the number of seconds
+.B smapd
+should sleep between scans of the spool directory. The
+default is 60 seconds.
+.SH INSTALLATION
+.LP
+To install
+.B smapd,
+configure the
+.B executable
+and
+.B directory 
+options in
+.B netperm-table,
+and add it to
+.B /etc/rc.local
+.LP
+Sample
+.B netperm-table
+configuration for
+.B smap
+and
+.B smapd:
+.sp 1
+.nf
+.na
+# email wrapper control
+smap, smapd:            userid 4
+smap, smapd:            directory /mail/inspool
+smapd:                  executable /usr/local/etc/smapd
+smap:                   maxrecip 4000
+smap:                   maxbytes 1048576
+smap:                   timeout 3600
+.fi
+.ad
+.LP
+In this example, both
+.B smap
+and
+.B smapd
+are running with user-id #4 (uucp) in the spool directory
+.B /mail/inspool.
+.LP
+Since
+.B sendmail(8)
+is not running in daemon mode, messages that cannot be
+delivered and are queued must be delivered by periodically
+invoking sendmail to process its queue. Add a line like:
+.sp 1
+0,30 * * * * /usr/lib/sendmail -q > /dev/null 2>&1
+.sp 1
+to the
+.B crontab(5)
+file.
+.SH FILES
+.PD 0
+.TP 20
+.B spool directory
+.SH SEE ALSO
+.BR netperm-table (5)
+.BR smap (8)
+.SH BUGS

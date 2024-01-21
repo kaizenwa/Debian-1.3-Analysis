@@ -1,0 +1,609 @@
+@node Some other features of Guile
+@chapter Some other features of Guile
+
+
+@menu
+* Modules in Guile::
+* The Guile interface to Posix::
+* Threads in Guile::
+* Guile exceptions - catch and throw::
+* Regular expression support::
+@end menu
+
+@node Modules in Guile
+@section Modules in Guile
+@cindex modules
+
+Guile provides a module system [FIXME: must flesh this out].
+
+@menu
+* Getting started with modules::
+* Interfaces to Scheme packages::
+@end menu
+
+@node Getting started with modules
+@subsection Getting started with modules
+
+[FIXME: must flesh out]
+
+@node Interfaces to Scheme packages
+@subsection Interfaces to Scheme packages
+
+[FIXME: must flesh out]
+
+
+@node The Guile interface to Posix
+@section The Guile interface to Posix
+@cindex posix
+
+Gary Houston has written a collection of new primitives which implement
+the @dfn{POSIX} system calls (a standardized set of UNIX system calls,
+see @cite{[AdvancedProgrammingUNIX], chapter 2} and @cite{[POSIX]}) in
+Scheme.  This makes it easy to do things like list directories, create
+processes and so forth.
+@cindex Houston, Gary
+
+Posix calls are described in great detail in the @cite{Guile
+Programmer's Manual}, and in the Gary Houston's @cite{Goonix Manual}.
+The former is more accurate, since not all of the original Goonix
+implementation is included in Guile.
+
+Here is an example of using the posix @code{opendir}, @code{readdir} and
+@code{closedir} calls (available in @file{examples/misc/list-dir.scm}).
+
+@smalllisp
+;; @r{list-dir takes a path and returns a list of files in that directory}
+(define (list-dir path)
+  (letrec ((dport (opendir path))
+	   (form-dlist			; a procedure that forms the list
+	    (lambda (dl)
+	      (let ((fname (readdir dport)))
+		(if (eof-object? fname)
+		    dl
+		    (form-dlist (cons fname dl))))))
+	   )
+    (define output-list (form-dlist '()))
+    (closedir dport)
+    output-list
+    )
+  )
+@end smalllisp
+
+To run it, just load the file @code{(load "list-dir.scm")} and type
+@code{(list-dir "/tmp")} (it will return a list with the filenames in
+/tmp).
+
+As a final note, the future plan for Guile's operating system interface
+is to converge with Olin Shiver's SCSH calls, so that @emph{shell
+scripts} might be portable between the two implementations.
+@cindex SCSH
+@cindex Shivers, Olin
+
+@node Threads in Guile
+@section Threads in Guile
+@cindex threads
+@cindex multithreaded programming
+
+@menu
+* What are threads::            
+* Configuring Guile to use threads::  
+* Examples of Scheme threads::  
+* Dynamic roots::               
+@end menu
+
+@node What are threads
+@subsection What are threads
+
+I now return to @emph{trendy} features in Guile.
+
+Many programs can be naturally split into several tasks, which are best
+run as separate processes.
+
+The traditional way of doing this in the UNIX environment is to
+@emph{fork} a new process, and @emph{exec} the other program in it.
+
+Another approach is to set up a @emph{client-server} pair of programs,
+where the server offers information, and the client uses and displays
+that information.  Many servers then fork off copies of themselves to
+service connections from new clients.
+
+But the UNIX fork/exec mechanisim is limited by the fact that after a
+@code{fork()} system call, the child process receives @emph{copies} of
+the parent's variables.  This has a few consequences: (1) process
+creation with @code{fork()} is slow, because so much data (which almost
+never gets used) has to be duplicated; (2) parent and child cannot
+examine each other's data structures.
+
+@cindex heavyweight processes
+@cindex lightweight processes
+Traditional UNIX processes are frequently called @emph{heavyweight
+processes} for the reasons mentioned above.  More recently, several
+implementations of @emph{light-weight processes}, or @emph{threads},
+have become available.  A @dfn{thread} is an execution path which has
+its own stack and local variables, but shares global variables with the
+other threads in the process.  Creating a new thread is very
+inexpensive, and the process has mechanisms to control the behaviour of
+the new thread.
+
+The Posix comittee has put forth a standard for UNIX threads (@dfn{POSIX
+1003.1c} standard).  The implementations available in Sun's Solaris 2
+and Novell's UnixWare do not follow the POSIX standard, but the free
+software thread libraries used in Guile are POSIX compliant.
+
+Though they are useful, threads have some serious disadvantages right
+now.  The main one is that they are not deeply ingrained in many
+fundamental UNIX libraries.  For example, the Tk library is not
+@emph{thread-safe}, i.e. it does not behave correctly when used in a
+multi-threaded program.  When programming with threads these days (for
+example, when you mix Guile threads with Tk) you have to worry about
+these issues.
+
+
+
+@node Configuring Guile to use threads
+@subsection Configuring Guile to use threads
+
+By default Guile does not build with threads, since they can be tricky
+on some architectures.
+
+To configure Guile to use threads you type:
+@smallexample
+./configure --with-threads
+@end smallexample
+
+Threads have been verified to work on [FIXME: list the architectures].
+
+This will add to Guile the @code{qt} thread library, a portable library
+that implements @emph{cooperative} threads, as well as a the glue to
+make the thread primitives available from Scheme.
+
+
+@node Examples of Scheme threads
+@subsection Examples of Scheme threads
+@cindex locking resources
+@cindex resource locking
+
+The first example demonstrates creating new threads to execute Scheme
+procedures.  I define a procedure that prints some stuff, sleeps, and
+then prints some more stuff.
+
+@smalllisp
+;; a simple procedure which prints some simple stuff -- also prints
+;; whether it is the only active thread
+(define (simple-delay-proc)
+  (begin
+    (display "single-active-thread? returns ")
+    (display (single-active-thread?))
+    (newline)
+    (display "just entered delay-sample procedure\n")
+    (force-output)
+    (sleep 25)
+    (display "done with sleeping\n")
+    (force-output)))
+
+;; invoke simple-delay-proc
+(display "about to invoke simple-delay-proc in the current thread\n")
+(simple-delay-proc)
+
+(display "\n-------------\n\n")
+(display "about to invoke simple-delay-proc *in a new thread*\n")
+(make-thread simple-delay-proc)
+(display "\n-------------\n\n")
+(display "now that all is done, single-active-thread? returns\n")
+(display (single-active-thread?))
+@end smalllisp
+
+Now for a more complex example.  Here I use the @code{make-thread}
+procedure to start up many copies of that routine (with different
+arguments), each in its own thread.
+
+You will notice that the @code{monitor} procedure is used.  Using
+@code{monitor} guarantees that simultaneous invocations of
+@code{(display ...)}  will not step on each other.  This kind of
+resources @code{locking} is frequently necessary when programming with
+threads.
+
+Also notice that at the end of this program I use the @code{join-thread}
+procedure.  This tells the original thread to yield control to the other
+threads until they have all returned.
+
+@smalllisp
+;; A first example of using threads that really shows that two threads
+;; are running.  This example works with cooperative threads (should
+;; also work with preemptive threads).
+
+(define (sample-thread delay)
+  (begin
+    (monitor
+     (display "this thread was invoked with a delay of ")
+     (display delay)
+     (newline)
+     (display "About to go to sleep:\n"))
+    (force-output)
+    (sleep delay)
+    (monitor
+     (display delay)
+     (display "-> done with sleeping")
+     (newline))
+    (force-output)))
+
+;; arrange the threads we are creating in a list
+(define list-of-threads (list (make-thread (lambda () (sample-thread 40)))
+			      (make-thread (lambda () (sample-thread 90)))
+			      (make-thread (lambda () (sample-thread 70)))
+			      (make-thread (lambda () (sample-thread 55)))))
+
+;; now invoke join-thread: this makes sure that the guile "read"
+;; statement (which waits for the next Scheme expression) does not
+;; block out the threads: join-thread will make sure they have all
+;; finished executing.
+(for-each join-thread list-of-threads)
+
+(newline) (newline)
+(display "all threads seem to have terminated\n")
+@end smalllisp
+
+
+Here's what it looks like when you run it:
+
+@smallexample
+guile> (load "sample-threads.scm")
+this thread was invoked with a delay of  90 
+About to go to sleep: 
+this thread was invoked with a delay of  70 
+About to go to sleep: 
+this thread was invoked with a delay of  55 
+About to go to sleep: 
+this thread was invoked with a delay of  40 
+About to go to sleep: 
+40 -> done with sleeping 
+55 -> done with sleeping 
+70 -> done with sleeping 
+90 -> done with sleeping 
+
+
+all threads seem to have terminated 
+guile> 
+@end smallexample
+
+
+@node Dynamic roots
+@subsection Dynamic roots
+@cindex dynamic roots
+
+Guile offers primitives to create new dynamic roots.  A procedure can be
+called with @code{(call-with-dynamic-root proc error-handler)}, in
+which case the calling environment is discarded (unwound), and a new
+environment is started for the evaluation of @code{(proc)}.
+@findex call-with-dynamic-root
+
+The rationale behind dynamic roots is mainily support for
+multi-threading (@pxref{Threads in Guile}): each thread should execute
+in its own dynamic root.  But they can also be used to get around escape
+procedures if you are invoking procedures that do not want to be escaped
+(@pxref{Dynamic Roots, , , scm, SCM} for more detail on this).
+
+Another possible use for dynamic roots is to throw in a quick bit of
+code which you would like executed with a clean slate.
+
+Dynamic roots are described in recent versions of the SCM manual
+(@pxref{Dynamic Roots, , , scm, SCM}).
+
+
+@node Guile exceptions - catch and throw
+@section Guile exceptions - catch and throw
+@cindex continuations
+@cindex call-with-current-continuation
+@cindex call/cc
+@cindex catch
+@cindex throw
+@cindex escape procedure
+@cindex exception handling
+
+Guile provides a pair of primitive procedures, @code{(catch ...)} and
+@code{(throw ...)}, which can be used to set up very clean exception
+handling mechanisms.
+
+The paradigm is this: suppose you want to call a procedure which
+@emph{might} encounter an exceptional circumstance.  This procedure
+would like to invoke an exception handler and then exit.
+
+Here's how you would do it with @emph{catch/throw}:
+@findex catch
+@findex throw
+
+@smalllisp
+;; an example of a program which handles exceptions with Guile's
+;; catch/throw mechanisms.
+
+;; run this by loading the file with (load "catch-sample").  It will run
+;; the program (by running (catch ...).  You just type strings at the
+;; program, and see them echoed back.  If you type the word "err" (without
+;; quotes), it will (throw ...) an exception, and thus invoke the
+;; handler.  If you type "quit", it will exit normally.
+
+(define-module (guile) :use-module (ice-9 slib))  ; need interface to slib
+
+(require 'debug)
+(require 'scanf)
+(require 'line-i/o)
+
+(newline) (newline)
+
+;; an example procedure; it's not particularly exciting: the user types
+;; words, and those are echoed back.
+;; The exciting thing here is that the procedure does a (throw ...)
+;; when the user types the word "err", and thus involves the handler
+;; set up by (catch ...).
+(define (some-long-running-procedure)
+  (do ((str "")
+       (i 0 (+ i 1)))
+      ((equal? str "quit") "done")
+    (if (equal? str "err")
+	(throw 'hi))
+    (display "prompt> ")
+    (set! str (car (scanf "%s")))
+    (display "one word was \"") (display str) (display "\"")
+    (newline)))
+
+;; use (catch ...) to run our procedure (some-long-running-procedure),
+;; so that when it throws an exception, we catch that exception with
+;; our handler (the (lambda (key) ...) expression is the handler).
+(catch 'hi
+       some-long-running-procedure
+       (lambda (key)
+	 (begin
+	   (newline) (newline)
+	   (display "-----------------------------------------------\n")
+	   (display "This is the HANDLER associated with (catch ...)\n")
+	   (display "the key is ") (display key) (newline)
+	   (display "-----------------------------------------------\n")
+	   (newline) (newline))))
+@end smalllisp
+
+This program is in the examples directory, under
+@file{examples/misc/catch-sample.scm}.  Try running this program in
+Guile, type some words at it (they will be echoed back).  When you feel
+like it, type the word @samp{err}, or @samp{quit}.
+
+You will notice that typing @samp{quit} will cause an ordinary return,
+whereas typing @samp{err} causes @code{(throw ...)}: the procedure
+@code{(some-long-running-procedure ...)} is escaped (and will never
+return), and the handler is invoked.  In fact, the string @samp{we are
+done with the do loop} will not be printed when you quit with
+@samp{err}.
+
+So @code{throw} is an example of @dfn{escape procedure}: the procedure
+that invokes @code{throw} will never regain control, and it will never
+return.
+
+@smallexample
+guile> (load "examples/exceptions/catch-sample.scm")
+;;; [junk output]
+ 
+prompt> some words
+"some" 
+prompt> "words" 
+prompt> some more words
+"some" 
+prompt> "more" 
+prompt> "words" 
+prompt> err
+one word was "err"
+ 
+ 
+-----------------------------------------------
+This is the HANDLER associated with (catch ...)
+the key is hi
+-----------------------------------------------
+ 
+ 
+#<unspecified>
+;Evaluation took 10 mSec (0 in scm_gc) 1209 cells work, 1131 bytes other
+guile> 
+@end smallexample
+
+@smallexample
+guile> (load "examples/exceptions/catch-sample.scm")
+;;; [junk output]
+ 
+prompt> some words
+"some" 
+prompt> "words" 
+prompt> some more words
+"some" 
+prompt> "more" 
+prompt> "words" 
+prompt> quit
+one word was "quit"
+ 
+ 
+ 
+----------------------------
+we are done with the do loop
+----------------------------
+ 
+#<unspecified>
+;Evaluation took 10 mSec (0 in scm_gc) 947 cells work, 1128 bytes other
+guile> 
+@end smallexample
+
+Here's an excercise: fix this program so that it will not print
+unnecessary @code{prompt>} strings when you have typed more than one
+word on a line.
+
+The @code{catch/throw} formalism has a lot in common with the ANSI C
+@code{setjmp()/longjmp()} mechanism (@cite{[AdvancedProgrammingUNIX],
+section 7.10, page 174}, also @pxref{Non-Local Exits, , , libc, GNU C
+Library}).  The Scheme approach is defined more clearly (no standard
+specifies the behaviour of @code{setjmp()/longjmp()} well enough to
+allow programmers to write portable code), and benefits from Scheme's
+@code{lambda ()} expressions.
+
+Exception handling methods like @code{catch} and @code{throw} are
+frequently built with the Scheme primitive
+@code{call-with-current-continuation} (usually abbreviated to
+@code{call/cc}): this is a very powerful procedure which allows escape
+and @emph{reentry into escaped procedures}.  The directory
+@file{examples/exceptions} has a couple of implemetations of
+@code{catch/throw} using @code{call/cc}.
+@cindex call-with-current-continuation
+@cindex call/cc
+
+I will not discuss continuations here, since the @code{catch/throw}
+paradigm accounts for the most frequent use of continuations.  The more
+advanced books on Scheme (see @cite{Scheme and the Art of Programming}
+and @cite{The Seasoned Schemer} in @ref{Where to find more Guile/Scheme
+resources}) intruduce continuations, and the @emph{Revised(4) Report on
+the Algorithmic Language Scheme} (R4RS, @pxref{Control features,
+Revised(4) Report on the Algorithmic Language Scheme, , r4rs, Revised(4)
+Report on the Algorithmic Language Scheme}) gives the exact definition
+of the @code{call/cc} behaviour.
+
+In Guile @code{catch} and @code{throw} are provided as primitives and
+not defined in terms of @code{call/cc}, mostly for performance reasons.
+They are documented in recent versions of the SCM manual
+(@pxref{Exceptions, , , scm, SCM}).
+
+
+
+@node Regular expression support
+@section Regular expression support
+@cindex regular expressions
+@cindex regex
+@cindex rx
+@cindex finite automaton
+
+Another package included with Guile is Tom Lord's @dfn{rx} library.  Rx
+implements POSIX regular expressions using the @emph{regular expression
+compiler} paradigm: a regular expression is compiled into a finite
+automaton which is capable of @emph{accepting} input strings that belong
+to that regular language.
+
+Here's how you call the rx library from Scheme.  Let us take the POSIX
+regular expression @code{"abc."} (which matches any string that starts
+@code{"abc"} and then has a single character) and see if it matches
+certain strings:
+
+@smallexample
+guile> (define r (regcomp "abc."))
+r
+;Evaluation took 16 mSec (0 in scm_gc) 179 cells work, 345 bytes other
+guile> r
+#<regex 1bb388>
+;Evaluation took 0 mSec (0 in scm_gc) 45 cells work, 40 bytes other
+guile> (regexec r "abc")
+#f
+;Evaluation took 0 mSec (0 in scm_gc) 96 cells work, 55 bytes other
+guile> (regexec r "abcd")
+#(0 4)
+;Evaluation took 0 mSec (0 in scm_gc) 82 cells work, 64 bytes other
+guile> 
+@end smallexample
+
+So the procedure is:
+
+@cartouche
+@enumerate
+@item
+Compile the regular expression with @code{regcomp}.  This will return a
+finite automaton which will recognize the given language.
+@item
+Execute the finite automaton (with @code{regexec}) to check for matches.
+@end enumerate
+@end cartouche
+
+Here is the definition of the two most user-visible procedures that
+implement the regular expression interface:
+
+@deffn {Rx} regcomp @var{pattern} @var{flags}
+Compile the regular expression pattern using POSIX rules.  Flags is
+optional and should be specified using symbolic names: REG_EXTENDED to
+use extended POSIX syntax; REG_ICASE for case-insensitive matching;
+REG_NEWLINE to allow anchors to match after newline characters in the
+string and to prevent . or [^...] from matching newlines.  @code{(logior
+...)}  can be used to combine multiple flags. The default is to use
+POSIX basic syntax, which makes + and ?  literals and \+ and \?
+operators.  Backslashes in pattern must be escaped if specified in a
+literal string e.g., "\\(a\\)\\?".
+@end deffn
+
+@deffn {Rx} regexec @var{regex} @var{string} @var{match-pick} @var{flags}
+
+Match string against the compiled POSIX regular expression regex.
+match-pick and flags are optional.  Possible flags (which can be
+combined using logior) are:
+
+REG_NOTBOL: beginning of line operator won't match the beginning of
+string (presumably because it's not the beginning of a line)
+
+REG_NOTEOL: like REG_NOTBOL except for end-of-line.
+
+If no match is possible, regexec returns #f.  Otherwise match-pick
+determines the return value:
+
+@code{#t} or unspecified: a newly-allocated vector is returned,
+containing pairs with the indices of the matched part of string and any
+substrings.
+
+@code{""}: a list is returned: the first element contains a nested list
+with the matched part of string surrounded by the the unmatched parts.
+Remaining elements are matched substrings (if any).  All returned
+substrings share memory with string.
+
+@code{#f}: regexec returns #t if a match is made, otherwise #f.
+
+vector: the supplied vector is returned, with the first element replaced
+by a pair containing the indices of the matched portion of string and
+further elements replaced by pairs containing the indices of matched
+substrings (if any).
+
+list: a list will be returned, with each member of the list
+specified by a code in the corresponding position of the supplied list:
+
+a number: the numbered matching substring (0 for the entire match).
+
+@code{#\<}: the beginning of string to the beginning of the part matched
+by regex.
+
+@code{#\>}: the end of the matched part of string to the end of string.
+
+@code{#\c}: the "final tag", which seems to be associated with the "cut
+operator", which doesn't seem to be available through the posix
+interface.
+
+e.g., @code{(list #\< 0 1 #\>)}.  The returned substrings share memory with
+string.
+@end deffn
+
+Here are some other procedures that might be used when using regular
+expressions.
+
+@deffn {Rx} compiled-regexp? @var{obj}
+Test whether obj is a compiled regular expression.
+@end deffn
+
+@deffn {Rx} regexp->dfa @var{regex} @var{flags}
+@end deffn
+
+@deffn {Rx} dfa-fork @var{dfa}
+@end deffn
+
+@deffn {Rx} reset-dfa! @var{dfa}
+@end deffn
+
+@deffn {Rx} dfa-final-tag @var{dfa}
+@end deffn
+
+@deffn {Rx} dfa-continuable? @var{dfa}
+@end deffn
+
+@deffn {Rx} advance-dfa! @var{dfa}
+@end deffn
+
+
+@cindex emacs regexp
+A pedagogical introduction to the sytax of regular expressions can be
+found in the Emacs manual (@pxref{Syntax of Regular Expressions, , ,
+emacs, The Emacs Editor}).
+

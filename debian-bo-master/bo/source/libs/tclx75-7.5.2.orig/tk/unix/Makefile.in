@@ -1,0 +1,238 @@
+#
+# tk/unix/Makefile.in --
+#
+# Makefile to build a wish with Extended Tcl (wishx).
+# 
+#------------------------------------------------------------------------------
+# Copyright 1992-1995 Karl Lehenbauer and Mark Diekhans.
+#
+# Permission to use, copy, modify, and distribute this software and its
+# documentation for any purpose and without fee is hereby granted, provided
+# that the above copyright notice appear in all copies.  Karl Lehenbauer and
+# Mark Diekhans make no representations about the suitability of this
+# software for any purpose.  It is provided "as is" without express or
+# implied warranty.
+#------------------------------------------------------------------------------
+# $Id: Makefile.in,v 7.0 1996/06/16 05:34:02 markd Exp $
+#------------------------------------------------------------------------------
+#
+
+#------------------------------------------------------------------------------
+# Common and user-editable defines.
+#
+srcdir = @srcdir@
+@MAKEINCLUDE@ @MAKEQUOTE@@bldbasedir@/unix/Common.mk@MAKEQUOTE@
+@MAKEINCLUDE@ @MAKEQUOTE@@bldbasedir@/unix/Config.mk@MAKEQUOTE@
+
+#------------------------------------------------------------------------------
+# Local macros.
+#
+CC_SWITCHES = ${CPPFLAGS} ${XCFLAGS} ${CFLAGS} ${TCLX_USE_SHLIB_CFLAGS} \
+              ${TK_DEFS} \
+	      -I${TKX_GENERIC_DIR} \
+	      -I${TK_GENERIC_DIR} -I${TK_UNIX_DIR} \
+	      -I${TCLX_GENERIC_DIR} -I${TCLX_UNIX_SRC_DIR} \
+	      -I${TCLX_UNIX_BLD_DIR} \
+	      -I${TCL_GENERIC_DIR} -I${TCL_UNIX_DIR} ${TK_XINCLUDES}
+
+LD_SWITCHES = ${LDFLAGS} ${LD_FLAGS} ${XLDFLAGS} ${XCFLAGS} ${CFLAGS}
+
+# The ordering of the libraries is important.  Some X libs on SysV include
+# "random" in a BSD module.  This would conflict with the one in the TclX
+# library if it was brought in.
+
+LDLIBS = ${TKX_BUILD_LIB_SPEC} ${TK_LIB} ${TK_XLIBSW} \
+	 ${TCLX_BUILD_LIB_SPEC} ${TCL_LIB} ${TK_LIBS} ${TCLX_LIBS}\
+	 ${TCL_LIBS} ${TCL_DL_LIBS} ${XLDLIBS} \
+	 ${TCL_LD_SEARCH_FLAGS} ${TK_LD_SEARCH_FLAGS} ${TCLX_LD_SEARCH_FLAGS}
+
+
+#------------------------------------------------------------------------------
+# Source and target macros.
+#
+GENERIC_OBJS = tkXinit.o tkXshell.o
+
+OBJS = ${GENERIC_OBJS}
+
+RUNTIME_DIR = ${srcbasedir}/tk/runtime
+
+LIBTCLX = ../../tcl/unix/libtclx.a
+
+HELP_DIR = ${srcbasedir}/tk/help
+
+TEST_OBJS = tkTest.o tkSquare.o tkXtest.o
+
+#------------------------------------------------------------------------------
+# Dependencies for generating the libraries and linking the executable.
+# If a link fails, purge the executable, as some systems leave invalid
+# executables around.
+#
+all: libtkx.a SHLIB_@BUILD_SHARED@ wishx RUNTIME tktest runtest \
+     ${bldbasedir}/tk/tests
+
+wishx: tkXAppInit.o libtkx.a ${LIBTK} ${LIBTCLX}
+	${CC} ${LD_SWITCHES} tkXAppInit.o ${LDLIBS} -o wishx || \
+	    (rm -f wishx; exit 1)
+
+libtkx.a: ${OBJS}
+	${AR} cr libtkx.a ${OBJS}
+	${RANLIB} libtkx.a
+
+SHLIB_YES: ${TKX_SHLIB_NAME}
+	touch SHLIB_YES
+
+${TKX_SHLIB_NAME}: ${OBJS}
+	rm -f ${TKX_SHLIB_NAME} ${TKX_SHLIB_BASE_NAME}
+	${TCL_SHLIB_LD} -o ${TKX_SHLIB_NAME} ${OBJS} ${SHLIBLIBS}
+	if test "${TKX_SHLIB_NAME}" != "${TKX_SHLIB_BASE_NAME}"; then \
+	    ln ${TKX_SHLIB_NAME} ${TKX_SHLIB_BASE_NAME} ;\
+	fi
+
+SHLIB_NO:
+	touch SHLIB_NO
+
+#------------------------------------------------------------------------------
+# Dependencies for generating objects.
+#
+tkXinit.o: ${TKX_GENERIC_DIR}/tkXinit.c Makefile
+	${CC} -c ${CC_SWITCHES} -DTKX_LIBRARY=\"${TKX_INST_RUNTIME}\" \
+	  ${TKX_GENERIC_DIR}/tkXinit.c
+
+tkXshell.o: ${TKX_GENERIC_DIR}/tkXshell.c
+	${CC} -c ${CC_SWITCHES} ${TKX_GENERIC_DIR}/tkXshell.c
+
+tkXAppInit.o: ${TKX_GENERIC_DIR}/tkXAppInit.c
+	${CC} -c ${CC_SWITCHES} ${TKX_GENERIC_DIR}/tkXAppInit.c
+
+#------------------------------------------------------------------------------
+# We need the "help" directory here so that the help command will work before
+# installation. Normally just symlink, unless we don't have them.
+#
+RUNTIME: tkx.tcl tclhelp help.tmp
+
+tkx.tcl: ${RUNTIME_DIR}/tkx.tcl
+	rm -f tkx.tcl
+	cp ${RUNTIME_DIR}/tkx.tcl tkx.tcl
+
+tclhelp: ${srcdir}/../runtime/tclhelp.tcl
+	rm -f tclhelp
+	echo "#!${TCLX_INST_BIN}/wishx"       >tclhelp
+	cat ${srcdir}/../runtime/tclhelp.tcl >>tclhelp
+	chmod +rx tclhelp
+
+help.tmp: help
+	touch help.tmp
+
+help:
+	if [ "@HAVE_SYML@" = "YES" ]; then \
+	    rm -rf help ;\
+	    ln -s ${HELP_DIR} help ;\
+	else \
+	    rm -rf help ;\
+	    (cd ${HELP_DIR}; tar -cf - help) | tar -xf - ;\
+	fi
+
+#------------------------------------------------------------------------------
+# Generate the test program.
+#
+
+tktest: ${TEST_OBJS} libtkx.a ${LIBTCLX}
+	${CC} ${LD_SWITCHES} ${TEST_OBJS} ${LDLIBS} -o tktest || \
+	    (rm -f tktest; exit 1)
+
+tkTest.o: ${TK_SRC}/generic/tkTest.c
+	${CC} -c ${CC_SWITCHES} ${TK_SRC}/generic/tkTest.c
+
+tkSquare.o: ${TK_SRC}/generic/tkSquare.c
+	${CC} -c ${CC_SWITCHES} ${TK_SRC}/generic/tkSquare.c
+
+tkXtest.o: ${TKX_GENERIC_DIR}/tkXtest.c
+	${CC} -c ${CC_SWITCHES} ${TKX_GENERIC_DIR}/tkXtest.c
+
+#------------------------------------------------------------------------------
+
+runtest: Makefile
+	@echo '#!/bin/sh'                                           >runtest
+	@echo "TCL_LIBRARY=${TCL_SRC}/library"                     >>runtest
+	@echo "TCLX_LIBRARY=${TCLX_TMP_RUNTIME}"                   >>runtest
+	@echo "TK_LIBRARY=${TK_SRC}/library"                       >>runtest
+	@echo "TKX_LIBRARY=${TKX_TMP_RUNTIME}"                     >>runtest
+	@echo "TCL_PROGRAM=${TCLX_UNIX_BLD_DIR}/tcl"               >>runtest
+	@echo "TESTWISH=${TKX_UNIX_BLD_DIR}/tktest"                >>runtest
+	@echo "export TCL_LIBRARY TCLX_LIBRARY"                    >>runtest
+	@echo "export TK_LIBRARY TKX_LIBRARY TCL_PROGRAM"          >>runtest
+	@echo "LD_LIBRARY_PATH=${bldbasedir}/tk/unix:${TK_UNIX_DIR}:${bldbasedir}/tcl/unix:${TCL_UNIX_DIR}:${LD_LIBRARY_PATH}" >>runtest
+	@echo "SHLIB_PATH=${bldbasedir}/tk/unix:${TK_UNIX_DIR}:${bldbasedir}/tcl/unix:${TCL_UNIX_DIR}:${SHLIB_PATH}" >>runtest
+	@echo "export LD_LIBRARY_PATH SHLIB_PATH"                  >>runtest
+	@echo "if [ \$$# = 0 ]"                                    >>runtest
+	@echo "then"                                               >>runtest
+	@echo "    exec \$$TESTWISH"                               >>runtest
+	@echo "else"                                               >>runtest
+	@echo "    exec \$$TESTWISH \"\$$@\""                      >>runtest
+	@echo "fi"                                                 >>runtest
+	chmod a+rx runtest
+
+#------------------------------------------------------------------------------
+# If test directory in not in build tree, copy it from the source tree.
+#
+${bldbasedir}/tk/tests:
+	mkdir ${bldbasedir}/tk/tests
+	cp ${srcbasedir}/tk/tests/*.test ${bldbasedir}/tk/tests
+
+#------------------------------------------------------------------------------
+# Run the UCB tests with wishx.
+
+test: all
+	echo "cd ${TK_SRC}/tests; source all; exit" | \
+	    ./runtest -geometry +0+0
+
+#------------------------------------------------------------------------------
+# Build help for Tk.  These files are normally part of the distribution and
+# not rebuilt by users.
+#
+buildhelp:
+	rm -rf ${HELP_DIR} help
+	mkdir ${HELP_DIR}
+	${BLDMANHELP} ${TK_SRC}/doc ${srcbasedir}/unix/tools/tkmanpages \
+	    ${HELP_DIR} Tk.brf
+
+#------------------------------------------------------------------------------
+
+install: install-exec install-runtime
+	${INSTCOPY} ${TKX_GENERIC_DIR}/tkXAppInit.c \
+	    ${INSTALL_ROOT}${TKX_INST_RUNTIME}
+	${INSTCOPY} ${HELP_DIR} ${INSTALL_ROOT}${TKX_INST_RUNTIME}/help
+
+install-runtime:
+	${INSTCOPY} tkx.tcl ${INSTALL_ROOT}${TKX_INST_RUNTIME}
+
+install-exec:
+	${INSTCOPY} wishx ${INSTALL_ROOT}${TCLX_INST_BIN}
+	${STRIP} ${INSTALL_ROOT}${TCLX_INST_BIN}/wishx
+	${INSTCOPY} libtkx.a ${INSTALL_ROOT}${TCLX_INST_LIB}
+	${RANLIB} ${INSTALL_ROOT}${TCLX_INST_LIB}/libtkx.a
+	if test "@BUILD_SHARED@" = "YES"; then \
+	    ${INSTCOPY} ${TKX_SHLIB_NAME} ${INSTALL_ROOT}${TCLX_INST_LIB} ;\
+	    if test "${TKX_SHLIB_NAME}" != "${TKX_SHLIB_BASE_NAME}"; then \
+		rm -f ${INSTALL_ROOT}${TCLX_INST_LIB}/${TKX_SHLIB_BASE_NAME};\
+	        ln ${INSTALL_ROOT}${TCLX_INST_LIB}/${TKX_SHLIB_NAME} \
+		   ${INSTALL_ROOT}${TCLX_INST_LIB}/${TKX_SHLIB_BASE_NAME} ;\
+	    fi ;\
+	fi
+	${INSTCOPY} tkxConfig.sh ${INSTALL_ROOT}${TCLX_INST_LIB}
+	${INSTCOPY} tclhelp ${INSTALL_ROOT}${TCLX_INST_BIN}
+
+#------------------------------------------------------------------------------
+clean:
+	-rm -f tkXAppInit.o ${OBJS} ${TEST_OBJS} wishx libtkx.a tkx.tcl
+	-rm -rf tclhelp help help.tmp SHLIB_YES SHLIB_NO
+	-rm -f ${TKX_SHLIB_NAME} ${TKX_SHLIB_BASE_NAME}
+
+#------------------------------------------------------------------------------
+# Restore to the distributed state.
+
+distclean: clean
+	rm -f Makefile tkxConfig.sh runtest tktest
+
+# Disable Sun's parallel make, it doesn't get the dependencies right.
+.NO_PARALLEL:

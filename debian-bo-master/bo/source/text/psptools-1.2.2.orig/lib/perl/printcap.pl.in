@@ -1,0 +1,133 @@
+
+{
+
+#
+# printcap.pl: parsing and utility routine for printcap.
+#
+# Yves Arrouye <Yves.Arrouye@marin.fdn.fr>, 1995.
+#
+# This package is heavily based on the `termcap.pl' perl package that
+# comes with Perl. Thanks...
+#
+
+package printcap;
+
+#
+
+#
+# getprintcapfile()
+#
+# Return the path to a printcap file, and a flag indicating if it is a
+# temporary file.
+#
+
+sub getprintcapfile {
+    local($nidump) = '@NIDUMP@';
+
+    if ($nidump) {
+	local($printcap) = "/tmp/pcap$$";
+	local($nidomain) = $ENV{'PRINTCAP_NIDOMAIN'};
+
+	$nidomain = "." unless $nidomain;
+
+	system("$nidump printcap $nidomain >$printcap");
+
+	return ($printcap, 1);
+    } else {
+	return ($main::file_printcap, 0);
+    }
+}
+
+#
+# printcap(printer-name)
+#
+# Parse a printcap entry and return a hash for it.
+#   The hash is also visible under the global %PRINTCAP name. The data
+# is got from the file specified for the PRINTCAP environment variable
+# (or directly from this variable if it is a PRINTCAP entry), or from
+# the file specified by the $file_printcap variable otherwise.
+#
+
+sub printcap {
+    local($printer) = @_;
+    local($printcap,$_,$entry,$loop,$field);
+    local($delpcap) = 0;
+
+    foreach $key (keys(main::PRINTCAP)) {
+	delete $main::PRINTCAP{$key};
+    }
+    $printcap = $ENV{'PRINTCAP'};
+    ($printcap, $delpcap) = &getprintcapfile() unless $printcap;
+    if ($printcap !~ m:^/:) {
+    	if ($printcap !~ /(^|\|)$printer[:\|]/) {
+    	    ($printcap, $delpcap) = &getprintcapfile();
+    	}
+    }
+
+    if ($printcap =~ m:^/:) {
+    	$entry = '';
+   	do {
+       	    $loop = "
+       	        open(PRINTCAP, '<$printcap') || die \"Can't open $printcap\";
+       	        while (<PRINTCAP>) {
+      		    next if /^#/;
+      		    next if /^\t/;
+      	            if (/(^|\\|)${printer}[:\\|]/) {
+          	    	chop;
+          	    	while (chop eq '\\\\') {
+         	            \$_ .= <PRINTCAP>;
+         	            chop;
+                    	}
+                        \$_ .= ':';
+                        last;
+	       	    }
+                }
+                close PRINTCAP;
+                \$entry .= \$_;
+            ";
+            eval $loop;
+        } while s/:tc=([^:]+):/:/ && ($printcap = $1);
+	$printcap = $entry;
+    }
+
+    foreach $field (split(/:[\s:\\]*/,$printcap)) {
+	if ($field =~ /^\w\w$/) {
+	    $main::PRINTCAP{$field} = 1;
+	} elsif ($field =~ /^(\w\w)#(.*)/) {
+	    $main::PRINTCAP{$1} = $2 if $main::PRINTCAP{$1} eq '';
+        } elsif ($field =~ /^(\w\w)=(.*)/) {
+	    $entry = $1;
+	    $_ = $2;
+	    s/\\E/\033/g;
+	    s/\\(\d\d\d)/pack('c',$1 & 0177)/eg;
+	    s/\\n/\n/g;
+	    s/\\r/\r/g;
+	    s/\\t/\t/g;
+	    s/\\b/\b/g;
+	    s/\\f/\f/g;
+	    s/\\\^/\377/g;
+	    s/\^\?/\177/g;
+	    s/\^(.)/pack('c',ord($1) & 31)/eg;
+	    s/\\(.)/$1/g;
+	    s/\377/^/g;
+	    $main::PRINTCAP{$entry} = $_ if $main::PRINTCAP{$entry} eq '';
+	}
+    }
+
+    if ($delpcap) {
+	unlink($printcap);
+    }
+
+    return %main::PRINTCAP;
+}
+
+#
+
+}
+
+if (!defined($file_printcap)) {
+    $file_printcap = '@PRINTCAP@';
+}
+
+1;
+

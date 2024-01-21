@@ -1,0 +1,257 @@
+.\" Hey Emacs! This file is -*- nroff -*- source.
+.\"
+.\" Copyright (c) 1992 Drew Eckhardt (drew@cs.colorado.edu), March 28, 1992
+.\" Parts Copyright (c) 1995 Nicolai Langfeldt (janl@ifi.uio.no), 1/1/95
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\"
+.\" Modified by Michael Haardt <u31b3hs@pool.informatik.rwth-aachen.de>
+.\" Modified Sat Jul 24 10:54:27 1993 by Rik Faith <faith@cs.unc.edu>
+.\" Modified Thu May 18 11:00:31 1995 by Rik Faith <faith@cs.unc.edu>
+.\"          to add comments suggested by Todd Larason <jtl@molehill.org>
+.\" Modified Fri Jan 31 17:43:02 1997 by Eric S. Raymond <esr@thyrsus.com>
+.\" 
+.TH STAT 2 "1 January 1995" "Linux 1.1.75" "Linux Programmer's Manual"
+.SH NAME
+stat, fstat, lstat \- get file status
+.SH SYNOPSIS
+.B #include <sys/stat.h>
+.br
+.B #include <unistd.h>
+.sp
+.BI "int stat(const char *" file_name ", struct stat *" buf );
+.br
+.BI "int fstat(int " filedes ", struct stat *" buf );
+.br
+.BI "int lstat(const char *" file_name ", struct stat *" buf );
+.SH DESCRIPTION
+.PP
+These functions return information about the specified file.  You do
+not need any access rights to the file to get this information but you
+need search rights to all directories named in the path leading to the
+file.
+.PP
+.B stat
+stats the file pointed to by 
+.I file_name
+and fills in
+.IR buf .
+
+.B lstat
+is identical to
+.BR stat ,
+only the link itself is stated, not the file that is obtained by tracing
+the links.
+
+.B fstat
+is identical to stat, only the open file pointed to by 
+.I filedes
+(as returned by
+.IR open (2))
+is stated in place of 
+.IR file_name .
+
+.PP
+They all return a
+.I stat
+structure, which is declared as follows:
+.PP
+.RS
+.nf
+struct stat
+{
+    dev_t         st_dev;      /* device */
+    ino_t         st_ino;      /* inode */
+    umode_t       st_mode;     /* protection */
+    nlink_t       st_nlink;    /* number of hard links */
+    uid_t         st_uid;      /* user ID of owner */
+    gid_t         st_gid;      /* group ID of owner */
+    dev_t         st_rdev;     /* device type (if inode device) */
+    off_t         st_size;     /* total size, in bytes */
+    unsigned long st_blksize;  /* blocksize for filesystem I/O */
+    unsigned long st_blocks;   /* number of blocks allocated */
+    time_t        st_atime;    /* time of last access */
+    time_t        st_mtime;    /* time of last modification */
+    time_t        st_ctime;    /* time of last change */
+};
+.fi
+.RE
+.PP
+Note that
+.I st_blocks
+may not always be in terms of blocks of size
+.IR st_blksize ,
+and that
+.I st_blksize
+may instead provide a notion of the "preferred" blocksize for efficient
+file system I/O.
+.PP
+Not all of the Linux filesystems implement all of the time fields.
+Traditionally,
+.I st_atime
+is changed by
+.BR mknod "(2), " utime "(2), " read "(2), " write "(2), and " truncate (2).
+
+Traditionally,
+.I st_mtime
+is changed by
+.BR mknod "(2), " utime "(2), and " write (2).
+The
+.I st_mtime
+is
+.I not
+changed for changes in owner, group, hard link count, or mode.
+
+Traditionally,
+.I st_ctime
+is changed by writing or by setting inode information (i.e., owner, group,
+link count, mode, etc.).
+.PP
+The following macros are defined to check the file type:
+.RS
+.TP 1.2i
+S_ISLNK(m)
+is it a symbolic link?
+.TP
+S_ISREG(m)
+regular file?
+.TP
+S_ISDIR(m)
+directory?
+.TP
+S_ISCHR(m)
+character device?
+.TP
+S_ISBLK(m)
+block device?
+.TP
+S_ISFIFO(m)
+fifo?
+.TP
+S_ISSOCK(m)
+socket?
+.RE
+.PP
+The following flags are defined for the
+.I st_mode
+field:
+.RS
+.TP 0.9i
+S_IFMT
+00170000 bitmask for the file type bitfields
+.TP
+S_IFSOCK 
+0140000 socket
+.TP
+S_IFLNK
+0120000 symbolic link
+.TP
+S_IFREG
+0100000 regular file
+.TP
+S_IFBLK
+0060000 block device
+.TP
+S_IFDIR
+0040000 directory
+.TP
+S_IFCHR
+0020000 character device
+.TP
+S_IFIFO
+0010000 fifo
+.TP
+S_ISUID
+0004000 set UID bit
+.TP
+S_ISGID
+0002000 set GID bit
+.TP
+S_ISVTX
+0001000 sticky bit
+.TP
+S_IRWXU
+00700 user (file owner) has read, write and execute permission
+.TP
+S_IRUSR (S_IREAD)
+00400 user has read permission
+.TP
+S_IWUSR (S_IWRITE)
+00200 user has write permission
+.TP
+S_IXUSR (S_IEXEC)
+00100 user has execute permission
+.TP
+S_IRWXG
+00070 group has read, write and execute permission
+.TP
+S_IRGRP
+00040 group has read permission
+.TP
+S_IWGRP
+00020 group has write permission
+.TP
+S_IXGRP
+00010 group has execute permission
+.TP
+S_IRWXO
+00007 others have read, write and execute permission
+.TP
+S_IROTH
+00004 others have read permission
+.TP
+S_IWOTH
+00002 others have write permisson
+.TP
+S_IXOTH
+00001 others have execute permission
+.RE
+.SH "RETURN VALUE"
+On success, zero is returned.  On error, \-1 is returned, and
+.I errno
+is set appropriately.
+.SH ERRORS
+.TP 0.8i
+.B EBADF
+.I filedes
+is bad.
+.TP
+.B ENOENT
+File does not exist.
+.SH "CONFORMING TO"
+The
+.B stat
+and
+.B fstat
+calls conform to SVr4, SVID, POSIX, X/OPEN, BSD 4.3.  The
+.B lstat
+call conforms to 4.3BSD and SVr4.
+SVr4 documents additional
+.B fstat
+error conditions EFAULT, EINTR, ENOLINK, and EOVERFLOW.  SVr4
+documents additional
+.B stat
+and
+.B lstat
+error conditions EACCES, EFAULT, EINTR, ELOOP, EMULTIHOP, ENAMETOOLONG,
+ENOTDIR, ENOLINK, and EOVERFLOW.
+.SH "SEE ALSO"
+.BR chmod "(2), " chown "(2), " readlink "(2), " utime (2)

@@ -1,0 +1,63 @@
+#! /usr/bin/make -f
+#
+# Last updated: Sat Aug 17 15:32:46 BST 1996 by and1000.
+#
+# To make the binary distribution package, the ``Debianized'' source package
+# and the context diff to the original package, type `./debian.rules dist'.
+# Make sure that `debian.rules' is executable before the final distribution
+# is made.
+#
+# Invoke each target with `./debian.rules <target>'.  All targets should be
+# invoked with the package root as the current directory.
+#
+# The `binary' target must be run as root, as it needs to install files with
+# specific ownerships.  The `diff' target assumes that you have the original
+# source package available, unpacked, in ../$(p)-$(v).orig, or that you have
+# the previous revision of the ``Debianized'' source package and context diff
+# in the parent directory.
+
+# The name of the package (for example, `emacs').
+p = bsdmainutils
+# The version of the package (for example, `19.28').
+v = 3.2
+# The Debian revision of the package (for example, `2').
+d = 0
+# The architecture of this build
+a = $(shell dpkg --print-architecture)
+
+build:
+# Builds the binary package.
+	make
+	touch stamp-build
+
+clean:
+# Undoes the effect of `make -f debian.rules build'.
+	make clean
+	rm -f stamp-build
+	rm -rf debian-tmp
+
+binary:
+# Makes a binary package.
+	test -f stamp-build || make -f debian.rules build
+	install -d -g root -m 755 -o root debian-tmp
+	chmod g-s debian-tmp
+	install -d -g root -m 755 -o root debian-tmp/DEBIAN
+	make install \
+	  usrbindir=debian-tmp/usr/bin \
+	  libdir=debian-tmp/usr/lib \
+	  mandir=debian-tmp/usr/man
+	chmod -R g-w debian-tmp
+	install -d -g root -m 755 -o root debian-tmp/usr/doc/copyright
+	install -g root -m 644 -o root README debian-tmp/usr/doc/copyright/$(p)
+	sed -e '11s/=V/$(v)/' -e '11s/=D/$(d)/' -e '12s/=A/$(a)/' \
+	  debian.control > debian-tmp/DEBIAN/control
+	chmod 644 debian-tmp/DEBIAN/control
+	dpkg --build debian-tmp && dpkg-name -o -s .. debian-tmp.deb
+
+source:
+# Makes a source package.
+	-test -f stamp-build && make -f debian.rules clean
+	( cd .. && tar cf - $(p)-$(v) | gzip -9f > $(p)-$(v)-$(d).tar.gz )
+
+dist: binary source
+# Prepares the package for distribution.

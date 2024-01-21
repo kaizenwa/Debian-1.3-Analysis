@@ -1,0 +1,640 @@
+@c $Id: python.tim,v 1.16 1996/07/10 04:29:55 janssen Exp $
+@setfilename ilu-python.info
+@settitle Using ILU with Python
+@ifclear largerdoc
+@titlepage
+@title Using ILU with Python
+@author Denis Severson @code{<severson@@parc.xerox.com>}
+@author Bill Janssen @code{<janssen@@parc.xerox.com>}
+@sp
+@today{}
+@sp
+Copyright @copyright{} 1994 Xerox Corporation@*
+All Rights Reserved.
+@end titlepage
+@ifinfo
+@node Top, ,(dir),(dir)
+@top Using ILU with Python
+@end ifinfo
+@syncodeindex vr cp
+@syncodeindex pg cp
+@syncodeindex tp cp
+@syncodeindex fn cp
+@end ifclear
+
+@section Introduction
+@cindex ILU and Python
+This document is for the @language{Python} programmer who wishes to use 
+@system{ILU}. The following sections will show how @language{ILU} is
+mapped into @language{Python} constructs and how both @language{Python}
+clients and servers are generated and built.
+
+@section The ISL Mapping to Python
+
+@subsection Names
+@cindex Mapping ISL names to Python symbols
+In general, @system{ILU} constructs @language{Python} symbols from
+@language{ISL} names by replacing hyphens with underscores.
+For example, an @language{ISL} object type @isl{T-1} would correspond to
+the @language{Python} class @C{T_1}.
+Any place an @language{ISL} name appears as part or all of a @language{Python}
+identifier, this translation occurs.
+
+@subsection Interface
+Each @language{ISL} @kwd{interface} @isl{@metavar{I}}
+generates two @language{Python} modules:
+one named @Python{@metavar{I}} containing common definitions,
+and another named @Python{@metavar{I}__skel} containing skeletons (server stubs).
+For example,
+@isl{INTERFACE map-test;} generates the @language{Python} modules
+@Python{map_test} and @Python{map_test__skel}, contained in the files
+@file{map_test.py} and @file{map_test__skel.py}, respectively.
+
+@subsection Constant
+@language{ISL} constants translate to
+@language{Python} variables initialized to the specified value.
+For example,
+@codeexample
+CONSTANT pi : real = 3.14159265358979323846;
+@end codeexample
+maps to
+@codeexample
+pi = 3.14159265358979323846e0
+@end codeexample
+
+@subsection Exception
+An @language{ISL} exception translates to a @language{Python} variable
+initialized with a string representing the exception.
+These variables are used in @language{Python} @Python{raise} statements
+in object implementation code, and in @Python{try ... except} statements
+in client code.
+For example, the declaration
+@codeexample
+EXCEPTION division-by-zero;
+@end codeexample
+in the interface @isl{map-test} maps to the following statement in
+@file{map_test.py}:
+@codeexample
+division = 'map-test: division-by-zero'
+@end codeexample
+
+@subsection Types
+
+@subsubsection Basic Types
+The basic @language{ISL} types have the following mapping to @language{Python}
+types:
+
+@enumerate
+@item
+BYTE,
+BOOLEAN,
+SHORT CHARACTER,
+CHARACTER,
+SHORT INTEGER,
+INTEGER,
+and SHORT CARDINAL
+all map to @language{Python} int.
+@item
+LONG INTEGER,
+CARDINAL,
+and LONG CARDINAL
+all map to @language{Python} long int.
+@item
+SHORT REAL
+and REAL
+map to @language{Python} float.
+@item
+LONG REAL
+maps to the @language{Python} type ilu_longreal, a type implemented by the
+@system{ILU} @language{Python} runtime.
+This type has limited functionality, but can be passed around without loss of
+precision, converted to float or int, and compared.
+A value of this type may be constructed by calling @Python{ilu.LongReal()}.
+@end enumerate
+
+@subsubsection Enumeration
+Enumerations are mapped to a method-less class object which
+contains an attribute of the correct type and value for each
+value in the enumeration.
+The class also contains a dictionary, called ``__image__'', for each enumeration type
+that maps an enumeration value to a
+string corresponding to its @language{Python} enumeration value name.
+
+For example,
+@codeexample
+TYPE color = ENUMERATION red, dark-blue END;
+@end codeexample
+maps to
+@codeexample
+class color:
+    red = 0;
+    dark_blue = 1;
+    __image__ = @{
+       red: 'red',
+       dark_blue: 'dark_blue'@};
+@end codeexample
+
+@subsubsection Array
+An @language{ISL} array maps into a @language{Python} list with the
+specified number of elements.
+Tuples as well as lists are accepted as input, but lists are always
+produced as output from @system{ILU}.
+Arrays of BYTE or SHORT CHARACTER are represented with Python strings.
+
+@subsubsection Sequence
+An @language{ISL} sequence of short character maps into a @language{Python}
+string.
+
+All other @language{ISL} sequence types map into @language{Python} lists.
+Tuples as well as lists are accepted as input, but lists are always
+produced as output from @system{ILU}.
+Sequences of BYTE or SHORT CHARACTER are represented as Python strings.
+
+@subsubsection Record
+@language{ISL} records map into generated @language{Python} classes with
+the same name, with the record's field names as attributes.  The name
+of the record becomes a constructor function which accepts exactly the
+same number of arguments as the record has fields, in the same order.
+
+For example, a record value of the @language{ISL} type
+@codeexample
+TYPE segment = RECORD left-limit : integer, right-limit : integer END;
+@end codeexample
+with a left-limit of -3 and a right-limit of 7 would map to
+@codeexample
+segment(-3, 7) => <segment:@{'left-limit' : -3, 'right-limit' : 7@}>
+@end codeexample
+
+@subsubsection Union
+An @language{ISL} union maps into a @language{Python} tuple with two
+components:
+an integer discriminator, and the discriminated value.
+There are three possibilities:
+@enumerate
+@item
+If the discriminator matches one of the union case values of an arm,
+the second component is of the type specified by that arm.
+@item
+If the discriminator matches no union case values and there is a default arm,
+the second component is of the type specified by the default arm.
+@item
+If the discriminator matches no union case values and there is no default arm
+but the union has the @isl{OTHERS} attribute,
+the second component is @Python{None}.
+@end enumerate
+
+@subsubsection Object
+Each @language{ISL} object type is mapped into a @language{Python} class.
+These classes have the methods specified in the ISL, as well as
+some built-ins.
+
+@subsubsection Optional
+A value corresponding to the @language{ISL} type @isl{OPTIONAL @metavar{T}}
+may be @Python{None} (indicating the null case) in addition to the values of the
+type @metavar{T}.
+
+@subsection Methods and Parameters
+@language{ISL} methods of an object type map to @language{Python} methods
+of the corresponding class.
+@isl{IN} and @isl{INOUT} parameters appear in the @language{Python} method
+signature in the same order as they do in @language{ISL}.
+
+Let us define a @emph{result} value to be either
+a return value (corresponding to a method's return type) or
+an @isl{INOUT} or @isl{OUT} parameter.
+Result values are returned by the @language{Python} method as a tuple,
+with the return value (if present) appearing before any parameters.
+If the method has only one result value, then it is simply returned
+(i.e., a tuple of length one is @emph{not} constructed to hold this value).
+If the method has no result values, then @Python{None} is returned.
+
+@subsection Threads
+
+To use threads, you must have configured both @system{ILU} and @system{Python} with thread
+support when building them.  If you have done this, your @system{ILU/Python} runtime support
+will be thread-capable.  To have @system{ILU} begin using threads, place a call to the
+function @fn{ilu.ThreadedOperation()} in your @language{Python} program before any other
+@system{ILU} calls are made.
+
+@subsection Identities
+
+An @system{ILU} passport (see @xref{Security}) is represented in
+@language{Python} by a dictionary.  Each entry has one of the following
+keys:
+@itemize @bullet
+@item @code{"connection"} -- this key is used for a value which is a string containing an identity
+of type @C{ilu_ConnectionIdentity}.
+@item @code{"sunrpc-unix"} -- this key is used for a value which is itself a dictionary, containing the fields @code{"uid"}, @code{"gid"}, @code{"hostname"}, and @code{"groups"}.
+@item @code{"GSS"} -- this key is used for a value which is a @language{Python} @system{GSS} object.
+@end itemize
+
+The passport may be obtained in the true method by calling the @system{ILU} runtime routine @Python{ilu.CallerIdentity()}.
+
+@section Using an ILU module from Python
+The @system{ILU} runtime interface is in the @language{Python} module
+@Python{ilu}.
+@language{Python} definitions for @language{ISL}
+@isl{INTERFACE @metavar{I}} are in the @language{Python} module
+@Python{@metavar{I}}.
+As with any other modules in @language{Python}, these modules are imported
+using the @Python{import} statement.
+
+A client program may create an @system{ILU} object in one of three ways:
+@enumerate
+@item
+Knowing the string binding handle @Python{sbh} and class @Python{cl} of an
+object,
+call @Python{ilu.ObjectOfSBH(cl, sbh)} which returns an instance of that class.
+For example, to obtain an instance of @language{ISL} type @isl{square} from
+@isl{INTERFACE shapes}
+whose string binding handle is @Python{sbh},
+one would call @Python{ilu.ObjectOfSBH(shapes.square, sbh)}.
+@item
+Knowing the object ID @Python{(sid, ih)} and class @Python{cl} of an object that
+has been published using the simple binding service,
+call @Python{ilu.Lookup(sid, ih, cl)} which returns an instance of that class
+(or @Python{None} if the lookup fails).
+@item
+Receive an instance as a result value from a method call that returns an
+object type or has an object type as an @isl{INOUT} or @isl{OUT} parameter.
+@end enumerate
+
+@section Implementing an ILU module in Python
+A @language{Python} module that implements @system{ILU} objects of types
+defined in @isl{INTERFACE @metavar{I}}
+also imports from @Python{@metavar{I}__skel}.
+This gives access to the skeleton classes from which implementation classes
+inherit.
+
+@subsection Implementation Inheritance
+An implementation of object type @metavar{T} from interface @metavar{I}
+needs to inherit from the class @Python{@metavar{I}__skel.@metavar{T}}.
+If there is inheritance in the @language{ISL}, and an implementation of a
+subtype wants to inherit from an implementation of a supertype,
+the skeleton class must be appear in the list of base types
+before the implementation class.
+
+For example, objects for the @language{ISL}
+@codeexample
+INTERFACE j;
+
+TYPE c1 = OBJECT METHODS one() END;
+TYPE c2 = OBJECT METHODS two() END;
+TYPE c3 = OBJECT SUPERTYPES c1, c2 END METHODS three() END;
+@end codeexample
+could be implemented in @language{Python} by
+@codeexample
+import ilu, j, j__skel
+
+class c1(j__skel.c1):
+    def one(self):
+        ...
+
+class c2(j__skel.c2):
+    def two(self):
+        ...
+
+class c3(j__skel.c3, c1, c2):
+    def three(self):
+        ...
+@end codeexample
+In this case @Python{c3}'s method @Python{one} is implemented by @Python{c1.one}
+and 
+@Python{c3}'s method @Python{two} is implemented by @Python{c2.two}.
+
+@subsection True Servers
+Each object exported by an implementation must belong to a true server,
+an instance of the @language{Python} type @Python{ilu_Server} which is
+implemented by the @system{ILU} runtime.
+An @Python{ilu_Server} can be created by calling the function
+@Python{ilu.CreateServer([serverID [, transport [, protocol [, objectTable]]]])},
+which returns a value of type @Python{ilu_Server}.
+If @metavar{serverID} is a string, it specifies the server ID;
+if it is @Python{None}, one will be invented automatically.
+The @metavar{transport} and @metavar{protocol} arguments are strings to choose a specific
+transport or protocol, or @Python{None} to let them default.
+The @metavar{objectTable} argument allows specification of a callback
+function for creating true instances on demand.  The callback function
+should take one argument, a string, which is the object ID of the
+instance to be created, and return a true instance.
+
+The first time a true server is created, it becomes the default server.
+The default server is used for an exported object if a server is not
+otherwise specified.
+If an object is exported before any servers have been created,
+one will be created automatically using default parameters and a message
+to that effect will be written to stderr.
+
+An object of type @Python{ilu_Server} has a method @Python{id()} that returns
+its server ID.
+
+@subsection Exporting Objects
+An object can be exported in one of three ways:
+@enumerate
+@item
+The object's string binding handle may be obtained by calling its
+method @Python{IluSBH()} and communicating this somehow to a client,
+who then turns the handle back into an object by calling
+@Python{ilu.ObjectOfSBH(cl, sbh)}.
+@item
+The object may be published using the simple binding service
+by calling its method @Python{IluPublish()}.
+In order for this to be effective, the object must have a well-known
+object ID, or the object ID must be communicated to clients, so clients can
+know what to pass to @Python{ilu.Lookup}.
+The object ID is a function of the object's instance handle and
+its server's server ID.
+@item
+The object may be returned by a method or passed back in a method's
+@isl{INOUT} or @isl{OUT} parameter.
+@end enumerate
+
+An object's instance handle can be controlled by setting the
+instance variable @Python{IluInstHandle} before the object is first exported.
+If this instance variable is not set, and instance handle will be
+invented automatically.
+
+An object's server can be controlled by setting the instance or class variable
+@Python{IluServer} to a value of type @Python{ilu_Server}.
+The value of this variable at the time an object is first exported will be
+used as the server for that object.
+If such a variable is not set, the default server is used.
+
+@subsection Animating Servers
+Running the @system{ILU} main loop
+by calling @Python{ilu.RunMainLoop()}
+brings the true servers to life.
+This function does not return until @Python{ilu.ExitMainLoop()} is called.
+If you are using @system{ILU} with @module{Tkinter},
+run the main loop by calling @fn{@Python{ilu_tk.RunMainLoop()}}, rather
+than using either the @system{ILU} or @module{Tkinter} main loops.
+@fn{@Python{ilu_tk.RunMainLoop}} sets things up so that both @system{Tk}
+and @system{ILU} events are handled.
+
+@subsection Using Alarms
+In order to schedule a @language{Python} function to be called at a certain
+time in the future when executing the @system{ILU} main loop,
+an @Python{ilu_Alarm} may be used.
+Objects of this type are created by calling @Python{ilu.CreateAlarm()}.
+An @Python{ilu_Alarm} must be set to have any effect.
+
+The alarm's method @Python{set(time, proc, args)} is used to set the alarm.
+The @Python{int}, @Python{float}, or @Python{ilu_FineTime} @Python{time} argument
+is the time at which the alarm will fire;
+the @Python{proc} argument is the @language{Python} function that will be
+called when the alarm fires;
+and
+the @Python{args} argument is a tuple of arguments to be passed to @Python{proc}.
+The tuple @Python{args} must match @Python{proc}'s signature.
+For example, if @Python{proc}
+is declared @Python{def P(a, b):} then @Python{args} must be a two-tuple.
+Likewise, if @Python{proc} takes only one argument then @Python{args} must be
+a one-tuple,
+or if no arguments then a zero-tuple.
+
+The function @Python{ilu.FineTime_Now()} may be called to obtain @system{ILU}'s
+idea of the current time.
+A value @Python{sec} of type @Python{int} or @Python{float} in units of seconds
+may be converted to type @Python{ilu_FineTime} by calling
+@Python{ilu.FineTime(sec)}.
+Values of type @Python{ilu_FineTime} may be compared, added, and subtracted.
+These operations may be used to construct values representing any relative
+time (subject to precision and range limitations), which is what is needed
+by an alarm's @Python{set} method.
+
+The alarm may be set multiple times with different arguments, in which
+case the parameters of the most recent call to @Python{set} are in effect.
+Thus, once an alarm fires, it may be reused by calling @Python{set} again.
+
+An alarm may be unset by calling its method @Python{unset()}.
+
+@section Using the Simple Binding Service
+An object may be published using the simple binding service by calling its
+method @Python{IluPublish()}.
+An object may be unpublished by calling its method @Python{IluWithdraw()}.
+
+A published @system{ILU} object may be obtained by calling
+@Python{ilu.Lookup(sid, ih, cl)},
+where @Python{sid} is object's server's server ID, @Python{ih}
+is the object's instance handle, and @Python{cl} is its class.
+
+@section Summary of the ILU Python Runtime
+Exported from module @Python{ilu}:
+
+@itemize @bullet
+
+@item
+@Python{def CallerIdentity():}
+
+Returns the passport containing identities of the caller.  This routine is only valid inside the code of a true method.
+@item
+@Python{def CreateAlarm():}
+
+Creates an object of type @Python{ilu_Alarm}.
+@item
+@Python{def CreateLoopHandle():}
+
+Creates and returns an instance of a ``loop handle'' object, which can
+be passed to @Python{ilu.RunMainLoop} and @Python{ilu.ExitMainLoop()}.
+@item
+@Python{def CreateServer([serverID [, transport [, protocol [, objtable]]]]):}
+
+Used to create an @Python{ilu_Server} object with the specified
+serverID, transport, and protocol.
+If @metavar{serverID} is unspecified or @Python{None}, an identifier will be invented automatically.
+If transport or protocol are unspecified or @Python{None}, they will default to
+@Python{'sunrpcrm|tcp_localhost_0'} and @Python{'sunrpc_'}, respectively.
+The first time @Python{@fn{CreateServer}} is called, the server so created becomes
+the default server.
+If there is no default server when one is required, one will be created
+using default parameters and a message will be issued on stderr.
+The @metavar{objtable} argument allows specification of a callback
+function for creating true instances on demand.  The callback function
+should take one argument, a string, which is the object ID of the
+instance to be created, and return a true instance.
+
+An @Python{ilu_Server} object has an @Python{id} method which returns the
+string identifier of that server.
+@item
+@Python{def DefaultServer():}
+
+Returns the default server.
+@item
+@Python{def Delete(obj):}
+
+Puts the specified object on a list to schedule it for eventual deletion.
+Actually, the deletion routine simply decrements the reference count increment
+used by ILU to hold onto an object, so if other references to the object exist,
+the object will continue to exist.
+@item
+@Python{def ExitMainLoop(loophandle):}
+
+Exits the @system{ILU} main loop, assuming it is running.  The @metavar{loophandle}
+is created by a call to @Python{ilu.CreateLoopHandle()}, and must have been
+previously used as an argument to a call to @Python{ilu.RunMainLoop()}.
+@item
+@Python{FALSE = 0}
+@item
+@Python{def FineTime(sec):}
+
+Converts its @Python{int} or @Python{float} argument @metavar{sec} in units of seconds
+to type @Python{ilu_FineTime}.
+Objects of this type can be compared, added, subtracted, and converted to
+@Python{int} or @Python{float}.
+The main use of objects of this type is in setting alarms.
+@item
+@Python{FineTimeRate = ...}
+
+The precision of type @Python{ilu_FineTime} in seconds is the reciprocal of
+this constant.
+@item
+@Python{def FineTime_Now():}
+
+Returns the current time as an @Python{ilu_FineTime} object.
+@item
+@Python{def FormSBH(objectID, contactInfo):}
+
+Returns the string binding handle corresponding to the
+object id @metavar{objectID}
+and contact info @metavar{contactInfo}.
+This is the inverse of @fn{@Python{ParseSBH}}.
+@item
+@Python{IluGeneralError},
+@Python{IluProtocolError},
+and
+@Python{IluUnimplementedMethodError}
+are all strings that may occur as exceptions from the @system{ILU} runtime.
+@item
+@Python{def LongReal(v):}
+
+Converts its @Python{int}, @Python{float}, or sixteen-integer @Python{list} or
+@Python{tuple} argument to type @Python{ilu_LongReal}.
+In case of a list or tuple, the elements encode the bytes of the
+IEEE long real value, from most significant to least.
+@item
+@Python{def LookupObject(sid, ih, cl):}
+
+Returns the object with object server ID @metavar{sid}, object instance handle @metavar{ih},
+and @language{Python} class @Python{cl},
+assuming it was previously published using the simple binding service.
+If the lookup fails, @Python{None} is returned.
+@item
+@Python{def ObjectOfSBH(cl, sbh):}
+
+Returns the object corresponding to the @language{Python} class @metavar{cl}
+and string binding handle @metavar{sbh}.
+@item
+@Python{def ParseSBH(sbh):}
+
+Returns the pair (object id, contact info) corresponding to the string
+binding handle @metavar{sbh}.
+@item
+@Python{def IOROfObject(obj):}
+
+If the @protocol{IIOP} protocol has been configured in, returns the string IOR
+of the object, as specified in the CORBA 2 IIOP specification.  If
+the @protocol{IIOP} protocol has not been configured in, throws an
+error.
+@item
+@Python{def RegisterInputHandler (file, handler_fn):}
+
+Sets up an association between the @metavar{file} (which must be a file object
+opened for reading), and the @metavar{handler_fn} (which must be a callable function
+with no arguments) so that @metavar{handler_fn} is called whenever input is available
+on @metavar{file}.  This is useful for implementing a server that also responds
+to commands typed to its standard input, for example.  Passing a value of
+@Python{None} for the @metavar{handler_fn} removes the association.
+
+@item
+@Python{def RunMainLoop(loophandle):}
+
+Runs the @system{ILU} main loop.  The argument is a ``handle'' on that loop invocation,
+created by a call to @Python{ilu.CreateLoopHandle()}.
+@item
+@Python{def SetMainLoop(DoEvent, RegisterInput, CancelInput, RegisterOutput, CancelOutput, CreateAlarm, SetAlarm, CancelAlarm)}
+
+The purpose of this function is to be able to use a foreign main loop
+(such as for a user interface toolkit)
+with an @system{ILU} server.
+The details will not be described here.
+Look at the runtime module @module{@Python{ilu_tk}} for an example of its use.
+
+@item
+@Python{def SetDebugLevel(bits):} or @Python{def SetDebugLevel(string):}
+
+Sets the @system{ILU} kernel debugging flags according to its @Python{int}
+argument, if an int is specified, or via the colon-separated list of
+debug switches, if a string is specified.  See the Debugging section of the
+ILU Manual for more information on these switches.
+
+@item
+@Python{def ThreadedOperation():}
+
+Enables thread use in both the @system{ILU} kernel and the @system{ILU/Python} runtime.  This routine should be called
+before any other @system{ILU} calls are made.
+
+@item
+@Python{TRUE = 1}
+@item
+@Python{def TypeID(cl):}
+
+Returns the @system{ILU} unique type identifier
+corresponding to the @language{Python} class @metavar{cl}.
+@item
+@Python{def TypeName(cl):}
+
+Returns the @system{ILU} type name
+corresponding to the @language{Python} class @metavar{cl}.
+@item
+@Python{Version = ...} is the ILU version string.
+@end itemize
+
+Built-in methods of @system{ILU} objects:
+
+@itemize @bullet
+@item
+@Python{IluObjectID()} returns the object ID of the object.
+@item
+@Python{IluPublish()} publishes the object using the simple binding service.
+@item
+@Python{IluSBH()} returns the object's string binding handle.
+@item
+@Python{IluTypeID()} returns the unique type identifier of the
+object's @system{ILU} type.
+@item
+@Python{IluTypeName()} returns the type name of the object's @system{ILU} type.
+@item
+@Python{IluWithdraw()} undoes the effect of IluPublish().
+@end itemize
+
+Special attributes of @system{ILU} true objects:
+One or more of the following attributes may be set in a
+true (implementation) object of an @language{ISL} object type
+to control certain aspects of that object.
+
+@itemize @bullet
+@item
+@Python{IluInstHandle}, a string instance variable,
+gives the object's instance handle.
+If not present, an instance handle is invented automatically.
+@item
+@Python{IluServer}, a variable of type @Python{ilu_Server},
+determines the object's server.
+This can be an instance or a class variable.
+If not present, the default server is used.
+@end itemize
+
+@section Stub Generation
+To generate @language{Python} stubs from an @language{ISL} file,
+use the program @program{python-stubber}.
+Two files are generated from each @language{ISL}
+@isl{INTERFACE @metavar{name}}:
+@itemize @bullet
+@item
+@file{@metavar{name}.py} containing code for constants, exceptions,
+and types defined in the interface,
+and
+@item
+@file{@metavar{name}__skel.py} containing code for the skeletons
+(server stubs) for object types defined in the interface.
+@end itemize

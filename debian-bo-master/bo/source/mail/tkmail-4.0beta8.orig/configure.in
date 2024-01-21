@@ -1,0 +1,528 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(mfv/mfv.c)
+
+AC_PROG_INSTALL
+AC_PREFIX_PROGRAM(wish)
+AC_ARG_ENABLE(gcc, [  --enable-gcc            allow use of gcc if available],
+    [tcl_ok=$enableval], [tcl_ok=no])
+if test "$tcl_ok" = "yes"; then
+    AC_PROG_CC
+else
+    CC=cc
+    AC_SUBST(CC)
+fi
+
+AC_AIX
+AC_CHECK_LIB(sun, getpwuid)
+
+#--------------------------------------------------------------------
+#	Checks for header files.
+#--------------------------------------------------------------------
+
+AC_HEADER_STDC
+AC_HEADER_SYS_WAIT
+AC_HEADER_TIME
+AC_CHECK_HEADER(string.h, , AC_DEFINE(NO_STRING_H))
+AC_CHECK_HEADER(unistd.h, , AC_DEFINE(NO_UNISTD_H))
+AC_CHECK_HEADER(dirent.h, , AC_DEFINE(NO_DIRENT_H))
+AC_HEADER_DIRENT
+
+#--------------------------------------------------------------------
+#	Headers needed for gethostbyname
+#--------------------------------------------------------------------
+AC_CHECK_HEADERS(sys/socket.h netinet/in.h arpa/inet.h netdb.h)
+
+#--------------------------------------------------------------------
+#	Supply a substitute for stdlib.h if it doesn't define strtol,
+#	strtoul, or strtod (which it doesn't in some versions of SunOS).
+#--------------------------------------------------------------------
+
+AC_MSG_CHECKING(stdlib.h)
+AC_HEADER_EGREP(strtol, stdlib.h, tk_ok=yes, tk_ok=no)
+AC_HEADER_EGREP(strtoul, stdlib.h, , tk_ok=no)
+AC_HEADER_EGREP(strtod, stdlib.h, , tk_ok=no)
+if test $tk_ok = no; then
+    AC_DEFINE(NO_STDLIB_H)
+fi
+AC_MSG_RESULT($tk_ok)
+
+
+#--------------------------------------------------------------------
+#	Checks for typedefs, structures, and compiler characteristics.
+#--------------------------------------------------------------------
+
+AC_C_CONST
+AC_TYPE_PID_T
+AC_TYPE_SIZE_T
+AC_STRUCT_TM
+
+#--------------------------------------------------------------------
+#	Checks for library functions.
+#--------------------------------------------------------------------
+
+AC_TYPE_SIGNAL
+AC_CHECK_FUNCS(strerror sigaction)
+dnl AC_CHECK_FUNCS(strftime getcwd mkdir mktime rmdir)
+AC_CHECK_FUNCS(uname gethostname tempnam)
+AC_CHECK_FUNCS(timelocal timegm)
+AC_CHECK_FUNCS(lockf flock)
+AC_CHECK_FUNCS(gethostbyname)
+
+AC_CHECK_FUNC(strcasecmp, ,
+    AC_CHECK_LIB(socket, strcasecmp, , AC_DEFINE(NO_STRCASECMP)))
+
+#--------------------------------------------------------------------
+#	Locate the X11 header files and the X11 library archive.  Try
+#	the ac_path_x macro first, but if it doesn't find the X stuff
+#	(e.g. because there's no xmkmf program) then check through
+#	a list of possible directories.  Under some conditions the
+#	autoconf macro will return an include directory that contains
+#	no include files, so double-check its result just to be safe.
+#--------------------------------------------------------------------
+
+AC_PATH_X
+not_really_there=""
+if test "$no_x" = ""; then
+    if test "$x_includes" = ""; then
+	AC_TRY_CPP([#include <X11/XIntrinsic.h>], , not_really_there="yes")
+    else
+	if test ! -r $x_includes/X11/Intrinsic.h; then
+	    not_really_there="yes"
+	fi
+    fi
+fi
+if test "$no_x" = "yes" -o "$not_really_there" = "yes"; then
+    echo checking for X11 header files
+    XINCLUDES="# no special path needed"
+    AC_TRY_CPP([#include <X11/Intrinsic.h>], , XINCLUDES="nope")
+    if test "$XINCLUDES" = nope; then
+        dirs="/usr/unsupported/include /usr/local/include /usr/X386/include /usr/include/X11R4 /usr/X11R5/include /usr/include/X11R5 /usr/openwin/include /usr/X11/include /usr/sww/include"
+        for i in $dirs ; do
+	    if test -r $i/X11/Intrinsic.h; then
+	        XINCLUDES=" -I$i"
+	    fi
+        done
+    fi
+else
+    if test "$x_includes" != ""; then
+	XINCLUDES=-I$x_includes
+    else
+	XINCLUDES="# no special path needed"
+    fi
+fi
+if test "$XINCLUDES" = nope; then
+  echo "Warning:  couldn't find any X11 include files."
+  XINCLUDES="# no include files found"
+fi
+AC_SUBST(XINCLUDES)
+
+if test "$no_x" = yes; then
+    XLIBSW=nope
+    if test "$XLIBSW" = nope; then
+	dirs="/usr/unsupported/lib /usr/local/lib /usr/X386/lib /usr/lib/X11R4 /usr/X11R5/lib /usr/lib/X11R5 /usr/openwin/lib /usr/X11/lib /usr/sww/X11/lib"
+	for i in $dirs ; do
+	    if test -r $i/libX11.a -o -r $i/libX11.so -o -r $i/libX11.sl; then
+		XLIBSW="-L$i -lX11"
+	    fi
+	done
+    fi
+else
+    if test "$x_libraries" = ""; then
+	XLIBSW=-lX11
+    else
+	XLIBSW="-L$x_libraries -lX11"
+    fi
+fi
+if test "$XLIBSW" = nope ; then
+    AC_CHECK_LIB(Xwindow, XCreateWindow, XLIBSW=-lXwindow)
+fi
+if test "$XLIBSW" = nope ; then
+    echo "Warning:  couldn't find the X11 library archive.  Using -lX11."
+    XLIBSW=-lX11
+fi
+AC_SUBST(XLIBSW)
+
+#--------------------------------------------------------------------
+#	Check for the existence of various libraries.  The order here
+#	is important, so that then end up in the right order in the
+#	command line generated by make.  The -lsocket and -lnsl libraries
+#	require a couple of special tricks:
+#	1. Use "connect" and "accept" to check for -lsocket, and
+#	   "gethostbyname" to check for -lnsl.
+#	2. Use each function name only once:  can't redo a check because
+#	   autoconf caches the results of the last check and won't redo it.
+#	3. Use -lnsl and -lsocket only if they supply procedures that
+#	   aren't already present in the normal libraries.  This is because
+#	   IRIX 5.2 has libraries, but they aren't needed and they're
+#	   bogus:  they goof up name resolution if used.
+#	4. On some SVR4 systems, can't use -lsocket without -lnsl too.
+#	   To get around this problem, check for both libraries together
+#	   if -lsocket doesn't work by itself.
+#--------------------------------------------------------------------
+
+AC_CHECK_LIB(Xbsd, main, [LIBS="$LIBS -lXbsd"])
+
+tk_checkBoth=0
+AC_CHECK_FUNC(connect, tk_checkSocket=0, tk_checkSocket=1)
+if test "$tk_checkSocket" = 1; then
+    AC_CHECK_LIB(socket, main, LIBS="$LIBS -lsocket", tk_checkBoth=1)
+fi
+if test "$tk_checkBoth" = 1; then
+    tk_oldLibs=$LIBS
+    LIBS="$LIBS -lsocket -lnsl"
+    AC_CHECK_FUNC(accept, tk_checkNsl=0, [LIBS=$tk_oldLibs])
+fi
+AC_CHECK_FUNC(gethostbyname, , AC_CHECK_LIB(nsl, main, [LIBS="$LIBS -lnsl"]))
+
+#--------------------------------------------------------------------
+# One more check related to the X libraries.  The standard releases
+# of Ultrix don't support the "xauth" mechanism, so send won't work
+# unless TK_NO_SECURITY is defined.  However, there are usually copies
+# of the MIT X server available as well, which do support xauth.
+# Check for the MIT stuff and use it if it exists.
+#
+# Note: can't use ac_check_lib macro (at least, not in Autoconf 2.1)
+# because it can't deal with the "-" in the library name.
+#--------------------------------------------------------------------
+
+if test -d /usr/include/mit ; then
+    AC_MSG_CHECKING([MIT X libraries])
+    tk_oldCFlags=$CFLAGS
+    CFLAGS="$CFLAGS -I/usr/include/mit"
+    tk_oldLibs=$LIBS
+    LIBS="$LIBS -lX11-mit"
+    AC_TRY_LINK([
+	#include <X11/Xlib.h>
+    ], [
+	XOpenDisplay(0);
+    ], [
+	AC_MSG_RESULT(yes)
+	XLIBSW="-lX11-mit"
+	XINCLUDES="-I/usr/include/mit"
+    ], AC_MSG_RESULT(no))
+    CFLAGS=$tk_oldCFlags
+    LIBS=$tk_oldLibs
+fi
+
+#--------------------------------------------------------------------
+#	On a few very rare systems, all of the libm.a stuff is
+#	already in libc.a.  Set compiler flags accordingly.
+#	Also, Linux requires the "ieee" library for math to
+#	work right (and it must appear before "-lm").
+#--------------------------------------------------------------------
+
+MATH_LIBS=""
+AC_CHECK_FUNC(sin, , MATH_LIBS="-lm")
+AC_CHECK_LIB(ieee, main, [MATH_LIBS="-lieee $MATH_LIBS"])
+AC_SUBST(MATH_LIBS)
+
+#--------------------------------------------------------------------
+#	Under Solaris 2.4, strtod returns the wrong value for the
+#	terminating character under some conditions.  Check for this
+#	and if the problem exists use a substitute procedure
+#	"fixstrtod" (provided by Tcl) that corrects the error.
+#--------------------------------------------------------------------
+
+AC_CHECK_FUNC(strtod, tk_strtod=1, tk_strtod=0)
+if test "$tk_strtod" = 1; then
+    AC_MSG_CHECKING([for Solaris 2.4 strtod bug])
+    AC_TRY_RUN([
+	extern double strtod();
+	int main()
+	{
+	    char *string = "NaN";
+	    char *term;
+	    strtod(string, &term);
+	    if ((term != string) && (term[-1] == 0)) {
+		exit(1);
+	    }
+	    exit(0);
+	}], tk_ok=1, tk_ok=0, tk_ok=0)
+    if test "$tk_ok" = 1; then
+	AC_MSG_RESULT(ok)
+    else
+	AC_MSG_RESULT(buggy)
+	AC_DEFINE(strtod, fixstrtod)
+    fi
+fi
+
+#--------------------------------------------------------------------
+#	The statements below define a collection of symbols related to
+#	dynamic loading and shared libraries.  See Makefile.in for a
+#	description of each of the symbols.
+#--------------------------------------------------------------------
+
+# Step 1: set the variable "system" to hold the name and version number
+# for the system.  This can usually be done via the "uname" command, but
+# there are a few systems, like Next, where this doesn't work.
+
+AC_MSG_CHECKING([system version (for dynamic loading)])
+if test -f /usr/lib/NextStep/software_version; then
+  system=NEXTSTEP-`awk '/3/,/3/' /usr/lib/NextStep/software_version`
+else
+    system=`uname -s`-`uname -r`
+    if test "$status" = 1 ; then
+	AC_MSG_RESULT([unknown (can't find uname command)])
+	system=unknown
+    else
+	# Special check for weird MP-RAS system (uname returns weird
+	# results, and the version is kept in special file).
+    
+	if test -r /etc/.relid -a "X`uname -n`" = "X`uname -s`" ; then
+	    system=MP-RAS-`awk '{print $3}' /etc/.relid'`
+	fi
+	AC_MSG_RESULT($system)
+    fi
+fi
+
+# Step 2: check for existence of -ldl library.  This is needed because
+# Linux can use either -ldl or -ldld for dynamic loading.
+
+AC_CHECK_LIB(dl, dlopen, have_dl=yes, have_dl=no)
+
+# Step 3: disable dynamic loading if requested via a command-line switch.
+
+AC_ARG_ENABLE(load, [  --disable-load          disallow dynamic loading and "load" command],
+    [tcl_ok=$enableval], [tcl_ok=yes])
+if test "$tcl_ok" = "no"; then
+    system=unknown
+fi
+
+# Step 4: set configuration options based on system name and version.
+
+case $system in
+    AIX-*)
+	# Warning:  the AIX definitions have never been tested and I'm
+	# pretty sure that they don't work as is.  This code is just
+	# a starting point for a real implementation.
+	# SHLIB_CFLAGS=""
+	# SHLIB_LD="/bin/ld -e _nostart -berok  -bM:SRE -bE:lib$(LIBNAME).exp -H512 -T512"
+	# SHLIB_SUFFIX=".so"
+	# DL_OBJS="tclLoadNone.o"
+	# DL_LIBS=""
+	# LD_FLAGS=""
+	echo "Dynamic loading isn't available yet under AIX."
+	echo "Want to volunteer?"
+	;;
+    HP-UX-*.08.*|HP-UX-*.09.*)
+	SHLIB_CFLAGS="+z"
+	SHLIB_LD="ld -b"
+	SHLIB_SUFFIX=".sl"
+	DL_OBJS="tclLoadShl.o"
+	DL_LIBS="-ldld"
+	LD_FLAGS="-Wl,-E"
+	;;
+    IRIX-4.*)
+	SHLIB_CFLAGS="-G0"
+	SHLIB_LD="echo tclLdAout | tclsh -r -G 0"
+	SHLIB_SUFFIX="..o"
+	DL_OBJS="tclLoadAout.o"
+	DL_LIBS=""
+	LD_FLAGS="-D 08000000"
+	;;
+    IRIX-5.*)
+	SHLIB_CFLAGS=""
+	SHLIB_LD="ld -shared -rdata_shared"
+	SHLIB_SUFFIX=".so"
+	DL_OBJS="tclLoadDl.o"
+	DL_LIBS=""
+	LD_FLAGS=""
+	;;
+    Linux*)
+	SHLIB_CFLAGS="-fpic"
+	SHLIB_SUFFIX=".so"
+	if test "$have_dl" = yes; then
+	    SHLIB_LD="${CC} -shared"
+	    DL_OBJS="tclLoadDl.o"
+	    DL_LIBS="-ldl"
+	    LD_FLAGS="-rdynamic"
+	else
+	    SHLIB_LD="ld -shared"
+	    DL_OBJS="tclLoadDld.o"
+	    DL_LIBS="-ldld"
+	    LD_FLAGS=""
+	fi
+	;;
+    MP-RAS-02*)
+	SHLIB_CFLAGS="-K PIC"
+	SHLIB_LD="cc -G"
+	SHLIB_SUFFIX=".so"
+	DL_OBJS="tclLoadDl.o"
+	DL_LIBS="-ldl"
+	LD_FLAGS=""
+	;;
+    MP-RAS-*)
+	SHLIB_CFLAGS="-K PIC"
+	SHLIB_LD="cc -G"
+	SHLIB_SUFFIX=".so"
+	DL_OBJS="tclLoadDl.o"
+	DL_LIBS="-ldl"
+	LD_FLAGS="-Wl,-Bexport"
+	;;
+    NetBSD-*|FreeBSD-*)
+	# Not available on all versions:  check for include file.
+	if test -e /usr/include/dlfcn.h; then
+	    SHLIB_CFLAGS="-fpic"
+	    SHLIB_LD="ld -Bshareable"
+	    SHLIB_SUFFIX=".so"
+	    DL_OBJS="tclLoadDl2.o"
+	    DL_LIBS=""
+	    LD_FLAGS=""
+	else
+	    SHLIB_CFLAGS=""
+	    SHLIB_LD="echo tclLdAout | tclsh -r"
+	    SHLIB_SUFFIX="..o"
+	    DL_OBJS="tclLoadAout.o"
+	    DL_LIBS=""
+	    LD_FLAGS=""
+	fi
+	;;
+    NEXTSTEP-*)
+	SHLIB_CFLAGS=""
+	SHLIB_LD="cc -nostdlib -r"
+	SHLIB_SUFFIX=".so"
+	DL_OBJS="tclLoadNext.o"
+	DL_LIBS=""
+	LD_FLAGS=""
+	;;
+    OSF-1.*)
+	SHLIB_CFLAGS="-fpic"
+	SHLIB_LD='ld -shared -expect_unresolved "*"'
+	SHLIB_SUFFIX=".so"
+	DL_OBJS="tclLoadDl.o"
+	DL_LIBS=""
+	LD_FLAGS=""
+	;;
+    OSF1-V*)
+	SHLIB_CFLAGS=""
+	SHLIB_LD='ld -shared -expect_unresolved "*"'
+	SHLIB_SUFFIX=".so"
+	DL_OBJS="tclLoadDl.o"
+	DL_LIBS=""
+	LD_FLAGS=""
+	;;
+    RISCos-*)
+	SHLIB_CFLAGS="-G0"
+	SHLIB_LD="echo tclLdAout | tclsh -r -G 0"
+	SHLIB_SUFFIX="..o"
+	DL_OBJS="tclLoadAout.o"
+	DL_LIBS=""
+	LD_FLAGS="-D 08000000"
+	;;
+    SCO_SV-3.2*)
+        # Note, dlopen is available only on SCO 3.2.5 and greater.  However,
+        # this test works, since "uname -s" was non-standard in 3.2.4 and
+        # below.
+	SHLIB_CFLAGS="-Kpic -belf"
+	SHLIB_LD="ld -G -z text"
+	SHLIB_SUFFIX=".so"
+	DL_OBJS="tclLoadDl.o"
+	DL_LIBS=""
+	LD_FLAGS="-belf -Wl,-Bexport"
+	;;
+    SunOS-4*)
+	SHLIB_CFLAGS="-pic"
+	SHLIB_LD="ld -assert pure-text"
+	SHLIB_SUFFIX=".so"
+	DL_OBJS="tclLoadDl.o"
+	DL_LIBS="-ldl"
+	LD_FLAGS=""
+	;;
+    SunOS-5*)
+	SHLIB_CFLAGS="-K pic"
+	SHLIB_LD="/usr/ccs/bin/ld -G -z text"
+	SHLIB_SUFFIX=".so"
+	DL_OBJS="tclLoadDl.o"
+	DL_LIBS="-ldl"
+	LD_FLAGS=""
+	;;
+    ULTRIX-4.*)
+	SHLIB_CFLAGS="-G0"
+	SHLIB_LD="echo tclLdAout | tclsh -r -G 0"
+	SHLIB_SUFFIX="..o"
+	DL_OBJS="tclLoadAout.o"
+	DL_LIBS=""
+	LD_FLAGS="-D 08000000"
+	;;
+    UNIX_SV*)
+	SHLIB_CFLAGS="-K PIC"
+	SHLIB_LD="cc -G"
+	SHLIB_SUFFIX=".so"
+	DL_OBJS="tclLoadDl.o"
+	DL_LIBS="-ldl"
+	LD_FLAGS="-Wl,-Bexport"
+	;;
+esac
+
+# The following magic was provided by Kevin Kenny to implement
+# pseudo-static linking as a form of dynamic loading (e.g. for old
+# Ultrix and other systems).  You'll have to ask him to explain
+# what this code does.
+
+if test "x$DL_OBJS" = "xtclLoadAOut.o" ; then
+    AC_MSG_CHECKING(sys/exec.h)
+    AC_TRY_COMPILE([#include <sys/exec.h>],[
+	struct exec foo;
+	unsigned long seek;
+	int flag;
+#ifdef __mips
+	seek = N_TXTOFF (foo.ex_f, foo.ex_o);
+#else
+	seek = N_TXTOFF (foo);
+#endif
+	flag = (foo.a_magic == OMAGIC);
+	return foo.a_text + foo.a_data + foo.a_bss + foo.a_entry;
+], tcl_ok=usable, tcl_ok=unusable)
+    AC_MSG_RESULT($tcl_ok)
+    if test $tcl_ok = usable; then
+	AC_DEFINE(USE_SYS_EXEC_H)
+    else
+	AC_MSG_CHECKING(a.out.h)
+	AC_TRY_COMPILE([#include <a.out.h>],[
+   struct exec foo;
+   unsigned long seek;
+	    int flag;
+#ifdef __mips
+	    seek = N_TXTOFF (foo.ex_f, foo.ex_o);
+#else
+	    seek = N_TXTOFF (foo);
+#endif
+	    flag = (foo.a_magic == OMAGIC);
+	    return foo.a_text + foo.a_data + foo.a_bss + foo.a_entry;
+], tcl_ok=usable, tcl_ok=unusable)
+	AC_MSG_RESULT($tcl_ok)
+	if test $tcl_ok = usable; then
+	    AC_DEFINE(USE_A_OUT_H)
+	else
+	    DL_OBJS=""
+	fi
+    fi
+fi
+
+if test "x$DL_OBJS" != "x" ; then
+    BUILD_DLTEST="loadTests"
+else
+    echo "Can't figure out how to do dynamic loading on this system."
+    SHLIB_CFLAGS=""
+    SHLIB_LD=""
+    SHLIB_SUFFIX=""
+    DL_OBJS="tclLoadNone.o"
+    DL_LIBS=""
+    LD_FLAGS=""
+    BUILD_DLTEST=""
+fi
+
+if test "$CC" = "gcc" -a "$DL_OBJS" != "tclLoadNone.o" ; then
+    SHLIB_CFLAGS="-fpic"
+fi
+
+AC_SUBST(SHLIB_CFLAGS)
+AC_SUBST(SHLIB_LD)
+AC_SUBST(SHLIB_SUFFIX)
+AC_SUBST(DL_LIBS)
+AC_SUBST(LD_FLAGS)
+
+#--------------------------------------------------------------------
+# Now create the Makefile with the results
+
+AC_OUTPUT(mfv/Makefile scripts/Makefile)

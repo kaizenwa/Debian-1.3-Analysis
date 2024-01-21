@@ -1,0 +1,641 @@
+#!@PERL@
+###############################################################################
+#
+# NOSEY PARKER : Disk usage information worm
+#                It is assumed that this script will be run once a week.
+#                I could change it but I have better things to do...
+#
+#
+# Mark Burgess 24/1/93
+#
+###############################################################################
+
+
+if ($< != 0)
+   {
+   die "NP: Bad luck, only root can run this one!\n";
+   }
+
+die "Syntax error: noseyparker <filesystem> <sysadm> [nomail]\n" if ($#ARGV > 2);
+die "No such filesystem @ARGV[0]\n" if (! -d @ARGV[0]);
+
+
+$cfbindir = @prefix@/lib/cfengine/bin;
+$findcomm = "/usr/bin/find";  # Use gnu-find if possible
+
+##############################################################################
+
+
+$home = shift;
+$sysadm = shift;
+$mailflag = shift;
+
+($slash,$fac,$mach,$un) = split(/\//,$home);            # Tag for file records
+$tag = "$fac.$mach.$un";
+
+
+###############################################################################
+# Setup
+###############################################################################
+
+
+$stat_data = "/etc/NP.stat.$tag";
+$limits_data = "/etc/NP.quotas.$tag";
+$work="/tmp/noseyparker.wrk";
+
+$version = "V1.3c";
+
+$restrict = "-xdev";    # Use GNU find on all systems
+
+$softlimit = 40000;
+$postmargin = 10000;
+$premargin = 2000;
+$tick = 1;             # 1 week between runs (only an alias, cannot be changed)
+
+$fsizelimit = 200;     # defines the size of a "big" file in 512byte blocks
+                       # i.e. divide by 2 to get answer in kbytes.
+
+$dormant_limit = 30;    # Accounts show up as being dormant if they haven't
+                        # changed in this many weeks.
+
+###############################################################################
+# Load in quota databases
+###############################################################################
+
+if ( -f $stat_data )
+   {
+   &ReadOldStatistics;
+   }
+else
+   {
+   $badstats = 1;                # Can't compute realiable stats
+   print "NP: $stat_data not found - unreliable statistics.\n";
+   }
+
+
+# Special quotas:
+
+if ( -f $limits_data )
+   {
+   &ReadSpecialLimits;
+   }
+
+###############################################################################
+# Level 0 : Main
+###############################################################################
+
+open (DU,"du -s $home/* |") || die "NP: Can't open shell\n";
+
+while (<DU>)
+   {
+   ($blocks,$userpath) = split;
+
+   $kb = $blocks/2;
+
+   ($slash,$fac,$mach,$un,$user) = split(/\//,$userpath);
+   next if &SystemStuff($user);
+   &GetNewStats($user);
+
+   if ($slimit{$user} > 0)
+      {
+      $limit = $slimit{$user};
+      }
+   else
+      {
+      $limit = $softlimit;
+      }
+
+   $hardlimit = $limit + $postmargin;
+
+
+   ###
+
+   ($exists)=getpwnam($user);
+
+   if (! $exists)                      # Don't try to mail directories
+      {                                # which do not correspond to users.
+      $nomail = 1;
+      }
+   else
+      {
+      $nomail = $mailflag;
+      }
+
+   ###
+
+   if ($dormant{$user})
+      {
+      &HandleDormantUser($user);
+      }
+
+   if (($kb > $hardlimit) && ($warnings{$user} > 3))
+      {
+      $warnings{$user}++ if (! $nomail);
+      &HardWarn($user);
+      next;
+      }
+
+   elsif ($kb > $limit)
+      {
+      $warnings{$user}++ if (! $nomail);
+
+      &SoftWarn($user);
+      next;
+      }
+
+   elsif ($kb > $limit-$premargin)
+      {
+      next if $warnings{$user} > 0;                # One prewarning only
+      $warnings{$user}++ if (! $nomail);
+      &PreWarn($user);
+      }
+
+   &CleanCriminalRecord($user);
+   }
+
+&MailSysAdm();
+&SaveNewStats();
+unlink($work);
+
+# (end)
+
+###############################################################################
+# Level 1
+###############################################################################
+
+sub ReadSpecialLimits
+   {
+   open (DATA,$limits_data);
+
+   while (<DATA>)
+      {
+      ($user,$limit) = split;
+      $slimit{$user}=$limit;
+      }
+    close(DATA);
+    }
+
+###############################################################################
+
+sub ReadOldStatistics
+   {
+   local($user);
+   open (DATA,$stat_data);
+
+   while (<DATA>)
+      {
+      chop;
+      next if $_ eq "";
+      ($user,$used,$grad,$avgrad,$dormant,$warn,$time) = split(/:/);
+      $o_used{$user}=$used;
+      $o_grad{$user}=$grad;
+      $o_avgrad{$user}=$avgrad;
+      $dormant{$user}=$dormant;   # Account dormant for x weeks
+      $warnings{$user}=$warn;     # Number of warnings sent
+      $time{$user}=$time;         # Elapsed time since records began
+      }
+   close(DATA);
+   }
+
+###############################################################################
+
+sub SystemStuff
+   {
+   local($user) = @_;
+
+   if ($user eq "lost+found" || substr($user,0,1) eq '.')
+      {
+      return 1;
+      }
+   else
+      {
+      return 0;
+      }
+   }
+
+###############################################################################
+
+sub GetNewStats
+   {
+   local($user) = @_;
+
+   $time{$user}++;
+
+   $n_used{$user}=$kb;                                    # New storage level
+   $n_grad{$user}=($n_used{$user} - $o_used{$user});      # New gradient/1 week
+   $n_avgrad{$user}=($n_used{$user}/$time{$user});        # Average gradient
+
+   if ($n_grad{$user} == 0)  #allow a bit for cfengine log files
+      {
+      $dormant{$user}++ ;
+      }
+   else
+      {
+      $dormant{$user}=0;
+      }
+
+   if ($badstats)                 # Can't calculate a gradient - no data!
+      {
+      $n_grad{$user}=0;
+      $n_avgrad{$user}=0;
+      $dormant{$user}=0;
+      $warnings{$user}=0;
+      }
+
+   if ($n_avgrad{$user} > 0.0)
+      {
+      $timetocrash = (($limit - $n_used{$user})/$n_avgrad{$user});
+      }
+   }
+
+###############################################################################
+
+sub HandleDormantUser
+   {
+   local($user)= @_;
+
+   &SaveByUser($user,"D=$dormant{$user}") if ($dormant{$user} > $dormant_limit);
+   }
+
+
+###############################################################################
+
+sub SoftWarn
+   {
+   local($user) = @_;
+   unlink($work);
+   &InitStat;
+
+   if ($mailfiles = &OldMail($user))
+      {
+      $mailsize=&MailSize($user);
+      }
+
+   &OldExecutables;               # Look for dead object files
+
+   &BigFiles;                     # Look for files bigger than $fsizelimit
+
+   ###
+
+   open(W,'>'.$work) || die "NP: Can't open $work";
+
+   print W <<"xxxx";
+This is an automatic mail from Nosey Parker $version concerning
+your disk usage on $home/$user. Please read it carefully.
+
+Friendly warning number $warnings{$user}.
+
+You have exceeded your quota of $limit kbytes and it's time to
+tidy up! If you feel that you need more space, you can discuss it
+with me. In the meantime, here are some suggestions to help you tidy up.
+
+Your total disk usage adds up to $n_used{$user} kbytes.
+
+xxxx
+
+   if ($timetocrash)
+      {
+      print W "If you carry on at the present rate, you will pass\n";
+      print W "the system's uppermost limit in $timetocrash weeks.\n";
+      }
+
+
+   if ($mailfiles)
+      {
+      print W "You have $mailsize kB of old mail in: $mailfiles.\n\n";
+      }
+
+   if ($hasbigfiles)
+      {
+      print W "\nThe following files are bigger than ",$fsizelimit/2,"kbytes.\n\n";
+      foreach $file (split(/:/,$bigfiles))
+         {
+         print W $file,"\n";
+         }
+      }
+
+   if ($hasbinaries)
+      {
+      print W "\nHere is specifically a list of executable files and binaries\n";
+      print W "which you haven't used for more than a week:\n\n";
+      foreach $file (split(/:/,$binaries))
+         {
+         print W $file,"\n";
+         }
+      }
+
+   print W  <<"xxxx";
+
+"cfengine" has already cleared out junk files you haven't used for a week.
+Try to find more -- e.g. postscript (.ps) files you don't need.
+Use the command "du -s *" to find out how big your files/directories
+are in kbytes. Alternatively you can use "ls -l". Ask if you have trouble.
+
+If you want to keep big files, you can use "compress" to make them smaller
+and then use "uncompress" to expand them again later. Note that if disk
+space becomes critical I will compress large files which do not get used
+often without asking! Good luck.
+
+--$sysadm
+xxxx
+
+
+   close(W);
+
+   if (! $nomail)
+      {
+      system ("$cfbindir/cfmail -s Quota-Warning $user < $work\n");
+      }
+
+   &SaveByUser($user,'S');
+   }
+
+###############################################################################
+
+sub HardWarn
+   {
+   ($user)=@_;
+   $todelete = $n_used{$user}-$limit-premargin;
+   unlink($work);
+   open(W,'>'.$work) || die "NP: Can't open $work";
+
+   print W <<"xxxx";
+This is an automatic mail from Nosey Parker $version concerning
+your disk usage on $home/$user. 
+
+Warning number $warnings{$user}.
+
+         **************************************
+         *                                    *
+         *  !!! THIS IS A FINAL WARNING !!!   *
+         *                                    *
+         **************************************
+You have exceeded your quota of $limit kbytes and have not
+made any effort to contact the system administrators to explain.
+Your total disk usage adds up to $n_used{$user} kbytes.
+If you do not clear at least $todelete kbytes immediately
+I will do it for you!
+
+--$sysadm
+
+xxxx
+
+   close(W);
+
+   if (! $nomail)
+      {
+      system ("$cfbindir/cfmail -s Final-Warning $user < $work\n");
+      }
+   &SaveByUser($user,'H');
+   }
+
+###############################################################################
+
+sub PreWarn
+   {
+   ($user)=@_;
+
+   open(W,'>'.$work) || die "NP: Can't open $work";
+
+   print W <<"xxxx";
+
+This is a friendly note from the system just to point out that your
+files are starting to grow close to the limit of space that is considered
+reasonable for you. You might want to clear out old files etc.
+or arrange for a bigger quota by contacting $sysadm. 
+xxxx
+   if ($timetocrash)
+      {
+      print W "At the  present rate of growth you'll reach the limit";
+      print W "in roughly $timetocrash weeks\n";
+      }
+   print W <<"xxxx";
+
+--$sysadm (Nosey Parker $version)
+xxxx
+
+   close(W);
+
+
+   if (! $nomail)
+      {
+      system ("$cfbindir/cfmail -s Reminder $user < $work\n");
+      }
+
+   &SaveByUser($user,'P');
+   }
+
+###############################################################################
+
+ sub CleanCriminalRecord
+    {
+    local($user) = @_;
+    $warnings{$user} = 0;
+    # Mail - thanks for tidying up!
+    }
+
+###############################################################################
+
+sub SaveNewStats
+   {
+   foreach $user (sort keys(%n_used))
+      {
+      $save{$user} .= $user .':' . $n_used{$user} . ':';
+      }
+   foreach $user (sort keys(%n_grad))
+      {
+      $save{$user} .= $n_grad{$user} . ':';
+      }
+   foreach $user (sort keys(%n_avgrad))
+      {
+      $save{$user} .= $n_avgrad{$user} . ':';
+      }
+   foreach $user (sort keys(%dormant))
+      {
+      $save{$user} .= $dormant{$user} . ':';
+      }
+   foreach $user (sort keys(%warnings))
+      {
+      $save{$user} .= $warnings{$user} . ':';
+      }
+   foreach $user (sort keys(%time))
+      {
+      $save{$user} .= $time{$user};
+      }
+
+   open (DATA,'>'.$stat_data);
+
+   foreach $user (sort keys(%save))
+      {
+      print DATA $save{$user},"\n";
+      }
+
+   close (DATA);
+   }
+
+###############################################################################
+
+sub MailSysAdm
+   {
+   unlink($work);
+   $sysmailflag = 0;
+   open(W,'>'.$work) || die "Can't open $work";
+
+   print W <<"xxxx";
+
+               Disk Usage Report from Nosey Parker
+
+   User       Quota (kb)   Used (kb)  Week     Grad     Warn  Type
+                                      T.Ov.   kb/week
+   ---------- ----------- ---------- -------  -------- ----- -------------
+
+xxxx
+
+   format W =
+   @<<<<<<<<< @<<<<<<<<<< @<<<<<<<<< @<<<     @<<<<<<< @<<<< @<<<<<<<<<<<<<<<<
+   $user,     $qu,        $tot,      $we,     $gr,     $wm,  $t
+.
+
+   select(W); $^= 'W_TOP'; $~ = 'W';
+
+   foreach $user (sort keys(%sysadm))
+      {
+      $sysmailflag = 1;
+      ($qu,$tot,$gr,$we,$wm,$t) = split(/:/,$sysadm{$user});
+      $we = '?' if ($we <= 0);
+      write(W);
+      }
+
+   print W "\n\n";
+   print W "Key: P - Pre-warning, user is approaching quota \n";
+   print W "     S - Soft-Warning, user has exceeded softlimit \n";
+   print W "     H - Hard-Warning, user has exceeded hardlimit \n";
+   print W "     D - Dormant, account has been static for x weeks \n\n";
+
+   if ($mailflag)
+      {
+      print W "\nNoseyParker $version was run with option nomail.\n";
+      }
+   else
+      {
+      print W "\nNoseyParker $version mailed warnings to the above\n";
+      print W "For categories P,S,H.\n";
+      }
+
+   close(W);
+
+   if ($sysmailflag)
+      {
+      system ("$cfbindir/cfmail -s $home $sysadm < $work\n");
+      }
+   }
+
+###############################################################################
+# Level 2
+###############################################################################
+
+sub InitStat
+   {
+   local($user)=@_;
+
+   $mailfiles = "";
+   $timetocrash = 0;
+   }
+
+###############################################################################
+
+sub OldMail
+   {
+   local($user)=@_;
+   if ( -f "$home/$user/mbox" )
+      {
+      $mailfiles .= "mbox ";
+      }
+   if( -d "$home/$user/Mail" )
+      {
+      $mailfiles .=  "Mail ";     
+      }
+   if( -d "$home/$user/mail")
+      {
+      $mailfiles .= "mail ";
+      }
+   return $mailfiles;
+   }
+
+###############################################################################
+
+sub MailSize
+   {
+   local($user)=@_;
+   $msize = 0;
+
+   foreach $folder ( split(/ /,$mailfiles) )
+      {
+      open (DIR,"du -s $home/$user/$folder |") || die "NP: error in Mailsize";
+
+      ($size) = <DIR>;
+      close(DIR);
+      $msize += $size;
+      }
+   return $msize;
+   }
+
+###############################################################################
+
+sub OldExecutables
+   {
+   $hasbinaries = 0;
+   $binaries="";
+
+   open(EX,"$findcomm $home/$user $restrict -atime +6 -print |") || die "NP: Can't open pipe";
+
+   while (<EX>)
+      {
+      chop;
+      next if ( -l $_ );
+      $binaries .= $_.':' if ( -B $_ && -f $_ );
+      $hasbinaries=1;
+      }
+
+   close(EX);
+   }
+
+###############################################################################
+
+sub BigFiles
+   {
+   $hasbigfiles = 0;
+   $bigfiles="";
+
+   open(BIG,"$findcomm $home/$user $restrict -size $fsizelimit -atime +3 -print |") || die "NP: Can't open pipe";
+
+   while (<BIG>)
+      {
+      chop;
+      next if ( -l $_ );
+      $bigfiles .= $_.':';
+      $hasbigfiles=1;
+      }
+
+   close(BIG);
+   }
+
+###############################################################################
+
+sub SaveByUser
+   {
+   local($user,$type)=@_;
+
+   if ($nomail)
+      {
+      $type = '('.$type.')';
+      }
+
+   if ($hasbigfiles)
+      {
+      $type .= " (big files)";
+      }
+
+   $sysadm{$user} = $limit.':'.$n_used{$user}.':'.$n_grad{$user}.':';
+   $sysadm{$user}.= $timetocrash.':'.$warnings{$user}.':'.$type;
+   }

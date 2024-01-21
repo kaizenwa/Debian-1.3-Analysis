@@ -1,0 +1,227 @@
+# Makefile for Checker - @OPTION@ -
+
+# Configuration 
+
+SHELL = /bin/sh
+srcdir = @SRCDIR@
+
+# The malloc directory
+MDIR = $(srcdir)/l-malloc
+
+# Your local language (English/French)
+# If you change it, do 'make language' to update files.
+LANG=@LANGUAGE@
+
+# Your compiler
+CC = @CC@
+AS = as
+LD = ld
+
+# Common prefix for installation directories. Must exist
+prefix = @PREFIX@
+exec_prefix = $(prefix)
+# Where to put the executables: checkergcc, checkerg++
+bindir = $(exec_prefix)/bin
+libdir = $(exec_prefix)/lib
+includedir = $(exec_prefix)/checker/include
+# Where to put the Info files.
+infodir = $(prefix)/info
+
+INSTALL = @INSTALL@
+INSTALL_DATA = @INSTALL_DATA@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+MAKEINFO = makeinfo
+
+VERSION=0.8
+DIST_NAME=Checker-$(VERSION)
+
+# Flags for your compiler.
+# Those are for GCC
+# -O2 means high optimization and -Wall enables (nearly) all warnings.
+# NEVER use -fomit-frame-pointer
+CWARNINGS = -Wall -Wstrict-prototypes # -Wmissing-prototypes -Werror -Wredundant-decls
+CPPFLAGS = -I. -I$(MDIR) -I$(srcdir) -I$(srcdir)/lib -I$(srcdir)/config/obj-formats
+ACPPFLAGS = $(CPPFLAGS) -I@CONFDIR@
+CFLAGS = -O2 -g $(CWARNINGS)
+# ALL_CFLAGS should be set by the configuration file.
+ALL_ASFLAGS = $(ACPPFLAGS)
+
+# CFLAGS for 'symctl' and 'genmess', only used to build the lib
+# It can also be used for 'checkergcc', 'checkerg++'.
+UTILS_CFLAGS = -O2 -Wall
+UTILS_LDFLAGS = -s
+
+#### HOST-decl configuration
+
+all: $(TARGET)
+
+L0OBJS = parse-args.o error.o smalloc.o signal.o find-exec.o fd.o time.o \
+         end.o begin.o
+
+L0CSRCS = $(srcdir)/parse-args.c $(srcdir)/error.c $(srcdir)/find-exec.c \
+	$(srcdir)/smalloc.c $(srcdir)/signal.c $(srcdir)/time.c message.c \
+	version.c end.c begin.c
+
+L0ASRCS =
+
+$(L0OBJS):
+	$(CC) -c $(ALL_CFLAGS) $(srcdir)/$*.c -o $@
+
+$(L0OBJS:.o=.s):
+	$(CC) -S $(ALL_CFLAGS) $(srcdir)/$*.c -o $@
+
+CSRCS = $(L0CSRCS)
+
+#### include-l-malloc-Makefile
+
+#### include-lib-Makefile
+
+#### include-confdir-Makefile
+
+#### include-stubs-Makefile
+
+#### HOST-rules configuration
+
+version.c:
+	echo "char *target = \"@TARGET@\";" > version.c
+	echo "char *version = \""$(VERSION)"\";" >> version.c
+
+message.o version.o:
+	$(CC) -c $(ALL_CFLAGS) $*.c -o $@
+
+testsuite:
+	cd $(srcdir)/testsuite && $(MAKE)
+
+symctl.o: $(SYMCTL_C)
+	$(CC) $(UTILS_CFLAGS) -c $(SYMCTL_C) -o symctl.o
+
+symctl: symctl.o
+	$(CC) $(UTILS_LDFLAGS) -o symctl symctl.o
+
+genmess.o: $(srcdir)/utils/genmess.c
+	$(CC) $(UTILS_CFLAGS) -c $(srcdir)/utils/genmess.c
+
+genmess: genmess.o
+	$(CC) $(UTILS_LDFLAGS) -o genmess genmess.o
+	$(RM) -f errlist.h errlist.mes message.c message.h message.o
+	$(RM) -f maccess.mes parse-args.mes
+
+language: genmess
+	./genmess errlist.new.h errlist.new.mes $(srcdir)/config/$(LANG)/errlist.m
+	-$(srcdir)/move-if-change errlist.new.h errlist.h
+	-$(srcdir)/move-if-change errlist.new.mes errlist.mes
+	./genmess message.new.h message.new.c $(srcdir)/config/$(LANG)/message.m
+	-$(srcdir)/move-if-change message.new.h message.h
+	-$(srcdir)/move-if-change message.new.c message.c
+	./genmess - maccess.new.mes $(srcdir)/config/$(LANG)/maccess.m
+	-$(srcdir)/move-if-change maccess.new.mes maccess.mes
+	./genmess /dev/null parse-args.new.mes $(srcdir)/config/$(LANG)/parse-args.m
+	-$(srcdir)/move-if-change parse-args.new.mes parse-args.mes
+
+errlist.mes errlist.h: genmess $(srcdir)/config/$(LANG)/errlist.m
+	./genmess errlist.new.h errlist.new.mes $(srcdir)/config/$(LANG)/errlist.m
+	-$(srcdir)/move-if-change errlist.new.h errlist.h
+	-$(srcdir)/move-if-change errlist.new.mes errlist.mes
+
+message.c message.h: genmess $(srcdir)/config/$(LANG)/message.m
+	./genmess message.new.h message.new.c $(srcdir)/config/$(LANG)/message.m
+	-$(srcdir)/move-if-change message.new.h message.h
+	-$(srcdir)/move-if-change message.new.c message.c
+
+maccess.mes: genmess $(srcdir)/config/$(LANG)/maccess.m
+	./genmess - maccess.new.mes $(srcdir)/config/$(LANG)/maccess.m
+	-$(srcdir)/move-if-change maccess.new.mes maccess.mes
+
+parse-args.mes: genmess $(srcdir)/config/$(LANG)/parse-args.m
+	./genmess /dev/null parse-args.new.mes $(srcdir)/config/$(LANG)/parse-args.m
+	-$(srcdir)/move-if-change parse-args.new.mes parse-args.mes
+
+#.depend: Makefile
+#	@echo "The dependency file is not up to date"	# have a beep
+#	@echo "Try 'make dep'"
+
+alwaysmake:
+
+info: checker.info
+
+checker.info: $(srcdir)/doc/checker.texi
+	$(MAKEINFO) $(srcdir)/doc/checker.texi
+
+TAGS:	$(SRCS)
+	etags $(SRCS)
+
+dist: distclean
+	cd ..; tar zcvf $(DIST_NAME).tgz $(DIST_NAME)
+
+Makefile: $(srcdir)/configure $(srcdir)/Makefile.in @MAKEFILE_FRAG@ \
+ $(MDIR)/SubMakefile  $(srcdir)/lib/SubMakefile @CONFDIR@/SubMakefile \
+ $(srcdir)/stubs/SubMakefile
+	$(SHELL) MakeMakefile @OPTION@
+
+depend: language version.c
+	$(CPP) -MM $(CSRCS) $(CPPFLAGS) > .depend
+	$(CPP) -MM $(ASRCS) $(ACPPFLAGS) >> .depend
+
+dep:
+	@echo "You don't have to do: make dep"
+
+checker.o: $(srcdir)/utils/checker.c
+	$(CC) $(UTILS_CFLAGS) -DCHECKER_PATH=\"$(libdir)\" -DGCCCHECKER \
+	-DCHECKER_INCLUDE_DIR=\"$(includedir)\" $(srcdir)/utils/checker.c \
+	-c -o checker.o
+
+checker: checker.o version.o
+	$(CC) $(UTILS_CFLAGS) checker.o version.o -o $@
+
+install.dir:
+	if test ! -d $(libdir) ; then mkdir $(libdir); fi
+	if test ! -d $(bindir); then mkdir $(bindir); fi
+	incdir=`echo $(includedir) | sed -e 's:/include$$::'`; \
+	if test ! -d $$incdir; then mkdir $$incdir; fi
+	if test ! -d $(includedir); then mkdir $(includedir); fi
+
+clean:
+	$(RM) -f core *.o *~ a.out symctl example checker checker.so.1
+	$(RM) -f prospect symctl.in
+
+mostlyclean: clean
+
+distclean: clean
+	$(RM) -f config.status TAGS MakeMakefile Makefile
+	$(RM) -f errlist.h errlist.c message.c message.h genmess
+	$(RM) -f maccess.mes parse-args.mes errlist.mes
+	$(RM) -f bitops.h chkrsyscall.h machine.h chkr-string.h version.c
+	$(RM) -f available-stubs.h checker_api.h
+
+realclean: distclean
+
+checker_api.h: $(srcdir)/checker.h
+	sed -e "/^\/\* NOT-API \*\/$$/,/^\/\* API \*\/$$/d" \
+	  $(srcdir)/checker.h > checker_api.h
+
+.PHONY: dep depend dist distclean clean alwaysmake testsuit all
+
+# depend
+DEP_CHECKER_H=$(srcdir)/checker.h $(srcdir)/define.h $(srcdir)/lib/chkrlib.h \
+  machine.h chkr-string.h chkrsyscall.h
+parse-args.s parse-args.o: $(srcdir)/parse-args.c $(DEP_CHECKER_H) \
+  errlist.h message.h parse-args.mes
+error.s error.o: $(srcdir)/error.c $(DEP_CHECKER_H) errlist.mes
+find-exec.s find-exec.o: $(srcdir)/find-exec.c $(DEP_CHECKER_H)
+smalloc.s smalloc.o: $(srcdir)/smalloc.c $(DEP_CHECKER_H) errlist.h
+signal.s signal.o: $(srcdir)/signal.c $(DEP_CHECKER_H) errlist.h message.h
+time.s time.o: $(srcdir)/time.c $(DEP_CHECKER_H)
+fd.s fd.o: $(srcdir)/fd.c $(DEP_CHECKER_H) errlist.h message.h
+message.s message.o: message.c 
+version.s version.o: version.c 
+gnu.a.out.s gnu.a.out.o: $(srcdir)/config/obj-formats/gnu.a.out.c \
+  $(srcdir)/config/obj-formats/stabx.h $(DEP_CHECKER_H)
+elf-stabs.s elf-stabs.o: $(srcdir)/config/obj-formats/elf-stabs.c message.h \
+  $(DEP_CHECKER_H) $(srcdir)/config/obj-formats/stabx.h \
+  $(srcdir)/config/obj-formats/elf-libs.h
+elf-symtab.s elf-symtab.o: $(srcdir)/config/obj-formats/elf-symtab.c \
+  $(DEP_CHECKER_H) $(srcdir)/config/obj-formats/elf-libs.h message.h
+generic-symtab.s generic-symtab.o: \
+  $(srcdir)/config/obj-formats/generic-symtab.c $(DEP_CHECKER_H) message.h
+begin.s begin.o: $(srcdir)/begin.c
+end.s end.o: $(srcdir)/end.c

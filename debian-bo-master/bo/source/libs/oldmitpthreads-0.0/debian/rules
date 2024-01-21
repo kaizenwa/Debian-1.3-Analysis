@@ -1,0 +1,75 @@
+#! /usr/bin/make -f
+#
+# Last updated: Sat Dec 17 10:52:20 EST 1994 by imurdock.
+#
+# To make the binary distribution package, the ``Debianized'' source package
+# and the context diff to the original package, type `./debian.rules dist'.
+# Make sure that `debian.rules' is executable before the final distribution
+# is made.
+#
+# Invoke each target with `./debian.rules <target>'.  All targets should be
+# invoked with the package root as the current directory.
+#
+# The `binary' target must be run as root, as it needs to install files with
+# specific ownerships.  The `diff' target assumes that you have the original
+# source package available, unpacked, in ../$(p)-$(v).orig, or that you have
+# the previous revision of the ``Debianized'' source package and context diff
+# in the parent directory.
+
+# The name of the package (for example, `emacs').
+p = oldmitpthreads
+# The version of the package (for example, `19.28').
+v = 0.0
+mv = 5.0.7
+pv = 1.60.4
+# The Debian revision of the package (for example, `2').
+d = 1
+a = $(shell dpkg --print-architecture)
+
+GNU_MALLOC = malloc-930716
+
+build:
+# Builds the binary package.
+	make
+	touch build
+
+clean:
+# Undoes the effect of `make -f debian.rules build'.
+	-make clean
+	rm -rf pth-tmp
+	rm -f `find . -name '*~' -print` build
+
+binary-arch: checkroot build
+# Makes a binary package.
+	$(checkdir)
+	#
+	rm -rf  pth-tmp
+	install -d pth-tmp
+	chmod g-s pth-tmp
+	#
+	install -d pth-tmp/usr/lib
+	cp elfshared/libpthreads.so.$(pv) pth-tmp/usr/lib
+	strip pth-tmp/usr/lib/libpthreads.so.$(pv)
+	ln -s libpthreads.so.$(pv) pth-tmp/usr/lib/libpthreads.so.1
+	ln -sf libpthreads.so.$(pv) pth-tmp/usr/lib/libpthreads.so
+	install -d pth-tmp/usr/include
+	cp -a include/pthread* pth-tmp/usr/include/
+	#
+	install -d pth-tmp/usr/doc/$(p)
+	install debian/README pth-tmp/usr/doc/$(p)/copyright
+	gzip -9f pth-tmp/usr/doc/$(p)/*
+	#
+	install -d pth-tmp/DEBIAN
+	dpkg-gencontrol -poldmitpthreads -Ppth-tmp
+	#
+	chmod -R g-w pth-tmp
+	chown -R root.root pth-tmp
+	dpkg --build pth-tmp
+	dpkg-name -o -s ..  pth-tmp.deb
+
+binary: binary-arch
+
+checkroot:
+	test root = "`whoami`"
+
+.PHONY: binary binary-arch binary-indep clean checkroot

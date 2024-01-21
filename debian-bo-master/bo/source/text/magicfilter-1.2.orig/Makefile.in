@@ -1,0 +1,85 @@
+#
+# Makefile for the lpr/lpd magic filter
+#
+# Copyright © 1995 Yggdrasil Computing, Inc
+#
+
+#
+# Define the following to suit your taste
+# 
+
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = ${exec_prefix}/bin
+mansec=8
+mandir = ${prefix}/man/man${mansec}
+
+CC = @CC@
+CFLAGS = @CFLAGS@
+LDFLAGS = @LDFLAGS@
+LIBS = @LIBS@
+RM = rm -f
+SED = sed
+INSTALL = @INSTALL@
+INSTALL_EXEC = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
+
+#
+# These defines control the sending of mail notices to people who submit
+# bad jobs (PostScript to non-PS printers, or trying to print binaries.)
+#
+# This may not work if the hostname lpd knows about is not necessary a
+# valid mail address (for example, if you can submit print jobs from
+# non-mailer machines without MX records).  If so, define -DNOMAIL.
+#
+# -DNOMAIL		Disable sending of rejection mail notices 
+# -DSENDMAIL="path"	Where is your mail transport agent?
+# -DBANG_ADDRESS	To send to "host!user" instead of "user@host"
+#
+# If <paths.h> exist and contains _PATH_SENDMAIL, it will be used unless
+# overridden here
+#
+SYSOPT=
+
+.c.o:
+	${CC} ${CFLAGS} ${SYSOPT} -c $<
+
+.PHONY: all filters clean distclean install install_filters
+
+OBJS = magicfilter.o parseconfig.o loadconfig.o
+
+all: magicfilter magicfilter.man filters
+
+filters:
+	cd filters; make
+
+install: magicfilter magicfilter.man
+	${INSTALL_EXEC} magicfilter ${bindir}/magicfilter
+	${INSTALL_DATA} magicfilter.man ${mandir}/magicfilter.${mansec}
+
+install_filters:
+	cd filters; make install
+
+clean:
+	-cd filters; make clean
+	-${RM} magicfilter magicfilter.man *.o
+
+distclean: clean
+	-cd filters; make distclean
+	-${RM} *~ Makefile config.cache config.log config.status config.h
+
+magicfilter: ${OBJS}
+	${CC} ${LDFLAGS} -o magicfilter ${OBJS} ${LIBS}
+
+magicfilter.o: magicfilter.c magicfilter.h
+
+parseconfig.o: parseconfig.c magicfilter.h
+
+loadconfig.o: loadconfig.c magicfilter.h
+
+magicfilter.man: magicfilter.man.in
+	${SED} -e "s:XXX_BINDIR_XXX:${bindir}:g" < magicfilter.man.in | \
+	${SED} -e "s:///*:/:g" > magicfilter.man

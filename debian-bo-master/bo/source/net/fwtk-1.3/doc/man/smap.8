@@ -1,0 +1,131 @@
+.\" Marcus J. Ranum, 1993
+.\" Copyright (C) Trusted Information Systems, Inc.
+.\" All rights reserved
+.TH SMAP 8 "23 August 1993"
+.SH NAME
+smap - sendmail wrapper client
+.SH SYNOPSIS
+.B smap
+[invoked from inetd]
+.SH DESCRIPTION
+.IX  "smap client"  ""  "\fLsmap\fP \(em sendmail wrapper security"
+.LP
+The
+.B smap
+client implements a minimal version of SMTP, accepting messages
+from over the network, and writing them to disk for future
+delivery by
+.B smapd.
+.B smap
+is designed to run under chroot(2) as a non-privileged process,
+to overcome potential security risks presented by privileged mailers
+running where they can be accessed from over a network.
+.LP
+.B smap
+is invoked from
+.B inetd(8)
+and exits when its session is completed. Each session's mail is
+recorded in an temporary file in its spool directory, with the
+SMTP envelope encoded in the heading of the file. In order to
+coordinate processing with
+.B smapd
+the file is locked while it is being written. As a secondary
+means of signalling when a message is completely gathered,
+the mode of the file, which is initially 644, is changed to
+755. In this manner the system can identify truncated or
+partial files left after a system crash or reboot.
+.SH OPTIONS
+.LP
+.B smap
+takes no command line options. All configuration rules in
+.B netperm-table
+for application "smap" are read, and the following clauses
+and parameters are recognized:
+.TP
+.B userid name
+specify the userid that
+.B smap
+should run under. The name can be either a name from the
+password database, or a numeric user-ID. This userid should
+be the same as that under which
+.B smapd
+runs, and should have write permission to the spool directory.
+.TP
+.B directory pathname
+specifies the spool directory where
+.B smap
+should store incoming messages. A chroot(2) system call is used
+to irrevocably make the specified directory the root filesystem
+for the remainder of the process.
+.TP
+.B maxbytes value
+specifies the maximum size of messages to gather, in bytes.
+If no value is set, message sizes are limited by the amount
+of disk space in the spool area.
+.TP
+.B maxrecip value
+specifies the maximum number of recipients allowed for any
+message. This option is only for administrators who are
+worried about the more esoteric denial of service attacks.
+.TP
+.B timeout value
+specifies a timeout, after which
+.B smap
+should exit if it has not collected a message. If no
+timeout value is specified,
+.B smap
+will never time out a connection.
+.SH INSTALLATION
+.LP
+To install
+.B smap
+identify the spool directory where mail will be collected.
+Identify the userid that
+.B smap
+will run with, and make sure that it own the spool directory.
+Install smap in
+.B /etc/inetd.conf
+as follows (pathnames may change):
+.sp 1
+.nf
+.na
+smtp stream tcp  nowait root  /usr/local/etc/smap  smap
+.fi
+.ad
+.LP
+After modifying
+.B /etc/inetd.conf
+it is necessary to signal inetd to reload its configuration
+information, and to make sure that
+.B sendmail(8)
+is no longer running on the system.
+.LP
+In the spool directory, it may be necessary to make an
+/etc directory with system-specific configuration files,
+if the C support library on the host UNIX requires them.
+Generally it is recommended to build
+.B smap
+so it is completely standalone, i.e.: a statically linked
+executable, linked against a resolver library that will
+not crash if it is unable to read /etc/resolv.conf. Alternately,
+a small number of support files (/etc/hosts, /etc/resolv.conf)
+may be required. Be careful not to install any device files,
+or executables in the spool directory. Test installation by
+using telnet to connect to the SMTP port.
+.LP
+.B smap
+assumes that
+.B smapd
+will also be running on the system. See
+.B smapd(8).
+.sp 1
+.SH FILES
+.PD 0
+.TP 20
+.B spool directory
+.SH SEE ALSO
+.BR netperm-table (5)
+.BR smapd (8)
+.SH BUGS
+.LP
+The support for SPECIALDOMAIN is an ugly hack.

@@ -1,0 +1,142 @@
+#!/bin/bash
+#
+# Find all docs related to one program.
+#
+
+trace() { 
+	(echo -n "$@  "; date) 1>/dev/null
+}
+trace beginning
+
+DWWW_QUICKFIND_DB=/var/lib/dwww/quickfind.dat
+if [ -f /etc/dwww/dwww.conf ]
+then
+	. /etc/dwww/dwww.conf
+fi
+
+findpkg() {
+	if [ -f "$DWWW_QUICKFIND_DB" ]
+	then
+		dwww-quickfind "$1" "$DWWW_QUICKFIND_DB"
+	else
+		dpkg --search "$1" | sed 's/:.*//;1q'
+	fi
+}
+
+mans_in_pkg() {
+	echo "<strong>Manual pages:</strong> "
+	grep '/man/' < $filelist | grep -v '^/usr/doc/' |
+	while read file
+	do
+	  x="`basename $file | sed 's/\.gz$//;s/\.\([^.]*\)$/(\1)/'`"
+	  [ -f "$file" ] &&
+	  echo "<a href=\"/cgi-bin/dwww?type=man&location=$file\">$x</a>"
+	done | tee $temp
+	if [ ! -s $temp ]
+	then
+		echo "none."
+	fi
+	echo "<p>"
+}
+
+infos_in_pkg() {
+	echo "<strong>Info files:</strong> "
+	grep -E '/info/.*info(\.gz)?$' < $filelist | 
+	while read file
+	do
+		base="`basename $file | sed 's/\..*//'`"
+		echo "<a href=\"/cgi-bin/info2www?$file\">$base</a>"
+	done | tee $temp
+	if [ ! -s $temp ]
+	then
+		echo "none."
+	fi
+	echo "<p>"
+}
+
+docs_in_pkg() {
+	echo "<strong>Other documents:</strong> "
+	grep '^/usr/doc/' < $filelist | 
+	grep -v '^/usr/doc/copyright' |
+	while read file
+	do
+	  [ -d "$file" ] &&
+	  echo "<a href=\"/cgi-bin/dwww?type=dir&location=$file\">$file</a>"
+	done | tee $temp
+	if [ ! -s $temp ]
+	then
+		echo "none."
+	fi
+	echo "<p>"
+}
+
+apropos() {
+	echo "<strong>Manual page search:</strong> "
+	if man -k "$1" > $temp
+	then
+		sed -e 's/- .*//' -e 's/  *//' $temp |
+		while read file
+		do
+			ref=`echo $file | sed -e 's:\((.*)\):/&:' -e 's/[()]//g'`
+			echo "<a href=\"/cgi-bin/dwww?type=runman&location=$ref\">$file</a>"
+		done
+	else
+		echo "nothing."
+	fi
+	echo "<p>"
+}
+
+
+trace beginning2
+
+if [ "$1" = "" ]
+then
+	echo "usage: $0 programname" 1>&2
+	exit 1
+fi
+
+temp="/tmp/dwww-find.$$"
+filelist="/tmp/dwww-find.list.$$"
+touch $temp
+chmod 600 $temp
+
+cat <<EOF
+<html> <head> <title>Search results</title> </head> <body>
+<h1>Search results</h1>
+EOF
+
+trace before for loop
+for arg in $*
+do
+	trace for loop "($arg)"
+	echo "<h2>Documentation related to <em>$arg</em></h2>"
+
+	for bin in $arg # `type -path -all $arg`
+	do
+		trace before findpkg
+		pkg="`findpkg $bin`"
+		trace after findpkg
+		if [ "$pkg" != "" ]
+		then
+			echo "<strong>Package:</strong> $pkg<p>"
+			trace before listfiles
+			dpkg --listfiles "$pkg" > $filelist
+			trace before man_in_pkg
+			mans_in_pkg $pkg
+			trace before infos_in_pkg
+			infos_in_pkg $pkg
+			trace before docs_in_pkg
+			docs_in_pkg $pkg
+			trace after docs_in_pkg
+		fi
+	done
+	trace before apropos
+	apropos $arg
+	trace after apropos
+done
+
+cat <<EOF
+</body> </html>
+EOF
+
+rm -f $temp $filelist

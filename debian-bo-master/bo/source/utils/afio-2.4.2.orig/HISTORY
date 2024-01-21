@@ -1,0 +1,239 @@
+
+This file contains some historical information on afio.  Some of the
+things said here may no longer be true.
+
+============Very old README file contents==============================
+
+Afio is a better way of dealing with cpio-format archives. It is
+generally faster than cpio, provides more diverse magnetic tape
+options and deals somewhat gracefully with input data corruption.
+
+Afio is quite portable. It is now running under 4.2BSD, System V
+and even one or two UNIX-like operating systems. Please see the
+beginning of afio.c for a brief description of the compile-time
+configuration options.
+
+Discussion of features (including those unintended ones commonly
+referred to as "bugs") may be sent to ..!{ihnp4, sun}!laidbak!mdb.
+
+				Mark Brukhartz
+				Lachman Associates, Inc.
+				..!{ihnp4, sun}!laidbak!mdb
+
+Current maintainer: Jeff Buhrt, uunet!sawmill!prslnk!buhrt
+
+=================Notes on changes in new versions==================
+
+
+Dave Gymer (dpg@cs.nott.ac.uk) (up to version 2.3-dpg-3):
+
+This is my port to Linux of afio.  See afio.1 and README for a
+description of what this does.  It's based on work I did to port this
+to MiNT by Eric Smith on the Atari ST, and consists mainly of bugfixes
+and one important new feature; the use of st_rdev to indicate whether
+a regular file was compressed by afio or not if it's name in the
+archive ends in .z.  I did this because I didn't want backups of files
+which were already compressed (like .tar.Z archives and some of the
+stuff in the Xfree386-1.1 distribution) to be uncompressed if I
+restored my filesystem.
+
+This also means that the -Z option is meaningful when listing the
+contents of an archive; if given, any .z files are listed without the
+.z if afio compressed them, or with the .z if they were like that when
+afio found them.
+
+I also ran the code through GNU Indent 1.4.
+
+This is the third release of my version; this one knows about gzipped
+files (.z), uses gzip instead of compress, and handles other files
+which rarely compress well, like JPEGs.
+
+You may want to undefine LONGZFILE if you still use the Minix fs; I
+use xiafs so it doesn't matter.  Even if you do use the Minix fs,
+you'll only get bitten if you try to restore a compressed archive
+without uncompressing files.
+
+Andrew Stevens (as@prg.oxford.ac.uk) (version 2.3-dpg-4 onwards)
+
+I've tidied the code a little to make the double-buffering work (and
+prompt sensibly) and avoid leakage of file-handles in the compression
+code.
+
+This code really really needs splitting up into multiple source files!
+
+I have tested backing up and restoring off floppies fairly thoroughly
+(various options), but I have no the faintest idea how reliable any of
+the other stuff is.  
+
+I have included my favourite backup script as an example of the usage
+of afio. [This script is in the script1 subdirectory.]
+This uses the directory /usr/adm/dump to record dumping
+dates and a file /usr/adm/dump/DONTDUMP (example included) to
+filter out non-dumpable areas.
+
+The afio source as given will not attempt to compress files ending in
+  .Z .z .gz 
+  .arc .gif .zip .zoo .lha .jpeg .jpg 
+  .tpz .taz .tgz .tzg 
+See also the -E option in the manual page.
+
+
+Koen Holtman (koen@win.tue.nl) (version 2.3.5 (for Linux) onwards)
+
+Introduced new options -E, -G, -M, -w and -W.
+
+On compressing files, afio now temporarily stores the result in memory
+in stead of creating (potentially huge) /tmp files.  This way, there
+is no danger of the /tmp filesystem getting full during a backup, so
+that a backup script calling afio can safely use /tmp.  Afio won't use
+more than 2 meg memory for temporary storage (also see the -M option).
+If it runs out of memory, it calls gzip twice, the first time to
+determine the length of the result, the second time to get the data
+itself.
+
+The -y and -Y options now are able to handle real shell patterns, and
+generally work more sensible.
+Verifying floppy disks now works on Linux.
+
+
+Version 2.3.6 (for Linux):
+
+Added -T option.  The options -G and -T can be used to optimize the
+backup speed/compression ratio if you have a slow machine or a fast
+backup medium.  Added -S option.  Fixed some bugs in 2.3.5.
+
+
+Version 2.3.6-dpg-1 (for Linux):
+
+Bug fix in -F option by Dave Gymer (dpg@Cs.Nott.AC.UK).
+
+
+Version 2.3.7:
+
+Deleted shared memory code to reduce code clutter.  
+
+Removed `buggy gzip workaround' in compfile.c, this caused afio to
+hang occasionally if the -f option was used.  This means that afio will
+only run with newer gzip versions. (I don't know exactly which version
+is new enough, though gzip 1.2.3 and above certainly are. Just try
+it.)
+
+Edited -F code to fix `double prompting' bug.
+
+Added more warnings to the manual.
+
+Added some ifdefs and a few notes to make porting to other unix
+versions easier.
+
+
+Version 2.4:
+
+Added -r option and small bugfix in tty handling, both by Anders
+Baekgaard (ab@osiris.cpk.auc.dk).
+
+Added -B option that prints the byte position of each file in the
+archive in the -v output.
+
+Made -F option do writing in O_SYNC mode under Linux.  Thus afio will
+notice some floppy disk write errors using Linux kernel 1.1.54 or
+higher.
+
+Updated manual page.  Updated usage message.
+
+Made version number shorter, though number of changes does not warrant
+a new major version.
+
+
+Version 2.4.1:
+
+Fixed bug that sometimes caused unzipping to fail due to a seek on a
+pipe (bug found and fixed by Keith Owens).
+
+Deleted malloc() result check in meminit() to help porting, malloc(0)
+returns NULL on some machines.
+
+Fixed bug caused by incorrect assumptions about write(), triggered
+under Linux if afio -iZ ... is stopped and restarted.
+
+Now exits if a broken pipe occurs on the stderr of afio -i or the
+stdout of afio -t and afio -rv.  Thus afio -t can be used with head to
+get a table of contents of the beginning of an archive.
+
+Fixed bug in setting suid/sgid bits when restoring a file that does
+not have user=root, group=root.  Afio did not take into account that
+the Linux chown() clears these bits in some cases.
+
+Expanded semantics of -s, changed the behavior when afio gets an input
+eof without there being an -s option given; the old behavior can be
+gotten back by using -s 0.  This change prevents bogus insert next
+disk messages when the archive ends prematurely.
+
+Made control file feature (added -D option).
+
+Fixed bug in afio 2.4 that caused symbolic link info to be omitted
+when creating an archive.
+
+Fixed bugs in -r option.
+
+Removed empty lines from logfile created with -L option, also fixed
+bug in logfile creation.
+
+Reorganized documentation files, updated manual page.
+
+
+Version 2.4.2:
+
+Added code to let subprocesses close archive file descriptor, needed
+for some tape drivers when changing tapes.
+
+Fixed bug in multivolume tape read code.
+
+Added some portabilty stuff:
+- Rewrote archive header scanf to be more portable.
+- Changed CPPFLAGS into CFLAGS in Makefile.
+- Changed ssize_t and size_t in writeall() to int.
+- Added code to clear asb.sb_rdev in the file stat block if not a
+  device: some OSes put (garbage?) info in this field in stead of
+  clearing it and afio wants it cleared.
+
+Added -a option to preserve atime on files read when doing -o or -r.
+Using it will set the ctime for these files to the current time, so
+this option _cannot_ be used together with most incremental backup
+schemes, which rely on the ctime being preserved.
+
+Fixed bug in -f option when used with -s.
+
+Updated manual, added new warning to BUGS section.
+
+Fixed tocentry() to print -B byte offset to stdout instead of stderr.
+
+Added support for creation of UNIX sockets in restore.
+
+Added single qoutes around rsh switches. 
+
+Added `-s 0' functionality to the -I command.
+
+Added -z calculation to -I and -O commands.
+
+Changed restore not to do utime() to restore time on symlinks: the
+timestamp change gets done on the file linked to and that is not very
+productive.
+
+Took -N flag out of LDOPTS in Makefile.  No idea what it should have
+done.
+
+Added `f to format' option in floppy handling code (patch by Ulrich
+Lauther).  Note that afio still does not have adequate multivolume
+floppy support: use the tbackup program as a wrapper around afio for
+that.
+
+Changed default format command in Makefile from /bin/fdformat to
+fdformat.
+
+Changed nice(-40) to nice(-10) for subprocess in -f option.
+
+Added options -U, -P, -Q to force compression, specify compression
+program and pass options to the compression program, based on patch
+file by karsten.ballueder@stud.uni-karlsruhe.de.  Added script3/
+directory to distribution.
+

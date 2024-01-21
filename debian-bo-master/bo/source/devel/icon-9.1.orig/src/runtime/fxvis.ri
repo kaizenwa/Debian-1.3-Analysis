@@ -1,0 +1,69 @@
+/*
+ * fxvis.ri -- functions to support program visualization.
+ */
+
+"serial(x) - return serial number of structure."
+function {0,1} serial(x)
+   abstract {
+      return integer
+      }
+
+   type_case x of {
+      list:   inline {
+         return C_integer BlkLoc(x)->list.id;
+         }
+      set:   inline {
+         return C_integer BlkLoc(x)->set.id;
+         }
+      table:   inline {
+         return C_integer BlkLoc(x)->table.id;
+         }
+      record:   inline {
+         return C_integer BlkLoc(x)->record.id;
+         }
+      default:
+         inline { fail; }
+      }
+end
+
+"structure(x) -- generate all structures allocated in program x"
+function {*} structure(x)
+
+   if !is:coexpr(x) then
+       runerr(118, x)
+
+   abstract {
+      return list ++ set ++ table ++ record
+      }
+
+   body {
+      tended char *bp;
+      char *free;
+      tended struct descrip descr;
+      word type;
+
+#ifdef MultiThread
+      bp = ((struct b_coexpr *)BlkLoc(x))->program->blockregion->base;
+      free = ((struct b_coexpr *)BlkLoc(x))->program->blockregion->free;
+#else					/* MultiThread */
+      bp = blkbase;
+      free = blkfree;
+#endif					/* MultiThread */
+
+      while (bp < free) {
+         type = BlkType(bp);
+         switch (type) {
+            case T_List:
+            case T_Set:
+            case T_Table:
+            case T_Record: {
+               BlkLoc(descr) = (union block *)bp;
+               descr.dword = type | F_Ptr | D_Typecode;
+               suspend descr;
+               }
+            }
+         bp += BlkSize(bp);
+         }
+      fail;
+      }
+end

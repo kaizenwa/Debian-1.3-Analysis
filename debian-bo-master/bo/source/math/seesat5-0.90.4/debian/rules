@@ -1,0 +1,87 @@
+#!/usr/bin/make -f
+
+p=seesat5
+
+INSTALL = install
+INSTALL_BIN = $(INSTALL) --owner=root --group=root --mode=0755
+INSTALL_LIB = $(INSTALL) --owner=root --group=root --mode=0644
+INSTALL_DIR = $(INSTALL) --directory --owner=root --group=root --mode=0755
+
+GZIP = gzip
+
+FAKE-ROOT =
+PREFIX = /usr
+
+BINDIR = $(FAKE-ROOT)$(PREFIX)/bin
+MANDIR = $(FAKE-ROOT)$(PREFIX)/man
+
+DOCDIR = $(FAKE-ROOT)$(PREFIX)/doc/$(p)
+EXAMPLEDIR = $(FAKE-ROOT)$(PREFIX)/doc/$(p)/examples
+
+build:
+	$(checkdir)
+	make
+	-rm clean
+	touch build
+
+clean:
+	$(checkdir)
+	-rm -f build
+	-rm -f *.o seesat5
+	-rm -rf debian/tmp *~ *.orig ./#*#
+	touch clean
+
+binary-indep:
+# None
+	@echo 'No indepenent portions for this package.'; false
+
+binary binary-arch:		checkroot build
+	-rm -rf debian/tmp
+	$(INSTALL_DIR) debian/tmp debian/tmp/DEBIAN
+	cp debian/postinst debian/tmp/DEBIAN/postinst
+	chmod +x debian/tmp/DEBIAN/postinst
+	make -f debian/rules FAKE-ROOT=debian/tmp install
+	dpkg-shlibdeps $(p)
+	dpkg-gencontrol
+	chown -R root.root debian/tmp
+	chmod -R g-ws debian/tmp
+	dpkg --build debian/tmp ..
+
+install: build
+	$(INSTALL_DIR) $(BINDIR)
+	strip seesat5
+	$(INSTALL_BIN) seesat5 $(BINDIR)/seesat5
+	strip cr
+	$(INSTALL_BIN) cr $(BINDIR)/cr
+	
+	$(INSTALL_DIR) $(MANDIR)/man1
+	$(INSTALL_LIB) Docs/seesat5.man.1 $(MANDIR)/man1/seesat5.1
+	$(INSTALL_LIB) Docs/cr.man.1 $(MANDIR)/man1/cr.1
+
+	$(INSTALL_DIR) $(MANDIR)/man5
+	$(INSTALL_LIB) Docs/SEESAT5.INI.man.5 $(MANDIR)/man5/SEESAT5.INI.5
+	$(INSTALL_LIB) Docs/tle.man.5 $(MANDIR)/man5/tle.5
+
+	$(INSTALL_DIR) $(MANDIR)/man7
+	$(INSTALL_LIB) Docs/seesat5.man.7 $(MANDIR)/man7/seesat5.7
+
+	$(INSTALL_DIR) $(DOCDIR)
+	$(INSTALL_LIB) Docs/seesat5.docs.old $(DOCDIR)
+	$(INSTALL_LIB) debian/copyright $(DOCDIR)
+	$(INSTALL_LIB) debian/changelog $(DOCDIR)
+	$(GZIP) $(DOCDIR)/*
+
+	$(INSTALL_DIR) $(EXAMPLEDIR)
+	$(INSTALL_LIB) Docs/Visual.tle $(EXAMPLEDIR)
+	$(INSTALL_LIB) Docs/SEESAT5.INI.example $(EXAMPLEDIR)
+	$(GZIP) $(EXAMPLEDIR)/*
+
+define checkdir
+	test -f seesat.c -a -f debian/rules
+endef
+
+checkroot:
+	$(checkdir)
+	test root = "`whoami`"
+
+.PHONY: binary binary-arch binary-indep source clean checkroot

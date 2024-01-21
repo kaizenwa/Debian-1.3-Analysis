@@ -1,0 +1,313 @@
+PGIF - A Postgres Interface for CNIDR's ISITE.
+
+/* Copyright 1995 Clearinghouse for Networked Information Discovery and   
+   Retrieval, all rights reserved.  Copyright assigned to CNIDR by Scott
+   Technologies, Inc., the developer of PGIF.  Scott Technologies
+   provides services for integration of databases and free text search
+   capabilities, as well as development of network and end-user interfaces.
+ 
+   Scott Technologies, Inc.
+   +1 919 732 7930
+   1406 US 70 E 
+   Hillsborough NC, 27278
+ 
+*/
+
+
+Welcome to PGIF, a postgres interface for CNIDR's ISITE.  PGIF is a layer
+behind SAPI that lets users submit Z39.50 queries and have those queries
+executed by Postgres.
+
+
+BUILDING PGIF
+
+Building PGIF is fairly straitforward, assuming you've built Isite once before
+and have feeling for how the Makefiles work.  You need to have installed
+Postgres already.  We're using version 4.2, and we suggest you do to.
+
+In general, do the following to rebuild Isite to use PGIF:
+
+1) Modify the toplevel Makefile.  Search for "PGIF" and follow the lead
+presented.  If you have a completely default installation of Postgres then you
+won't even have to change the path names.
+
+2) Modify .../zdist-1.02/zserver/Makefile and make sure you're adding the
+Postgres library and library path on the end of the link line.  Look for
+"-lpq" and follow our lead.  This is necessary because the Isite Makefiles
+seem to lack a way to pass in support libraries to this directory directly.
+
+3) If you built postgres with "cc" but you're trying to build PGIF with gcc or
+g++, then remove or comment out all of the function prototypes in
+/usr/local/postgres/include/libpq.h.  This is necessary because it appears
+that gcc is trying to be really clever and build function header information
+into function names.  You'll know you need to do this if you get a message
+that PGntuplesGroup() couldn't be found, but you *don't* get a message
+complaining that PQexec() is missing.
+
+4) Type "make clean; make"  (dependencies are incomplete, so you need to make
+clean so zserver will be rebuilt).  With a modicum of luck, the compile should
+generate only slightly more than the usual number of warnings, and in about a
+minute you'll have a zserver that can use Postgres.
+
+Next steps:  Modify sapi.ini.  Here's a look at one that works:
+
+[Default]
+
+# What databases are available for calling applications?
+DBList=MyNewZServer,ManPages,dodges,pgiftest
+
+# For each database listed in the DBList directive, you must have a 
+# Database Information Group 
+
+[MyNewZServer]
+
+# What type of database system indexed this database?
+Type=SCRIPT
+
+# Where does the database live?
+Location=/home/kgamiel/Isite-1.00/bin/MyNewZServer.sh
+
+# In the case of a SCRIPT type database system, you need to define a temporary
+# filename prefix in the directive "Results"
+Results=/tmp/MyNewZServer
+
+[ManPages]
+Type=SCRIPT
+Location=/home/kgamiel/Isite-1.00/bin/ManPages.sh
+Results=/tmp/ManPages
+
+
+[dodges]
+Type=ISEARCH
+Location=/usr/users/escott/Isite-1.00/bin
+
+[pgiftest]
+Type=PGIF
+Location=DEMO
+
+
+-end-of-snippet-
+
+The line "Type=PGIF" is pretty self-explanatory.  The line "Location=DEMO" is
+used to pass in the name of the Postgres database to use.
+
+
+Next, modify zserver.ini:
+
+[Default]
+ServerType=INETD
+MaxSessions=50
+Port=2210
+Trace=ON
+TraceLog=/tmp/zlog.txt
+ServerPath=/usr/users/escott/Isite-1.00/bin
+
+# Where is the CNIDR Search API configuration file?
+SAPI=/usr/users/escott/Isite-1.00/bin/sapi.ini
+
+# Which databases (available from the Search API) are we supporting?
+DBList=pgiftest
+
+# Diagnostic messages returned by the ZServer.
+[1.2.840.10003.3.1]
+1=Permanent system error
+ ...and so on...
+
+Here, we just tell it that "pgiftest" is one of the available databases and it
+can learn more about it from sapi.ini.
+
+
+Now, let's create a database for PGIF to search into:
+
+1) createdb DEMO
+
+   Note that the name "DEMO" was the "Location" field in sapi.ini.
+
+2) monitor DEMO
+
+   That starts the postgres monitor so we can load some data.
+
+3)
+
+create headlines (title = text, paper = text, date = abstime ) \g
+ 
+append headlines (title = "S. Florida illegal aliens cut in half by new law",
+                  paper = "The Miami News",
+                  date  = "Feb 20 1987")     \g
+ 
+append headlines (title = "Grilled duck shows off skill",
+                  paper = "The Evening Phoenix (Phoenixville, PA.)",
+                  date  = "Jun 24 1987")    \g
+ 
+append headlines (title = "Gates asks Reagan to recall name",
+                  paper = "Daily Iowan",
+                  date  = "Mar 3 1987")     \g
+ 
+append headlines (title = "Dr. Ruth Talks About Sex With Newspaper Editors",
+                  paper = "Rutland (Vt.) Herald",
+                  date  = "Apr 14 1986")    \g
+ 
+append headlines (title = "Utah Girl Does Well in Dog Shows",
+                  paper = "Salt Lake Tribune",
+                  date  = "Dec 30 1981")    \g
+
+
+These examples, by the way, are from _Exploring Language_, edited by Gary
+Goshgarian, Fifth Edition, and published by Scott, Foresman and Company.  The
+actual examples are quoted from the Columbia Journalism Review.  We didn't
+make up *any* of these.
+
+Now, you can modify zclient.ini to do the actual query:
+
+[*test]
+Host=127.0.0.1
+Port=2210
+sQuery=in[1,2145]
+sDBNames=pgiftest
+pNumRecsReq=10
+pElementSetNames=B
+pPreferredRecSyntax=1.2.840.10003.5.1000.34.1
+
+
+So, when you do a "zclient -i,test", you should see:
+
+./zclient -i,test
+<title>CNIDR Search [in]</title>
+<i>Generated by <a href="http://cnidr.org/">CNIDR</a> http->Z39.50 gateway 
+(zclient, version 1.02)</i><p><hr>S. Florida illegal aliens cut in half by 
+new law
+The Miami News
+Fri Feb 20 00:00:00 1987 EST
+ 
+ 
+ 
+Grilled duck shows of skill
+The Evening Phoenix (Phoenixville, PA.)
+Wed Jun 24 00:00:00 1987 EDT
+ 
+ 
+ 
+Dr. Ruth Talks About Sex With Newspaper Editors
+Rutland (Vt.) Herald
+Mon Apr 14 00:00:00 1986 EST
+ 
+ 
+ 
+Utah Girl Does Well in  Dog Shows
+Salt Lake Tribune
+Wed Dec 30 00:00:00 1981 EST
+
+
+
+
+HOW IT WORKS
+
+PGIF is a layer between SAPI and Postgres.  SAPI is able to call pgif_init(),
+pgif_destroy(), pgif_search(), and pgif_GetRecord().  These functions call
+Postgres via the libpq interface.
+
+pgif_init() builds a result set name and opens Postgres for access.  The
+result set name is a reult of the database name and the pid of the zserver
+that calls it.  For example, if a zserver with a pid of 2241 tried to open the
+Postgres database "MYBASE", then the result set name for that session would be
+"MYBASE2241".  Unique result set names are required so that multiple users can
+search in the same database.  Result sets are stored in the database until the
+results are fetched with pgif_GetRecord() so that the user can select just a
+few records, avoiding possibly transfering huge numbers of unnecessary
+records.  In many cases, a user will see that there were, say, 3 million
+records returned and will not elect to present *any* of them.  We don't want
+to transfer those records unless we have to.
+
+pgif_destroy() contains code to delete the result set when we're done with the
+session.  Note that ZDist 1.02 will not call this.  It's entirely likely that
+whatever version of ZDist that ships with this package will have that
+deficiency remedied.  Just in case, here's how to find and delete result sets
+by hand:
+
+% monitor DEMO
+
+Welcome to the POSTGRES terminal monitor
+ 
+Go 
+*  retrieve (pg_class.relname) where pg_class.relname !~ "pg_*" \g
+ 
+Query sent to backend is "retrieve (pg_class.relname) where pg_class.relname !~ "pg_*" "
+---------------
+| relname     |
+---------------
+| headlines   |
+---------------
+| DEMO23344   |
+---------------
+ 
+Go 
+* destroy DEMO23344 \g
+ 
+Query sent to backend is "destroy DEMO23344 "
+DESTROY
+Go 
+* \q
+%
+
+That should be done frequently, perhaps nightly.  Perhaps you'll want to hack
+zserver to always call pgif_destroy() before exiting?  It's your call.
+
+pgif_search() is used to parse the query and present it to Postgres for
+execution.  It calls ParseAttributes() to parse any attributes specified with
+the query (i.e.: Miller[1,4] means search for "Miller" in the title field,
+while 19910120[1,30] means search for entries with a date of Jan 20 1991).
+
+The real excitement begins in DoPostgresSearch(), and this is where you'll
+create new postquel queries for each combination of attributes.  The postquel
+query will, of course, be highly dependent on your database schema.  The
+general structure of DoPostgresSearch() is to destroy the old result set (if
+any exists, otherwise ignore the harmless warning message), perform the query
+putting the results into a result set table, and finally counting the number
+of entries in the resulting result set table.  It's a bit roundabout, since at
+least Commercial Ingres and Sybase can do that in one fell swoop, but then how
+much did you pay for Postgres?  I rest my case.
+
+pgif_GetRecord() is called to handle Present requests.  WAIS-ers should
+remember that as far as Z39.50 is concerned, returning headlines and showing
+full documents are just two special cases of "Present", and pgif_GetRecord is
+where you'll do both.  This implementation is grossly inefficient, but serves
+as an example of where to start from. 
+
+The general game plan of pgif_GetRecord() is to retrieve all of the records in
+the table, reading sequentially until the right record is returned.  Note that
+while Z39.50 more or less leads to an impression that records should be in
+some order, Postgres follows the relational model and can return tuples in any
+order.  In practice, you'll want to include a "sort by" or at least use an
+index on a searched field to get some kind of order, or else you'll see things
+in the reverse order from how they were appended.
+
+At this point, three observations are in order:
+1) This scheme is at best slow.
+2) SAPI probably should provide a "sapi_GetManyRecords()" interface.  I
+   suspect I know why it doesn't, but it would be nice.
+3) If we're stuck with the sapi_GetRecord() interface, then we should probably
+   use SQL cursors (obviously impossible with Postgres, but not, say, Sybase),
+   cache returned records or entire result sets, or possibly use the Postgres
+   "Fast Path" interface to peek directly into the result set table.
+
+If you're facing performance problems, you'll want to do something about
+sapi_GetRecord(), and then you'll want to make sure you're using Postgres
+efficiently.  It really is a good idea to put "vacuum" in your crontab and
+run it nightly if you're doing more than a few updates a day, and you'll want
+to use indexes where possible.  Also bear in mind that using Postgres to do
+free text searching via regular expressions is going to be pretty slow since
+no indexes will be consulted.  There are ways to do this efficiently, and
+we'll be announcing one way Real Soon Now, so you might want to contact us if
+you need to do that.
+
+
+
+CONTACTING THE DEVLOPERS
+
+If you have difficulty with this software, feel free to contact us either via
+email (escott@cnidr.org) or by phone (+1 919 732 7930).  We'll do what we can
+to help.
+
+
+
+

@@ -1,0 +1,86 @@
+#! /bin/sh
+# mergeactive - merge active data from another site into this site's
+#	active file, cautiously
+# mergeactive [-#] file ...
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/maint:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+replace=y
+for dummy
+do
+	case "$1" in
+	'-#')	replace=n	;;
+	--)	shift ; break	;;
+	-*)	echo "$0: unknown option \`$1'" >&2 ; exit 2	;;
+	*)	break		;;
+	esac
+	shift
+done
+
+cd $NEWSCTL
+
+tmp=/tmp/am$$
+tmpb=/tmp/am$$b
+err=/tmp/am$$e
+locks=
+status=1
+trap 'rm -f $tmp $tmpb $err ; unlock $locks ; trap 0 ; exit $status' 0 1 2 15
+
+# gather up the input
+cat $* >$tmp
+
+# do some checking
+checkactive -i -q $tmp >$err 2>&1
+if test -s $err
+then
+	echo "$0: problems in input:" >&2
+	cat $err >&2
+	exit
+fi
+
+# now we need to make sure things don't change underfoot...
+lock LOCK $$ 10 || exit
+locks=LOCK
+
+# let's be paranoid...
+checkactive -q active >$err 2>&1
+if test -s $err
+then
+	echo "$0: problems in $NEWSCTL/active:" >&2
+	cat $err >&2
+	exit
+fi
+
+# pick out the new ones
+awk '{ print $1, $4 }' $tmp | sort >$tmpb
+sort active | join -a2 - $tmpb | awk 'NF == 2' >$tmp
+
+# and away we go...
+cp active active.tmp
+awk '{ print $1, "0000000000", "00001", $2 }' $tmp >>active.tmp
+cp active.times actimes.tmp
+me=${LOGNAME-${USER-unknown}}@`newshostname`
+now=`now`
+sed "s/ .*/ $now $me/" $tmp >>actimes.tmp
+
+# should we proceed?
+if test " $replace" = " n"
+then
+	status=0
+	exit
+fi
+
+# do the dirty deed
+mv active active.old || exit
+mv active.tmp active || exit
+mv active.times active.times.o && mv actimes.tmp active.times
+
+# and add any necessary directories
+adddirs
+
+# looks like it worked
+status=0

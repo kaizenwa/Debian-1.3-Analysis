@@ -1,0 +1,254 @@
+dnl Process this file with autoconf to produce a configure script.
+
+AC_INIT(search.c)
+AC_CONFIG_HEADER(config.h:config_h.in)
+
+dnl Checks for programs.
+AC_PROG_YACC
+AC_PROG_CC
+dnl AC_PROG_INSTALL
+dnl AC_PROG_LEX
+AC_PROG_LN_S
+AC_PROG_MAKE_SET
+
+dnl Check for a less/more/pg type program & a crypt/des type program
+ac_save_path="$PATH"
+PATH=$PATH:/usr/local/bin:/bin:/usr/bin:/usr/libexec:/usr/sbin:/usr/etc:/etc
+AC_PATH_PROGS(DFLT_PAGER, less more pg cat, cat)
+AC_PATH_PROGS(CRYPT_PATH, crypt)
+AC_PATH_PROGS(DES, des)
+PATH="$ac_save_path"
+
+dnl Checks for libraries.
+TERMLIBS=
+dnl I picked box because it is less likely to need -lterm* then initscr
+AC_CHECK_LIB(curses, box, [TERMLIBS="$TERMLIBS -lcurses"])
+dnl AC_CHECK_LIB(termcap, tgetent, [TERMLIBS="$TERMLIBS -ltermcap"])
+dnl AC_CHECK_LIB(termlib, tgetent, [have_termlib=yes], [have_termlib=no])
+# Systems that have -ltermlib should use that before -ltermcap (e.g. SVR4)
+found_termlib=''
+for termlib in termlib termcap terminfo curses ; do
+  AC_CHECK_LIB(${termlib}, main, [LIBS="${LIBS} -l${termlib}"])
+   case " ${LIBS} " in
+     *" -l${termlib} "* ) found_termlib=t; break ;;
+   esac
+done
+if test ".${found_termlib}" = "." ; then 
+   AC_DEFINE(NO_TERMCAP)
+fi
+dnl Regular expressions (regcmp) are in -lgen on Solaris 2,
+dnl and in -lintl on SCO Unix.
+AC_CHECK_LIB(gen, regcmp)
+AC_CHECK_LIB(intl, regcmp)
+AC_CHECK_LIB(PW, regcmp)
+
+#--------------------------------------------------------------------
+#	On a few very rare systems, all of the libm.a stuff is
+#	already in libc.a.  Set compiler flags accordingly.
+#	Also, Linux requires the "ieee" library for math to work
+#	right (and it must appear before "-lm").
+#--------------------------------------------------------------------
+dnl AC_CHECK_FUNC(ceil, MATH_LIBS="", MATH_LIBS="-lm")
+AC_CHECK_LIB(m, main, MATH_LIBS="-lm", MATH_LIBS="")
+AC_CHECK_LIB(ieee, main, [MATH_LIBS="-lieee $MATH_LIBS"])
+LIBS="$LIBS $MATH_LIBS"
+dnl AC_SUBST(MATH_LIBS)
+
+dnl Solaris has curses & termcap, but they don't work without libucb
+dnl which is broken, so we use termlib.
+AC_MSG_CHECKING(for working terminal libraries)
+SAVE_LIBS=$LIBS
+LIBS="$LIBS $TERMLIBS"
+AC_TRY_LINK(, [tgetent(0); tgetflag(0); tgetnum(0); tgetstr(0);],
+  [termok=yes], [termok=no])
+if test $termok = yes; then
+  AC_MSG_RESULT(using $TERMLIBS)
+else
+  LIBS="$SAVE_LIBS"
+  if test $have_termlib = yes; then
+    LIBS="$LIBS -ltermlib"
+    AC_MSG_RESULT(using -ltermlib)
+  else
+    AC_MSG_RESULT(TERMINAL LIBRARY BROKEN - configure failed)
+    exit 1
+  fi
+fi
+
+dnl Look for the X11 include files in various places, if they're
+dnl not in the compiler's path.  Substitute for `xincludedir' and
+dnl `xlibdir'.  Perhaps we need different checks for Xt and Xaw?
+define(AC_X11_LOCATION,
+[echo checking for X11 headers and libraries
+dir=""
+AC_TEST_CPP([#include <X11/Intrinsic.h>], :,
+  if test -r /usr/local/[[include]]/X11/Intrinsic.h; then
+    dir=/usr/local/[[include]]
+
+  elif test -r /usr/[[include]]/X11R4/X11/Intrinsic.h; then
+    dir=/usr/[[include]]/X11R4
+  elif test -r /usr/[[include]]/X11R5/X11/Intrinsic.h; then
+    dir=/usr/[[include]]/X11R5
+
+  elif test -r /usr/lpp/X11/Xamples/[[include]]/X11/Intrinsic.h; then
+    dir=/usr/lpp/X11/Xamples/[[include]]
+
+  elif test -r /usr/X11/[[include]]/X11/Intrinsic.h; then
+    dir=/usr/X11/[[include]]
+  elif test -r /usr/X11R5/[[include]]/X11/Intrinsic.h; then
+    dir=/usr/X11R5/[[include]]
+
+  elif test -r /usr/openwin/[[include]]/X11/Intrinsic.h; then
+    dir=/usr/openwin/[[include]]
+  elif test -r /usr/openwin/share/[[include]]/X11/Intrinsic.h; then
+    dir=/usr/openwin/share/[[include]]
+
+  elif test -r /usr/[[include]]/X11/Intrinsic.h; then
+    dir= # everyone's cc searches /usr/include, right?
+  else
+    no_x=t
+  fi
+)
+dnl Can't use AC_SUBST inside AC_TEST_CPP.
+if test -n "$dir"; then
+  xincludedir=-I$dir
+  DEFS="$DEFS -I$dir"
+  echo "(using $xincludedir)"
+elif test -n "$no_x"; then 
+  # Not all programs may use this symbol, but it won't hurt to define it.
+  xincludedir=-DX_DISPLAY_MISSING
+fi
+AC_SUBST(xincludedir)
+#
+# Now check for the libraries.  Amazing how every single X vendor puts
+# these in a different place, and all because MIT thought they should go
+# in /usr/lib.
+dir1=""
+if test -r /usr/local/lib/libXt.a; then
+  dir1=/usr/local/lib
+
+elif test -r /usr/lib/X11R4/libXt.sl; then
+  dir1=/usr/lib/X11R4
+elif test -r /usr/lib/X11R4/libXt.a; then
+  dir1=/usr/lib/X11R4
+elif test -r /usr/lib/X11R5/libXt.a; then
+  dir1=/usr/lib/X11R5
+
+elif test -r /usr/lpp/X11/Xamples/lib/Xt/libXt.a; then
+  dir1=/usr/lpp/X11/Xamples/lib/Xt
+
+elif test -r /usr/X11/lib/libXt.a; then
+  dir1=/usr/X11/lib
+elif test -r /usr/X11R5/lib/libXt.a; then
+  dir1=/usr/X11R5/lib
+
+elif test -r /usr/openwin/lib/libXt.a; then
+  dir1=/usr/openwin/lib
+elif test -r /usr/openwin/lib/libXt.so; then
+  dir1=/usr/openwin/lib
+
+fi
+dir2=""
+if test -r /usr/lpp/X11/Xamples/lib/Xmu/libXmu.a; then
+  dir2=/usr/lpp/X11/Xamples/lib/Xmu
+fi
+#
+# It would be nice to have a more robust check for the -R ld option then
+# just checking for Solaris.  The parentheses elide `uname: not found'.
+# 
+# It would also be nice to do this for all -L options, not just this one.
+if test -n "$dir1"; then
+  xlibdir=-L$dir1
+  DEFS="$DEFS -L$dir1"
+  if test "`(uname) 2>/dev/null`" = SunOS && uname -r | grep '^5'; then
+    xlibdir="$xlibdir -R$dir1"
+  fi
+  #
+  # Don't need all that stuff for dir2, since it only gets used on AIX.
+  test -n "$dir2" && xlibdir="$xlibdir -L$dir2"
+fi
+#
+# Check for additional X libraries.
+# 
+# Since we already have an explicit check for POSIXified ISC, use it.
+if test -n "$ISC"; then
+  wlibs="$wlibs -lnsl_s -linet"
+  echo "(adding -lnsl_s -linet to wlibs)"
+else
+  # Martyn.Johnson@cl.cam.ac.uk says this is needed for Ultrix, if the X
+  # libraries were built with DECnet support.  And karl@cs.umb.edu's Alpha
+  # needs dnet_stubs.
+  AC_CHECK_LIB(dnet, main,
+    [wlibs="$wlibs -ldnet"
+     have_dnet=t
+     echo "(adding -ldnet to wlibs)"])
+  if test -z "$have_dnet"; then
+    AC_CHECK_LIB(dnet_stub, main,
+      [wlibs="$wlibs -ldnet_stub"
+       echo "(adding -ldnet_stub to wlibs)"])
+  fi
+  # lieder@skyler.mavd.honeywell.com says without -lsocket,
+  # socket/setsockopt and other routines are undefined under SCO ODT 2.0.
+  AC_CHECK_LIB(socket, main,
+    [wlibs="$wlibs -lsocket"
+     echo "(adding -lsocket to wlibs)"])
+  AC_CHECK_LIB(nsl, main,
+    [wlibs="$wlibs -lnsl"
+     echo "(adding -lnsl to wlibs)"])
+fi
+test -n "$xlibdir" && echo "(using $xlibdir)"
+LIBS="$LIBS $xlibdir $wlibs"
+AC_SUBST(xlibdir)dnl
+AC_SUBST(wlibs)dnl
+])dnl
+
+dnl Checks for header files.
+dnl AC_CONFIG_HEADER(config.h)
+AC_HEADER_STDC
+AC_CHECK_HEADERS(ctype.h fcntl.h limits.h stdlib.h string.h strings.h sys/file.h sys/ioctl.h sys/ptem.h sys/stream.h sys/time.h time.h unistd.h)
+AC_X11_LOCATION
+AC_HEADER_CHECK(X11/X.h, AC_DEFINE(HAVE_X11_X_H) LIBS="$LIBS -lX11")
+
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_TYPE_SIZE_T
+AC_STRUCT_ST_BLKSIZE
+AC_STRUCT_TM
+
+dnl Checks for library functions.
+AC_FUNC_ALLOCA
+AC_PROG_GCC_TRADITIONAL
+AC_TYPE_SIGNAL
+AC_CHECK_FUNCS(strchr memcpy)
+AC_CHECK_FUNCS(re_comp regcmp regcomp)
+dnl math.h specific (optional) functions, otherwise we use our own
+AC_CHECK_FUNCS(rint pow10 fmod)
+dnl curses.h specific functions
+dnl keypad: BSD doesn't have this (used in lex.c)...
+dnl 
+AC_CHECK_FUNCS(fixterm idlok keypad notimeout reset_prog_mode reset_term_mode resetterm)
+
+
+dnl AC_COMPILE_CHECK([checking for broken TIOCGWINSZ],[
+dnl #include <sys/ioctl.h>
+dnl #ifdef HAVE_TERMIOS_H
+dnl #include <termios.h>
+dnl #else /* ! HAVE_TERMIOS_H */
+dnl #ifdef HAVE_TERMIO_H
+dnl #include <termio.h>
+dnl #else /* ! HAVE_TERMIO_H */
+dnl #include <sgtty.h>
+dnl #endif
+dnl #endif
+dnl ],[
+dnl #ifdef TIOCGWINSZ
+dnl struct winsize	wsize;
+dnl #endif /* TIOCGWINSZ */
+dnl ],
+dnl [:],
+dnl [AC_DEFINE(BROKEN_TIOCGWINSZ)]
+dnl )
+
+dnl AC_OUTPUT(Makefile)
+AC_OUTPUT(Makefile)
+

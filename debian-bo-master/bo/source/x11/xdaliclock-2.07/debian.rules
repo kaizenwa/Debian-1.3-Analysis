@@ -1,0 +1,105 @@
+#! /usr/bin/make -f
+#
+# Last updated: Sun May 12 13:57:04 MET DST 1996 by Joey
+#
+# To make the binary distribution package, the ``Debianized'' source package
+# and the context diff to the original package, type `./debian.rules dist'.
+# Make sure that `debian.rules' is executable before the final distribution
+# is made.
+#
+# Invoke each target with `./debian.rules <target>'.  All targets should be
+# invoked with the package root as the current directory.
+#
+# The `binary' target must be run as root, as it needs to install files with
+# specific ownerships.  The `diff' target assumes that you have the original
+# source package available, unpacked, in ../$(p)-$(version).orig, or that you have
+# the previous revision of the ``Debianized'' source package and context diff
+# in the parent directory.
+
+# The name of the package
+package = xdaliclock
+appendix = 
+# The version of the package
+version = 2.07
+# The Debian revision of the package
+revision = 2
+# The architecture of this build
+arch = $(shell dpkg --print-architecture)
+
+build:
+# Builds the binary package.
+	xmkmf
+	$(MAKE)
+	touch stamp-build
+
+clean:
+# Undoes the effect of `make -f debian.rules build'.
+	rm -f *.o xdaliclock Makefile Makefile.bak
+	rm -rf stamp-build debian-tmp *~
+
+binary:
+# Makes a binary package.
+	test -f stamp-build || make -f debian.rules build
+	install -d -g root -m 755 -o root debian-tmp
+	chmod g-s debian-tmp
+	install -d -g root -m 755 -o root debian-tmp/DEBIAN
+	sed -e 's/@@version@@/$(version)/' -e 's/@@revision@@/$(revision)/' \
+	  -e 's/@@package@@/$(package)$(appendix)/' -e 's/@@arch@@/$(arch)/' \
+	 debian.control > debian-tmp/DEBIAN/control
+	chmod 644 debian-tmp/DEBIAN/control
+	#
+	install -d -g root -m 755 -o root debian-tmp/usr/doc/$(package)
+	(cat debian.copyright; sed -e '22,$$d' < xdaliclock.c) > tmp
+	install -g root -m 644 -o root tmp debian-tmp/usr/doc/$(package)/copyright
+	rm -f tmp
+	install -g root -m 644 -o root README debian-tmp/usr/doc/$(package)
+	install -g root -m 644 -o root debian.ChangeLog \
+	  debian-tmp/usr/doc/$(package)/changelog.debian
+	gzip -9f debian-tmp/usr/doc/$(package)/changelog.debian
+	#
+	install -d -g root -m 755 -o root debian-tmp/usr/X11R6/bin
+	install -s -g root -m 755 -o root xdaliclock \
+	  debian-tmp/usr/X11R6/bin
+	install -d -g root -m 755 -o root debian-tmp/usr/X11R6/man/man1
+	install -g root -m 644 -o root xdaliclock.man \
+	  debian-tmp/usr/X11R6/man/man1/xdaliclock.1
+	#
+	dpkg --build debian-tmp && dpkg-name -o -s .. debian-tmp.deb
+
+source:
+# Makes a source package.
+	make -f debian.rules clean
+	( cd .. && tar cf - $(package)-$(version) | gzip -9f > $(package)_$(version)-$(revision).tar.gz )
+
+diff:
+# Makes a context diff.
+	-test -f stamp-build && make -f debian.rules clean
+	-test -d ../orig/$(package)-$(version) -a ! -d ../$(package)-$(version).orig \
+	  && (ln -s orig/$(package)-$(version) ../$(package)-$(version).orig; touch stamp-orig; true)
+	-test -d ../$(package)-$(version).orig -o -f ../$(package)_$(version)-`expr $(revision) - 1`.diff.gz \
+	  || ( echo "Original source package is not available." ; false )
+	-test -d ../$(package)-$(version).orig || make -f debian.rules orig
+	( cd .. && diff -uNr $(package)-$(version).orig $(package)-$(version) | gzip -9f \
+	  > $(package)_$(version)-$(revision).diff.gz )
+	-test -f stamp-orig \
+	  && rm -rf ../$(package)-$(version).orig && rm -f stamp-orig
+
+dist: binary source diff
+# Prepares the package for distribution.
+
+orig:
+# Prepares the original package from the previous
+# Debian revision source package and context diff.
+	( cd .. \
+	  && mkdir $(package).orig \
+	  && cd $(package).orig \
+	  && tar xzf ../$(package)_$(version)-`expr $(revision) - 1`.tar.gz \
+	  && cd $(package)-$(version) \
+	  && ( zcat ../../$(package)_$(version)-`expr $(revision) - 1`.diff.gz \
+	    | patch -sER -p1 ) \
+	  && find . -name "*.orig" -exec rm -f {} \; \
+	  && cd .. \
+	  && mv $(package)-$(version) ../$(package)-$(version).orig \
+	  && cd .. \
+	  && rmdir $(package).orig )
+	touch stamp-orig

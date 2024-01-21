@@ -1,0 +1,567 @@
+'\" t
+.\" Note: this must be run through tbl before nroff.
+.\" The magic cookie on the first line triggers this under some man program
+.\"
+.\" Traduzione in italiano di Giovanni Bortolozzo <borto@dei.unipd.it>
+.\" Agosto 1996
+.\"
+.\" " for hilit19
+.TH MTOOLS 5 "5 Dicembre 1995" "" "Linux Programmer's Manual"
+.SH NOME
+mtools \- tabella dei dispositivi DOS
+.SH DESCRIZIONE
+.B /etc/mtools.conf
+e
+.B ~/.mtoolsrc
+sono i file di configurazione per gli Mtools. Questi file di configurazione
+descrivono le seguenti cose:
+.PP
+.TP
+.B o
+.B Flag e variabili di configurazione globali
+.TP
+.B o
+.B Flag e variabili di configurazione per disco
+.TP
+.B o
+.B Tabelle di traduzione dei caratteri
+.PP
+.B /etc/mtools.conf
+è il file di configurazione per l'intero sistema, e 
+.B ~/.mtoolsrc
+è il file per la configurazione privata dell'utente.
+
+.SS Sintassi generale
+I file di configurazione sono divisi in sezioni. Ogni sezione inizia
+con una parola chiave che identifica la sezione seguita da un due punti (:).
+Seguono poi gli assegnamenti alle variabili e i flag. Gli assegnamenti
+alle variabili assumono la seguente forma:
+.PP
+.B nome=valore
+.PP
+I flag sono parole singole senza alcun segno di uguale o valore che le
+segue. Una sezione finisce alla fine del file o dove inizia la sezione
+successiva.
+
+Le righe che iniziano con un cancelletto (\c
+.B #\c 
+) sono commenti. I caratteri di LF sono equivalenti a spazi (tranne quando 
+finiscono un commento). I file di configurazione sono case insensitive, 
+ad eccezione delle cose racchiuse tra virgolette (come i nomi di file).
+
+.SS Valori di default
+Per molte piattaforme, gli Mtools contengono ragionevoli valori di default
+pre-compilati. Si solito non è necessario preoccuparsi dei file di 
+configurazione se tutto quello che si vuole fare con gli Mtools è l'accesso
+ai floppy. D'altra parte, i file di configurazione sono necessari se si
+vogliono usare gli Mtools per accedere alla proprie partizioni sul disco fisso
+e ai file hdimage del Dosemu.
+
+.SH VARIABILI GLOBALI
+
+Le variabili globali possono essere settate a 1 o a 0.
+
+Sono riconosciute le seguenti variabili globali:
+.PP
+.TP
+.B MTOOLS_SKIP_CHECK
+Se è settata a 1, gli Mtools evitano molte delle loro verifiche 
+sull'integrità (sanity check). È necessaria per leggere qualcuno dei dischi Atari fatti con 
+le prime ROM, i quali altrimenti non sarebbero riconosciuti.
+.TP
+.B MTOOLS_FAT_COMPATIBILITY
+Se è settata a 1, gli Mtools saltano le verifiche sulla dimensione della FAT.
+Qualche disco ha una FAT più grande del necessario. Se questa opzione non è
+settata, questi dischi sarebbero rifiutati.
+.TP
+.B MTOOLS_LOWER_CASE
+Se è settata a 1, gli Mtools mostrano tutti i nomi di file corti a tutti 
+caratteri maiuscoli in minuscole. È presente per permettere un comportamento
+consistente con le versioni più vecchie degli Mtools che non riconoscevano
+i case bit.
+.PP
+
+Esempio:
+L'inserimento della seguente linea nel proprio file di configurazione
+``dice'' agli Mtools di saltare le verifiche sull'integrità:
+.B MTOOLS_SKIP_CHECK=1
+
+Le variabili globali possono essere settate anche come variabili d'ambiente:
+.B export MTOOLS_SKIP_CHECK=1
+
+.SH OPZIONI E VARIABILI PER UN DRIVE
+
+Le opzioni e le variabili di un drive possono essere definite in una sezione 
+drive. Una sezione drive inizia con
+.BI drive " lettera-del-drive " :
+
+Seguono poi le coppie variabile-valore e le opzioni.
+
+.SS Variabili Drive per Uso Generale
+Sono disponibili le seguenti variabili:
+.PP
+.TP
+.B file
+Il nome del file o del device contenente l'immagine del disco. È obbligatoria.
+Il nome del file deve essere racchiuso fra virgolette.
+.TP
+.B use_xdf
+Se è settata ad un valore diverso da zero, gli Mtools provano ad accedere
+a questo disco anche come un disco Xdf. Xdf è un formato ad alta
+capacità usato da OS/2. Di default è disabilitata.
+.TP
+.B partition
+Dice agli Mtools di trattare il drive come un dispositivo partizionato, e di
+usare la partizione data. Usando questo metodo sono accessibili solo partizioni
+primarie e numerate da 1 a 4. Per le partizioni logiche, si usi la 
+variabile più generale
+.BR offset .
+La variabile 
+.B partition
+è pensata per i drive Syquests e ZIP e le hdimage di Dosemu. Non è raccomandata
+per i dischi fissi per i quali è disponibile l'accesso diretto alle partizioni.
+.TP
+.B offset
+Definisce dove inizia nel file il filesystem MSDOS. È utile per le partizioni
+logiche negli 
+.B hdimage di Dosemu\c 
+, e per i ram disk
+.BR ATARI .
+Di default vale zero, indicando che il filesystem inizia all'inizio del 
+device o del file.
+.TP
+.B fat_bits
+Il numero di FAT bit. Potrebbe essere 12 o 16. È necessaria molto raramente,
+poiché può essere quasi sempre dedotta dalle informazioni nel boot sector.
+Al contrario, specificare il numero di fat bit potrebbe essere
+realmente  dannoso se lo si sbaglia. Si dovrebbe usare solo se
+l'autodetect del numero di fat bit degli Mtools sbaglia, o se si vuole
+``mformat-are'' un disco con un bizzarro numero di fat bit.
+.PP
+Solo l'opzione
+.B file
+è obbligatoria. Gli altri parametri si possono anche non specificare. In tal
+caso è usato un valore di default o rilevato automaticamente.
+
+.SS Configurazione della Geometria del Drive
+
+Le infomazioni sulla geometria descrivono le caratteristiche fisiche del disco.
+Ha tre scopi:
+.TP
+.B mformat
+Le informazioni ``geometriche'' sono scritte nel boot sector del disco 
+appena formattato. Comunque, tali informazioni possono essere fornite anche
+dalla linea di comando. Si veda mformat(1) per i dettagli.
+.TP
+.B filtraggio
+In alcuni Unix ci sono device node che supportano solo una geometria
+fisica. La geometria è confrontata con la reale geometria salvata nel
+boot sector per assicurarsi che il device node sia in grado di leggere
+correttamente il disco. Se la geometria non corrisponde, questa drive entry
+fallisce, ed è provata la successiva entry che porta la stessa lettera di drive.
+Si veda la sezione successiva "Fornire descrizioni multiple per un drive" per
+maggiori dettagli per fornire più descrizioni per una lettera di drive.
+
+Se non sono fornite informazioni sulla geometria nel file di configurazione,
+sono accettati tutti i dischi. Su Linux (e su Sparc) esistono dei device node
+con geometria configurabile (\c
+.B /dev/fd0\c
+,
+.B /dev/fd1
+ecc), e quindi il filtraggio per i disk drive non è necessario (e ignorato).
+(In Linux gli Mtools eseguono ancora il filtraggio sui file regolari 
+(disk image): ciò è principalmente pensato per scopi di test, in quanto io
+non avevo accesso ad Unix ai quali servisse realmente il filtraggio).
+.TP
+.B geometria iniziale
+Le informazioni sulla geometria (se disponibili) sono usate anche per settare
+la geometria iniziale di un device node. Tale geometria iniziale è usata per
+leggere il boot sector, il quale contiene la reale geometria. Se non sono
+fornite informazioni ``geometriche'' nel file di configurazione, non viene
+fatta nessuna configurazione iniziale. Su Linux, ciò non è realmente necessario
+in quanto i dispositivi configurabili sono in grado, per leggere il boot 
+sector, di rilevare da soli il tipo di disco abbastanza accuratamente 
+(per i formati più comuni).
+.PP
+Informazioni sulla geometria sbagliate possono portare ad errori bizzarri.
+Ecco perché raccomando fortemente di non usare la configurazione della geometria
+finché ciò non sia strettamente necessario.
+
+Le seguenti variabili sono disponibili per la geometria:
+.PP
+.TP
+.B cylinders
+Il numero di cilindri.
+.TP
+.B heads
+Il numero di testine (lati).
+.TP
+.B sectors
+Il numero di settori per traccia.
+.PP
+Esempio: la seguente sezione drive descrive un drive da 1.44MB:
+.PP
+.sp
+.RS
+.nf
+.B drive a:
+.B \tfile="/dev/fd0H1440"
+.B \tfat_bits=12
+.B \ttracks=80 heads=2 sectors=18
+.fi
+.RE
+
+Sono disponibili le seguenti descrizioni geometriche abbreviate:
+.PP
+.TP
+.B 1.44m
+disco da 3 1/2 ad alta densità. Equivalente a:
+.B fat_bits=12 tracks=80 heads=2 sectors=18
+.TP
+.B 1.2m
+disco da 5 1/4 ad alta densità. Equivalente a:
+.B fat_bits=12 tracks=80 heads=2 sectors=15
+.TP
+.B 720k
+disco da 3 1/2 a doppia densità. Equivalente a:
+.B fat_bits=12 tracks=80 heads=2 sectors=9
+.TP
+.B 360k
+disco da 5 1/4 a doppia densità. Equivalente a:
+.B fat_bits=12 tracks=40 heads=2 sectors=9
+.PP
+
+Le descrizioni abbreviate dei formati possono essere corrette. Per 
+esempio,
+.B 360k sectors=8
+definisce un disco da 320KB ed è equivalente a:
+.B fat_bits=12 tracks=40 heads=2 sectors=8
+
+.SS Opzioni Aperte
+
+Inoltre, sono disponibili le seguenti opzioni:
+.PP
+.TP
+.B sync
+Tutte le operazioni di I/O sono fatte in modo sincrono.
+.TP
+.B nodelay
+Il device o il file è aperto con il flag O_NDELAY. È necessaria su alcune
+architetture non Linux.
+.TP
+.B exclusive
+Il device o il file sono aperti con il flag O_EXCL. Sotto Linux, ciò
+assicura l'accesso esclusivo al floppy. In molte altre architetture, e 
+per i file normali, non ha nessuno effetto.
+.PP
+
+.SS Fornire descrizioni multiple per un drive
+
+È possibile fornire più descrizioni per un drive. In questo caso, le 
+descrizioni sono provate fino a che ne è trovata una che si adatta. Le 
+descrizioni possono fallire per diverse ragioni:
+.PP
+.TP
+.B 1
+perché la geometria non è appropriata,
+.TP
+.B 2
+perché non c'è nessun disco nel drive,
+.TP
+.B 3
+o a causa di altri problemi.
+.PP
+
+Le definizioni multiple sono utili quando si usano dispositivi fisici che sono
+in grado di supportare una sola geometria del disco.
+Esempio:
+.PP
+.sp
+.RS
+.nf
+.B drive a: file="/dev/fd0H1440" 1.44m
+.B drive a: file="/dev/fd0H720" 720k
+.fi
+.RE
+.PP
+Ciò istruisce gli Mtools ad usare /dev/fd0H1440 per dischi da 1.44m 
+(alta densità) e /dev/fd0H720 per i dischi da 720k (doppia densità).
+Sotto Linux, questa caratteristica non è realmente necessaria, in quanto il
+device /dev/fd0 è in grado di trattare qualsiasi geometria.
+
+Si possono usare le descrizioni multiple dei drive per accedere ad entrambi
+i propri dispositivi fisici tramite la stessa lettera di drive:
+.PP
+.sp
+.RS
+.nf
+.B drive z: file="/dev/fd0"
+.B drive z: file="/dev/fd1"
+.fi
+.RE
+.PP
+Con questa descrizione,
+.B mdir z:
+accede al primo drive fisico se questi contiene un disco. Se il primo
+drive non contiene un disco, gli Mtools controllano in secondo drive.
+
+Quando si usano più file di configurazione, le descrizioni dei drive nei file
+analizzati per ultimi prevalgono sulle descrizioni per la stessa lettera di drive
+nei file precedenti. Per evitare ciò, si usino le parole chiave
+.B drive+
+o
+.B +drive
+invece di
+.B drive
+\&. La prima aggiunge una descrizione alla fine della lista (sarà provata 
+per ultima), e la seconda l'aggiunge all'inizio della lista.
+
+.SH TABELLE DI TRADUZIONE CARATTERI
+
+Se vivi in USA, in Europa dell'ovest o in Australia, puoi saltare questa 
+sezione.
+
+.SS Introduzione
+
+Il DOS usa codici di mappaggio dei caratteri diversi da Unix. I caratteri a 
+7-bit hanno ancora lo stesso significato, solo i caratteri con l'ottavo bit ne
+risentono le conseguenze. Per far sì che le cose funzionino, sono disponibili
+diverse tabelle di traduzione dei caratteri a seconda del paese in cui si vive.
+L'``apparenza'' dei caratteri è definita usando le code page. Tali
+code page non sono le stesse per tutti i paesi. Per esempio, alcune
+code page non contengono i caratteri maiuscoli accentati. D'altra
+parte, alcune code page contengono caratteri che non esistono in Unix,
+come certe
+consonanti accentate usate nei paesi dell'est europeo. Ciò ha effetto
+su due cose, relativamente ai nomi di file:
+
+.TP
+.B caratteri maiuscoli
+Nei nomi corti, sono permessi solo caratteri maiuscoli. Questo vale
+anche per i caratteri accentati. Per esempio, in una code page che non
+contiene caratteri maiuscoli accentati, i caratteri minuscoli
+accentati saranno trasformati nelle loro controparti non accentate.
+.TP
+.B nomi di file lunghi
+La Micro$oft è finalmente rinsavita e usa un mappaggio più standard
+per i nomi di file lunghi. Usa Unicode, che è in pratica una
+versione a 32 bit dell'ASCII. I suoi primi 256 caratteri sono identici
+all'ASCII Unix. Quindi, le code page hanno effetto anche sulla
+corrispondenza tra i codici usati nei nomi lunghi e quelli usati nei
+nomi corti.
+
+.PP
+Gli Mtools assumono che i nomi di file immessi della riga di
+comando abbiano il mappaggio Unix, e traducono i caratteri per ottenere
+i nomi corti. Di default, è usata la code page 850 con il mappaggio 
+Svizzero tra maiuscole e minuscole. Ho scelto questa code page, perché
+il suo insieme di caratteri esistenti è quello che più corrisponde
+con quello Unix. Inoltre questa code page copre molti caratteri usati
+in USA, Australia e Europa dell'ovest. Comunque è ancora possibile
+scegliere
+un mappaggio differente. Ci sono due metodi: la variabile
+.B country
+e le tabelle esplicite.
+
+.SS Configurazione usando Country
+
+La variabile 
+.B COUNTRY
+è raccomandata per chi ha anche accesso ai file di sistema dell'MSDOS
+e alla loro documentazione. Io non ho accesso a questi, e suggerisco
+in questo caso di usare le tabelle esplicite.
+
+Sintassi:
+.B COUNTRY="\c
+.I nazione\c
+.B [,[\c
+.I codepage\c
+.B ],\c
+.I country.sys\c
+.B ]"
+
+Ciò dice agli Mtools di usare una tabella di traduzione Unix-to-DOS
+che corrisponde alla
+.I codepage
+e una tabella minuscole-maiuscole per 
+.I nazione
+e di usare il file
+.I country.sys
+per avere la tabella minuscole-maiuscole. Il codice della nazione è
+molto spesso il prefisso telefonico della nazione. Si faccia
+riferimento alla pagina d'aiuto del DOS su "country" per maggiori
+dettagli. I parametri 
+.I codepage
+e
+.I country.sys
+sono opzionali. Si prega di non scrivere anche le parentesi quadre, ci
+sono solo per dire che quei parametri sono opzionali. Il file
+.B country.sys
+è fornito con MSDOS. In molti casi non se ne ha bisogno, in quanto le più
+comuni tabelle di traduzione sono compilate dentro gli
+Mtools. Perciò, non ci si preoccupi se si usa una macchina con solo
+Unix nella quale non c'è questo file.
+
+Se non è data la
+.IR codepage ,
+è usata quella di default per la nazione. Se non è dato il parametro
+.IR country.sys ,
+sono usate le tabelle minuscole-maiuscole di default compilate
+all'interno. Ciò è utile per gli altri Unix piuttosto che per Linux,
+che possono non avere a disposizione il file
+.BR country.sys .
+
+Le tabelle Unix-to-DOS non sono contenute nel file
+.IR country.sys ,
+e quindi gli Mtools usano sempre quelle precompilate di default. Perciò,
+è supportato solo un numero limitato di code page. Se manca la propria
+code page preferita, e se si conosce il nome del file di Windows95 che
+contiene tale mappa, fatemelo sapere a
+.B Alain.Knaff@inrialpes.fr
+\&.
+
+La variabile
+.B COUNTRY
+può essere settata anche come variabile d'ambiente.
+
+.SS Configurazione usando tabelle di traduzione esplicite
+
+Le tabelle di traduzione possono essere definite nel file di
+configurazione. Sono necessarie due tabelle: prima la tabella
+Unix-to-DOS, e poi la tabella minuscole-maiuscole. Una tabella
+Unix-to-DOS inizia con la parola chiave
+.BR tounix ,
+seguita da un due punti, e da 128 numeri esadecimali. Una tabella
+minuscole-maiuscole inizia con la parola chiave
+.BR fucase ,
+seguita da un due punti, e da 128 numeri esadecimali.
+
+Le tabelle illustrano solo le traduzioni per i caratteri il cui codice
+è maggiore di 128, in quanto le traduzioni per i codici minori sono triviali.
+
+Esempio:
+.PP
+.sp
+.RS
+.nf
+.B tounix:
+.B \t0xc7 0xfc 0xe9 0xe2 0xe4 0xe0 0xe5 0xe7 
+.B \t0xea 0xeb 0xe8 0xef 0xee 0xec 0xc4 0xc5 
+.B \t0xc9 0xe6 0xc6 0xf4 0xf6 0xf2 0xfb 0xf9 
+.B \t0xff 0xd6 0xdc 0xf8 0xa3 0xd8 0xd7 0x5f 
+.B \t0xe1 0xed 0xf3 0xfa 0xf1 0xd1 0xaa 0xba 
+.B \t0xbf 0xae 0xac 0xbd 0xbc 0xa1 0xab 0xbb 
+.B \t0x5f 0x5f 0x5f 0x5f 0x5f 0xc1 0xc2 0xc0 
+.B \t0xa9 0x5f 0x5f 0x5f 0x5f 0xa2 0xa5 0xac 
+.B \t0x5f 0x5f 0x5f 0x5f 0x5f 0x5f 0xe3 0xc3 
+.B \t0x5f 0x5f 0x5f 0x5f 0x5f 0x5f 0x5f 0xa4 
+.B \t0xf0 0xd0 0xc9 0xcb 0xc8 0x69 0xcd 0xce 
+.B \t0xcf 0x5f 0x5f 0x5f 0x5f 0x7c 0x49 0x5f 
+.B \t0xd3 0xdf 0xd4 0xd2 0xf5 0xd5 0xb5 0xfe 
+.B \t0xde 0xda 0xd9 0xfd 0xdd 0xde 0xaf 0xb4 
+.B \t0xad 0xb1 0x5f 0xbe 0xb6 0xa7 0xf7 0xb8 
+.B \t0xb0 0xa8 0xb7 0xb9 0xb3 0xb2 0x5f 0x5f 
+
+.B fucase:
+.B \t0x80 0x9a 0x90 0xb6 0x8e 0xb7 0x8f 0x80 
+.B \t0xd2 0xd3 0xd4 0xd8 0xd7 0xde 0x8e 0x8f 
+.B \t0x90 0x92 0x92 0xe2 0x99 0xe3 0xea 0xeb 
+.B \t0x59 0x99 0x9a 0x9d 0x9c 0x9d 0x9e 0x9f 
+.B \t0xb5 0xd6 0xe0 0xe9 0xa5 0xa5 0xa6 0xa7 
+.B \t0xa8 0xa9 0xaa 0xab 0xac 0xad 0xae 0xaf 
+.B \t0xb0 0xb1 0xb2 0xb3 0xb4 0xb5 0xb6 0xb7 
+.B \t0xb8 0xb9 0xba 0xbb 0xbc 0xbd 0xbe 0xbf 
+.B \t0xc0 0xc1 0xc2 0xc3 0xc4 0xc5 0xc7 0xc7 
+.B \t0xc8 0xc9 0xca 0xcb 0xcc 0xcd 0xce 0xcf 
+.B \t0xd1 0xd1 0xd2 0xd3 0xd4 0x49 0xd6 0xd7 
+.B \t0xd8 0xd9 0xda 0xdb 0xdc 0xdd 0xde 0xdf 
+.B \t0xe0 0xe1 0xe2 0xe3 0xe5 0xe5 0xe6 0xe8 
+.B \t0xe8 0xe9 0xea 0xeb 0xed 0xed 0xee 0xef 
+.B \t0xf0 0xf1 0xf2 0xf3 0xf4 0xf5 0xf6 0xf7 
+.B \t0xf8 0xf9 0xfa 0xfb 0xfc 0xfd 0xfe 0xff 
+.fi
+.RE
+.PP
+
+La prima tabella mappa i codici carattere DOS in codici carattere
+Unix. Per esempio, si consideri il carattere DOS con numero 129. Questa
+è una u con due puntini sopra. Per tradurlo in Unix prendiamo il
+carattere numero 1 nella prima tabella (1 = 129 - 128). Questi è
+0xfc. (Attenzione, la numerazione parte da 0).
+La seconda tabella mappa i caratteri minuscoli DOS nei caratteri
+maiuscoli DOS. La stessa u minuscola coi puntini viene mappata nel
+carattere 0x9a, che è la U maiuscola con i puntini in DOS.
+
+.SS Caratteri Unicode maggiori di 256
+Se un nome MSDOS esistente contiene caratteri Unicode maggiori di
+256. questi sono tradotti in underscore ("_") o in caratteri vicini
+come aspetto. Per esempio, le consonanti accentate sono tradotte nelle
+loro controparti non accentate. Tali traduzioni sono usate per mdir e
+per i nomi di file generati con mcopy. Anche Linux supporta Unicode,
+ma sfortunatamente ancora troppo poche applicazioni lo supportano per
+preoccuparsi di lui negli Mtools. Molto più importate è che xterm non
+può mostrare gli Unicode. Se c'è sufficiente richiesta potrei includere il
+supporto per Unicode nei nomi di file Unix.
+
+.B Avvertimenti:
+Quando si cancella un file con gli Mtools, l'underscore corrisponde a
+tutti i caratteri che non possono essere rappresentati in Unix. Si
+faccia attenzione prima di fare mdel!
+
+.SH LOCAZIONE DEI FILE DI CONFIGURAZIONE E ORDINE DI ANALISI
+
+I file di configurazione sono analizzati nel seguente ordine:
+.PP
+.TP
+.B 1
+valori di default compilati
+.TP
+.B 2
+.B /etc/mtools.conf
+.TP
+.B 3
+.B /etc/mtools
+Questo è solo per compatibilità all'indietro, e è analizzato solo se
+non esiste
+.BR mtools.conf .
+.TP
+.B 4
+.B ~/.mtoolsrc\c
+\&.
+.PP
+
+Le opzioni definite negli ultimi file prevalgono su quelle definite nei
+precedenti. Drive definiti nei primi file continuano a esistere se
+non sono ridefinite negli ultimi file. Per esempio, i drive A e B
+possono essere definiti in
+.B /etc/mtools.conf
+e i drive C e D possono essere definiti in
+.B ~/.mtoolsrc
+Comunque, se anche
+.B ~/.mtoolsrc
+definisce il drive A, questo nuova descrizione si sovrapporrà alla
+descrizione del drive A presente in
+.B /etc/mtools.conf
+invece di aggiungersi a questa. Se si vuole aggiungere una nuova
+descrizione ad un drive già descritto in un file precedente, si usi la
+parola chiave
+.B +drive
+o
+.BR drive+ .
+
+.SH COMPATIBILITÀ ALL'INDIETRO
+
+La sintassi qui descritta è per la nuova versione
+.B mtools-2.5.4\c
+\&. La vecchia sintassi line-oriented è ancora supportata. Ogni riga
+che inizi con una sola lettera è assunta essere una descrizione di
+drive che usa la vecchia sintassi. Sezioni drive con il vecchio stile
+e il nuovo possono coesistere nello stesso file di configurazione, in
+modo da rendere più facile l'aggiornamento. Il supporto per la vecchia
+sintassi potrebbe infine essere tralasciato, e per scoraggiarne l'uso,
+ne ho qui omesso la descrizione.
+
+.SH FILE
+/etc/mtools.conf, ~/.mtoolsrc
+.SH "VEDERE ANCHE"
+.IR mtools (1)

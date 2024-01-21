@@ -1,0 +1,198 @@
+/* parser definition */
+
+/* normal C code */
+%{
+#include "kiss.h"
+#define YYSTYPE Stringstack
+
+static Stringstack
+    tmp;
+%}
+
+/* token section */
+%token IDENT SQUOTESTRING DQUOTESTRING ENDLINE VARIABLE
+       PIPETO BACKGROUND REDIRTO REDIRFROM REDIRAPPEND
+       RECALLCMD BQUOTESTRING
+
+/* rules */
+%%
+input:
+    input	
+    line	    {
+			dumpstack ("whole line:", $2);
+			runcmd ($2);
+			clearstack (&$2);
+			while (bufferedinput [0])
+			{
+			    addstringtostack (&$2, bufferedinput);
+			    bufferedinput [0] = '\0';
+			    runcmd ($2);
+			    clearstack (&$2);
+			}
+			inputparsed = 1;
+		    }
+    |
+    line	    {
+			dumpstack ("whole line", $1);
+			runcmd ($1);
+			clearstack (&$1);
+			while (bufferedinput [0])
+			{
+			    addstringtostack (&$1, bufferedinput);
+			    bufferedinput [0] = '\0';
+			    runcmd ($1);
+			    clearstack (&$1);
+			}
+			inputparsed = 1;
+		    }
+    ;
+
+line:
+    oneline
+    optbackground
+    endlinetoken    {
+			$$ = addstring ($1, $2);
+		    }
+    |
+    endlinetoken
+    |
+    error
+    endlinetoken
+    ;
+
+oneline:
+    oneline
+    pipetotoken
+    statement	    {
+			tmp = addstring ($1, $2);
+			$$ = addstring (tmp, $3);
+		    }
+    |
+    statement
+    ;
+			
+statement:
+    recalltoken
+    command	    {
+			$$ = addstring ($1, $2);
+			dumpstack ("recallcmd:", $$);
+		    }
+    |
+    command
+    optredir	    {
+			$$ = addstring ($1, $2);
+			dumpstack ("statement:", $$);
+		    }
+    ;
+
+command:
+    command
+    string	    {
+			$$ = addstring ($1, $2);
+		    }
+    |
+    string
+    ;
+
+optredir:
+    redirto
+    |
+    redirfrom
+    |
+    redirto
+    redirfrom	    {
+			$$ = addstring ($1, $2);
+		    }
+    |
+    redirfrom
+    redirto  	    {
+			$$ = addstring ($1, $2);
+		    }
+    |
+    /* empty */	    { $$.nstr = 0; }
+    ;
+
+optbackground:
+    backgroundtoken
+    |
+    /* empty */	    { $$.nstr = 0; }
+    ;
+
+redirto:
+    redirtotoken
+    string	    {
+			$$ = addstring ($1, $2);
+		    }
+   |
+    redirappendtoken
+    string	    {
+			$$ = addstring ($1, $2);
+		    }
+   ;
+
+redirfrom:
+    redirfromtoken
+    string	    {
+			$$ = addstring ($1, $2);
+		    }
+    ;
+    
+string:
+    simplestring
+    |
+    dquotestring
+    |
+    bquotestring
+    |
+    squotestring
+    |
+    variable
+    ;
+
+simplestring:
+    IDENT	    { $$ = setstring (yytext); }
+    ;
+
+dquotestring:
+    DQUOTESTRING    { $$ = setquotedstring (yytext, '"'); }
+    ;
+
+squotestring:
+    SQUOTESTRING    { $$ = setquotedstring (yytext, '\''); }
+    ;
+
+bquotestring:
+    BQUOTESTRING    { $$ = setstring (yytext); }
+    ;
+
+variable:
+    VARIABLE	    { $$ = setvariable (yytext); }
+    ;
+
+redirtotoken:
+    REDIRTO	    { $$ = setstring (">"); }
+    ;
+
+redirappendtoken:
+    REDIRAPPEND	    { $$ = setstring (">>"); }
+    ;
+    
+redirfromtoken:
+    REDIRFROM	    { $$ = setstring ("<"); }
+    ;
+
+pipetotoken:
+    PIPETO	    { $$ = setstring ("|"); }
+    ;
+
+backgroundtoken:
+    BACKGROUND	    { $$ = setstring ("&"); }
+    ;
+
+endlinetoken:
+    ENDLINE	    { $$.nstr = 0; }
+    ;
+
+recalltoken:
+    RECALLCMD	    { $$ = setstring ("!"); }
+    ;

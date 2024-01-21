@@ -1,0 +1,226 @@
+#! /bin/sh
+# newsdaily - daily housekeeping chores
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/maint:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+gripes="/tmp/ngrip$$"
+tmp="/tmp/ndai$$"
+sus="/tmp/suspects$$"
+trap "rm -f $gripes $tmp $sus ; trap 0 ; exit 0" 0 1 2 15
+>$gripes
+
+cd $NEWSCTL
+
+# keep one generation of log -- it's big
+rm -f log.o log.o.Z
+mv log log.o
+touch log
+# log.o gets compressed below
+
+# keep several generations of other logs for statistics and troubleshooting
+logroll -o errlog
+logroll -o batchlog
+
+# report any errors
+sleep 500			# hope that errlog.o is quiescent after this
+if test -s errlog.o
+then
+	(
+		echo "errlog.o"
+		echo ---------
+		cat errlog.o
+		echo ---------
+		echo
+	) >>$gripes
+fi
+
+# look for input anomalies
+cd $NEWSARTS/in.coming
+find . -type f -mtime +1 -print | sed 's;^\./;;' | egrep -v '^bad/' >$tmp
+if test -s $tmp		# old non-bad files lying about
+then
+	(
+		echo 'old input files:'
+		ls -ldtr `cat $tmp`
+		echo
+	) >>$gripes
+fi
+find bad -type f -name '[0-9]*' -mtime -2 -print >$tmp	# recent bad batches
+if test -s $tmp
+then
+	(
+		echo 'recent bad input batches (perhaps worth investigation):'
+		ls -ldtr `cat $tmp`
+		echo
+	) >>$gripes
+fi
+find bad -type f -name '[0-9]*' -mtime +7 -exec rm -f '{}' ';'
+cd $NEWSCTL
+
+# look for output anomalies
+cd $NEWSARTS/out.going
+find . -type f -name 'togo*' -size +0 -mtime +1 -print >$tmp
+if test -s $tmp
+then
+	(
+		echo 'batching possibly stalled for sites:'
+		sed 's;^\./\([^/]*\)/.*;\1;' $tmp | sort -u
+		echo
+	) >>$gripes
+fi
+cd $NEWSCTL
+no=0
+if test -f batchlog.o
+then
+	no=`egrep 'disk too full' batchlog.o | wc -l`
+fi
+if test " $no" -gt 0
+then
+	(
+		echo "space shortage(s) limited batching $no times"
+		echo
+	) >>$gripes
+fi
+
+# do a quick check of the active file
+checkactive -q >$tmp
+if test -s $tmp
+then
+	(
+		echo 'checkactive reports problems in active file:'
+		cat $tmp
+		echo
+	) >>$gripes
+fi
+
+# sweep log file, once, for suspect lines
+egrep '`
+ancient
+future
+unparsable
+header
+space in
+Message-ID' log.o >$sus
+
+# compress the old log file, now that we're done with it
+compress log.o
+
+# look for problem newsgroups on input (can miss cross-posted articles)
+egrep 'junked|junk group is excluded' $sus | sed 's/.*`\(.*\)'"'"'.*/\1/' |
+	sort | uniq -c | sort -nr | sed 5q >$tmp
+if test -s $tmp
+then
+	(
+		echo 'leading five unknown newsgroups by number of articles:'
+		cat $tmp
+		echo
+	) >>$gripes
+fi
+egrep unapproved $sus | sed 's/.*`\(.*\)'"'"'.*/\1/' | sort |
+	uniq -c | sort -nr | sed 5q >$tmp
+if test -s $tmp
+then
+	(
+		echo 'top five supposedly-moderated groups with unmoderated postings:'
+		cat $tmp
+		echo
+	) >>$gripes
+fi
+egrep 'no subscribed' $sus | sed 's/.*`\(.*\)'"'"'.*/\1/' | sort |
+	uniq -c | sort -nr | sed 5q >$tmp
+if test -s $tmp
+then
+	(
+		echo 'leading five unsubscribed newsgroups:'
+		cat $tmp
+		echo
+	) >>$gripes
+fi
+
+# And other signs of problems.
+egrep 'ancient|too far in the future|unparsable Date' $sus | egrep ' - ' |
+	awk '{print $4}' | sort | uniq -c | sort -nr | sed 5q >$tmp
+if test -s $tmp
+then
+	(
+		echo 'leading five sites sending stale/future/misdated news:'
+		cat $tmp
+		echo
+	) >>$gripes
+fi
+egrep ' (no|empty) .* header|contains non-|Message-ID|space in' $sus |
+	egrep ' - ' | awk '{print $4}' | sort | uniq -c | sort -nr |
+	sed 5q >$tmp
+if test -s $tmp
+then
+	(
+		echo 'leading five sites sending news with bad headers:'
+		cat $tmp
+		echo
+	) >>$gripes
+fi
+
+# send it
+report 'newsdaily report' <$gripes
+
+# and do other daily chores
+$NEWSBIN/relay/dodelayed
+
+# if there are dead-newsgroup directories to be deleted when empty, try them
+if test -s dirs.tbd
+then
+	while read dir
+	do
+		if test ! -d $NEWSARTS/$dir
+		then
+			continue		# NOTE CONTINUE
+		fi
+		cd $NEWSARTS/$dir
+		if test " `ls | egrep '^[0-9]+$' | wc -l`" -gt 0
+		then
+			# articles remain, try again tomorrow...
+			echo "$dir"
+		else
+			# looks like we can scrap it...
+			rm -f .[a-zA-Z]* *.* $NEWSOV/$dir/.overview
+			cd $NEWSARTS
+			rmdir $dir 2>/dev/null
+			while test `expr "$dir" : '.*/.*'` -gt 0
+			do
+				dir=`expr "$dir" : '\(.*\)/[^/]*'`
+				rmdir $dir 2>/dev/null
+			done
+			cd $NEWSOV
+			rmdir $dir 2>/dev/null
+			while test `expr "$dir" : '.*/.*'` -gt 0
+			do
+				dir=`expr "$dir" : '\(.*\)/[^/]*'`
+				rmdir $dir 2>/dev/null
+			done
+		fi
+	done <dirs.tbd >dirs.ttd
+	cd $NEWSCTL
+	mv dirs.ttd dirs.tbd
+fi
+
+# if symlinks.used is older than the oldest article, get rid of it
+if test -f symlinks.used
+then
+	usedat="`cat symlinks.used`"
+	case "$usedat" in
+	'')	usedat=0	;;
+	esac
+	oldest="`sed 1q history | sed 's/^[^	]*	//' | sed 's/[~	].*//'`"
+	case "$oldest" in
+	'')	oldest=`now`	;;
+	esac
+	# throw in 10000s for a safety margin
+	obsoleteness=`echo "$usedat $oldest" | awk '{ print $1 - $2 + 10000 }'`
+	case "$obsoleteness" in
+	-*)	rm -f symlinks.used	;;
+	esac
+fi

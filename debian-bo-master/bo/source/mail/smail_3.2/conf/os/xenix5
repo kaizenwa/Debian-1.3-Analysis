@@ -1,0 +1,84 @@
+#ident	"@(#)smail/conf/os:RELEASE-3_2:xenix5,v 1.10 1996/02/26 16:33:35 woods Exp"
+#
+# xenix5 - define the characteristics of SCO Xenix System V
+
+# WARNING: should probably source sys5.2
+
+# OSNAMES - Names defining this operating system
+OSNAMES=UNIX_SYS5_2:UNIX_SYS5:UNIX_XENIX:UNIX
+
+# ARCH_TYPE - this is likely true.... (but what about ancient 286?)
+ARCH_TYPE=32bit
+
+# LOCKING_PROTOCOL - macros for efficient file locking
+LOCKING_PROTOCOL="\
+#include <sys/locking.h>
+#define LOCK_REQUIRES_WRITE
+#define lock_fd(fd)	    ((locking((fd), LK_NBLCK, 0L) < 0 ||	\
+      locking((fd), LK_NBRLCK, 0L) < 0) ? FAIL : SUCCEED)
+#define lock_fd_wait(fd)    (locking((fd), LK_LOCK, 0L) < 0? FAIL: SUCCEED)
+#define unlock_fd(fd)	    ((void) locking((fd), LK_UNLCK, 0L))
+#define unlock_fd_wait(fd)  ((void) locking((fd), LK_UNLCK, 0L))
+#define lock_fd_rd_wait(fd) (locking((fd), LK_RLCK, 0L) < 0? FAIL: SUCCEED)
+"
+
+# MAILBOX_DIR - in which directory are user mailbox files
+MAILBOX_DIR=/usr/spool/mail
+
+# CONSOLE - name of the console device file
+CONSOLE=/dev/console
+
+# DECLARE_STRINGS - declare string routines, using macros as needed
+DECLARE_STRINGS="\
+#include <string.h>
+#define bzero(b,n)      (memset((b),'\0',(n)))
+#define bcopy(b1,b2,n)	(memcpy((b2),(b1),(n)))
+#define bcmp(b1,b2,n)	(memcmp((b1),(b2),(n)))
+#define index	strchr
+#define rindex	strrchr
+"
+
+# SECURE_PATH - directories containing system-supplied user programs
+SECURE_PATH=/bin:/usr/bin
+
+# OSLIBS - name any object libraries containing routines we will need
+OSLIBS="-ldbm -lx"
+
+# DRIVER_CONFIGURATION - configuration file describing smail drivers
+DRIVER_CONFIGURATION=unix-generic
+
+# RANLIB - how do we organize an existing object archive library
+RANLIB=ranlib
+
+# CHOWN - command to use for accessing the chown program
+CHOWN=chown
+
+# HAVE - what features should be used with this operating system
+HAVE=BSTRING:SYS5_STRLIB:GETOPT:UNAME:READDIR:VFPRINTF:CHSIZE
+NO_HAVE=MEMMOVE
+
+# MISC_DEFINES - miscellaneous definitions
+# Xenix5.0 dumps core without a TZ env variable.
+# Xenix5.0 does not define strucct utimbuf, so smail must do it itself.
+MISC_DEFINES=REQUIRE_TZ:DECLARE_UTIMBUF
+
+# MISC_C_DEFINES - miscellaneous inclusions in the defs.h files
+MISC_C_DEFINES="#include <unistd.h>"
+
+# Architecture- and directory-specific definitions
+
+case "$ARCH_TYPE" in
+*16*)
+	# Xenix/286
+	case "$FROM_ROOT" in
+	src|src/*)
+		CFLAGS="-LARGE -Ml -Mt64 $CFLAGS"
+		LDFLAGS="-F 2000 -SEG 256 $LDFLAGS"
+		;;
+	pd/pathalias)
+		CFLAGS="-Ml -Me $CFLAGS"
+		LDFLAGS="-F D000 $LDFLAGS"
+		;;
+	esac
+	;;
+esac

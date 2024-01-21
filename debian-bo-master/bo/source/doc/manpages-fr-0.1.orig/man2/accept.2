@@ -1,0 +1,224 @@
+.\" Copyright (c) 1983, 1990, 1991 The Regents of the University of California.
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. All advertising materials mentioning features or use of this software
+.\"    must display the following acknowledgement:
+.\"	This product includes software developed by the University of
+.\"	California, Berkeley and its contributors.
+.\" 4. Neither the name of the University nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"     @(#)accept.2	6.6 (Berkeley) 4/29/91
+.\"
+.\" Modified Sat Jul 24 16:42:42 1993 by Rik Faith (faith@cs.unc.edu)
+.\"
+.\" Traduction 9/10/1996 par Christophe Blaess (ccb@club-internet.fr)
+.\"
+.TH ACCEPT 2 "9 Octobre 1996" BSD "Manuel du programmeur Linux"
+.SH NOM
+accept \- Accepter une connexion sur une socket.
+.SH SYNOPSIS
+.B #include <sys/types.h>
+.br
+.B #include <sys/socket.h>
+.br
+.BI "int accept(int " sock ", struct sockaddr *" addr ", int *" addrlen );
+.SH DESCRIPTION
+
+.B accept
+est utilise generalement avec des processus serveurs orientes\-connexion.
+
+L'argument
+.I sock
+est une socket qui a ete creee avec la fonction
+.BR socket (2),
+a qui on a affecte une adresse avec
+.BR bind (2),
+et dont le desir de recevoir les connexions entrantes a ete
+indique au systeme avec 
+.BR listen (2).
+
+L'appel systeme
+.B accept
+extrait la premiere connexion de la file des connexions en attente,
+cree une nouvelle socket avec les memes proprietes que
+.I sock
+et alloue un nouveau descripteur de fichier pour cette socket.
+
+S'il n'y a pas de connexion en attente dans la file, et si la socket
+est bloquante,
+.B accept
+se met en attente d'une connexion. Si la socket est 
+non-bloquante, et qu'aucune connexion n'est presente dans la file,
+.B accept
+retourne une erreur decrite ci-dessous. 
+
+Une socket acceptee ne peut
+pas etre utilisee pour accepter de nouvelles connexions. La socket
+originale
+.I sock
+reste ouverte.
+
+L'argument
+.I addr
+est un parametre resultat qui est renseigne avec l'adresse de l'entite
+se connectant, telle qu'elle est connue par la couche de communication.
+Le format exact du parametre
+.I addr
+est fonction du domaine dans lequel la communication s'etablit. Le
+parametre-resultat
+.I addrlen
+est renseigne avec la longueur (en octets) de l'adresse retournee.
+Ce parametre doit initialement contenir la longueur du parametre
+.I addr.
+
+Cet appel systeme est utilise avec les sockets utilisant un protocole
+en mode connecte, generalement du type
+.BR SOCK_STREAM . 
+
+Lorsque l'on desire accepter des connexions sur plusieurs sockets
+simultanement, il est important de ne pas rester bloque en
+attente avec l'appel
+.B accept
+sur une seule d'entre elles.
+Il est alors possible d'utiliser l'appel-systeme
+.BR select (2)
+sur l'ensemble des sockets pour determiner la disponibilite
+de donnees a lire, et d'effectuer ensuite l'appel
+.B accept
+sur celles qui ont effectivement recu des demandes de connexion.
+
+
+Pour certain protocoles necessitant une confirmation explicite,
+comme
+.B ISO
+ou
+.BR DATAKIT ,
+.B accept
+peut etre considere comme extrayant simplement la connexion suivante de
+la file, sans demander de confirmation. Cette confirmation peut etre
+effectuee par une simple lecture ou ecriture sur le nouveau descripteur
+de fichier, et un rejet peut etre effectue en fermant simplement la 
+nouvelle socket.
+
+On peut obtenir les donnees utilisateur d'une connexion sans
+confirmation, en effectuant un appel-systeme
+.BR recvmsg (2)
+avec un
+.I msg_iovlen
+valant zero, et un
+.IR msg_controllen
+non nul, ou en effectuant une demande
+.BR getsockopt (2).
+
+De meme on peut fournir des informations sur un rejet de connexion en
+utilisant un appel
+.BR sendmsg (2)
+en fournissant uniquement les donnees de controle,
+ou en appelant
+.BR setsockopt (2).
+.SH "VALEUR RENVOYEE"
+.BR accept
+renvoie \-1 en cas d'erreur. S'il reussit il renvoie
+un entier non-negatif, constituant un descripteur pour la nouvelle
+socket.
+.SH ERREURS
+.TP 0.8i
+.B EBADF
+.I sock
+est un descripteur invalide.
+.TP
+.B ENOTSOCK
+.I sock
+est un descripteur de fichier, pas de socket.
+.TP
+.B EOPNOTSUPP
+La socket de reference n'est pas de type
+.BR SOCK_STREAM . 
+.TP
+.B EFAULT
+.I addr
+pointe en-dehors de l'espace d'adresse accessible.
+.TP
+.B EWOULDBLOCK
+La socket est non-bloquante et aucune connexion n'est
+presente dans la file.
+.SH EXEMPLE
+
+Un scenario typique de mise en oeuvre de serveur oriente
+connexion est le suivant :
+
+.nf
+
+int  sock;
+int  nouvelle;
+
+sock  = socket (famille, type, 0);
+if (sock < 0) {
+    perror ("socket");
+    exit (1);
+}
+if (bind (sock, & mon_adresse, longueur_adresse) < 0) {
+    perror ("bind);
+    exit (1);
+}
+if (listen (sock, 5) < 0) {
+    perror ("listen");
+    exit (1);
+}
+
+while (1) {
+
+    nouvelle = accept (sock, & adresse_client, & lg_adresse_client);
+    if (nouvelle < 0) {
+        perror ("accept");
+        exit (1);
+    }
+
+    if (fork () == 0) {
+        /* Processus fils */
+        close (sock);
+        Traiter_le_client (nouvelle);
+        exit (0);
+    }
+
+    if (fork () > 0) {
+
+        /* Processus pere */
+        close (nouvelle);
+        /* Attendre la connexion suivante */
+        continue;
+    }
+
+    perror ("fork");
+    exit (1);
+}
+.fi
+
+.SH HISTORIQUE
+La fonction
+.B accept
+est apparue dans BSD 4.2.
+.SH "VOIR AUSSI"
+.BR bind "(2), " connect "(2), " listen "(2), " select "(2), " socket (2)

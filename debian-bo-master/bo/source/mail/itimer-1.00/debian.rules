@@ -1,0 +1,109 @@
+#!/usr/bin/make -f
+
+# who are we?
+
+package=itimer
+version=1.00
+revision=4
+
+CFLAGS=-O2 -Wall -fno-strength-reduce
+BATCHFLAGS = -batch -q -no-site-file
+EMACS=emacs
+PREFIX=
+
+# targets to do the actual compilation
+
+build:
+	$(checkdir)
+	test ! -f build.aout
+	$(MAKE) -f debian.rules compile
+	touch build
+
+build.aout:
+	$(checkdir)
+	test ! -f build
+	$(MAKE) -f debian.rules compile CC=/usr/i486-linuxaout/bin/gcc
+	touch build.aout
+
+compile: itimer itimer.elc
+
+itimer: itimer.o
+	$(CC) $(LDFLAGS) -o itimer itimer.o
+
+itimer.elc: itimer.el
+	$(EMACS) $(BATCHFLAGS) -f batch-byte-compile itimer.el
+
+# target to tidy everything up
+
+clean:
+	$(checkdir)
+	-rm -f build build.aout
+	-rm -rf debian-tmp `find . -name '*~'` *.elc *.o itimer
+
+# target to build the binary package
+
+binary: checkroot build
+	$(MAKE) -f debian.rules binary.generic
+
+binary.aout: checkroot build.aout
+	$(MAKE) -f debian.rules binary.generic PREFIX=aout-
+
+binary.generic:
+	-rm -rf debian-tmp
+	mkdir debian-tmp debian-tmp/DEBIAN
+	cp debian.postinst debian-tmp/DEBIAN/postinst
+	cp debian.postrm debian-tmp/DEBIAN/postrm
+	chmod +x debian-tmp/DEBIAN/post{inst,rm}
+	:
+	sed -e 's/VERSION/$(version)-$(revision)/' \
+		debian.control > debian-tmp/DEBIAN/control
+	:
+	mkdir -p debian-tmp/usr/lib/emacs/site-lisp
+	cp itimer.elc debian-tmp/usr/lib/emacs/site-lisp
+	:
+	mkdir -p debian-tmp/usr/bin
+	cp itimer debian-tmp/usr/bin
+	:
+	mkdir -p debian-tmp/usr/doc/copyright/
+	cp debian.README debian-tmp/usr/doc/copyright/$(package)
+	:
+	mkdir -p debian-tmp/usr/doc/examples/itimer
+	cp itimer.c itimer.sh ntime.el debian-tmp/usr/doc/examples/itimer
+	chmod +x debian-tmp/usr/doc/examples/itimer/itimer.sh
+	:
+	mkdir -p debian-tmp/usr/doc/itimer
+	cp debian.doc debian-tmp/usr/doc/itimer/README
+	:
+	chown -R root.root debian-tmp
+	chmod -R g-ws debian-tmp
+	:
+	dpkg --build debian-tmp
+	mv debian-tmp.deb ../$(PREFIX)$(package)-$(version)-$(revision).deb
+
+define checkdir
+	test -f itimer.el
+endef
+
+# target to build the source package
+
+source:		clean
+	chmod +x debian.rules
+	cd .. && \
+	tar cf $(package)-$(version)-$(revision).tar $(package)-$(version) && \
+	gzip -9vf $(package)-$(version)-$(revision).tar
+ 
+# target to build the diff package
+
+diff:		clean
+	cd .. && \
+	(diff -ruN $(package)-$(version).orig $(package)-$(version) \
+	 >$(package)-$(version)-$(revision).diff; [ $$? = 1 ]) && \
+	gzip -9vf $(package)-$(version)-$(revision).diff
+
+# check that we're root
+
+checkroot:
+	$(checkdir)
+	test root = "`whoami`"
+
+.PHONY: binary source diff clean checkroot

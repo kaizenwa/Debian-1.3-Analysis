@@ -1,0 +1,113 @@
+------------------------------------------------------------------------------
+--                                                                          --
+--                 GNU ADA RUNTIME LIBRARY (GNARL) COMPONENTS               --
+--                                                                          --
+--                S Y S T E M . T A S K _ P R I M I T I V E S               --
+--                                                                          --
+--                                  S p e c                                 --
+--                          (Version for new GNARL)                         --
+--                                                                          --
+--                             $Revision: 1.1 $                            --
+--                                                                          --
+--   Copyright (C) 1991,1992,1993,1994,1995,1996 Florida State University   --
+--                                                                          --
+-- GNARL is free software; you can  redistribute it  and/or modify it under --
+-- terms of the  GNU General Public License as published  by the Free Soft- --
+-- ware  Foundation;  either version 2,  or (at your option) any later ver- --
+-- sion. GNARL is distributed in the hope that it will be useful, but WITH- --
+-- OUT ANY WARRANTY;  without even the  implied warranty of MERCHANTABILITY --
+-- or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License --
+-- for  more details.  You should have  received  a copy of the GNU General --
+-- Public License  distributed with GNARL; see file COPYING.  If not, write --
+-- to  the Free Software Foundation,  59 Temple Place - Suite 330,  Boston, --
+-- MA 02111-1307, USA.                                                      --
+--                                                                          --
+-- As a special exception,  if other files  instantiate  generics from this --
+-- unit, or you link  this unit with other files  to produce an executable, --
+-- this  unit  does not  by itself cause  the resulting  executable  to  be --
+-- covered  by the  GNU  General  Public  License.  This exception does not --
+-- however invalidate  any other reasons why  the executable file  might be --
+-- covered by the  GNU Public License.                                      --
+--                                                                          --
+-- GNARL was developed by the GNARL team at Florida State University. It is --
+-- now maintained by Ada Core Technologies Inc. in cooperation with Florida --
+-- State University (http://www.gnat.com).                                  --
+--                                                                          --
+------------------------------------------------------------------------------
+
+--  ....preliminary draft (tpb)
+--  This is an OS/2 version of this package.
+--  This package provides low-level support for most tasking features.
+
+with Interfaces.OS2Lib.Threads;
+with Interfaces.OS2Lib.Synchronization;
+
+package System.Task_Primitives is
+
+   pragma Preelaborate;
+
+   type Lock is limited private;
+   --  Should be used for implementation of protected objects.
+
+   type RTS_Lock is limited private;
+   --  Should be used inside the runtime system.
+   --  The difference between Lock and the RTS_Lock is that the later
+   --  one serves only as a semaphore so that do not check for
+   --  ceiling violations.
+
+   type Task_Body_Access is access procedure;
+   --  Pointer to the task body's entry point (or possibly a wrapper
+   --  declared local to the GNARL).
+
+   type Private_Data is limited private;
+   --  Any information that the GNULLI needs maintained on a per-task
+   --  basis.  A component of this type is guaranteed to be included
+   --  in the Ada_Task_Control_Block.
+
+private
+
+   type Lock is
+      record
+         Mutex          : aliased Interfaces.OS2Lib.Synchronization.HMTX;
+         Priority       : Integer;
+         Owner_Priority : Integer;
+      end record;
+
+   type RTS_Lock is new Lock;
+
+   type Private_Data is record
+      Thread      : aliased Interfaces.OS2Lib.Threads.TID;
+      pragma Atomic (Thread);
+      --  Thread field may be updated by two different threads of control.
+      --  (See, Enter_Task and Create_Task in s-taprop.adb).
+      --  They put the same value (thr_self value). We do not want to
+      --  use lock on those operations and the only thing we have to
+      --  make sure is that they are updated in atomic fashion.
+      CV          : aliased Interfaces.OS2Lib.Synchronization.HEV;
+      L           : aliased RTS_Lock;
+      --  protection for all components is lock L
+      Active_Priority : System.Any_Priority;
+      --  Active priority, except that the effects of protected object
+      --  priority ceilings are not reflected. This only reflects explicit
+      --  priority changes and priority inherited through task activation
+      --  and rendezvous.
+      --  Ada 95 notes: In Ada 95, this field will be transferred to the
+      --  Priority field of an Entry_Calls component when an entry call
+      --  is initiated. The Priority of the Entry_Calls component will not
+      --  change for the duration of the call. The accepting task can
+      --  use it to boost its own priority without fear of its changing in
+      --  the meantime.
+      --  This can safely be used in the priority ordering
+      --  of entry queues. Once a call is queued, its priority does not
+      --  change.
+      --  Since an entry call cannot be made while executing
+      --  a protected action, the priority of a task will never reflect a
+      --  priority ceiling change at the point of an entry call.
+      --  Protection: Only written by Self, and only accessed when Acceptor
+      --  accepts an entry or when Created activates, at which points Self is
+      --  suspended.
+   end record;
+
+end System.Task_Primitives;
+
+

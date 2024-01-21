@@ -1,0 +1,1410 @@
+This is Info file slib.info, produced by Makeinfo-1.64 from the input
+file slib.texi.
+
+  This file documents SLIB, the portable Scheme library.
+
+  Copyright (C) 1993 Todd R. Eigenschink Copyright (C) 1993, 1994, 1995
+Aubrey Jaffer
+
+  Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+  Permission is granted to copy and distribute modified versions of this
+manual under the conditions for verbatim copying, provided that the
+entire resulting derived work is distributed under the terms of a
+permission notice identical to this one.
+
+  Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions, except that this permission notice may be stated in a
+translation approved by the author.
+
+
+File: slib.info,  Node: Sorting,  Next: Topological Sort,  Prev: Pretty-Print,  Up: Procedures
+
+Sorting
+=======
+
+  `(require 'sort)'
+
+  Many Scheme systems provide some kind of sorting functions.  They do
+not, however, always provide the *same* sorting functions, and those
+that I have had the opportunity to test provided inefficient ones (a
+common blunder is to use quicksort which does not perform well).
+
+  Because `sort' and `sort!' are not in the standard, there is very
+little agreement about what these functions look like.  For example,
+Dybvig says that Chez Scheme provides
+     (merge predicate list1 list2)
+     (merge! predicate list1 list2)
+     (sort predicate list)
+     (sort! predicate list)
+
+while MIT Scheme 7.1, following Common LISP, offers unstable
+     (sort list predicate)
+
+TI PC Scheme offers
+     (sort! list/vector predicate?)
+
+and Elk offers
+     (sort list/vector predicate?)
+     (sort! list/vector predicate?)
+
+  Here is a comprehensive catalogue of the variations I have found.
+
+  1. Both `sort' and `sort!' may be provided.
+
+  2. `sort' may be provided without `sort!'.
+
+  3. `sort!' may be provided without `sort'.
+
+  4. Neither may be provided.
+
+  5. The sequence argument may be either a list or a vector.
+
+  6. The sequence argument may only be a list.
+
+  7. The sequence argument may only be a vector.
+
+  8. The comparison function may be expected to behave like `<'.
+
+  9. The comparison function may be expected to behave like `<='.
+
+ 10. The interface may be `(sort predicate? sequence)'.
+
+ 11. The interface may be `(sort sequence predicate?)'.
+
+ 12. The interface may be `(sort sequence &optional (predicate? <))'.
+
+ 13. The sort may be stable.
+
+ 14. The sort may be unstable.
+
+  All of this variation really does not help anybody.  A nice simple
+merge sort is both stable and fast (quite a lot faster than *quick*
+sort).
+
+  I am providing this source code with no restrictions at all on its use
+(but please retain D.H.D.Warren's credit for the original idea).  You
+may have to rename some of these functions in order to use them in a
+system which already provides incompatible or inferior sorts.  For each
+of the functions, only the top-level define needs to be edited to do
+that.
+
+  I could have given these functions names which would not clash with
+any Scheme that I know of, but I would like to encourage implementors to
+converge on a single interface, and this may serve as a hint.  The
+argument order for all functions has been chosen to be as close to
+Common LISP as made sense, in order to avoid NIH-itis.
+
+  Each of the five functions has a required *last* parameter which is a
+comparison function.  A comparison function `f' is a function of 2
+arguments which acts like `<'.  For example,
+
+     (not (f x x))
+     (and (f x y) (f y z)) == (f x z)
+
+  The standard functions `<', `>', `char<?', `char>?', `char-ci<?',
+`char-ci>?', `string<?', `string>?', `string-ci<?', and `string-ci>?'
+are suitable for use as comparison functions.  Think of `(less? x y)'
+as saying when `x' must *not* precede `y'.
+
+ - Function: sorted? SEQUENCE LESS?
+     Returns `#t' when the sequence argument is in non-decreasing order
+     according to LESS? (that is, there is no adjacent pair `... x y
+     ...' for which `(less? y x)').
+
+     Returns `#f' when the sequence contains at least one out-of-order
+     pair.  It is an error if the sequence is neither a list nor a
+     vector.
+
+ - Function: merge LIST1 LIST2 LESS?
+     This merges two lists, producing a completely new list as result.
+     I gave serious consideration to producing a Common-LISP-compatible
+     version.  However, Common LISP's `sort' is our `sort!' (well, in
+     fact Common LISP's `stable-sort' is our `sort!', merge sort is
+     *fast* as well as stable!) so adapting CL code to Scheme takes a
+     bit of work anyway.  I did, however, appeal to CL to determine the
+     *order* of the arguments.
+
+ - Procedure: merge! LIST1 LIST2 LESS?
+     Merges two lists, re-using the pairs of LIST1 and LIST2 to build
+     the result.  If the code is compiled, and LESS? constructs no new
+     pairs, no pairs at all will be allocated.  The first pair of the
+     result will be either the first pair of LIST1 or the first pair of
+     LIST2, but you can't predict which.
+
+     The code of `merge' and `merge!' could have been quite a bit
+     simpler, but they have been coded to reduce the amount of work
+     done per iteration.  (For example, we only have one `null?' test
+     per iteration.)
+
+ - Function: sort SEQUENCE LESS?
+     Accepts either a list or a vector, and returns a new sequence
+     which is sorted.  The new sequence is the same type as the input.
+     Always `(sorted? (sort sequence less?) less?)'.  The original
+     sequence is not altered in any way.  The new sequence shares its
+     *elements* with the old one; no elements are copied.
+
+ - Procedure: sort! SEQUENCE LESS?
+     Returns its sorted result in the original boxes.  If the original
+     sequence is a list, no new storage is allocated at all.  If the
+     original sequence is a vector, the sorted elements are put back in
+     the same vector.
+
+     Some people have been confused about how to use `sort!', thinking
+     that it doesn't return a value.  It needs to be pointed out that
+          (set! slist (sort! slist <))
+
+     is the proper usage, not
+          (sort! slist <)
+
+  Note that these functions do *not* accept a CL-style `:key' argument.
+A simple device for obtaining the same expressiveness is to define
+     (define (keyed less? key)
+       (lambda (x y) (less? (key x) (key y))))
+
+and then, when you would have written
+     (sort a-sequence #'my-less :key #'my-key)
+
+in Common LISP, just write
+     (sort! a-sequence (keyed my-less? my-key))
+
+in Scheme.
+
+
+File: slib.info,  Node: Topological Sort,  Next: Standard Formatted I/O,  Prev: Sorting,  Up: Procedures
+
+Topological Sort
+================
+
+  `(require 'topological-sort)' or `(require 'tsort)'
+
+The algorithm is inspired by Cormen, Leiserson and Rivest (1990)
+`Introduction to Algorithms', chapter 23.
+
+ - Function: tsort DAG PRED
+ - Function: topological-sort DAG PRED
+     where
+    DAG
+          is a list of sublists.  The car of each sublist is a vertex.
+          The cdr is the adjacency list of that vertex, i.e. a list of
+          all vertices to which there exists an edge from the car
+          vertex.
+
+    PRED
+          is one of `eq?', `eqv?', `equal?', `=', `char=?',
+          `char-ci=?', `string=?', or `string-ci=?'.
+
+     Sort the directed acyclic graph DAG so that for every edge from
+     vertex U to V, U will come before V in the resulting list of
+     vertices.
+
+     Time complexity: O (|V| + |E|)
+
+     Example (from Cormen):
+          Prof. Bumstead topologically sorts his clothing when getting
+          dressed.  The first argument to `tsort' describes which
+          garments he needs to put on before others.  (For example,
+          Prof Bumstead needs to put on his shirt before he puts on his
+          tie or his belt.)  `tsort' gives the correct order of
+          dressing:
+
+          (require 'tsort)
+          (tsort '((shirt tie belt)
+                   (tie jacket)
+                   (belt jacket)
+                   (watch)
+                   (pants shoes belt)
+                   (undershorts pants shoes)
+                   (socks shoes))
+                 eq?)
+          =>
+          (socks undershorts pants shoes watch shirt belt tie jacket)
+
+
+File: slib.info,  Node: Standard Formatted I/O,  Next: String-Case,  Prev: Topological Sort,  Up: Procedures
+
+Standard Formatted I/O
+======================
+
+* Menu:
+
+* Standard Formatted Output::
+* Standard Formatted Input::
+
+stdio
+-----
+
+  `(require 'stdio)'
+
+  `require's `printf' and `scanf' and additionally defines the symbols:
+
+ - Variable: stdin
+     Defined to be `(current-input-port)'.
+
+ - Variable: stdout
+     Defined to be `(current-output-port)'.
+
+ - Variable: stderr
+     Defined to be `(current-error-port)'.
+
+
+File: slib.info,  Node: Standard Formatted Output,  Next: Standard Formatted Input,  Prev: Standard Formatted I/O,  Up: Standard Formatted I/O
+
+Standard Formatted Output
+-------------------------
+
+  `(require 'printf)'
+
+ - Procedure: printf FORMAT ARG1 ...
+ - Procedure: fprintf PORT FORMAT ARG1 ...
+ - Procedure: sprintf STR FORMAT ARG1 ...
+     Each function converts, formats, and outputs its ARG1 ...
+     arguments according to the control string FORMAT argument and
+     returns the number of characters output.
+
+     `printf' sends its output to the port `(current-output-port)'.
+     `fprintf' sends its output to the port PORT.  `sprintf'
+     `string-set!'s locations of the non-constant string argument STR
+     to the output characters.
+
+          *Note:* sprintf should be changed to a macro so a `substring'
+          expression could be used for the STR argument.
+
+     The string FORMAT contains plain characters which are copied to
+     the output stream, and conversion specifications, each of which
+     results in fetching zero or more of the arguments ARG1 ....  The
+     results are undefined if there are an insufficient number of
+     arguments for the format.  If FORMAT is exhausted while some of the
+     ARG1 ... arguments remain unused, the excess ARG1 ... arguments
+     are ignored.
+
+     The conversion specifications in a format string have the form:
+
+          % [ FLAGS ] [ WIDTH ] [ . PRECISION ] [ TYPE ] CONVERSION
+
+     An output conversion specifications consist of an initial `%'
+     character followed in sequence by:
+
+        * Zero or more "flag characters" that modify the normal
+          behavior of the conversion specification.
+
+         `-'
+               Left-justify the result in the field.  Normally the
+               result is right-justified.
+
+         `+'
+               For the signed `%d' and `%i' conversions and all inexact
+               conversions, prefix a plus sign if the value is positive.
+
+         ` '
+               For the signed `%d' and `%i' conversions, if the result
+               doesn't start with a plus or minus sign, prefix it with
+               a space character instead.  Since the `+' flag ensures
+               that the result includes a sign, this flag is ignored if
+               both are specified.
+
+         `#'
+               For inexact conversions, `#' specifies that the result
+               should always include a decimal point, even if no digits
+               follow it.  For the `%g' and `%G' conversions, this also
+               forces trailing zeros after the decimal point to be
+               printed where they would otherwise be elided.
+
+               For the `%o' conversion, force the leading digit to be
+               `0', as if by increasing the precision.  For `%x' or
+               `%X', prefix a leading `0x' or `0X' (respectively) to
+               the result.  This doesn't do anything useful for the
+               `%d', `%i', or `%u' conversions.  Using this flag
+               produces output which can be parsed by the `scanf'
+               functions with the `%i' conversion (*note Standard
+               Formatted Input::.).
+
+         `0'
+               Pad the field with zeros instead of spaces.  The zeros
+               are placed after any indication of sign or base.  This
+               flag is ignored if the `-' flag is also specified, or if
+               a precision is specified for an exact converson.
+
+        * An optional decimal integer specifying the "minimum field
+          width".  If the normal conversion produces fewer characters
+          than this, the field is padded (with spaces or zeros per the
+          `0' flag) to the specified width.  This is a *minimum* width;
+          if the normal conversion produces more characters than this,
+          the field is *not* truncated.
+
+          Alternatively, if the field width is `*', the next argument
+          in the argument list (before the actual value to be printed)
+          is used as the field width.  The width value must be an
+          integer.  If the value is negative it is as though the `-'
+          flag is set (see above) and the absolute value is used as the
+          field width.
+
+        * An optional "precision" to specify the number of digits to be
+          written for numeric conversions and the maximum field width
+          for string conversions.  The precision is specified by a
+          period (`.') followed optionally by a decimal integer (which
+          defaults to zero if omitted).
+
+          Alternatively, if the precision is `.*', the next argument in
+          the argument list (before the actual value to be printed) is
+          used as the precision.  The value must be an integer, and is
+          ignored if negative.  If you specify `*' for both the field
+          width and precision, the field width argument precedes the
+          precision argument.  The `.*' precision is an enhancement.  C
+          library versions may not accept this syntax.
+
+          For the `%f', `%e', and `%E' conversions, the precision
+          specifies how many digits follow the decimal-point character.
+          The default precision is `6'.  If the precision is
+          explicitly `0', the decimal point character is suppressed.
+
+          For the `%g' and `%G' conversions, the precision specifies how
+          many significant digits to print.  Significant digits are the
+          first digit before the decimal point, and all the digits
+          after it.  If the precision is `0' or not specified for `%g'
+          or `%G', it is treated like a value of `1'.  If the value
+          being printed cannot be expressed accurately in the specified
+          number of digits, the value is rounded to the nearest number
+          that fits.
+
+          For exact conversions, if a precision is supplied it
+          specifies the minimum number of digits to appear; leading
+          zeros are produced if necessary.  If a precision is not
+          supplied, the number is printed with as many digits as
+          necessary.  Converting an exact `0' with an explicit
+          precision of zero produces no characters.
+
+        * An optional one of `l', `h' or `L', which is ignored for
+          numeric conversions.  It is an error to specify these
+          modifiers for non-numeric conversions.
+
+        * A character that specifies the conversion to be applied.
+
+Exact Conversions
+.................
+
+    `d', `i'
+          Print an integer as a signed decimal number.  `%d' and `%i'
+          are synonymous for output, but are different when used with
+          `scanf' for input (*note Standard Formatted Input::.).
+
+    `o'
+          Print an integer as an unsigned octal number.
+
+    `u'
+          Print an integer as an unsigned decimal number.
+
+    `x', `X'
+          Print an integer as an unsigned hexadecimal number.  `%x'
+          prints using the digits `0123456789abcdef'.  `%X' prints
+          using the digits `0123456789ABCDEF'.
+
+Inexact Conversions
+...................
+
+     *Note:* Inexact conversions are not supported yet.
+
+    `f'
+          Print a floating-point number in fixed-point notation.
+
+    `e', `E'
+          Print a floating-point number in exponential notation.  `%e'
+          prints `e' between mantissa and exponont.  `%E' prints `E'
+          between mantissa and exponont.
+
+    `g', `G'
+          Print a floating-point number in either normal or exponential
+          notation, whichever is more appropriate for its magnitude.
+          `%g' prints `e' between mantissa and exponont.  `%G' prints
+          `E' between mantissa and exponont.
+
+Other Conversions
+.................
+
+    `c'
+          Print a single character.  The `-' flag is the only one which
+          can be specified.  It is an error to specify a precision.
+
+    `s'
+          Print a string.  The `-' flag is the only one which can be
+          specified.  A precision specifies the maximum number of
+          characters to output; otherwise all characters in the string
+          are output.
+
+    `a', `A'
+          Print a scheme expression.  The `-' flag left-justifies the
+          output.  The `#' flag specifies that strings and characters
+          should be quoted as by `write' (which can be read using
+          `read'); otherwise, output is as `display' prints.  A
+          precision specifies the maximum number of characters to
+          output; otherwise as many characters as needed are output.
+
+          *Note:* `%a' and `%A' are SLIB extensions.
+
+    `%'
+          Print a literal `%' character.  No argument is consumed.  It
+          is an error to specifiy flags, field width, precision, or
+          type modifiers with `%%'.
+
+
+File: slib.info,  Node: Standard Formatted Input,  Prev: Standard Formatted Output,  Up: Standard Formatted I/O
+
+Standard Formatted Input
+------------------------
+
+  `(require 'scanf)'
+
+ - Function: scanf-read-list FORMAT
+ - Function: scanf-read-list FORMAT PORT
+ - Function: scanf-read-list FORMAT STRING
+
+ - Macro: scanf FORMAT ARG1 ...
+ - Macro: fscanf PORT FORMAT ARG1 ...
+ - Macro: sscanf STR FORMAT ARG1 ...
+     Each function reads characters, interpreting them according to the
+     control string FORMAT argument.
+
+     `scanf-read-list' returns a list of the items specified as far as
+     the input matches FORMAT.  `scanf', `fscanf', and `sscanf' return
+     the number of items successfully matched and stored.  `scanf',
+     `fscanf', and `sscanf' also set the location corresponding to ARG1
+     ... using the methods:
+
+    symbol
+          `set!'
+
+    car expression
+          `set-car!'
+
+    cdr expression
+          `set-cdr!'
+
+    vector-ref expression
+          `vector-set!'
+
+    substring expression
+          `substring-move-left!'
+
+     The argument to a `substring' expression in ARG1 ... must be a
+     non-constant string.  Characters will be stored starting at the
+     position specified by the second argument to `substring'.  The
+     number of characters stored will be limited by either the position
+     specified by the third argument to `substring' or the length of the
+     matched string, whichever is less.
+
+     The control string, FORMAT, contains conversion specifications and
+     other characters used to direct interpretation of input sequences.
+     The control string contains:
+
+        * White-space characters (blanks, tabs, newlines, or formfeeds)
+          that cause input to be read (and discarded) up to the next
+          non-white-space character.
+
+        * An ordinary character (not `%') that must match the next
+          character of the input stream.
+
+        * Conversion specifications, consisting of the character `%', an
+          optional assignment suppressing character `*', an optional
+          numerical maximum-field width, an optional `l', `h' or `L'
+          which is ignored, and a conversion code.
+
+     Unless the specification contains the `n' conversion character
+     (described below), a conversion specification directs the
+     conversion of the next input field.  The result of a conversion
+     specification is returned in the position of the corresponding
+     argument points, unless `*' indicates assignment suppression.
+     Assignment suppression provides a way to describe an input field
+     to be skipped.  An input field is defined as a string of
+     characters; it extends to the next inappropriate character or
+     until the field width, if specified, is exhausted.
+
+          *Note:* This specification of format strings differs from the
+          `ANSI C' and `POSIX' specifications.  In SLIB, white space
+          before an input field is not skipped unless white space
+          appears before the conversion specification in the format
+          string.  In order to write format strings which work
+          identically with `ANSI C' and SLIB, prepend whitespace to all
+          conversion specifications except `[' and `c'.
+
+     The conversion code indicates the interpretation of the input
+     field; For a suppressed field, no value is returned.  The
+     following conversion codes are legal:
+
+    `%'
+          A single % is expected in the input at this point; no value
+          is returned.
+
+    `d', `D'
+          A decimal integer is expected.
+
+    `u', `U'
+          An unsigned decimal integer is expected.
+
+    `o', `O'
+          An octal integer is expected.
+
+    `x', `X'
+          A hexadecimal integer is expected.
+
+    `i'
+          An integer is expected.  Returns the value of the next input
+          item, interpreted according to C conventions; a leading `0'
+          implies octal, a leading `0x' implies hexadecimal; otherwise,
+          decimal is assumed.
+
+    `n'
+          Returns the total number of bytes (including white space)
+          read by `scanf'.  No input is consumed by `%n'.
+
+    `f', `F', `e', `E', `g', `G'
+          A floating-point number is expected.  The input format for
+          floating-point numbers is an optionally signed string of
+          digits, possibly containing a radix character `.', followed
+          by an optional exponent field consisting of an `E' or an `e',
+          followed by an optional `+', `-', or space, followed by an
+          integer.
+
+    `c', `C'
+          WIDTH characters are expected.  The normal
+          skip-over-white-space is suppressed in this case; to read the
+          next non-space character, use `%1s'.  If a field width is
+          given, a string is returned; up to the indicated number of
+          characters is read.
+
+    `s', `S'
+          A character string is expected The input field is terminated
+          by a white-space character.  `scanf' cannot read a null
+          string.
+
+    `['
+          Indicates string data and the normal
+          skip-over-leading-white-space is suppressed.  The left
+          bracket is followed by a set of characters, called the
+          scanset, and a right bracket; the input field is the maximal
+          sequence of input characters consisting entirely of
+          characters in the scanset.  `^', when it appears as the first
+          character in the scanset, serves as a complement operator and
+          redefines the scanset as the set of all characters not
+          contained in the remainder of the scanset string.
+          Construction of the scanset follows certain conventions.  A
+          range of characters may be represented by the construct
+          first-last, enabling `[0123456789]' to be expressed `[0-9]'.
+          Using this convention, first must be lexically less than or
+          equal to last; otherwise, the dash stands for itself.  The
+          dash also stands for itself when it is the first or the last
+          character in the scanset.  To include the right square
+          bracket as an element of the scanset, it must appear as the
+          first character (possibly preceded by a `^') of the scanset,
+          in which case it will not be interpreted syntactically as the
+          closing bracket.  At least one character must match for this
+          conversion to succeed.
+
+     The `scanf' functions terminate their conversions at end-of-file,
+     at the end of the control string, or when an input character
+     conflicts with the control string.  In the latter case, the
+     offending character is left unread in the input stream.
+
+
+File: slib.info,  Node: String-Case,  Next: String Ports,  Prev: Standard Formatted I/O,  Up: Procedures
+
+String-Case
+===========
+
+  `(require 'string-case)'
+
+ - Procedure: string-upcase STR
+ - Procedure: string-downcase STR
+ - Procedure: string-capitalize STR
+     The obvious string conversion routines.  These are non-destructive.
+
+ - Function: string-upcase! STR
+ - Function: string-downcase! STR
+ - Function: string-captialize! STR
+     The destructive versions of the functions above.
+
+
+File: slib.info,  Node: String Ports,  Next: String Search,  Prev: String-Case,  Up: Procedures
+
+String Ports
+============
+
+  `(require 'string-port)'
+
+ - Procedure: call-with-output-string PROC
+     PROC must be a procedure of one argument.  This procedure calls
+     PROC with one argument: a (newly created) output port.  When the
+     function returns, the string composed of the characters written
+     into the port is returned.
+
+ - Procedure: call-with-input-string STRING PROC
+     PROC must be a procedure of one argument.  This procedure calls
+     PROC with one argument: an (newly created) input port from which
+     STRING's contents may be read.  When PROC returns, the port is
+     closed and the value yielded by the procedure PROC is returned.
+
+
+File: slib.info,  Node: String Search,  Next: Tektronix Graphics Support,  Prev: String Ports,  Up: Procedures
+
+String Search
+=============
+
+  `(require 'string-search)'
+
+ - Procedure: string-index STRING CHAR
+     Returns the index of the first occurence of CHAR within STRING, or
+     `#f' if the STRING does not contain a character CHAR.
+
+ - procedure: substring? PATTERN STRING
+     Searches STRING to see if some substring of STRING is equal to
+     PATTERN.  `substring?' returns the index of the first character of
+     the first substring of STRING that is equal to PATTERN; or `#f' if
+     STRING does not contain PATTERN.
+
+          (substring? "rat" "pirate") =>  2
+          (substring? "rat" "outrage") =>  #f
+          (substring? "" any-string) =>  0
+
+ - Procedure: find-string-from-port? STR IN-PORT MAX-NO-CHARS
+ - Procedure: find-string-from-port? STR IN-PORT
+     Looks for a string STR within the first MAX-NO-CHARS chars of the
+     input port IN-PORT.  MAX-NO-CHARS may be omitted: in that case,
+     the search span is limited by the end of the input stream.  When
+     the STR is found, the function returns the number of characters it
+     has read from the port, and the port is set to read the first char
+     after that (that is, after the STR) The function returns `#f' when
+     the STR isn't found.
+
+     `find-string-from-port?' reads the port *strictly* sequentially,
+     and does not perform any buffering.  So `find-string-from-port?'
+     can be used even if the IN-PORT is open to a pipe or other
+     communication channel.
+
+
+File: slib.info,  Node: Tektronix Graphics Support,  Next: Tree Operations,  Prev: String Search,  Up: Procedures
+
+Tektronix Graphics Support
+==========================
+
+  *Note:* The Tektronix graphics support files need more work, and are
+not complete.
+
+Tektronix 4000 Series Graphics
+------------------------------
+
+  The Tektronix 4000 series graphics protocol gives the user a 1024 by
+1024 square drawing area.  The origin is in the lower left corner of the
+screen.  Increasing y is up and increasing x is to the right.
+
+  The graphics control codes are sent over the current-output-port and
+can be mixed with regular text and ANSI or other terminal control
+sequences.
+
+ - Procedure: tek40:init
+
+ - Procedure: tek40:graphics
+
+ - Procedure: tek40:text
+
+ - Procedure: tek40:linetype LINETYPE
+
+ - Procedure: tek40:move X Y
+
+ - Procedure: tek40:draw X Y
+
+ - Procedure: tek40:put-text X Y STR
+
+ - Procedure: tek40:reset
+
+Tektronix 4100 Series Graphics
+------------------------------
+
+  The graphics control codes are sent over the current-output-port and
+can be mixed with regular text and ANSI or other terminal control
+sequences.
+
+ - Procedure: tek41:init
+
+ - Procedure: tek41:reset
+
+ - Procedure: tek41:graphics
+
+ - Procedure: tek41:move X Y
+
+ - Procedure: tek41:draw X Y
+
+ - Procedure: tek41:point X Y NUMBER
+
+ - Procedure: tek41:encode-x-y X Y
+
+ - Procedure: tek41:encode-int NUMBER
+
+
+File: slib.info,  Node: Tree Operations,  Prev: Tektronix Graphics Support,  Up: Procedures
+
+Tree operations
+===============
+
+  `(require 'tree)'
+
+  These are operations that treat lists a representations of trees.
+
+ - Function: subst NEW OLD TREE
+ - Function: substq NEW OLD TREE
+ - Function: substv NEW OLD TREE
+     `subst' makes a copy of TREE, substituting NEW for every subtree
+     or leaf of TREE which is `equal?' to OLD and returns a modified
+     tree.  The original TREE is unchanged, but may share parts with
+     the result.
+
+     `substq' and `substv' are similar, but test against OLD using
+     `eq?' and `eqv?' respectively.
+
+     Examples:
+          (substq 'tempest 'hurricane '(shakespeare wrote (the hurricane)))
+             => (shakespeare wrote (the tempest))
+          (substq 'foo '() '(shakespeare wrote (twelfth night)))
+             => (shakespeare wrote (twelfth night . foo) . foo)
+          (subst '(a . cons) '(old . pair)
+                 '((old . spice) ((old . shoes) old . pair) (old . pair)))
+             => ((old . spice) ((old . shoes) a . cons) (a . cons))
+
+ - Function: copy-tree TREE
+     Makes a copy of the nested list structure TREE using new pairs and
+     returns it.  All levels are copied, so that none of the pairs in
+     the tree are `eq?' to the original ones - only the leaves are.
+
+     Example:
+          (define bar '(bar))
+          (copy-tree (list bar 'foo))
+             => ((bar) foo)
+          (eq? bar (car (copy-tree (list bar 'foo))))
+             => #f
+
+
+File: slib.info,  Node: Standards Support,  Next: Session Support,  Prev: Procedures,  Up: Top
+
+Standards Support
+*****************
+
+* Menu:
+
+* With-File::                   'with-file
+* Transcripts::                 'transcript
+* Rev2 Procedures::             'rev2-procedures
+* Rev4 Optional Procedures::    'rev4-optional-procedures
+* Multi-argument / and -::      'multiarg/and-
+* Multi-argument Apply::        'multiarg-apply
+* Rationalize::                 'rationalize
+* Promises::                    'promise
+* Dynamic-Wind::                'dynamic-wind
+* Values::                      'values
+* Time::                        'time
+* CLTime::                      'common-lisp-time
+
+
+File: slib.info,  Node: With-File,  Next: Transcripts,  Prev: Standards Support,  Up: Standards Support
+
+With-File
+=========
+
+  `(require 'with-file)'
+
+ - Function: with-input-from-file FILE THUNK
+ - Function: with-output-to-file FILE THUNK
+     Description found in R4RS.
+
+
+File: slib.info,  Node: Transcripts,  Next: Rev2 Procedures,  Prev: With-File,  Up: Standards Support
+
+Transcripts
+===========
+
+  `(require 'transcript)'
+
+ - Function: transcript-on FILENAME
+ - Function: transcript-off FILENAME
+     Redefines `read-char', `read', `write-char', `write', `display',
+     and `newline'.
+
+
+File: slib.info,  Node: Rev2 Procedures,  Next: Rev4 Optional Procedures,  Prev: Transcripts,  Up: Standards Support
+
+Rev2 Procedures
+===============
+
+  `(require 'rev2-procedures)'
+
+  The procedures below were specified in the `Revised^2 Report on
+Scheme'.  *N.B.*: The symbols `1+' and `-1+' are not `R4RS' syntax.
+Scheme->C, for instance, barfs on this module.
+
+ - Procedure: substring-move-left! STRING1 START1 END1 STRING2 START2
+ - Procedure: substring-move-right! STRING1 START1 END1 STRING2 START2
+     STRING1 and STRING2 must be a strings, and START1, START2 and END1
+     must be exact integers satisfying
+
+          0 <= START1 <= END1 <= (string-length STRING1)
+          0 <= START2 <= END1 - START1 + START2 <= (string-length STRING2)
+
+     `substring-move-left!' and `substring-move-right!' store
+     characters of STRING1 beginning with index START1 (inclusive) and
+     ending with index END1 (exclusive) into STRING2 beginning with
+     index START2 (inclusive).
+
+     `substring-move-left!' stores characters in time order of
+     increasing indices.  `substring-move-right!' stores characters in
+     time order of increasing indeces.
+
+ - Procedure: substring-fill! STRING START END CHAR
+     Fills the elements START-END of STRING with the character CHAR.
+
+ - Function: string-null? STR
+     == `(= 0 (string-length STR))'
+
+ - Procedure: append! . PAIRS
+     Destructively appends its arguments.  Equivalent to `nconc'.
+
+ - Function: 1+ N
+     Adds 1 to N.
+
+ - Function: -1+ N
+     Subtracts 1 from N.
+
+ - Function: <?
+ - Function: <=?
+ - Function: =?
+ - Function: >?
+ - Function: >=?
+     These are equivalent to the procedures of the same name but
+     without the trailing `?'.
+
+
+File: slib.info,  Node: Rev4 Optional Procedures,  Next: Multi-argument / and -,  Prev: Rev2 Procedures,  Up: Standards Support
+
+Rev4 Optional Procedures
+========================
+
+  `(require 'rev4-optional-procedures)'
+
+  For the specification of these optional procedures, *Note Standard
+procedures: (r4rs)Standard procedures.
+
+ - Function: list-tail L P
+
+ - Function: string->list S
+
+ - Function: list->string L
+
+ - Function: string-copy
+
+ - Procedure: string-fill! S OBJ
+
+ - Function: list->vector L
+
+ - Function: vector->list S
+
+ - Procedure: vector-fill! S OBJ
+
+
+File: slib.info,  Node: Multi-argument / and -,  Next: Multi-argument Apply,  Prev: Rev4 Optional Procedures,  Up: Standards Support
+
+Multi-argument / and -
+======================
+
+  `(require 'mutliarg/and-)'
+
+  For the specification of these optional forms, *Note Numerical
+operations: (r4rs)Numerical operations.  The `two-arg:'* forms are only
+defined if the implementation does not support the many-argument forms.
+
+ - Function: two-arg:/ N1 N2
+     The original two-argument version of `/'.
+
+ - Function: / DIVIDENT . DIVISORS
+
+ - Function: two-arg:- N1 N2
+     The original two-argument version of `-'.
+
+ - Function: - MINUEND . SUBTRAHENDS
+
+
+File: slib.info,  Node: Multi-argument Apply,  Next: Rationalize,  Prev: Multi-argument / and -,  Up: Standards Support
+
+Multi-argument Apply
+====================
+
+  `(require 'multiarg-apply)'
+
+For the specification of this optional form, *Note Control features:
+(r4rs)Control features.
+
+ - Function: two-arg:apply PROC L
+     The implementation's native `apply'.  Only defined for
+     implementations which don't support the many-argument version.
+
+ - Function: apply PROC . ARGS
+
+
+File: slib.info,  Node: Rationalize,  Next: Promises,  Prev: Multi-argument Apply,  Up: Standards Support
+
+Rationalize
+===========
+
+  `(require 'rationalize)'
+
+  The procedure rationalize is interesting because most programming
+languages do not provide anything analogous to it.  For simplicity, we
+present an algorithm which computes the correct result for exact
+arguments (provided the implementation supports exact rational numbers
+of unlimited precision), and produces a reasonable answer for inexact
+arguments when inexact arithmetic is implemented using floating-point.
+We thank Alan Bawden for contributing this algorithm.
+
+ - Function: rationalize X E
+
+
+File: slib.info,  Node: Promises,  Next: Dynamic-Wind,  Prev: Rationalize,  Up: Standards Support
+
+Promises
+========
+
+  `(require 'promise)'
+
+ - Function: make-promise PROC
+
+  Change occurrences of `(delay EXPRESSION)' to `(make-promise (lambda
+() EXPRESSION))' and `(define force promise:force)' to implement
+promises if your implementation doesn't support them (*note Control
+features: (r4rs)Control features.).
+
+
+File: slib.info,  Node: Dynamic-Wind,  Next: Values,  Prev: Promises,  Up: Standards Support
+
+Dynamic-Wind
+============
+
+  `(require 'dynamic-wind)'
+
+  This facility is a generalization of Common LISP `unwind-protect',
+designed to take into account the fact that continuations produced by
+`call-with-current-continuation' may be reentered.
+
+ - Procedure: dynamic-wind THUNK1 THUNK2 THUNK3
+     The arguments THUNK1, THUNK2, and THUNK3 must all be procedures of
+     no arguments (thunks).
+
+     `dynamic-wind' calls THUNK1, THUNK2, and then THUNK3.  The value
+     returned by THUNK2 is returned as the result of `dynamic-wind'.
+     THUNK3 is also called just before control leaves the dynamic
+     context of THUNK2 by calling a continuation created outside that
+     context.  Furthermore, THUNK1 is called before reentering the
+     dynamic context of THUNK2 by calling a continuation created inside
+     that context.  (Control is inside the context of THUNK2 if THUNK2
+     is on the current return stack).
+
+     *Warning:* There is no provision for dealing with errors or
+     interrupts.  If an error or interrupt occurs while using
+     `dynamic-wind', the dynamic environment will be that in effect at
+     the time of the error or interrupt.
+
+
+File: slib.info,  Node: Values,  Next: Time,  Prev: Dynamic-Wind,  Up: Standards Support
+
+Values
+======
+
+  `(require 'values)'
+
+ - Function: values OBJ ...
+     `values' takes any number of arguments, and passes (returns) them
+     to its continuation.
+
+ - Function: call-with-values THUNK PROC
+     THUNK must be a procedure of no arguments, and PROC must be a
+     procedure.  `call-with-values' calls THUNK with a continuation
+     that, when passed some values, calls PROC with those values as
+     arguments.
+
+     Except for continuations created by the `call-with-values'
+     procedure, all continuations take exactly one value, as now; the
+     effect of passing no value or more than one value to continuations
+     that were not created by the `call-with-values' procedure is
+     unspecified.
+
+
+File: slib.info,  Node: Time,  Next: CLTime,  Prev: Values,  Up: Standards Support
+
+Time
+====
+
+  The procedures `current-time', `difftime', and `offset-time' are
+supported by all implementations (SLIB provides them if feature
+`('current-time)' is missing.  `current-time' returns a "calendar time"
+(caltime) which can be a number or other type.
+
+ - Function: current-time
+     Returns the time since 00:00:00 GMT, January 1, 1970, measured in
+     seconds.  Note that the reference time is different from the
+     reference time for `get-universal-time' in *Note CLTime::.  On
+     implementations which cannot support actual times, `current-time'
+     will increment a counter and return its value when called.
+
+ - Function: difftime CALTIME1 CALTIME0
+     Returns the difference (number of seconds) between twe calendar
+     times: CALTIME1 - CALTIME0.  CALTIME0 can also be a number.
+
+ - Function: offset-time CALTIME OFFSET
+     Returns the calendar time of CALTIME offset by OFFSET number of
+     seconds `(+ caltime offset)'.
+
+     (require 'posix-time)
+
+  These procedures are intended to be compatible with Posix time
+conversion functions.
+
+ - Variable: *timezone*
+     contains the difference, in seconds, between UTC and local
+     standard time (for example, in the U.S.  Eastern time zone (EST),
+     timezone is 5*60*60).  `*timezone*' is initialized by `tzset'.
+
+ - Function: tzset
+     initializes the *TIMEZONE* variable from the TZ environment
+     variable.  This function is automatically called by the other time
+     conversion functions that depend on the time zone.
+
+ - Function: gmtime CALTIME
+     converts the calendar time CALTIME to a vector of integers
+     representing the time expressed as Coordinated Universal Time
+     (UTC).
+
+ - Function: localtime CALTIME
+     converts the calendar time CALTIME to a vector of integers
+     expressed relative to the user's time zone.  `localtime' sets the
+     variable *TIMEZONE* with the difference between Coordinated
+     Universal Time (UTC) and local standard time in seconds by calling
+     `tzset'.  The elements of the returned vector are as follows:
+
+       0.  seconds (0 - 61)
+
+       1.  minutes (0 - 59)
+
+       2.  hours since midnight
+
+       3.  day of month
+
+       4.  month (0 - 11).  Note difference from
+          `decode-universal-time'.
+
+       5.  year (A.D.)
+
+       6.  day of week (0 - 6)
+
+       7.  day of year (0 - 365)
+
+       8.  1 for daylight savings, 0 for regular time
+
+ - Function: mktime UNIVTIME
+     Converts a vector of integers in Coordinated Universal Time (UTC)
+     format to calendar time (caltime) format.
+
+ - Function: asctime UNIVTIME
+     Converts the vector of integers CALTIME in Coordinated Universal
+     Time (UTC) format into a string of the form `"Wed Jun 30 21:49:08
+     1993"'.
+
+ - Function: ctime CALTIME
+     Equivalent to `(time:asctime (time:localtime CALTIME))'.
+
+
+File: slib.info,  Node: CLTime,  Prev: Time,  Up: Standards Support
+
+CLTime
+======
+
+ - Function: get-decoded-time
+     Equivalent to `(decode-universal-time (get-universal-time))'.
+
+ - Function: get-universal-time
+     Returns the current time as "Universal Time", number of seconds
+     since 00:00:00 Jan 1, 1900 GMT.  Note that the reference time is
+     different from `current-time'.
+
+ - Function: decode-universal-time UNIVTIME
+     Converts UNIVTIME to "Decoded Time" format.  Nine values are
+     returned:
+       0.  seconds (0 - 61)
+
+       1.  minutes (0 - 59)
+
+       2.  hours since midnight
+
+       3.  day of month
+
+       4.  month (1 - 12).  Note difference from `gmtime' and
+          `localtime'.
+
+       5.  year (A.D.)
+
+       6.  day of week (0 - 6)
+
+       7.  #t for daylight savings, #f otherwise
+
+       8.  hours west of GMT (-24 - +24)
+
+     Notice that the values returned by `decode-universal-time' do not
+     match the arguments to `encode-universal-time'.
+
+ - Function: encode-universal-time SECOND MINUTE HOUR DATE MONTH YEAR
+ - Function: encode-universal-time SECOND MINUTE HOUR DATE MONTH YEAR
+          TIME-ZONE
+     Converts the arguments in Decoded Time format to Universal Time
+     format.  If TIME-ZONE is not specified, the returned time is
+     adjusted for daylight saving time.  Otherwise, no adjustment is
+     performed.
+
+     Notice that the values returned by `decode-universal-time' do not
+     match the arguments to `encode-universal-time'.
+
+
+File: slib.info,  Node: Session Support,  Next: Optional SLIB Packages,  Prev: Standards Support,  Up: Top
+
+Session Support
+***************
+
+* Menu:
+
+* Repl::                        Macros at top-level
+* Quick Print::                 Loop-safe Output
+* Debug::                       To err is human ...
+* Breakpoints::                 Pause execution
+* Trace::                       'trace
+* Getopt::                      Command Line option parsing
+* Command Line::                A command line reader for Scheme shells
+* System Interface::            'system and 'getenv
+
+Certain features are so simple, system-dependent, or widely subcribed
+that they are supported by all implementations as part of the
+`*.init' files.
+
+The features described in the following sections are provided by all
+implementations.
+
+* Require::                     Module Management
+* Vicinity::                    Pathname Management
+* Configuration::               Characteristics of Scheme Implementation
+* Input/Output::                Things not provided by the Scheme specs.
+* Legacy::
+* System::                      LOADing, EVALing, ERRORing, and EXITing
+
+
+File: slib.info,  Node: Repl,  Next: Quick Print,  Prev: Session Support,  Up: Session Support
+
+Repl
+====
+
+  `(require 'repl)'
+
+  Here is a read-eval-print-loop which, given an eval, evaluates forms.
+
+ - Procedure: repl:top-level REPL:EVAL
+     `read's, `repl:eval's and `write's expressions from
+     `(current-input-port)' to `(current-output-port)' until an
+     end-of-file is encountered.  `load', `slib:eval', `slib:error',
+     and `repl:quit' dynamically bound during `repl:top-level'.
+
+ - Procedure: repl:quit
+     Exits from the invocation of `repl:top-level'.
+
+  The `repl:' procedures establish, as much as is possible to do
+portably, a top level environment supporting macros.  `repl:top-level'
+uses `dynamic-wind' to catch error conditions and interrupts.  If your
+implementation supports this you are all set.
+
+  Otherwise, if there is some way your implementation can catch error
+conditions and interrupts, then have them call `slib:error'.  It will
+display its arguments and reenter `repl:top-level'.  `slib:error'
+dynamically bound by `repl:top-level'.
+
+  To have your top level loop always use macros, add any interrupt
+catching lines and the following lines to your Scheme init file:
+     (require 'macro)
+     (require 'repl)
+     (repl:top-level macro:eval)
+
+
+File: slib.info,  Node: Quick Print,  Next: Debug,  Prev: Repl,  Up: Session Support
+
+Quick Print
+===========
+
+  `(require 'qp)'
+
+When displaying error messages and warnings, it is paramount that the
+output generated for circular lists and large data structures be
+limited.  This section supplies a procedure to do this.  It could be
+much improved.
+
+     Notice that the neccessity for truncating output eliminates
+     Common-Lisp's *Note Format:: from consideration; even when
+     variables `*print-level*' and `*print-level*' are set, huge
+     strings and bit-vectors are *not* limited.
+
+ - Procedure: qp ARG1 ...
+ - Procedure: qpn ARG1 ...
+ - Procedure: qpr ARG1 ...
+     `qp' writes its arguments, separated by spaces, to
+     `(current-output-port)'.  `qp' compresses printing by substituting
+     `...' for substructure it does not have sufficient room to print.
+     `qpn' is like `qp' but outputs a newline before returning.  `qpr'
+     is like `qpn' except that it returns its last argument.
+
+ - Variable: *qp-width*
+     `*qp-width*' is the largest number of characters that `qp' should
+     use.
+
+
+File: slib.info,  Node: Debug,  Next: Breakpoints,  Prev: Quick Print,  Up: Session Support
+
+Debug
+=====
+
+  `(require 'debug)'
+
+Requiring `debug' automatically requires `trace' and `break'.
+
+An application with its own datatypes may want to substitute its own
+printer for `qp'.  This example shows how to do this:
+
+     (define qpn (lambda args) ...)
+     (provide 'qp)
+     (require 'debug)
+
+ - Procedure: trace-all FILE
+     Traces (*note Trace::.) all procedures `define'd at top-level in
+     file `file'.
+
+ - Procedure: break-all FILE
+     Breakpoints (*note Breakpoints::.) all procedures `define'd at
+     top-level in file `file'.
+
+
+File: slib.info,  Node: Breakpoints,  Next: Trace,  Prev: Debug,  Up: Session Support
+
+Breakpoints
+===========
+
+  `(require 'break)'
+
+ - Function: init-debug
+     If your Scheme implementation does not support `break' or `abort',
+     a message will appear when you `(require 'break)' or `(require
+     'debug)' telling you to type `(init-debug)'.  This is in order to
+     establish a top-level continuation.  Typing `(init-debug)' at top
+     level sets up a continuation for `break'.
+
+ - Function: breakpoint ARG1 ...
+     Returns from the top level continuation and pushes the
+     continuation from which it was called on a continuation stack.
+
+ - Function: continue
+     Pops the topmost continuation off of the continuation stack and
+     returns an unspecified value to it.
+
+ - Function: continue ARG1 ...
+     Pops the topmost continuation off of the continuation stack and
+     returns ARG1 ... to it.
+
+ - Macro: break PROC1 ...
+     Redefines the top-level named procedures given as arguments so that
+     `breakpoint' is called before calling PROC1 ....
+
+ - Macro: break
+     With no arguments, makes sure that all the currently broken
+     identifiers are broken (even if those identifiers have been
+     redefined) and returns a list of the broken identifiers.
+
+ - Macro: unbreak PROC1 ...
+     Turns breakpoints off for its arguments.
+
+ - Macro: unbreak
+     With no arguments, unbreaks all currently broken identifiers and
+     returns a list of these formerly broken identifiers.
+
+  The following routines are the procedures which actually do the
+tracing when this module is supplied by SLIB, rather than natively.  If
+defmacros are not natively supported by your implementation, these might
+be more convenient to use.
+
+ - Function: breakf PROC
+ - Function: breakf PROC NAME
+ - Function: debug:breakf PROC
+ - Function: debug:breakf PROC NAME
+     To break, type
+          (set! SYMBOL (breakf SYMBOL))
+
+     or
+          (set! SYMBOL (breakf SYMBOL 'SYMBOL))
+
+     or
+          (define SYMBOL (breakf FUNCTION))
+
+     or
+          (define SYMBOL (breakf FUNCTION 'SYMBOL))
+
+ - Function: unbreakf PROC
+ - Function: debug:unbreakf PROC
+     To unbreak, type
+          (set! SYMBOL (unbreakf SYMBOL))
+
+
+File: slib.info,  Node: Trace,  Next: Getopt,  Prev: Breakpoints,  Up: Session Support
+
+Tracing
+=======
+
+  `(require 'trace)'
+
+ - Macro: trace PROC1 ...
+     Traces the top-level named procedures given as arguments.
+
+ - Macro: trace
+     With no arguments, makes sure that all the currently traced
+     identifiers are traced (even if those identifiers have been
+     redefined) and returns a list of the traced identifiers.
+
+ - Macro: untrace PROC1 ...
+     Turns tracing off for its arguments.
+
+ - Macro: untrace
+     With no arguments, untraces all currently traced identifiers and
+     returns a list of these formerly traced identifiers.
+
+  The following routines are the procedures which actually do the
+tracing when this module is supplied by SLIB, rather than natively.  If
+defmacros are not natively supported by your implementation, these might
+be more convenient to use.
+
+ - Function: tracef PROC
+ - Function: tracef PROC NAME
+ - Function: debug:tracef PROC
+ - Function: debug:tracef PROC NAME
+     To trace, type
+          (set! SYMBOL (tracef SYMBOL))
+
+     or
+          (set! SYMBOL (tracef SYMBOL 'SYMBOL))
+
+     or
+          (define SYMBOL (tracef FUNCTION))
+
+     or
+          (define SYMBOL (tracef FUNCTION 'SYMBOL))
+
+ - Function: untracef PROC
+ - Function: debug:untracef PROC
+     To untrace, type
+          (set! SYMBOL (untracef SYMBOL))
+

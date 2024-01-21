@@ -1,0 +1,187 @@
+.\"
+.\" Copyright (c) 1993 Michael Haardt (u31b3hs@pool.informatik.rwth-aachen.de), Fri Apr  2 11:32:09 MET DST 1993
+.\"
+.\" This is free documentation; you can redistribute it and/or
+.\" modify it under the terms of the GNU General Public License as
+.\" published by the Free Software Foundation; either version 2 of
+.\" the License, or (at your option) any later version.
+.\"
+.\" The GNU General Public License's references to "object code"
+.\" and "executables" are to be interpreted as the output of any
+.\" document formatting or typesetting system, including
+.\" intermediate and printed output.
+.\"
+.\" This manual is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public
+.\" License along with this manual; if not, write to the Free
+.\" Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139,
+.\" USA.
+.\"
+.\" Tue Jul  6 12:42:46 MDT 1993 (dminer@nyx.cs.du.edu)
+.\" Added "Calling Directly" and supporting paragraphs
+.\"
+.\" Modified Sat Jul 24 15:19:12 1993 by Rik Faith (faith@cs.unc.edu)
+.\"
+.\" Modified 21 Aug 1994 by Michael Chastain (mec@shell.portal.com):
+.\"   Added explanation of arg stacking when 6 or more args.
+.\"
+.\" Modified 10 June 1995 by Andries Brouwer (aeb@cwi.nl)
+.\"
+.\" 
+.\" Traduction  10/10/1996 Christophe BLAESS (ccb@club-internet.fr)
+.\" 
+.TH INTRO 2 "10 Octobre 1996" "Linux 1.2.13" "Manuel du programmeur Linux"
+.SH NOM
+intro \- Introduction a la section des appels systemes
+.SH DESCRIPTION
+Ce chapitre decrit les appels systemes de Linux.
+.SS "Appel Direct"
+Dans la plupart des cas il n'est pas necessaire d'invoquer directement
+un appel systeme, mais il arrive parfois que la bibliotheque C standard
+n'implemente pas une fonction utile.
+.SS "Synopsis"
+#include <linux/unistd.h>
+
+une macro _syscall
+
+L'appel systeme desire
+
+.SS Setup
+
+La chose la plus importante a connaitre concernant un appel systeme
+est son prototype. Vous devez connaitre le nombre d'arguments, leurs
+types, et le type de retour de la fonction.
+Il y a 6 macros simplifiant l'appel effectif au systeme.
+Elles ont la forme :
+.sp
+.RS
+.RI _syscall X ( type , name , type1 , arg1 , type2 , arg2 ,...)
+.RS
+.HP 1.0i
+avec \fIX\fP dans l'intervalle 0\(en5, correspondant au nombre d'arguments
+de l'appel systeme.
+.HP
+\fItype\fP est le type de la valeur renvoyee par l'appel systeme.
+.HP
+\fIname\fP est le nom de l'appel systeme.
+.HP
+\fItypeN\fP est le type du Nieme argument.
+.HP
+\fIargN\fP est le nom du Nieme argument.
+.RE
+.RE
+.sp
+Ces macros creent une fonction appelee \fIname\fP avec les arguments
+specifies. Une fois inclus le  _syscall() dans le fichier source,
+on effectue l'appel systeme avec \fIname\fP.
+.SH EXEMPLE
+.nf
+.sp
+#include <stdio.h>
+#include <linux/unistd.h>	/* les macros _syscallX */
+#include <linux/kernel.h>	/* pour struct sysinfo  */
+
+_syscall1(int, sysinfo, struct sysinfo *, info);
+
+/* 
+ * Note : Si vous copiez directement depuis le source nroff
+ * de cette page,  n'oubliez pas d'enlever les backslashes
+ * supplementaires dans les printf.
+ */
+
+int main(void)
+{
+	struct sysinfo s_info;
+	int error;
+
+	error = sysinfo(&s_info);
+	printf("code d'erreur = %d\\n", error);
+        printf("Uptime = %ds\\nCharge: 1 min %d / 5 min %d / 15 min %d\\n"
+                "RAM: totale %d / libre %d / partagee %d\\n"
+                "Memoire dans buffers = %d\\nSwap: total %d / libre %d\\n"
+                "Nombre de processus = %d\\n",
+		s_info.uptime, s_info.loads[0],
+		s_info.loads[1], s_info.loads[2],
+		s_info.totalram, s_info.freeram,
+		s_info.sharedram, s_info.bufferram,
+		s_info.totalswap, s_info.freeswap,
+		s_info.procs);
+	return(0);
+}
+.fi
+.SH "EXEMPLE D'EXECUTION"
+.nf
+code d'erreur = 0
+uptime = 502034s
+Charge: 1 min 13376 / 5 min 5504 / 15 min 1152
+RAM: totale 15343616 / libre 827392 / partagee 8237056
+Memoire dans buffers = 5066752
+Swap: total 27881472 / libre 24698880
+Nombre de processus = 40
+.fi
+.SH NOTES
+La macro _syscall() ne cree
+.B pas
+de prototype. Il faut le fournir vous\-meme, principalement en C++.
+.sp
+Les appels systemes ne renvoient pas necessairement des code d'erreurs
+tous positifs ou negatifs. Vous devez lire les sources pour verifier
+le retour en erreur. Generalement,  ce sont des codes d'erreur negatifs,
+par exemple \-\fBEPERM\fP.
+
+La macro _syscall() renverra le resultat \fIr\fP de l'appel systeme
+quand \fIr\fP est positif ou nul, mais renverra \-1 sinon, en
+positionnant la variable
+.I errno
+a \-\fIr\fP.
+.sp
+Certains appels systemes, comme
+.BR mmap ,
+necessitent plus de cinq arguments. Ceci est gere en placant les
+arguments sur la pile et en passant un pointeur sur le bloc d'arguments.
+.\" .sp
+.\" When defining a system call, the argument types MUST be passed by-value
+.\" or by-pointer (for aggregates like structs).
+.SH FICHIERS
+.I /usr/include/linux/unistd.h
+.SH AUTEURS
+Dans l'en-tete de la page de manuel se trouvent le nom des auteurs
+et les conditions de copyright. Ceci peut changer suivant les pages !
+
+.SH VERSION FRANCAISE
+
+La traduction de la section 2 des pages de manuel a ete effectuee en
+tentant de rester le plus fidele possible au texte original.
+Il nous est arrive cependant d'ajouter certains commentaires explicatifs
+supplementaires, et meme quelques exemples.
+
+Dans la partie 
+.B NOM 
+des pages, on trouvera souvent entre parentheses
+un terme anglais correspondant au mot francais. Loin de nous
+l'idee de vouloir expliquer au lecteur que
+.I filesystem
+signifie
+.I systeme de fichiers,
+mais ceci elargit les possibilites de
+recherche des pages avec la commande
+.IR apropos (1)
+
+Pour que cette commande fonctionne, il vous faut modifier le script
+.B makewhatis
+(souvent dans /usr/sbin) afin qu'il accepte l'identificateur de
+section 
+.B NOM
+a egalite avec
+.BR NAME.
+
+Aucun accent n'est present dans ces pages de manuels, car 
+.B groff
+les supprime allegrement.
+
+Nous avons egalement uniformise l'ensemble des en-tetes et bas de pages
+de la section 2.

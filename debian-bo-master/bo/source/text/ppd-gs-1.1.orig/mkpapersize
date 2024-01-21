@@ -1,0 +1,81 @@
+#! /bin/sh
+
+if [ $# -ne 2 ]
+then
+    >&2 echo usage: `basename $0` paperspec papersize.ps
+    exit 1
+fi
+ 
+in="$1"
+out="$2"
+
+exec <"$1" >"$2"
+
+cat <<EOPS
+%!
+
+% papersize.ps: try to determine the paper size actually in use.
+%
+% Yves Arrouye <Yves.Arrouye@marin.fdn.fr>, 1996
+
+% If we're lucky enough, PAGESIZE is defined under gs...
+
+userdict /*no-papersize-check* known not {
+    systemdict /PAPERSIZE known {
+        PAPERSIZE print (\n) print flush quit
+    } if
+} if
+
+% Now, determine the page size in points and round it to the next
+% integer value.
+
+deviceinfo /PageSize {
+    get dup 0 get ceiling exch 1 get ceiling
+} stopped {
+    pop pop
+    clippath pathbbox
+    exch 4 1 roll exch sub ceiling
+    3 1 roll sub ceiling exch
+} if
+
+% Now build an array of known paper sizes along with their physical
+% dimensions (in points).
+%   If we don't use gs, a built-in table is used (corresponding,
+% actually, to the paper types defined in gs 3.68, with some
+% exotic sizes).
+
+statusdict /.pagetypenames { get } stopped {
+    pop pop
+    [
+EOPS
+
+sed -e '/^[ 	]*$/d' -e 's/\(.*\) \(.*\) \(.*\)/        [ \/\1 [ \2 \3 ] ]/'
+
+cat <<EOPS
+    ]
+} {
+    [
+	exch {
+	    dup load dup 0 get exch 1 get [ 3 1 roll ] [ 3 1 roll ]
+        } forall
+    ]
+} ifelse
+
+% Now look for the paper name.
+
+() exch {
+    dup 1 get dup 0 get exch 1 get
+    4 index eq exch 5 index eq and {
+	0 get exch pop 20 string cvs exit
+    } {
+	pop
+    } ifelse
+} forall
+
+print (\n) print flush
+
+pop pop
+
+quit
+EOPS
+

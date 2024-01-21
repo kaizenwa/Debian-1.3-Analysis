@@ -1,0 +1,102 @@
+# Makefile for netCDF library
+#
+# $Id: Makefile.in,v 1.35 1996/05/07 16:38:23 steve Exp $
+
+PROGRAM		= cdftest
+CPPFLAGS	= @CPPFLAGS@
+CFLAGS		= @CPICOPT@ @CFLAGS@
+GARBAGE		= $(PROGRAM) test.cdf cdftest_out.new test.nc
+HEADERS		= netcdf.h
+XDRFILE		= @XDRFILE@
+CSRCS		= array.c attr.c cdf.c dim.c error.c file.c \
+		  globdef.c iarray.c putget.c putgetg.c sharray.c string.c \
+		  var.c xdrffio.c xdrposix.c xdrstdio.c
+MANIFEST	= Makefile.in \
+		  depend \
+		  $(CSRCS) cdftest.c \
+		  alloc.h testout.sav error.h htons.mar \
+		  local_nc.gen local_nc.h.in makevms.com netcdf.h \
+		  ntohs.mar test_cdf.sav msoft32.mak winnt_io.h \
+		  djgpp32.mak emx.mak
+LIBOBJS		= array.o attr.o cdf.o dim.o file.o iarray.o error.o \
+		  globdef.o putget.o putgetg.o sharray.o string.o var.o \
+		  @XDRFILE@.o
+LIBRARY		= netcdf
+DEBUGLIBRARY	= netcdf_g
+PROFILEDLIBRARY	= netcdf_pg
+OBJS		= $(PROGRAM).o
+LD_XDR		= @LD_XDR@
+LD_NETCDF	= libnetcdf.a
+LIBS		= $(LD_NETCDF) $(LD_XDR)
+prefix		= ../../..
+
+all:		library
+
+#
+# The formatted file `cdftest_out.new' might differ from the touchstone
+# file `testout.sav', but this should be due to rounding errors.
+#
+# `$(PROGRAM)' creates the binary-file `test.cdf' which should be byte-for-byte
+# identical with `test_cdf.sav', modulo small rounding errors.
+#
+test:		$(PROGRAM)
+	./$(PROGRAM) > cdftest_out.new
+	@cmd="diff cdftest_out.new testout.sav"; \
+	    echo $$cmd; \
+	    if $$cmd; then \
+		echo "*** netCDF passes formatted test ***"; \
+	    else \
+		echo "*** netCDF fails formatted test ***"; \
+		echo "The above differences are OK if small"; \
+		exit 0; \
+	    fi
+	@cmd="cmp test.nc test_cdf.sav"; \
+	    echo $$cmd; \
+	    if $$cmd; then \
+		echo "*** netCDF passes binary test ***"; \
+	    else \
+		echo "*** netCDF fails binary test ***"; \
+		exit 1; \
+	    fi
+
+install:	installed_library installed_headers
+
+$(PROGRAM):	$(PROGRAM).o library
+
+debug:
+#	rm -f $(COBJS)
+	$(MAKE) $(MFLAGS) "CFLAGS=-g" "LIBRARY=$(LIBRARY)_g" library
+
+profiled:
+#	rm -f $(COBJS)
+	$(MAKE) $(MFLAGS) "CFLAGS=-pg" "LIBRARY=$(LIBRARY)_pg" library
+
+cdftest.oc:	$(CSRCS) cdftest.c
+	#load -C $(CPPFLAGS) -I/usr/local/lang/SC1.0/ansi_include \
+	    $(CSRCS) cdftest.c /usr/local/lang/SC1.0/ansi_lib/libansi.a 
+
+# The following rule exists as a workaround for a bug in the AIX 3.2 C
+# compiler (it doesn't optimize correctly).
+#
+string.o:	string.c
+	case `uname -sv` in \
+	    'AIX 3') \
+		CFLAGS=`echo $(CFLAGS) | sed 's/-O[23]//g;s/-O//g'`; \
+		$(CC) -c $$CFLAGS $(CPPFLAGS) string.c; \
+		;; \
+	    *) \
+		$(CC) -c $(CFLAGS) $(CPPFLAGS) string.c; \
+		;; \
+	esac
+
+distclean:
+	rm -f local_nc.h
+
+tags:		FORCE
+	ctags -t $(HEADERS) $(XDRFILE).c $(CSRCS)
+
+include ../port/master.mk
+
+### Everything after the following line might be overwritten ###
+### DO NOT DELETE THIS LINE.  make depend DEPENDS ON IT ###
+include depend

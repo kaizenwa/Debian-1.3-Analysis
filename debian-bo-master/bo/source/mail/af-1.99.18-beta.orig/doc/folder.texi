@@ -1,0 +1,742 @@
+@c This is part of the af manual.
+@c Copyright (C) 1996, 1997 Malc Arnold, Emma Kemm, Kay Dekker.
+@c Derived in parts from the GNU Emacs Manual, Eleventh Edition,
+@c Copyright (C) 1985, 1986, 1987, 1993, 1994, 1995 Free Software Foundation, Inc.
+@c See file af.texi for copying conditions.
+
+@node Folders, Buffers, Narrowing, Top
+@chapter Folder Handling
+@cindex folders
+@cindex files
+
+The operating system stores data permanently in named @dfn{files}.  We
+refer to files which contain mail messages as @dfn{folders}.  In
+general, the mail messages you process with af come from a folder which
+will need to be updated to reflect any changes you make.
+
+Unlike most mail readers, af can read in and process several folders
+simultaneously, which makes it convenient to store messages in several
+folders rather than leaving them all in your incoming mailbox.  Af can
+actually be used quite conveniently as a small database by using folders
+to store related messages.
+
+By default, af reads in your incoming mailbox when it starts.  You can
+also use command-line arguments to tell af to read a different folder
+(@pxref{Command Arguments}).  Or you can tell an existing af to read
+another folder and prepare a buffer containing a copy of the folder's
+messages.  This is called @dfn{visiting} the folder.  Af commands apply
+to the messages in the buffer; that is, to the copy inside af.  Your
+changes appear in the folder itself only when you @dfn{save} the buffer
+back into the folder.
+
+@menu
+* File Names::       How to type and edit file name arguments.
+* Network Folders::  Af can handle reading folders over a network.
+* Visiting::         Visiting a folder prepares af to handle it.
+* Pending Folders::  How an af buffer may contain two files.
+* Resynchronizing::  Keeping buffers up-to-date with their folders.
+* Saving::           Saving makes your changes permanent.
+* Reverting::        Reverting cancels all the changes not saved.
+* Inserting::        You can insert a folder into the buffer.
+@end menu
+
+@node File Names
+@section File Names
+@cindex file names
+
+Most af commands that operate on a file require you to specify the file
+name.  (Saving and reverting are exceptions; the buffer knows which file
+name to use for them.)  You enter the file name using the minibuffer
+(@pxref{Minibuffer}).  @dfn{Completion} is available, to make it easier
+to specify long file names (@pxref{Completion}).
+
+@cindex filename prefixes
+@cindex prefixes, filename
+Many people prefer to keep all their mail folders in one directory; any
+folders saved from Usenet news (news folders) in another, and so on.  To
+make this kind of operation more convenient, af interprets several
+characters specially if they appear at the start of the file name.
+
+@vindex folder
+@vindex news-folder
+@table @samp
+@item ~@var{user}
+@var{user}'s home directory, or your home directory if @var{user} is not
+given.  For example @file{~/foo} is the file @file{foo} in your home
+directory, while @file{~malc/foo} is the file @file{foo} in malc's home
+directory.
+@item %@var{user}
+@var{user}'s incoming mailbox, or your incoming mailbox if @var{user} is
+not given.  So @file{%} is the your incoming mailbox, while @file{%malc}
+is malc's incoming mailbox.  Note that you won't usually have the
+necessary permission to read other people's incoming mailboxes.
+@item +
+Your @dfn{folder directory}, as specified by the variable @code{folder}.
+This is either extracted from the environment variable @code{FOLDER}, or
+defaulted to @file{~/Mail}.  So @file{+af} will usually expand to
+@file{~/Mail/af}.  You will need to create the directory yourself if you
+plan to use it; af won't create it for you.
+@item =
+Your @dfn{news folder directory}, where saved news articles are stored,
+as specified by the variable @code{news-folder}.  This is either
+extracted from the environment variable @code{SAVEDIR}, or defaulted to
+@file{~/News}.  So @file{=Comp.mail.headers} will usually expand to
+@file{~/News/Comp.mail.headers}.  Normally your news-reader will have
+created this directory for you.
+@item \
+A leading @samp{\} in a file name is ignored, but it prevents any
+special meaning being taken from the next character in the filename.
+To start a file name with a @samp{\}, use @samp{\\}.  For example
+@file{\+af} is the file @file{+af} in the current directory.
+@end table
+
+@cindex current directory
+@cindex working directory
+Af has a @dfn{current directory}, sometimes referred to as the
+@dfn{working directory}, which is normally the directory you were in
+when you ran af.  When you enter a folder name without a directory or a
+special prefix, the current directory is used.  If you specify a
+directory in a relative fashion, with a name that does not start with
+either a special prefix or a slash, it is interpreted with respect to
+the current directory.
+
+For example, if the current directory is @file{/home/malc/src/af} and
+you type just @samp{foo}, which does not specify a directory, it is
+short for @file{/home/malc/src/af/foo}.  @samp{../../.afrc} would stand
+for @file{/home/malc/.afrc}.  @samp{new/foo} would stand for the file
+name @file{/home/malc/src/af/new/foo}.
+
+@findex cd
+@findex pwd
+The command @kbd{M-x pwd} prints af's current directory, and the command
+@kbd{M-x cd} sets it (to a value read using the minibuffer).  Af's
+current directory can only be changed by using the @code{cd} command.
+
+@node Network Folders
+@section Reading Folders Over a Network
+
+Af supports a mail protocol called @sc{pop3}, which allows you to read a
+folder over a network.  This allows people to read mail on a small
+machine which doesn't have a mail system itself; you simply connect to
+the @dfn{@sc{pop} server} where your mail is stored, and read your mail
+over the network.
+
+Your incoming mailbox may live on a @sc{pop} server, or you may have a
+separate @sc{pop3} mailbox somewhere.  To access a @sc{pop3} folder use a
+filename beginning in a colon.  Two forms of @sc{pop3} folder name are
+acceptable: @samp{:@var{server}} or @samp{:@var{user}@@@var{server}}.
+The first form implies that the username to use on @var{server} is the
+same one that you are currently logged in as; the second explicitly
+specifies the username to use to connect to the @sc{pop} server.
+
+Once af has opened a connection to the @sc{pop} server, you are prompted
+for a password.  The password won't be echoed (for security reasons),
+and it won't be stored in the minibuffer history either.  If you don't
+know your password then you will need to check with your system
+administrator to find out what it is.  The password you use to log in is
+often worth trying.
+
+Once af has read the @sc{pop} folder (which may like some time; network
+connections are often slow), it displays the buffer as normal.  However,
+the buffer containing the folder will have the @code{@sc{pop3}} minor
+mode set.  This disallows several af features, notably killing and
+yanking messages in the buffer.  The reason for this is that the
+@sc{pop3} protocol was designed to work well with existing mail readers,
+and it doesn't have the functionality to cope with af's method of folder
+management.  @footnote{This isn't really @sc{pop3}'s fault; the design
+of af and of other mailers is very different in several areas.  The
+@sc{imap} protocol provides all the functionality that af needs to work
+normally, but since it is nothing like as widely supported as @sc{pop3},
+we decided that @sc{pop3} was the network protocol to support.  For
+now.}  One way of working around this is to use a pending folder
+(@pxref{Pending Folders}).
+
+@node Visiting
+@section Visiting Files
+@cindex visiting files
+
+@table @kbd
+@item C-x C-f
+Visit a folder (@code{find-file}).
+@item C-x C-r
+Visit a folder for viewing, without allowing changes to it
+(@code{find-file-read-only}).
+@item C-x C-v
+Visit a different folder instead of the one visited last
+(@code{find-alternate-file}).
+@item C-x 4 C-f
+Visit a file, in another window (@code{find-file-other-window}).
+@end table
+
+@cindex folders, visiting and saving
+@cindex visiting
+@cindex saving
+@dfn{Visiting} a folder means reading its contents into an af buffer so
+you can process them.  Af makes a new buffer for each folder that you
+visit.  We say that this buffer is visiting the folder that it was
+created to hold.  Af constructs the buffer name from the folder name by
+throwing away the directory, keeping just the name proper.  For example,
+a file named @file{/home/malc/Mail/af} would get a buffer named
+@samp{af}.  If there is already a buffer with that name, a unique name
+is constructed by appending @samp{<2>}, @samp{<3>}, or so on, using the
+lowest number that makes a name that is not already in use.
+
+Each window's mode line shows the name of the buffer that is being
+displayed in that window, so you can always tell what buffer you are
+processing.
+
+The changes you make with af commands are made in the af buffer.  They
+do not take effect in the folder that you visited, or any place
+permanent, until you @dfn{save} the buffer.  Saving the buffer means
+that af writes the current contents of the buffer into its visited
+folder.  @xref{Saving}.
+
+@cindex modified (buffer)
+If a buffer contains changes that have not been saved, we say the buffer
+is @dfn{modified}.  This is important because it implies that some
+changes will be lost if the buffer is not saved.  The mode line displays
+two stars near the left margin to indicate that the buffer is modified.
+
+@cindex status-modified (buffer)
+If the status of one or more messages in a buffer has changed (perhaps
+they were new before you read the folder), but no other changes have
+been made, then we say that the buffer is @dfn{status modified}.  This
+is not so important as being modified, but some information will be lost
+if the buffer is not changed.  The mode line displays two plus signs
+near the left margin to indicate that the buffer is status modified.
+
+@kindex C-x C-f
+@findex find-file
+To visit a folder, use the command @kbd{C-x C-f} (@code{find-file}).
+Follow the command with the name of the folder you wish to visit,
+terminated by a @key{RET}.
+
+The folder name is read using the minibuffer (@pxref{Minibuffer}), with
+defaulting and completion in the standard manner (@pxref{File Names}).
+While in the minibuffer, you can abort @kbd{C-x C-f} by typing
+@kbd{C-g}.
+
+If the specified folder does not exist and could not be created, or
+cannot be read, then you get an error, with an error message displayed
+in the echo area.
+
+@vindex message-count-update
+While af is reading the folder, it reports on how many messages it has
+read, usually after every five messages read.  You can control how often
+af updates the count by setting the variable @code{message-count-update}.
+Once the folder has been read, af will print a message like this:
+
+@example
+(Read 15 messages)
+@end example
+
+@noindent
+This confirms that af has successfully read the folder into a buffer.
+The message may also sometimes look like this:
+
+@example
+(Read 15 messages; including 1 with bad headers)
+@end example
+
+@noindent
+This means that the folder was read successfully, but some of the
+messages in the folder had mail headers that af couldn't interpret
+properly.  This is not usually critical, but some people prefer to know
+about errors in their mailboxes.
+
+If the variable @code{first-unread-message} is set to @code{true}; then
+af will move point to the first message in the buffer that you haven't
+read, if there are any.  Otherwise you will begin processing the buffer
+with point on the first message.
+
+If you visit a file that is already in af, @kbd{C-x C-f} does not make
+another copy.  It selects the existing buffer containing that file.
+
+@cindex creating files
+What if you want to create a new folder?  Just visit it.  Af prints
+@samp{(New File)} in the echo area, but in other respects behaves as if
+you had visited an existing empty file.  If you make any changes and
+save them, the file is created.
+
+@kindex C-x C-q
+@findex toggle-read-only
+If you visit a file that the operating system won't let you modify, Af
+makes the buffer read-only, so that you won't go ahead and make changes
+that you'll have trouble saving afterward.  You can make the buffer
+writable with @kbd{C-x C-q} (@code{toggle-read-only}).
+
+@kindex C-x C-r
+@findex find-file-read-only
+Occasionally you might want to visit a folder as read-only in order to
+protect yourself from entering changes accidentally; do so by visiting
+the file with the command @kbd{C-x C-r} (@code{find-file-read-only}).
+
+@kindex C-x C-v
+@findex find-alternate-file
+If you accidentally visit the wrong folder (perhaps you mistyped the
+file name), use the @kbd{C-x C-v} command (@code{find-alternate-file})
+to visit the file you really wanted.  @kbd{C-x C-v} is similar to
+@kbd{C-x C-f}, but it kills the current buffer (after first offering to
+save it if it is modified).
+
+@kindex C-x 4 f
+@findex find-file-other-window
+@kbd{C-x 4 f} (@code{find-file-other-window}) is like @kbd{C-x C-f}
+except that the buffer containing the specified file is selected in
+another window.  The window that was selected before @kbd{C-x 4 f}
+continues to show the same buffer it was already showing.  If this
+command is used when only one window is being displayed, that window is
+split in two, with one window showing the same buffer as before, and the
+other one showing the newly requested file.  @xref{Windows}.
+
+@node Pending Folders
+@section Pending Folders
+@cindex pending folders
+
+@vindex pending-folder
+If you are reading mail via @sc{pop3}, you may prefer to store your
+mail on your local machine, rather than on a @sc{pop} server.  You can
+do this conveniently with af by using a @dfn{pending folder}, a folder
+which contains two folders.  The simplest way of doing this is to set
+the variable @code{pending-folder} to the name of the folder where all
+your incoming mail should be stored; say @file{+mailbox}.  You must set
+the @code{pending-folder} variable in your @file{.afrc} file, or it
+will have no affect (@pxref{Variables,Startup Files}).
+
+Once the @code{pending-folder} variable is set, it changes the behaviour
+of af when you start without specifying folders to read or addresses to
+send mail to.  Instead of reading your incoming mailbox into its own
+buffer, it reads the folder specified in the @code{pending-folder}
+variable, and then appends the contents of your incoming mailbox to the
+buffer.
+
+The buffer is considered to contain both the @dfn{pending folder} and
+your incoming mailbox; it will be resynchronised from both, and visiting
+either folder will switch to the buffer displaying the pending folder.
+When you save the pending folder your incoming mailbox will be cleared,
+ready for any new mail.  If you don't save the buffer, both folders
+are left untouched.
+
+One advantage of pending folders is that they are normal disk folders.
+If your incoming mailbox is read via @sc{pop3}, using a pending folder
+will allow you to avoid the limitations of buffers in @sc{pop3} mode,
+and use all of af's features in the buffer.  Once you've set it up,
+using a default pending folder is transparent enough that you'll
+probably never notice the difference.
+
+@findex read-pending-file
+You can also read a folder into an existing buffer, making the buffer
+pending on the folder you read.  To do this use the command
+@kbd{M-x read-pending-file}.  You will be prompted for the name of the
+file to make the buffer pending on.  This has exactly the same effect
+as using the @code{pending-folder} variable.
+
+@node Resynchronizing
+@section Resynchronizing Buffers
+@cindex resynchronizing buffers
+@cindex new mail
+@cindex updating buffers for new mail
+
+As we have discussed, buffers are copies of the contents of a folder.
+So what can we do to handle new mail arriving in the folder after we
+have read it?  The solution to this is @dfn{resynchronizing} the buffer,
+so that any new messages in the file on disk are incorporated into the
+buffer.
+
+When a buffer is resynchronised, any new messages are appended to the
+buffer, and a message will appear in the echo area to let you know that
+new messages were read into the buffer.
+
+Af will check for new messages whenever you try to save a buffer to
+disk.  If there are new messages then the buffer is resynchronised, and
+the save will fail.
+
+@vindex resync-time
+Af also checks for new mail in each folder you are visiting on a
+regular basis.  If any buffers are out of date, then they are
+resynchronised.  How often af does this is controlled by the
+@code{resync-time} variable, normally it is done every 600 seconds
+(10 minutes).
+
+@kindex C-x r
+@findex resync-buffer
+To manually check for new messages in a buffer's folder, use @kbd{C-x r}
+(@code{resync-buffer}).  If the buffer needs to be resynchronised, then
+point will be set on the first new message.
+
+@node Saving
+@section Saving Files
+
+@dfn{Saving} a buffer in af means writing its contents back into the
+folder that was visited in the buffer.
+
+@table @kbd
+@item C-x C-s
+Save the current buffer in its visited file (@code{save-buffer}).
+@item C-x s
+Save any or all buffers in their visited files (@code{save-some-buffers}).
+@item M-x save-all-buffers
+Save all modified buffers in their visited files.
+@item M-~
+Forget that the current buffer has been changed (@code{not-modified}).
+@item C-x C-w
+Save the current buffer in a specified file (@code{write-file}).
+@end table
+
+@kindex C-x C-s
+@findex save-buffer
+When you wish to save the folder and make your changes permanent, type
+@kbd{C-x C-s} (@code{save-buffer}).  After saving is finished,
+@kbd{C-x C-s} displays a message like this:
+
+@example
+(Wrote 12 messages)
+@end example
+
+@noindent
+If the selected buffer is not modified or status modified (no changes
+have been made in it since the buffer was created or last saved), saving
+is not really done, because it would have no effect.  Instead, @kbd{C-x
+C-s} displays a message like this in the echo area:
+
+@example
+(No changes need to be written)
+@end example
+
+@kindex C-x s
+@findex save-some-buffers
+The command @kbd{C-x s} (@code{save-some-buffers}) offers to save any
+or all modified buffers.  It asks you what to do with each buffer.
+These questions are also asked if you exit af by typing @kbd{C-x C-c}.
+The buffer is automatically resynchronised before being saved, and if
+any new messages are found the save will be abandoned.
+
+@findex save-all-buffers
+The command @kbd{M-x save-all-buffers} saves all modified buffers.  This
+can be dangerous if you have several buffers, since you may not want to
+save one of them, so be careful!
+
+@kindex M-~
+@findex not-modified
+If you have changed a buffer but you do not want to save the changes,
+you should take some action to prevent it.  Otherwise, each time you use
+@kbd{C-x s} or @kbd{C-x C-c}, you are liable to save this buffer by
+mistake.  One thing you can do is type @kbd{M-~} (@code{not-modified}),
+which clears out the indication that the buffer is modified.  If you do
+this, none of the save commands will believe that the buffer needs to be
+saved.  (@samp{~} is often used as a mathematical symbol for `not'; thus
+@kbd{M-~} is `not', metafied.)  Alternatively, you can cancel all the
+changes made since the file was visited or saved, by reading the text
+from the file again.  This is called @dfn{reverting}.  @xref{Reverting}.
+
+@kindex C-x C-w
+@findex write-file
+If you wish to mark the buffer as visiting a different folder and save
+it right away, use @kbd{C-x C-w} (@code{write-file}).  It prompts for
+the new folder, marks the buffer as visiting that folder, and saves the
+buffer.  If the folder already exists, af will ask for confirmation that
+it is ok to overwrite the file with the buffer.
+
+@node Reverting
+@section Reverting a Buffer
+@findex revert-buffer
+@cindex drastic changes
+
+If you have made extensive changes to a folder and then change your mind
+about them, you can get rid of them by reading in the previous version
+of the folder.  To do this, use @kbd{M-x revert-buffer}, which operates
+on the current buffer.  Since reverting a buffer unintentionally could
+lose a lot of work, you must confirm this command with @kbd{yes}.
+
+Reverting marks the buffer as ``not modified'' until another change is
+made.
+
+@node Inserting
+@section Inserting a Folder
+
+@kindex C-x i
+@findex insert-file
+Sometimes you may want to merge two folders.  An easy way to do this is
+to use @kbd{C-x i} (@code{insert-file}), which inserts the contents of
+the specified folder into the buffer at point, leaving mark at the start
+of the inserted contents and point after them.  The buffer will not be
+visiting the folder you inserted, and so will be saved to its original
+folder.
+
+@node Buffers, Windows, Folders, Top
+@chapter Using Multiple Buffers
+
+@cindex buffers
+The messages you are processing in af reside in an object called a
+@dfn{buffer}.  Each time you visit a folder, a buffer is created to hold
+the messages in the folder.
+
+@cindex selected buffer
+@cindex current buffer
+At any time, one and only one buffer is @dfn{selected}.  It is also
+called the @dfn{current buffer}.  Often we say that a command operates
+on ``the buffer'' as if there were only one; but really this means that
+the command operates on the selected buffer (most commands do).
+
+When af has multiple windows, each window has a chosen buffer which is
+displayed there, but at any time only one of the windows is selected and
+its chosen buffer is the selected buffer.  Each window's mode line
+displays the name of the buffer that the window is displaying
+(@pxref{Windows}).
+
+Each buffer has a name, which can be of any length, and you can select
+any buffer by giving its name.  Most buffers are made by visiting files,
+and their names are derived from the files' names.  But you can also
+create an empty buffer with any name you want.  A newly started af has a
+buffer named @samp{*scratch*} which can be used as a temporary place to
+store messages.  The distinction between upper and lower case matters in
+buffer names.
+
+Each buffer records individually what folder it is visiting, whether it
+is modified, and what major mode and minor modes are in effect in it
+(@pxref{Major Modes}).
+
+@menu
+* Select Buffer::      Creating a new buffer or reselecting an old one.
+* List Buffers::       Getting a list of buffers that exist.
+* Kill Buffers::       Killing buffers you no longer need.
+@end menu
+
+@node Select Buffer
+@section Creating and Selecting Buffers
+@cindex change buffers
+@cindex switch buffers
+
+@table @kbd
+@item C-x b @var{buffer} @key{RET}
+Select or create a buffer named @var{buffer} (@code{switch-to-buffer}).
+@item C-x 4 b @var{buffer} @key{RET}
+Similar, but select @var{buffer} in another window
+(@code{switch-to-buffer-other-window}).
+@end table
+
+@kindex C-x b
+@kindex C-x 4 b
+@findex switch-to-buffer
+@findex switch-to-buffer-other-window
+To select the buffer named @var{bufname}, type @kbd{C-x b @var{bufname}
+@key{RET}}.  This runs the command @code{switch-to-buffer} with argument
+@var{bufname}.  You can use completion on an abbreviation for the buffer
+name you want (@pxref{Completion}).  An empty argument to @kbd{C-x b}
+specifies the most recently selected buffer that is not displayed in any
+window.
+
+Most buffers are created by visiting files, but you can also create a
+buffer explicitly by typing @kbd{C-x b @var{bufname} @key{RET}}.  This
+makes a new, empty buffer which is not visiting any file, and selects
+it.  If you try and save a buffer created in this way, you are asked for
+the file name to use.
+
+Note that @kbd{C-x C-f}, and any other command for visiting a file, can
+also be used to switch to an existing file-visiting buffer.
+@xref{Visiting}.
+
+@node List Buffers
+@section Listing Existing Buffers
+
+@cindex listing current buffers
+@kindex C-x C-b
+@findex list-buffers
+To display a list of all the buffers that exist, type @kbd{C-x C-b}.  Each
+line in the list shows one buffer's name, major mode and visited file.  The
+buffers are listed in the order, most recently visited first.
+
+@samp{*} or @samp{+} at the beginning of a line indicates the buffer is
+modified or status modified.  If several buffers are modified, it may be
+time to save some with @kbd{C-x s} (@pxref{Saving}).  @samp{%} indicates
+a read-only buffer.  @samp{.} marks the selected buffer.  Here is an
+example of a buffer list:
+
+@smallexample
+ MR Buffer         Size  Mode           File
+ -- ------         ----  ----           ----
+.*  malc             12  Mail           /var/spool/mail/malc
+ +  af               21  Mail           /home/malc/Mail/af
+    *scratch*         0  Mail
+@end smallexample
+
+@node Kill Buffers
+@section Killing Buffers
+
+@cindex killing buffers
+If you continue an af session for a while, you may accumulate a large
+number of buffers.  You may then find it convenient to @dfn{kill} the
+buffers you no longer need.  On most operating systems, killing a buffer
+releases its space back to the operating system so that other programs
+can use it.  Here are some commands for killing buffers:
+
+@table @kbd
+@item C-x k @var{bufname} @key{RET}
+Kill buffer @var{bufname} (@code{kill-buffer}).
+@item M-x kill-some-buffers
+Offer to kill each buffer, one by one.
+@end table
+
+@findex kill-buffer
+@findex kill-some-buffers
+@kindex C-x k
+@kbd{C-x k} (@code{kill-buffer}) kills one buffer, whose name you
+specify in the minibuffer.  The default, used if you type just @key{RET}
+in the minibuffer, is to kill the current buffer.  If you kill the
+current buffer, another buffer is selected; one that has been selected
+recently but does not appear in any window now.  If you ask to kill a
+file-visiting buffer that is modified, then you must confirm with
+@kbd{yes} before the buffer is killed.
+
+The command @kbd{M-x kill-some-buffers} asks about each buffer, one by
+one.  An answer of @kbd{y} means to kill the buffer.  Killing the
+current buffer or a buffer containing unsaved changes selects a new
+buffer or asks for confirmation just like @code{kill-buffer}.
+
+@node Windows, Customisation, Buffers, Top
+@chapter Multiple Windows
+@cindex windows in af
+@cindex multiple windows in af
+
+Af can split the screen into two or many windows.  Multiple windows
+can display parts of different buffers, or different parts of one
+buffer.
+
+@menu
+* Basic Windows::       Introduction to af windows.
+* Using Windows::       How to create and use windows.
+* Change Windows::      Deleting windows and changing their sizes.
+@end menu
+
+@node Basic Windows
+@section Concepts of Af Windows
+
+Each Af window displays one Af buffer at any time.  A single buffer may
+appear in more than one window; if it does, any changes in its text are
+displayed in all the windows where it appears.  But the windows showing
+the same buffer can show different parts of it, because each window has
+its own value of point.
+
+@cindex selected window
+At any time, one of the windows is the @dfn{selected window}; the buffer
+this window is displaying is the current buffer.  The arrow cursor shows
+the location of point in this window, but is not visible in any other
+window.
+
+Commands to move point affect the value of point for the selected af
+window only.  They do not change the value of point in any other af
+window, even one showing the same buffer.  The same is true for commands
+such as @kbd{C-x b} to change the selected buffer in the selected
+window; they do not affect other windows at all.  However, there are
+other commands such as @kbd{C-x 4 b} that select a different window and
+switch buffers in it.
+
+When multiple windows show the same buffer, they can have different
+regions, because they can have different values of point and mark.
+
+Each window has its own mode line, which displays the buffer name,
+modification status, size in messages, and major and minor modes of the
+buffer that is displayed in the window.  @xref{Mode Line}, for full
+details on the mode line.
+
+@node Using Windows
+@section Creating and Using Windows
+
+@table @kbd
+@item C-x 2
+Split the current window vertically, creating a new window
+(@code{split-window-vertically}).
+@item C-x o
+Select the ``other'' window (@code{other-window}).  That is @kbd{o},
+not zero.
+@item M-x previous-window RET
+Select the previous window.
+@item C-M-v
+Scroll the next window (@code{scroll-other-window}).
+@end table
+
+@kindex C-x 2
+@findex split-window-vertically
+The command @kbd{C-x 2} (@code{split-window-vertically}) breaks the
+selected window into two windows, one above the other.  Both windows
+start out displaying the same buffer, with the same value of point.  By
+default the two windows each get half the height of the window that was
+split; a numeric argument specifies how many lines to give to the top
+window.
+
+@kindex C-x o
+@findex other-window
+To select a different window, type @kbd{C-x o} (@code{other-window}).
+That is an @kbd{o}, for `other', not a zero.  When there are more than
+two windows, this command moves through all the windows from top to
+bottom.  After the bottommost window, it goes back to the one at the
+top.  A numeric argument means to move several steps in the cyclic order
+of windows.  A negative argument moves around the cycle in the opposite
+order.
+
+@findex previous-window
+You can also select a different window with @kbd{M-x previous window}.
+When there are more than two windows, this command moves through all the
+windows from bottom to top.  After the topmost window, it goes back to
+the one at the bottom.  A numeric argument means to move several steps
+in the cyclic order of windows.  A negative argument moves around the
+cycle in the opposite order.
+
+@kindex C-M-v
+@findex scroll-other-window
+The usual scrolling commands (@pxref{Scrolling}) apply to the selected
+window only, but there is one command to scroll the next window.
+@kbd{C-M-v} (@code{scroll-other-window}) scrolls the window that
+@kbd{C-x o} would select.  It takes arguments, positive and negative,
+like @kbd{C-v}.
+
+@node Change Windows
+@section Deleting and Rearranging Windows
+
+@table @kbd
+@item C-x 0
+Delete the selected window (@code{delete-window}).  That is a zero.
+@item C-x 1
+Delete all windows except the selected window
+(@code{delete-other-windows}).
+@item C-x ^
+Make the selected window taller (@code{enlarge-window}).
+@item M-x shrink-window
+Make the selected window smaller.
+@end table
+
+@kindex C-x 0
+@findex delete-window
+To delete a window, type @kbd{C-x 0} (@code{delete-window}).  (That is a
+zero.)  The space occupied by the deleted window is given to an adjacent
+window.  Once a window is deleted, its attributes are forgotten; only
+restoring a window configuration can bring it back.  Deleting the window
+has no effect on the buffer it used to display; the buffer continues to
+exist, and you can select it in any window with @kbd{C-x b}.
+
+@kindex C-x 1
+@findex delete-other-windows
+@kbd{C-x 1} (@code{delete-other-windows}) is more powerful than @kbd{C-x
+0}; it deletes all the windows except the selected one; the selected
+window expands to use the whole screen except for the echo area.
+
+@kindex C-x ^
+@findex enlarge-window
+To readjust the division of space among vertically adjacent windows, use
+@kbd{C-x ^} (@code{enlarge-window}).  It makes the currently selected
+window get one line bigger, or as many lines as is specified with a
+numeric argument.  With a negative argument, it makes the selected
+window smaller.  The extra screen space given to a window comes from one
+of its neighbors.  You cannot enlarge the window if it would make a
+neighbouring window less than two lines tall.
+
+@findex shrink-window
+You can also readjust the size of the selected window with
+@kbd{M-x shrink-window}.  It makes the currently selected window get one
+line smaller, or as many lines as is specified with a numeric argument.
+With a negative argument, it makes the selected window bigger.  The
+extra screen space released by a window is given to of its neighbors.
+You cannot shrink the window if it would make the window less than two
+lines tall.
+
+@c $Id: folder.texi,v 1.5 1997/01/29 18:29:38 malc Exp $

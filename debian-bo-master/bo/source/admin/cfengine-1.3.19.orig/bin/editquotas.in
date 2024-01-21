@@ -1,0 +1,169 @@
+#!@PERL@
+#############################################################
+#
+# EDIT QUOTAS (for Nosey Parker)
+#
+# Mark Burgess 24/1/92
+#
+#############################################################
+
+if ($< != 0)
+   {
+   die "Bad luck, only root can run this one!\n";
+   }
+
+die "Syntax error: editquotas <filesystem>\n" if ($#ARGV != 0);
+
+#############################################################
+
+$MUTILSHOME = $ENV{MUTILSHOME};
+
+$home = shift;
+($slash,$fac,$mach,$un) = split(/\//,$home);            # Tag for file records
+$tag = "$fac.$mach.$un";
+
+$stat_data = "/etc/NP.stat.$tag";
+$limits_data = "/etc/NP.quotas.$tag";
+$work="/tmp/noseyparker.wrk";
+$sysadm = "SYSADM@local.uio.no";
+$version = "V1.3";
+
+##############################################################
+# Load in quota databases
+##############################################################
+
+if ( -f $stat_data )
+   {
+   &ReadOldStatistics;
+   }
+else
+   {
+   $badstats = 1;                # Can't compute realiable stats
+   }
+
+
+if ( -f $limits_data )
+   {
+   &ReadSpecialLimits;
+   }
+
+
+################################################################
+# Level 0
+################################################################
+
+if ($ENV{EDITOR})
+   {
+   system ("$ENV{EDITOR} $limits_data");
+   }
+else
+   {
+   system ("/usr/ucb/vi $limits_data");
+   }
+
+if ( -f $limits_data )
+   {
+   open (DATA,$limits_data);
+   $checked = "";
+
+   while (<DATA>)
+      {
+      next if (substr($_,0,1) eq "#");
+      ($user,$limit) = split;
+      $edlimit{$user} = $limit;
+      }
+   close(DATA);
+
+   foreach $user (keys(%slimit))
+      {
+      if ($edlimit{$user} != $slimit{$user})   # Install new special quota
+         {
+         $warnings{$user} = 0;
+         print "Changed quota for $user\n";
+         }
+      }
+   }
+else
+   {
+   die "No file $limits_data - nothing to do, quitting...\n";
+   }
+
+&SaveNewStats();
+
+################################################################
+# Toolkit
+################################################################
+
+sub ReadSpecialLimits
+   {
+   open (DATA,$limits_data);
+
+   while (<DATA>)
+      {
+      ($user,$limit) = split;
+      $slimit{$user}=$limit;
+      }
+    close(DATA);
+    }
+
+##############################################################
+
+sub ReadOldStatistics
+   {
+   local($user);
+   open (DATA,$stat_data);
+
+   while (<DATA>)
+      {
+      chop;
+      next if $_ eq "";
+      ($user,$used,$grad,$avgrad,$dormant,$warn) = split(/:/);
+      $o_used{$user}=$used;
+      $o_grad{$user}=$grad;
+      $o_avgrad{$user}=$avgrad;
+      $dormant{$user}=$dormant;
+      $warnings{$user}=$warn;
+      }
+   close(DATA);
+   }
+
+##############################################################
+
+sub SaveNewStats
+   {
+   foreach $user (sort keys(%o_used))
+      {
+      $save{$user} .= $user .':' . $o_used{$user} . ':';
+      }
+   foreach $user (sort keys(%o_grad))
+      {
+      $save{$user} .= $o_grad{$user} . ':';
+      }
+   foreach $user (sort keys(%o_avgrad))
+      {
+      $save{$user} .= $o_avgrad{$user} . ':';
+      }
+   foreach $user (sort keys(%dormant))
+      {
+      $save{$user} .= $dormant{$user} . ':';
+      }
+   foreach $user (sort keys(%warnings))
+      {
+      $save{$user} .= $warnings{$user};
+      }
+
+   open (DATA,'>'.$stat_data);
+
+   foreach $user (sort keys(%save))
+      {
+      print DATA $save{$user},"\n";
+      }
+
+   close (DATA);
+   }
+
+
+
+
+
+

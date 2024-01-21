@@ -1,0 +1,92 @@
+#!/bin/sh
+# Tcl sees the next lines as an assignment to variable `kludge'.
+# For sh, the two shifts cancel the effect of the set, and then we
+# run scotty on this script.
+
+set kludge { $*
+    shift
+    shift
+    if test -f ../scotty ; then
+      exec ../scotty -nf $0 $*
+    else
+      exec scotty -nf $0 $*
+    fi
+}
+
+##
+## Create the gnuplot data input file.
+##
+
+proc data { file data } {
+    global label
+    set in [open $file r]
+    set out [open $data w+]
+    set last 0
+    while {![eof $in]} {
+	gets $in line
+	if {$line == "" || [string match #* $line]} continue
+	scan $line "%d %d %f %*c %*s %s" clock ifIndex ifLoad ifDescr
+	set label($ifIndex) $ifDescr
+	if {$last+2 < $clock} {
+	    set last $clock
+	    puts $out ""
+	}
+	puts $out $ifLoad
+    }
+    close $in
+    close $out
+}
+
+##
+## Create the gnuplot control file for data. Gnuplot will write
+## its output to file.
+##
+
+proc plot { file data } {
+    global label
+    set gp [open "| gnuplot" r+]
+    puts $gp "set xlabel \"interface\""
+    puts $gp "set ylabel \"time\""
+    puts $gp "set zlabel \"interface load\""
+    #puts $gp "set hidden3d"
+    puts $gp "set nocontour"
+    puts $gp "set surface"
+    puts $gp "set view 30, 120, 1.0, 1.2"
+    puts $gp "set border"
+    puts $gp "set nokey"
+    puts $gp "set size 1.1,1.2"
+    puts $gp "set data style lines"
+    puts $gp "set ticslevel 0.1"
+
+#   puts $gp "set zrange \[0:100\]"
+#   foreach a [lsort [array names label]] {
+#       puts $gp "set label \"$label($a)\" at $a,200,0"
+#   }
+
+    puts $gp "set terminal pbm"
+    puts $gp "set output \"$file\""
+
+    puts $gp "splot \"$data\" using 1"
+
+    flush $gp
+    close $gp
+}
+
+##
+## Create a gif file foreach file name given in argv.
+##
+
+set data /tmp/ifload[pid].data
+set pbm  /tmp/ifload[pid].pbm
+
+foreach file $argv {
+    if {![file readable $file]} {
+	puts stderr "File $file is not readable - skipped."
+	continue
+    }
+    data $file $data
+    plot $pbm $data
+    catch "exec pnmcrop $pbm | ppmtogif > $file.gif"
+}
+
+catch {exec rm -f $pbm $data}

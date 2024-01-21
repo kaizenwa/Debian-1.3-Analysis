@@ -1,0 +1,805 @@
+#!/bin/sh
+#
+#	$Id: dunc,v 1.5 1996/11/18 00:06:30 richr Exp richr $
+#	
+#	This is the dunc ash script written by Richard G. Roberto
+#	It comes with no warrenty of any kind and is released into
+#	the public domain under the GPL distributed with Debian.
+#
+
+say() {
+# if $1 is +/-n, shift and display text accordingly
+# if not, display $1 with a linefeed at the end
+
+case $1 in
+'+n') shift
+      printf "%s\n\n" "$1"
+      ;;
+'-n') shift
+      printf "%s" "$1"
+      ;;
+*)    printf "%s\n" "$1"
+      ;;
+esac
+	}
+
+pause() {
+# for debugging
+
+say -n "press enter to continue ..."
+read junk
+	}
+
+die() {
+# remove temporary files and exit with a status of
+# $1.  Any text passed to die() as $2 gets echoed to stdout
+
+[ -f $out ] && $del $out*
+[ -f $toptions -o -f $toptions.1 ] && $del $toptions*
+[ -f $tchatfile ] && $del $tchatfile
+[ -f $tcmd_file ] && $del $tcmd_file
+[ -f $cmd_file ] && $chmd +x $cmd_file
+
+# get rid of tutorial documents
+do_docs clean
+
+say "$2"
+exit $1
+	}
+
+warn_conf () {
+# echo warnings about the configuration option
+case $1 in
+conf) $d $o "$s" --beep --msgbox " writing current data to temporary files\n \
+you must choose Save from the Main Menu to \n save to permanent files" 0 0
+	;;
+save) $d $o "$s" --beep --msgbox " WARNING: You have already saved this \n \
+data to permanent files.  If you \n continue with this option, new \n \
+data will be written to _temporary_ \n files.  You will have to choose \n \
+Save from the Main Menu to \n save them again." 0 0
+	;;
+esac
+	}
+
+get_speed() {
+# use an input box to query theuser for the modem speed
+
+$d $o "$s" --inputbox "enter modem speed (e.g. 9600,19200,38400)" \
+ 0 0 ${spd_st:-9600} 2>$out
+
+speed=`$ccat $out`
+	}
+
+get_dev() {
+# use a radiolist to query the user for the modem device
+
+$d $o "$s" --radiolist "Where is your modem attached?" 0 40 5 \
+"/dev/ttyS0" "com1 in DOS" ${dev0_st:-off} \
+"/dev/ttyS1" "com2 in DOS" ${dev1_st:-on} \
+"/dev/ttyS2" "com3 in DOS"  ${dev2_st:-off} \
+"/dev/ttyS3" "com4 in DOS"  ${dev3_st:-off} 2>$out
+
+dev=`$ccat $out`
+
+# reset state variables
+dev0_st=off
+dev1_st=off
+dev2_st=off
+dev3_st=off
+
+# set device state variables (on or off)
+case $dev in
+  '/dev/ttyS0') dev0_st=on;;
+  '/dev/ttyS1') dev1_st=on;;
+  '/dev/ttyS2') dev2_st=on;;
+  '/dev/ttyS3') dev3_st=on;;
+esac
+	}
+
+get_act() {
+# this presents a menu for the user to select an action to take.
+# it sets $chc which is used in the case block in do_act()
+
+$d $o "$s" --title "Main Menu" --menu "Select a menu option" 0 60 6 \
+"Help" "Help Sub Menu" \
+"Conf" "Configure PPP" \
+"Save" "Save Setup" \
+"Done" "Finished" \
+"Edit" "Manual Edit" \
+"Quit" "Exit Utility" 2>$out
+
+chc=`$ccat $out`
+	}
+
+help_menu () {
+$d $o "$s" --title "Help Menu" --menu "   Select a menu option " 0 70 6 \
+"Tutor" "Tutorial" \
+"Help" "Navigating" \
+"Options" "PPP options" \
+"Chat" "Chat help" \
+"Back" "Main Menu" 2>$out
+
+hchc=`$ccat $out`
+	}
+
+get_opt() {
+# use a checklist to set pppd options in an options file.  The
+# options I use are turned on by default.
+
+$d $o "$s" --separate-output --checklist "      Select \
+the ppp options that you desire   \n\n   option description" 0 0 5 \
+"-all" "force defaults" ${all_st:-off} \
+"defaultroute" "default gateway" ${defrte_st:-on} \
+"-defaultroute" "disable defaultroute" ${nodefrte_st:-off} \
+"crtscts" "hardware flow control" ${rcts_st:-on} \
+"-crtscts" "disable crtscts" ${norcts_st:-off} \
+"xonxoff" "software flow controll" ${xonxoff_st:-off} \
+"passive" "passive mode" ${psv_st:-off} \
+"-ac" "disable field compression" ${fcomp_st:-off} \
+"-bsdcomp" "disable BSD compression" ${bcomp_st:-off} \
+"-am" "disable asyncmap" ${nomap_st:-on} \
+"-detach" "don't fork" ${nodet_st:-off} \
+"modem" "use modem controll" ${modem_st:-on} \
+"local" "ignore Carrier Detect" ${lcl_st:-off} \
+"proxyarp" "add arp entry for peer" ${parp_st:-on} \
+"-proxyarp" "diable proxyarp" ${noparp_st:-off} \
+"persist" "don't die on termination" ${prst_st:-off} \
+"-mru" "disable mru negotiaion" ${nomru_st:-on} \
+"lock" "use UUCP locking" ${lock_st:-on} 2>$toptions
+
+# PPP options state variables (on or off) derived from conf file
+
+# -all option state variable
+if [ `grep "\-all" $toptions` ];then
+  all_st=on
+else
+  all_st=off
+fi
+# defaultroute option state variable
+if [ `grep "^defaultroute" $toptions` ];then
+  defrte_st=on
+else
+  defrte_st=off
+fi
+# -defaultroute option state variable
+if [ `grep "\-defaultroute" $toptions` ];then
+  nodefrte_st=on
+else
+  nodefrte_st=off
+fi
+# crtscts option state variable
+if [ `grep "^crtscts" $toptions` ];then
+  rcts_st=on
+else
+  rcts_st=off
+fi
+# -crtscts option state variable
+if [ `grep "\-crtscts" $toptions` ];then
+  norcts_st=on
+else
+  norcts_st=off
+fi
+# xonxoff option state variable
+if [ `grep "xonxoff" $toptions` ];then
+  xonxoff_st=on
+else
+  xonxoff_st=off
+fi
+# passive mode option state variable
+if [ `grep "^passive" $toptions` ];then
+  psv_st=on
+else
+  psv_st=off
+fi
+# -ac option state variable
+if [ `grep "\-ac" $toptions` ];then
+  fcomp_st=on
+else
+  fcomp_st=off
+fi
+# -bsdcomp option state variable
+if [ `grep "\-bsdcomp" $toptions` ];then
+  bcomp_st=on
+else
+  bcomp_st=off
+fi
+# -am option state variable
+if [ `grep "\-am" $toptions` ];then
+  nomap_st=on
+else
+  nomap_st=off
+fi
+# -detach option state variable
+if [ `grep "\-detach" $toptions` ];then
+  nodet_st=on
+else
+  nodet_st=off
+fi
+# modem option state variable
+if [ `grep "^modem" $toptions` ];then
+  modem_st=on
+else
+  modem_st=off
+fi
+# local option state variable
+if [ `grep "^local" $toptions` ];then
+  lcl_st=on
+else
+  lcl_st=off
+fi
+# proxyarp option state variable
+if [ `grep "^proxyarp" $toptions` ];then
+  parp_st=on
+else
+  parp_st=off
+fi
+# -proxyarp option state variable
+if [ `grep "\-proxyarp" $toptions` ];then
+  noparp_st=on
+else
+  noparp_st=off
+fi
+# persist option state variable
+if [ `grep "^persist" $toptions` ];then
+  prst_st=on
+else
+  prst_st=off
+fi
+# -mru option state variable
+if [ `grep "\-mru" $toptions` ];then
+  nomru_st=on
+else
+  nomru_st=off
+fi
+
+# lock option state variable
+if [ `grep "\lock" $toptions` ];then
+  lock_st=on
+else
+  lock_st=off
+fi
+	}
+
+set_ip() {
+# this uses a yesno widget to query the user to specify
+# IP address(es) as an option to pppd.  If the user chooses
+# no, continue (return was sending me back to main instead
+# of the calling function).  If the user chooses yes, execution
+# continues and we use an input box to query for the adress pair.
+# $IP gets set with the user input.  There is no input 
+# verification, so bogus entries are possible. $IP is used
+# as a comand line option.
+
+$d $o "$s" --yesno "Specify IP addresses? (local:remote)\n \
+Either can be absent (e.g. :remote)" 0 0
+
+yn=$?
+
+chk_yn || return
+
+$d $o "$s" --inputbox "Enter IP adress(es) (i.e. local:remote)" 0 0 ${ip_st:-''} 2>$out
+
+IP=`$ccat $out`
+	}
+
+set_mrtu() {
+# this function uses a yesno widget to query the user to specify
+# mru/mtu values.  No continues (return was returning to main
+# instead of the calling function) while yes continues execution
+# and uses an inputbox widget to get the mru:mtu value pair.
+# this is written out to $out and parsed to set $mru and $mtu.
+# this avoids querying the user twice. $mru and $mtu get put
+# in $toptions.1 and merged with $toptions later.
+
+$d $o "$s" --yesno "   Set mru/mtu values? This should not be\n \
+disabled by -mru in the options checklist" 0 0
+
+yn=$?
+
+chk_yn || return
+
+$d $o "$s" --inputbox "Enter mru/mtu pair separated\n by a colon \
+(i.e. mru:mtu)" 0 0 ${mrtu_st:-''} 2>$out
+
+mru=`$ccat $out|cut -d: -f1`
+mtu=`$ccat $out|cut -d: -f2`
+$ccat <<EOF >>$toptions.1
+mru=$mru
+mtu=$mtu
+EOF
+	}
+
+custom_opts() {
+# this queries the user to set her own command line options
+
+$d $o "$s" --yesno " Do you want to set your own custom options? \n \
+You can do that here instead of editing the script" 0 0
+
+yn=$?
+
+chk_yn || return
+
+$d $o "$s" --inputbox "Enter options separated by white space:" 0 0 2>>$toptions.1
+	}
+
+edit_script() {
+# set the correct files
+ecmd_file=$1
+eoptions=$2
+echatfile=$3
+
+# This calls the editor and loads the connect script
+# Then it loads the options file
+# The message box introduces the editor.
+$d $o "$s" --beep --msgbox " You will now have the opportunity \n \
+to edit the connection script, options \n file and chatfile.  The editor \
+is ae, which \n is explained in the installation notes.\n If \$EDITOR \
+is set, that will be \n used instead" 0 0
+
+[ -f $ecmd_file ] && $edit $ecmd_file
+[ -f ${eoptions} ] && $edit ${eoptions}
+$d $o "$s" --beep --msgbox "Please note that the PWD in \
+this file \n is a token that gets replaced during program \n execution.  Please\
+don't edit this token" 0 0
+[ -f ${echatfile} ] && $edit ${echatfile}
+	}
+
+start() {
+# welcome screen, etc.
+
+$d --clear $o "$s" --title "PPP Config" \
+--beep --msgbox "This utility will configure PPP.\nYou can use the arrow keys\nfor navigating the menus or the\ntab key to move the cursor." 0 0 --and-widget $o "$s" \
+--yesno "Configure Point to Point? " 0 0
+
+yn=$?
+
+chk_yn || die 1 "user exited ..."
+
+	}
+
+do_act() {
+# this is the case block to compliment the get_act() menu
+# function.
+
+case $chc in
+Help) help_menu
+      do_help
+      ;;
+Conf) if [ $save -eq 1 ];then
+	warn_conf save
+	$d $o "$s" --yesno "Continue configuring options?" 0 0
+	yn=$?
+	chk_yn || return
+        save=0
+      fi
+      config_ppp
+      custom_opts
+      config_acnt
+      config_chat
+      warn_conf conf
+      write_files $toptions $tchatfile $tcmd_file
+      conf=1
+      ;;
+Save) if [ $conf -eq 1 ]; then
+        write_files $options $chatfile $cmd_file
+	# get rid of temporary files so they don't get executed
+	# on accident
+	[ -f $toptions -o -f $toptions.1 ] && $del $toptions*
+	[ -f $tchatfile ] && $del $tchatfile
+	[ -f $tcmd_file ] && $del $tcmd_file
+	# save current selection state
+	write_rc
+	# set the save flag
+        save=1
+      else
+        $d $o "$s" --beep --msgbox " Nothing to save, please configure ppp" 0 0
+        return
+      fi
+      ;;
+Done) break
+      ;;
+Edit) if [ $save -eq 0 ];then
+        edit_script $tcmd_file $toptions $tchatfile
+      else
+        edit_script $cmd_file $options $chatfile
+      fi
+      ;;
+Quit) die 0 "user terminated ..."
+      ;;
+esac
+	}
+
+do_help() {
+case $hchc in
+  Tutor) $d $o "$s" --textbox $docbase/$tutorial 0 0
+         $d $o "$s" --textbox $docbase/$nav_help 0 0
+         $d $o "$s" --textbox $docbase/$prog_help 0 0
+         $d $o "$s" --textbox $docbase/$opt_help 0 0
+         $d $o "$s" --textbox $docbase/$chat_help 0 0
+          ;;
+  Help) $d $o "$s" --textbox $docbase/$nav_help 0 0 ;;
+  Options) $d $o "$s" --textbox $docbase/$opt_help 0 0 ;;
+  Chat) $d $o "$s" --textbox $docbase/$chat_help 0 0 ;;
+  *) return ;;
+esac
+	}
+
+setup_tty () {
+# this sets up the serial port
+if [ $vhi -eq 0 ];then
+	# setserial not installed, so use stty to configure
+	# the port.  
+	[ $rcts_st = 'on' ] && $tty_cmd crtscts < $dev
+	$tty_cmd ${speed:-9600} < $dev
+	return $?
+else
+	# setserial was found, autoconfigure the port.  If
+	# $speed=38400, set speed_vhi.  session_lockout is used
+	# as a safetly measure, just in case "lock" was not 
+	# selected as an option to pppd, or a comm program
+	# doesn't obey lock file conventions.
+	[ ${speed:-9600} -eq 38400 ] && sp_opt='spd_vhi'
+	$tty_cmd -q $dev auto_irq skip_test autoconfig session_lockout $sp_opt
+	return $?
+fi
+	}
+
+chk_yn() {
+# this checks the return code of a yesno widget after $yn is set.
+# It really just saves some typing.
+
+[ $yn -eq 0 ] || return 1
+	}
+
+config_ppp() {
+# This calls the config functions.  These functions used to be
+# here before they were broken out into functions.  This function may
+# go away, although I guess it provides an abstraction layer.
+get_dev
+get_speed
+get_opt
+set_ip
+set_mrtu
+	}
+
+config_acnt() {
+# This gets the account information.  The passwd is visible if the
+# user opts to save it in a file. $getpwd is used to store the 
+# chosen behavior
+
+getpwd=0
+
+$d $o "$s" --inputbox "Enter your user name" 0 0 ${user_st:-''} 2>$out
+user=`$ccat $out`
+
+$d $o "$s" --inputbox "Enter the telephone number " 0 0 ${pn_st:-''} 2>$out
+pn=`$ccat $out`
+
+$d $o "$s" --yesno " By default your password will need to be \n \
+given each time you run the connect script.\n You can opt to store \
+it in both the configuration\n file and the script instead, so you \
+only have to\n enter it once.  This may be insecure, however.\n \
+If you are concerned about security, say\n no here.  Do you want to \
+store the passwd\n in a file?" 0 0
+yn=$?
+ 
+chk_yn && getpwd=1
+
+
+[ $getpwd -eq 1 ] && $d $o "$s" --inputbox "Enter your passwd " 0 0 ${pwd_st:-''} 2>$out
+pwd=`$ccat $out`
+
+
+}
+
+config_chat() {
+$d $o "$s" --msgbox "Now we will configure the expect/send\n\
+pairs for the chat program ..." 0 0
+
+$d $o "$s" --inputbox "Enter the text of connect acknowledgement.\n\
+Chat won't send any response to this" 0 0 ${pconnect:-'CONNECT'} 2>$out
+pconnect=`$ccat $out`
+
+$d $o "$s" --inputbox "Enter the text of the first login prompt.\n\
+Chat will send your username in response" 0 0 ${plogin:-'login:--login:'} 2>$out
+plogin=`$ccat $out`
+
+$d $o "$s" --inputbox "Enter the text of the next (passwd) prompt.\n\
+Chat will send your passwd in response" 0 0 ${pprompt:-'passwd:'} 2>$out
+pprompt=`$ccat $out`
+
+$d $o "$s" --inputbox "Enter any additional input test you require.\n\
+This may be a program name like ppp\nor a response to a menu prompt.\n\
+If you're not sure, leave this blank.\nIf you need to make an entry,\n\
+make the first entry the prompt you\nexpect.  If you don't expect anything,\n\
+please make two double quotes (null)\nthe first entry (e.g. \"\"). All\n\
+entries must be separated by white space\n" 0 0 ${pothers:-''} 2>$out
+pothers=`$ccat $out`
+	}
+
+write_files() {
+ioptions=$1
+ichatfile=$2
+icmd_file=$3
+# create a pppd command file
+$ccat <<EOF >$icmd_file
+#!/bin/sh
+# This is the PPP/SLIP command file created by dunc 
+#
+# this is useful
+die() {
+echo \$2
+exit \$1
+	}
+#
+# Let's check to see if we have a chat file
+[ -f $ichatfile ] || die 1 "no chat file, exiting ..."
+#
+EOF
+
+case $getpwd in
+
+0) $ccat <<EOF >>$icmd_file
+# If you want to get promted for your passwd each time you
+# run this script, uncomment the line below and comment out the
+# line begginning with "passwd="
+stty -echo;printf "%s" "Password: ";read passwd;stty echo
+
+# If you want to store your passwd so you don't have to enter
+# it all the time, comment out the line above begginning with
+# "stty -echo" and uncomment the line below and add your passwd
+# passwd=\$pwd
+
+EOF
+;;
+1) $ccat <<EOF >>$icmd_file
+# If you want to get promted for your passwd each time you
+# run this script, uncomment the line below and comment out the
+# line begginning with "passwd="
+#stty -echo;printf "%s" "Password: ";read passwd;stty echo
+ 
+# If you want to store your passwd so you don't have to enter
+# it all the time, comment out the line above begginning with
+# "stty -echo" and uncomment the line below and add your passwd
+passwd=$pwd
+
+EOF
+;;
+esac
+
+$ccat <<EOF >>$icmd_file
+$ccat $ichatfile | $sedit -e 's/PWD/\$passwd/g' >$wchatfile
+
+$ppp ${IP:-""} file $options connect "$chat -v -f $wchatfile" $dev $speed &
+
+$del $wchatfile
+
+EOF
+
+if [ "${pn}X" != "X" -a "${user}X" != "X" ];then
+# create the chat file
+$ccat <<EOF >$ichatfile
+"" atdtm0$pn $pconnect "" $plogin \q$user $ppasswd PWD ${pothers:-''}
+EOF
+else
+$d $o "$s" --msgbox "WARNING: no user or phone number -- no chatfile\n\
+Please select Configure from the Main Menu and try again" 6 60
+fi
+
+# the options file gets written out to $toptions during the
+# interactive phase.  We try to determine here if we're saving
+# to permanent or temporary files so that we a) merge $toptions.1
+# into the correct file and b) actually have a $options file!
+
+# copy $toptions to $options if saving permanent files
+[ "$ioptions" = "$options" -a -f $toptions ] && $copy $toptions $options
+
+# merge custom options into options file
+[ -f $toptions.1 ] && $ccat $toptions.1 >>$ioptions
+
+	}
+
+
+write_rc () {
+# This function will write out a new rcfile using the current values
+say "# the speed state variable, derived from conf file">$rcfile
+say "spd_st=${speed}">>$rcfile
+say "# device state variables (on or off) derived from conf file">>$rcfile
+say "dev0_st=${dev0_st}">>$rcfile
+say "dev1_st=${dev1_st}">>$rcfile
+say "dev2_st=${dev2_st}">>$rcfile
+say +n "dev3_st=${dev3_st}">>$rcfile
+say +n "# PPP options state variables (on or off) derived from conf file">>$rcfile
+say "# -all option state variable">>$rcfile
+say "all_st=${all_st}">>$rcfile
+say "# defaultroute option state variable">>$rcfile
+say "defrte_st=${defrte_st}">>$rcfile
+say "# -defaultroute option state variable">>$rcfile
+say "nodefrte_st=${nodefrte_st}">>$rcfile
+say "# crtscts option state variable">>$rcfile
+say "rcts_st=${rcts_st}">>$rcfile
+say "# -crtscts option state variable">>$rcfile
+say "norcts_st=${norcts_st}">>$rcfile
+say "# xonxoff option state variable">>$rcfile
+say "xonxoff_st=${xonxoff_st}">>$rcfile
+say "# passive mode option state variable">>$rcfile
+say "psv_st=${psv_st}">>$rcfile
+say "# -ac option state variable">>$rcfile
+say "fcomp_st=${fcomp_st}">>$rcfile
+say "# -bsd option state variable">>$rcfile
+say "bcomp_st=${bcomp_st}">>$rcfile
+say "# -am option state variable">>$rcfile
+say "nomap_st=${nomap_st}">>$rcfile
+say "# -detach option state variable">>$rcfile
+say "nodet_st=${nodet_st}">>$rcfile
+say "# modem option state variable">>$rcfile
+say "modem_st=${modem_st}">>$rcfile
+say "# local option state variable">>$rcfile
+say "lcl_st=${lcl_st}">>$rcfile
+say "# proxyarp option state variable">>$rcfile
+say "parp_st=${parp_st}">>$rcfile
+say "# -proxyarp option state variable">>$rcfile
+say "noparp_st=${noparp_st}">>$rcfile
+say "# persist option state variable">>$rcfile
+say "prst_st=${prst_st}">>$rcfile
+say "# -mru option state variable">>$rcfile
+say +n "nomru_st=${nomru_st}">>$rcfile
+say +n "# account config state variables">>$rcfile
+say "ip_st=$IP">>$rcfile
+say "mrtu_st=${mru}:${mtu}">>$rcfile
+say "user_st=${user}">>$rcfile
+[ $getpwd -eq 1 ] && say "pwd_st=${pwd}">>$rcfile
+say +n "pn_st=${pn}">>$rcfile
+say +n "# cahtfile expect/send variables">>$rcfile
+say "pconnect=${pconnect:-''}">>$rcfile
+say "plogin=${plogin:-''}">>$rcfile
+say "ppasswd=${ppasswd:-''}">>$rcfile
+say "pothers=${pothers:-''}">>$rcfile
+}
+
+do_docs () {
+# extract and remove docs, depending on $1
+case $1 in
+get)
+	for doc in $tutorial $nav_help $prog_help $chat_help $opt_help
+	do
+		if [ -f $docsrc/$doc.gz ];then
+			$unzip $docsrc/$doc.gz >$docbase/$doc
+		else 
+			$copy $docsrc/$doc $docbase/$doc
+		fi
+	done
+	;;
+clean) (cd $docbase;$del *.tut) ;;
+esac
+	}
+
+# main
+
+# "die" on -HUP -TERM ^C and ^Z
+trap "die 1 exiting..." 1 2 15 24
+
+# the following variables are set to save typing
+d=/usr/bin/dialog 
+o="--backtitle" 
+s="                       PPP CONFIGURATION UTILITY "
+
+# define some additional variables
+
+# file locations
+base=${DUNC_DIR:-$HOME/.dunc}
+docbase=$base			#this is a temproray location
+docsrc=/usr/doc/dunc
+out=${base}/out.tmp
+tchatfile=${base}/tchatfile	#temporary chat file
+chatfile=${base}/chatfile	#permenant (saved) chatfile
+wchatfile=/tmp/wchatfile	#working chat file
+toptions=${base}/toptions	#temporary options file
+options=${base}/options		#permenant (saved) options file
+tcmd_file=${base}/tcmd_file	#temporary connect script
+cmd_file=${base}/dialup_connect	#permanent connect script
+rcfile=${DUNC_RC:-$HOME/.duncrc}
+nav_help=navigation.tut
+tutorial=tutorial.tut
+prog_help=dunc.tut
+chat_help=chat.tut
+opt_help=ppp_opts.tut
+
+# other commands
+del="/bin/rm -f"
+chat=/usr/sbin/chat
+ppp=/usr/sbin/pppd
+chmd=/bin/chmod
+move=/bin/mv
+copy=/bin/cp
+ccat=/bin/cat
+edit=${EDITOR:-'/bin/ae'}
+sedit=/bin/sed
+unzip="/bin/gunzip -c"
+if [ -x /bin/setserial ];then
+	tty_cmd=/bin/setserial
+	vhi=1
+else
+	tty_cmd=/bin/stty
+	vhi='no'
+fi
+
+# other variables
+conf=0
+if [ -f $cmd_file -a -f $options -a -f $chatfile ];then
+  save=1
+else
+  save=0
+fi
+
+[ -d $base ] || mkdir -p $base
+[ -d $docbase ] || mkdir -p $docbase
+
+# set up doc files
+do_docs get
+
+# get last config from the rc file
+if [ -f $rcfile ];then
+  . $rcfile
+  # setup default $dev value or use /dev/ttyS1 (com2)
+  [ $dev0_st = "on" ] && dev=/dev/ttyS0
+  [ $dev1_st = "on" ] && dev=/dev/ttyS1
+  [ $dev2_st = "on" ] && dev=/dev/ttyS2
+  [ $dev3_st = "on" ] && dev=/dev/ttyS3
+fi
+
+[ "$devX" = "X" ] && dev=/dev/ttyS1
+
+# display welcome
+start
+
+while true
+do
+  # display menu
+  get_act
+  # act on $chc
+  do_act
+done
+
+[ -f $cmd_file -o -f $tcmd_file ] || die 1 "nothing configured, exiting ..."
+[ -f $chatfile -o -f $tchatfile ] || die 1 "chatfile not configured, exiting..."
+
+# Now we need to decide on which files to use for current execution
+# If there exists $tcmdfile, we know Conf has been run most recently
+# and Save was not run, which deletes this file.  We therefore execute
+# $tcmd_file, the most current file.
+if [ -f $tcmd_file ];then
+  cmd_file=$tcmd_file
+fi
+
+$d $o "$s" --title "The following command file has \n \
+been constructed for execution" --textbox $cmd_file 0 0 --and-widget \
+$o "$s" --infobox "Saving configuration ..." 0 0
+
+# this saves the current config in $rcfile
+write_rc
+
+$d $o "$s" --yesno " Do you want to configure the serial port?\n \
+If it has already been configured then \n this isn't necessary.  \
+If you are not sure \n then its safe to say yes.  However,\n please \
+be aware that you need to be root to\n set up the serial \
+port, so if you are not\n root, say no." 0 0
+yn=$?
+
+if [ $yn -eq 0 ];then
+  setup_tty
+  [ $? -eq 0 ] || die $? "setup_tty failed, exiting ..."
+else
+  say "setup_tty not executed"
+fi
+
+$d $o "$s" --yesno "execute command file?" 0 0
+yn=$?
+
+chk_yn || die 1 "$ppp command not executed ..."
+
+[ -f $cmd_file ] && $chmd +x $cmd_file
+
+exec $cmd_file
+
+die 0 ""

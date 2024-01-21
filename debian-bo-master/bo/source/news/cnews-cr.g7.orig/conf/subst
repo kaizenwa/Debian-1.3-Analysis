@@ -1,0 +1,88 @@
+#! /bin/sh
+# subst - substitute strings into files, carefully
+
+PATH=/bin:/usr/bin ; export PATH
+
+case "$1" in
+-f)	substs=$2
+	shift ; shift
+	;;
+*)	echo "$0: no substitutions file given" >&2
+	exit 2
+	;;
+esac
+
+# going via a tempfile avoids annoying quoting problems in botched shells
+sed -n '/^#/d
+s/^\([^	]*\)		*\([^	]*\)$/s#@<\1>@#\2#g/p' $substs >/tmp/sb$$
+them="`cat /tmp/sb$$ ; rm -f /tmp/sb$$`"
+
+for f
+do
+	# first, figure out temporary names
+	case "$f"
+	in
+		*/*)
+		dir="`echo $f | sed 's;/[^/]*$;;'`"
+		new="$dir/substtmp.new"
+		old="$dir/substtmp.old"
+		;;
+
+		*)
+		new="substtmp.new"
+		old="substtmp.old"
+		;;
+	esac
+	echo "$f: " | tr -d '\012'
+	rm -f $new $old
+
+	# test existences
+	if test ! -f $f
+	then
+		echo "$0: cannot find \`$f'" >&2
+		exit 1
+	fi
+	if test -r $new
+	then
+		echo "$0: $new exists, cannot proceed" >&2
+		exit 1
+	fi
+	if test -r $old
+	then
+		echo "$0: $old exists, cannot proceed" >&2
+		exit 1
+	fi
+	touch $old $new 2>/dev/null
+	if test ! -w "$old" -o ! -w "$new"
+	then
+		rm -f $old $new
+		echo "$0: cannot create temporaries $old $new" >&2
+		exit 1
+	fi
+
+	# generate the new version
+	trap "rm -f $new; exit 1" 1 2 15
+	# the ''""'' business is more robust against stupid shell implementors
+	# than just ""
+	sed '/=()<.*>()=/{
+		h
+		n
+		g
+		s/.*=()<//
+		s/>()=.*//
+		'"$them"'
+	}' $f >$new
+
+	# substitute new for old, if necessary
+	if cmp -s $new $f
+	then
+		rm -f $new $old
+		echo "unchanged"
+	else
+		mv $f $old || exit 1
+		mv $new $f || { mv $old $f ; exit 1 ; }
+		rm -f $old
+		echo "updated"
+	fi
+	trap 1 2 15
+done

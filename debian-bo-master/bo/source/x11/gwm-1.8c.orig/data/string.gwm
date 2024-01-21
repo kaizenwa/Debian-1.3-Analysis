@@ -1,0 +1,119 @@
+;; string.gwm --- Basic string handling routines
+;;
+;; Author: Anders Holst  (aho@sans.kth.se)  
+;; Copyright (C) 1994  Anders Holst
+;; Last change: 19/11
+;;
+;; This file is copyrighted under the same terms as the rest of GWM
+;; (see the X Inc license for details). There is no warranty that it
+;; works. 
+;;
+;; --------------------------------------------------------------------- 
+
+
+;; Until this is implemented as primitives, we have to do it the clumsy way
+(setq ascii-list (list "\000" "\001" "\002" "\003" "\004" "\005" "\006" "\007"
+                       "\010" "\011" "\012" "\013" "\014" "\015" "\016" "\017"
+                       "\020" "\021" "\022" "\023" "\024" "\025" "\026" "\027"
+                       "\030" "\031" "\032" "\033" "\034" "\035" "\036" "\037"
+                       "\040" "\041" "\042" "\043" "\044" "\045" "\046" "\047"
+                       "\050" "\051" "\052" "\053" "\054" "\055" "\056" "\057"
+                       "\060" "\061" "\062" "\063" "\064" "\065" "\066" "\067"
+                       "\070" "\071" "\072" "\073" "\074" "\075" "\076" "\077"
+                       "\100" "\101" "\102" "\103" "\104" "\105" "\106" "\107"
+                       "\110" "\111" "\112" "\113" "\114" "\115" "\116" "\117"
+                       "\120" "\121" "\122" "\123" "\124" "\125" "\126" "\127"
+                       "\130" "\131" "\132" "\133" "\134" "\135" "\136" "\137"
+                       "\140" "\141" "\142" "\143" "\144" "\145" "\146" "\147"
+                       "\150" "\151" "\152" "\153" "\154" "\155" "\156" "\157"
+                       "\160" "\161" "\162" "\163" "\164" "\165" "\166" "\167"
+                       "\170" "\171" "\172" "\173" "\174" "\175" "\176" "\177"
+                       "\200" "\201" "\202" "\203" "\204" "\205" "\206" "\207"
+                       "\210" "\211" "\212" "\213" "\214" "\215" "\216" "\217"
+                       "\220" "\221" "\222" "\223" "\224" "\225" "\226" "\227"
+                       "\230" "\231" "\232" "\233" "\234" "\235" "\236" "\237"
+                       "\240" "\241" "\242" "\243" "\244" "\245" "\246" "\247"
+                       "\250" "\251" "\252" "\253" "\254" "\255" "\256" "\257"
+                       "\260" "\261" "\262" "\263" "\264" "\265" "\266" "\267"
+                       "\270" "\271" "\272" "\273" "\274" "\275" "\276" "\277"
+                       "\300" "\301" "\302" "\303" "\304" "\305" "\306" "\307"
+                       "\310" "\311" "\312" "\313" "\314" "\315" "\316" "\317"
+                       "\320" "\321" "\322" "\323" "\324" "\325" "\326" "\327"
+                       "\330" "\331" "\332" "\333" "\334" "\335" "\336" "\337"
+                       "\340" "\341" "\342" "\343" "\344" "\345" "\346" "\347"
+                       "\350" "\351" "\352" "\353" "\354" "\355" "\356" "\357"
+                       "\360" "\361" "\362" "\363" "\364" "\365" "\366" "\367"
+                       "\370" "\371" "\372" "\373" "\374" "\375" "\376" "\377"
+                       ))
+
+(defun ord (ch) 
+  (member ch ascii-list))
+
+(defun chr (num)
+  (# num ascii-list))
+
+(defun string-make (len ch)
+  (if (< len 1)
+      ""
+    (eval (+ '(+) (list-make len ch)))))
+
+(defun substring (i j str)
+  (with (len (length str)
+         j (if (> j len) len j)
+         reg (+ "^" (string-make i ".") "\\(" (string-make (- j i) ".") "\\)"))
+    (match reg str 1)))
+
+(defun nth-char (n str)
+  (with (reg (+ "^" (string-make n ".") "\\(.\\)"))
+    (match reg str 1)))
+
+(defun explode (str)
+  (with (len (length str))
+    (if (= len 1)
+          (list (ord str))
+        (> len 9)
+          (+ (explode (substring 0 9 str)) (explode (substring 9 len str)))
+          (with (reg (string-make len "\\(.\\)")
+                 nums (with (i 0) (mapfor ele (list-make len) (: i (+ 1 i)))))
+            (mapfor ch (eval (+ '(match reg str) nums)) (ord ch))))))
+
+(defun implode (lst)
+  (eval (+ '(+) (mapfor ind lst (chr ind)))))
+
+;; Try to handle iso-latin...
+(defun str-down-ind (ind)
+  (if (or (and (> ind 64) (< ind 91))
+          (and (> ind 191) (< ind 223)))
+      (+ ind 32)
+    ind))
+
+(defun str-up-ind (ind)
+  (if (or (and (> ind 96) (< ind 123))
+          (and (> ind 223) (< ind 255)))
+      (- ind 32)
+    ind))
+
+(defun str-letter-ind (ind)
+  (or (and (> ind 64) (< ind 91))
+      (and (> ind 96) (< ind 123))
+      (and (> ind 191) (< ind 223))
+      (and (> ind 223) (< ind 255))))
+
+(defun downcase (str)
+  (implode (mapfor ind (explode str) 
+                   (str-down-ind ind))))
+
+(defun upcase (str)
+  (implode (mapfor ind (explode str) 
+                   (str-up-ind ind))))
+
+(defun capitalize (str)
+  (with (first-done ())
+    (implode (mapfor ind (explode str) 
+                     (if first-done 
+                           (str-down-ind ind)
+                         (not (str-letter-ind ind))
+                           ind
+                           (progn
+                             (setq first-done t)
+                             (str-up-ind ind)))))))

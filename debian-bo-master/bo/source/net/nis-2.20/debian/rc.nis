@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# /etc/init.d/nis	Start NIS (formerly YP) daemons.
+#
+#
+
+# Set to "false", "slave" or "master".
+NISSERVER=false
+
+
+NET="/usr/sbin"
+test -f ${NET}/ypbind -a -f /etc/defaultdomain || exit 0
+case "$1" in
+  start)
+	domainname `cat /etc/defaultdomain`
+	echo "Setting NIS domainname to: `domainname`"
+	echo -n "Starting yellow page services: "
+	if [ "$NISSERVER" != "false" ]
+	then
+		echo -n "ypserv "
+		start-stop-daemon --start --quiet \
+			--pidfile /var/run/ypserv.pid --exec ${NET}/ypserv
+	fi
+	if [ "$NISSERVER" = master ]
+	then
+		echo -n "yppasswdd "
+		start-stop-daemon --start --quiet \
+			--exec ${NET}/rpc.yppasswdd -- -e chsh
+	fi
+	echo -n "ypbind "
+	start-stop-daemon --start --quiet --exec ${NET}/ypbind
+	echo
+	;;
+  stop)
+	start-stop-daemon --stop --quiet --oknodo --exec /usr/sbin/ypbind
+	start-stop-daemon --stop --quiet --oknodo \
+		--pidfile /var/run/ypserv.pid --exec /usr/sbin/ypserv
+	start-stop-daemon --stop --quiet --oknodo \
+		--exec /usr/sbin/rpc.yppasswdd
+	;;
+  reload)
+	start-stop-daemon --stop --quiet --oknodo --signal 1 \
+		--pidfile /var/run/ypserv.pid --exec /usr/sbin/ypserv
+	;;
+  *)
+	echo "Usage: /etc/init.d/nis {start|stop|reload}"
+	exit 1
+esac
+
+exit 0
+

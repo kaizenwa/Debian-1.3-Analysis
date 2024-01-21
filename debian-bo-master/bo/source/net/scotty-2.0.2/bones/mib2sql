@@ -1,0 +1,145 @@
+#!/usr/local/bin/scotty -nf
+## -*- tcl -*-
+##
+## Convert Internet MIB definitions into a SQL database schema.
+## This script output create table SQL statements. Every relation
+## contains a column IpAddresse and a column TimeStamp which is used 
+## to mark the time the data row was retrieved.
+##
+## Copyright (c) 1995
+##
+## J. Schoenwaelder
+## TU Braunschweig, Germany
+## Institute for Operating Systems and Computer Networks
+##
+## Permission to use, copy, modify, and distribute this
+## software and its documentation for any purpose and without
+## fee is hereby granted, provided that this copyright
+## notice appears in all copies.  The University of Braunschweig
+## makes no representations about the suitability of this
+## software for any purpose.  It is provided "as is" without
+## express or implied warranty.
+##
+
+##
+## The following proc converts an Internet MIB type (aka syntax)
+## into a SQL type. Feel free to edit the switch to fit your
+## database system.
+##
+
+proc SQLtype {oid} {
+    set syntax [mib syntax $oid]
+    if {[mib tc $oid] != ""} {
+	set syntax [lindex [mib tc $oid] 1]
+    }
+    switch -glob $syntax {
+	INTEGER -
+	UInteger* -
+	Integer* -
+	Gauge* -
+	Counter* -
+	TimeTicks {
+	    return int
+	}
+	IpAddress {
+	    return char(4)
+	}
+	"OCTET STRING" {
+	    return char(256)
+	}
+	"OBJECT IDENTIFIER" {
+	    return char(256)
+	}
+	PhysAddress {
+	    return char(80)
+	}
+	NetworkAddress {
+	    return char(80)
+	}
+	NsapAddress {
+	    return char(80)
+	}
+	default {
+	    error "failed to translate $syntax to SQL type"
+	}
+    }
+}
+
+##
+## Construct an SQL statement to create a table that represents
+## the SNMP table given by oid.
+##
+
+proc SQLtable {oid} {
+    set name [mib name $oid]
+    append sql "create table $name ( \n"
+    append sql "\tTarget\tchar(15) not null,\n"
+    append sql "\tTimeStamp\tint not null"
+    foreach var [mib suc [mib suc $oid]] {
+	set attribute [mib name $var]
+	append sql ",\n\t$attribute\t[SQLtype $var]"
+    }
+    append sql "\n) \\g\n"
+    return $sql
+}
+
+##
+## Construct an SQL statement to create a table that represents
+## the SNMP scalars in the group given by oid.
+##
+
+proc SQLscalars {oid} {
+    set name [mib name $oid]
+    append sql "create table $name ( \n"
+    append sql "\tTarget\tint not null,\n"
+    append sql "\tTimeStamp\tint not null"
+    foreach var [mib suc $oid] {
+	if {[mib access $var] != "not-accessible"} {
+	    set attribute [mib name $var]
+	    append sql ",\n\t$attribute\t[SQLtype $var]"
+	}
+    }
+    append sql "\n) \\g\n"
+    return $sql
+}
+
+##
+## Walk through a MIB tree and create tables to hold SNMP tables
+## and SNMP scalars.
+##
+
+proc walk {node} {
+    mib walk oid [mib oid $node] {
+	switch [mib syntax $oid] {
+	    SEQUENCE continue
+	    "SEQUENCE OF" {
+		puts [SQLtable $oid]
+	    }
+	    "OBJECT IDENTIFIER" {
+		set scalars 0
+		foreach var [mib suc $oid] {
+		    if {[mib access $var] != "not-accessible"} {
+			set scalars 1
+			break
+		    }
+		}
+		if {$scalars} {
+		    puts [SQLscalars $oid]
+		}
+	    }
+	}
+    }
+}
+
+##
+## And that's all. Check the arguments and go ahead.
+##
+
+if {$argv == ""} {
+    puts stderr {usage: mib2sql <mib-node> [<mib-node> ...]}
+    exit 42
+}
+
+foreach node $argv {
+    walk $node
+}

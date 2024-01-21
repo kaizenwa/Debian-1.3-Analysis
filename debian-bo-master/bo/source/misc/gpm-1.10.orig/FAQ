@@ -1,0 +1,103 @@
+
+This file tries to summarize the questions that I've been responding over
+and over. It is meant to save some time to both you and me :)
+
+If your problem with gpm isn't described here, feel free to ask me by
+Email.
+
+--
+    __ o La forza dei forti sta nel traversare le traversie con occhio sereno
+   _`\<,                                                        (Paperino)
+__( )/( )__     alessandro.rubini@linux.it  +39-382-529554
+
+
+===========================================================================
+Q: Compilation fails with
+
+	yacc  gpm-root.y
+	make: /usr/bin/make: cannot execute binary file
+	make: *** [gpm-root.c] Error 126
+
+---------------------------------------------------------------------------
+A: This is a typical error (I've got several of them reported), though
+   not related to gpm.
+
+   It looks like you have an old slackware installation, like mine, or
+   another faulty setup. I've been reported that slackware-3 is wrong
+   as well.
+
+   The 'yacc' executable is a shell script that calls bison, and it
+   lacks the '#!/bin/sh' line (or has it incorrect, missing the
+   '!'). I don't remember the details, but while it runs under your
+   shell, it can't be executed under make. I looked in the binfmt
+   sources in the kernel, and /bin/sh doesn't appear explicitly, so
+   you must fix the first line in the 'yacc' script, and everything
+   should go fine.
+
+   Note however that the server has already been compiles. Only the
+   gpm-root client, written with yacc, is affected by this problem.
+
+===========================================================================
+Q: My serial mouse works in X with ms protocol, but behaves erratically
+   with gpm on the text console, and I get involuntary pastes.
+
+---------------------------------------------------------------------------
+A: Many ms protocol mice equipped with three buttons use an extension
+   to the protocol, which consists in repeating events (thus with no
+   effect under the normal protocol) to signal a change in the middle
+   button.  Unfortunately, some old true-ms protocol mice do repeat
+   events, thus triggering the middle-button in gpm.
+
+   If you're running your mouse with ``-t ms'', you'd better try ``-t
+   bare'', which is the unadorned ms protocol of the old days. My
+   choice to use the third-button extension as the default, was taken
+   because a true ms protocol doesn't repeat enevt notification, and
+   because many three button mice feature the extension.
+
+===========================================================================
+Q: I have a serial mouse. It works fine except that when I try to drag
+   the mouse with the middle button pressed, gpm assumes that the middle
+   button has been released. Dragging with the other buttons works just
+   fine.
+
+---------------------------------------------------------------------------
+A: Your mouse uses an extension to the m$ protocol in order to report
+   the middle button. It sends empty events (i.e., no-motion &
+   no-button-change) in order to report a change in the status of the
+   middle button.  Unfortunately enough, some two-button devices do send
+   empty packets any now and then, so I added the ``-t bare'' decoding,
+   which is identical to the X decoding.
+
+   Even those devices that do report the middle button often fail
+   miserably to report it correctly during mouse motion. So I've been
+   forced to disable middle-and-motion: there are much more faulty
+   devices than correct ones.
+
+   You know, since the mouse uses the null packet to report a change,
+   if the decoder misses one of them there's no way to recover: gpm
+   will think the button is down when it's up, and vice versa.
+
+   If you want to try to generate drags, you can change the ``#if 1''
+   in mice.c (M_ms) to ``#if 0'', in order to select the ``#else''
+   decoder. The source embeds both decoders: the no-drag is on by
+   default for the reason above. If your device works with the
+   complete decoder (marked by ``/* my own trial ... */'', you can
+   happily keep it on.
+
+===========================================================================
+Q: My mouse doesn't sense the middle button in X, while it works with
+   gpm.
+
+---------------------------------------------------------------------------
+A: Gpm uses a different decoder (see the previous two answers). You
+   can use the ``-R'' option to repeat mouse data to X (look at the man
+   page).  However, as explained in the previous answer, this won't
+   generate drag events for the middle button (i.e. motion while the
+   button is down).
+
+===========================================================================
+Q: I have a busmouse, and I have the single-open problem. Is there any
+   way around it?
+
+---------------------------------------------------------------------------
+A: Try the -R option of gpm (look at the man page)

@@ -1,0 +1,30 @@
+#!/bin/sh
+
+VAULT=/progressive/release-vault
+
+GNUTAR=/usr/latest/bin/tar
+BLOCKSIZE=62k
+
+
+if [ $# != 3 ] ; then
+	echo Usage: $0 release bundle [tapedev]
+	exit 1
+fi
+
+set -e
+
+release=$1
+bundle=$2
+tape=${3-${TAPE-/dev/rst0}}
+
+SRCDIR=$VAULT/$release/$bundle
+
+cd $SRCDIR
+mt -f ${tape} ret
+mt -f ${tape} rew
+dd conv=sync if=$SRCDIR/src.tar.Z of=$tape obs=${BLOCKSIZE}
+
+mt -f $tape rew
+dd if=$tape ibs=${BLOCKSIZE} | compress -d | tar tvf -
+
+mt -f ${tape} rewoffl

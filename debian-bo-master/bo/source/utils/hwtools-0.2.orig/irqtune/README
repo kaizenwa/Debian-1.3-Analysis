@@ -1,0 +1,445 @@
+
+   
+   
+   
+     _________________________________________________________________
+   
+                IRQTUNE -- A LINUX X86 IRQ PRIORITY OPTIMIZER
+                                       
+   irqtune changes the IRQ priority of devices to allow devices that
+   require high priority and fast service (e.g. serial ports, modems) to
+   have it.
+   
+   With irqtune, a 3X speedup of serial/modem throughput is possible.
+   
+   
+   
+   
+     _________________________________________________________________
+   
+                           WHERE DO I GET IRQTUNE?
+                                       
+   irqtune is free software under the terms and conditions of the GNU
+   Public License. See the file COPYING, included in the distribution,
+   for details.
+   
+     * It's available via anonymous ftp from:
+       ftp://www.best.com/pub/cae/irqtune.tgz (gzipped tar archive)
+       
+     * The author is Craig Estey, (cae@best.com).
+       
+     * This FAQ file is available both in html and text versions included
+       in the tar file. This FAQ is also available online via
+       http://www.best.com/~cae/irqtune
+       
+   
+   
+   
+     _________________________________________________________________
+   
+                      HOW DO I KNOW IF I NEED IRQTUNE?
+                                       
+   You are running Linux on an x86 PC, other architectures to be
+   implemented later--Sorry.
+   
+   You probably need irqtune, if you are experiencing any of the
+   following:
+   
+     * SLIP/PPP transfers seem slow. For example, using a 28.8 (or
+       better) modem, the effective throughput is approximately 700
+       bytes/second instead of the expected 2500 bytes/second.
+       
+     * A running SLIP/PPP dies at random times.
+       
+     * Serial connections are slow or drop data.
+       
+     * Netscape hangs mysteriously or stalls when trying to access a web
+       page.
+       
+     * Equivalent programs under Windoze run much faster than under
+       Linux.
+       
+     * Disk accesses seem to interfere with SLIP/PPP.
+       
+     * Interrupt handlers for specialized, time critical devices don't
+       get control when they need to.
+       
+   
+   
+   
+     _________________________________________________________________
+   
+             WHAT IS ACTUALLY HAPPENING TO CAUSE THESE PROBLEMS?
+                                       
+   Note to Linux kernel programmers: Please forgive the simplifications.
+   
+   Q: What should the system be doing?
+   
+   Serial devices are what are termed fast-interrupt devices: They
+   require frequent interrupts but the interrupt service executes
+   quickly. Such devices require high IRQ priority.
+   
+   On the the other end of the scale is the timer interrupt. The kernel
+   has some laborous tasks that it must perform internally for an
+   interrupt service routine. These are too time consuming to perform
+   with interrupts locked off. Linux defers them and processes them, in
+   the bottom-half or soft-interrupt section of the timer interrupt.
+   
+   When the kernel is in the bottom-half routine, interrupts are enabled.
+   This allows other interrupt routines to preempt the bottom-half
+   routine, allow fast-interrupt routines to run, and resume the
+   bottom-half routine.
+   
+   Q: Sounds fine, so what is wrong?
+   
+   Unfortunately, this is what should happen--it doesn't. What actually
+   happens is this:
+   
+   When the PC boots Linux, the timer is given, by default, the highest
+   IRQ priority in the system (it's IRQ 0 and thus, priority 0). On a
+   standard configuration, the serial ports are priority 11 and 12!!!
+   
+   Because of the way the interrupt controller is currently programmed
+   under Linux, when it is executing the bottom-half, preemptive
+   interrupt processing does not occur. The system will continue to
+   execute the bottom-half routine until completion. The serial interrupt
+   will not be allowed to preempt the bottom-half when it needs to,
+   causing some characters to be delayed, or worse yet, dropped.
+   
+   Q: But, why is this so--The bottom-half interrupt code does enable
+   interrupts!?!?
+   
+   It enables interrupts in the CPU itself (via sti), not the interrupt
+   controller. The CPU would allow the preemptive interrupt, but the
+   interrupt controller will not permit the interrupt to be shown to the
+   CPU.
+   
+   Q: Why won't the interrupt controller allow the CPU to see the
+   interrupt?
+   
+   Because the bottom-half routine is executing at IRQ priority 0--the
+   highest priority in the system. The serial interrupt is given priority
+   11, one of the lowest. The interrupt controller will not allow a lower
+   priority device to preempt a higher priority device.
+   
+   Q: So if we could make the serial interrupt a higher priority than the
+   timer interrupt, would this solve the problem?
+   
+   Exactly! This is what irqtune does. It allows you to change the IRQ
+   priority of devices so that the high priority interrupts occur when
+   they are supposed to.
+   
+   
+   
+   
+     _________________________________________________________________
+   
+                          HOW DO I INSTALL IRQTUNE?
+                                       
+     * Unpack the tar file:
+          + gzip -d < irqtune.tgz | tar xvf -
+          + It will create a directory, irqtune in whatever is the
+            current directory.
+     * cd ./irqtune
+     * make install
+          + This will install the files:
+               o /sbin/irqtune
+               o /sbin/irqtune_mod.o
+                 
+   
+   
+   
+     _________________________________________________________________
+   
+          HOW DO I USE IRQTUNE? DON'T I HAVE TO REBUILD MY KERNEL?
+                                       
+   No, you do not have to rebuild your kernel. irqtune uses insmod and
+   rmmod to dynamically load and unload a kernel module. But you are
+   correct in sensing that irqtune is a kernel patch.
+   
+   Q: Ok, if it's a kernel patch, why not just issue a kernel patch like
+   everybody else does (e.g. diff -u output)?
+   
+   irqtune will work even if you don't have the kernel source loaded. It
+   uses insmod to load the patch, invoke it, and then unload it. The IRQ
+   priority changes will last so long as the kernel is booted.
+   
+   Q: How do I invoke it?
+   
+   irqtune takes two arguments optional arguments:
+   
+     * irqtune master slave
+       
+   The only caveat is that you must specify the full pathname, evenif
+   irqtune is placed in a directory that is in $PATH. This is required
+   because irqtune uses argv[0] to locate its irqtune_mod.o file.
+   
+   The default is 3 14 which will work for many standard configurations.
+   More on this later.
+   
+   Q: Could I do this from my /etc/rc.d/rc.local file?
+   
+   Yes. Just add a /sbin/irqtune line to this file and you're in
+   business. You may also issue another irqtune command at any time.
+   
+   Q: But aren't kernel patches dependent on the particular revision of
+   the kernel? What if my kernel revision is different from the kernel
+   revision that you built it on?
+   
+   irqtune is 99.44% kernel revision independent. It is built using ELF
+   binaries, so your insmod must understand them. But that's really about
+   it.
+   
+   Q: But what if I don't have ELF binary support, how can I still do
+   things?
+   
+   Well, I'd recommend that you upgrade your kernel as ELF binaries are
+   cool :-) But if you insist, you'll just have to recompile irqtune.
+   Just be sure that /usr/src/linux/include is installed. Then, just
+   type:
+   
+     * make clean
+     * make sbin
+     * make install
+       
+   and that should do the trick.
+   
+   
+   
+   
+     _________________________________________________________________
+   
+             WHAT ABOUT MY NON-STANDARD HARDWARE CONFIGURATION?
+                                       
+   irqtune defaults for a standard IRQ configuration. It assumes that the
+   highest priority device should be on IRQ 3. This is normally the first
+   serial port on standard configurations, which is what you want.
+   
+   Q: How do I determine what my IRQ configuration is?
+   
+   Just type cat /proc/interrupts and you'll get something like:
+   
+     0:  8578913   timer
+     1:   109547   keyboard
+     2:        0 + cascade
+     3:    86470 + serial
+     4:   197648 + serial
+    13:        1   math error
+    14:    93123 + Ux4F
+
+   Note that /proc/interrupts only reports on active devices. So to scope
+   out the serial IRQ's ideally you'd have X Windows up with your serial
+   mouse and be connected via PPP to the net.
+   
+   Q: OK, I've got the output from /proc/interrupts, what do I do with
+   it?
+   
+   The leftmost number is the IRQ number. The rightmost column is the
+   internal device name (not to be confused with /dev names). In the
+   above case, the two serial ports are on IRQ 3 and IRQ 4. Just use the
+   lower number, in this case 3:
+   
+     * /sbin/irqtune 3
+       
+   This sets IRQ 3 to the highest priority. In fact, before we invoked
+   irqtune, the IRQ number was also its priority:
+   
+    IRQ  PRIOR
+     0     0
+     1     1
+     2     2
+     3     3
+     4     4
+     5     5
+     6     6
+     7     7
+
+   After this command, the IRQ priorities are now:
+   
+    IRQ  PRIOR
+     0     5
+     1     6
+     2     7
+     3     0
+     4     1
+     5     2
+     6     3
+     7     4
+
+   Q: BTW, What's the cascade device I saw in the output of
+   /proc/interrupts?
+   
+   Glad you asked. There are actually two interrupt controllers, a master
+   and a slave. The slave is cascaded to the master via its IRQ 2. The
+   master controls IRQ's 0-7 and the slave controls IRQ's 8-15.
+   
+   You actually may select two high IRQ priorities, one for the master
+   and one for the slave. irqtune defaults the slave to IRQ 14, which is
+   normally the disk controller.
+   
+   Although the normal notation is to refer to IRQ's as 0-15, it may be
+   easier to understand if we refer to the master IRQ's as M0-M7 and the
+   slave IRQ's as S0-S7.
+   
+   Q: But I've also got an Ethernet controller on IRQ 12. What about
+   that?
+   
+   In other words, your configuration might look something like this:
+   
+     0:  8578913   timer
+     1:   109547   keyboard
+     2:        0 + cascade
+     3:    86470 + serial
+     4:   197648 + serial
+    12:    17968 + eth
+    13:        1   math error
+    14:    93123 + Ux4F
+
+
+   In this case, you might want to use:
+   
+     * /sbin/irqtune 3 12
+       
+   because you want your ethernet card to have a higher priority than the
+   diskcontroller. Actually if you did have this configuration, setting 3
+   14 (the default) would make the ethernet card, the lowest priority
+   device in the system.
+   
+   In our new notation IRQ 12 is S4, and the resulting priority would be:
+   
+   
+    IRQ M/S  PRIOR
+    0   M0     5
+    1   M1     6
+    2   M2     7
+    3   M3     0
+    4   M4     1
+    5   M5     2
+    6   M6     3
+    7   M7     4
+    8   S0     12
+    9   S1     13
+    10  S2     14
+    11  S3     15
+    12  S4     8
+    13  S5     9
+    14  S6     10
+    15  S7     11
+
+   Q: Suppose I also had a serial multiplexer card on IRQ 11?
+   
+   Once again, your configuration might look something like this:
+   
+     0:  8578913   timer
+     1:   109547   keyboard
+     2:        0 + cascade
+     3:    86470 + serial
+     4:   197648 + serial
+    11:   197648 + sermux
+    12:    17968 + eth
+    13:        1   math error
+    14:    93123 + Ux4F
+
+
+   This configuration is a bit tricky because now we've got a serial
+   device on the slave controller. It would be much better to put all
+   serial cards on the master controller. Things would stay much simpler.
+   
+   
+   In this case you would want to use:
+   
+     * /sbin/irqtune 2 11
+       
+   The resulting priorities would be more complex and would result in
+   somethinglike:
+   
+    IRQ M/S  PRIOR
+    0   M0     13
+    1   M1     14
+    2   M2     0
+    3   M3     8
+    4   M4     9
+    5   M5     10
+    6   M6     11
+    7   M7     12
+    8   S0     5
+    9   S1     6
+    10  S2     7
+    11  S3     0
+    12  S4     1
+    13  S5     2
+    14  S6     3
+    15  S7     4
+
+   The reason things would be better if all serial devices were on the
+   master is that now you have serial devices at priorities 0, 8, and
+   9.
+   
+   Q: So what's wrong with that?
+   
+   Well, we boosted the priority of the serial multiplexer at the expense
+   of the regular serial ports. The only way to allow all serial ports
+   equally high priority is to group them on consecutive IRQ's and set
+   the high priority for the lowest of those IRQ's.
+   
+   
+   
+   
+     _________________________________________________________________
+   
+           HOW CAN I TELL IF IRQTUNE ACTUALLY DID ANYTHING FOR ME?
+                                       
+   Well, first off, if PPP/SLIP was dying mysteriously, it will probably
+   be more reliable.
+   
+   Secondly, run without it and get a feel for the transfer rate:
+   
+     * Hit many of your favorite web sites and note the transfer rates in
+       bytes/second.
+     * FTP reports the transfer time of a file in bytes/second. Download
+       (or upload) a few files (300K or greater to smooth out the
+       benchmark) and note the transfer rates.
+       
+   Repeat this using irqtune and note the transfer times again. NOTE:
+   IRQTUNE just won't quit--if you want to test in the original mode
+   again, reboot the system first.
+   
+   
+   
+   
+     _________________________________________________________________
+   
+                 WHAT ABOUT OTHER REMEDIES I'VE HEARD ABOUT?
+                                       
+   Q: What about disabling Van Jacobsen header compression?
+   
+   This reduces the amount of bottom-half processing the system has to do
+   at the expense of larger packets being sent.
+   
+   Q: What about using ``hdparm -u'' to set the interrupt-unmask flag in
+   hard disk driver?
+   
+   It suffers from the same problem as the bottom-half routine. The disk
+   controller typically uses IRQ 14 and 15. While the slave interrupt
+   controller would probably allow preemption, the master (on IRQ 2)
+   would not because the priority of all slave devices is higher than the
+   serial IRQ priority.
+   
+   Q: What about adjusting the MRU/MTU numbers?
+   
+   This will have less of an effect now. In fact, you normally reduced
+   the MRU to a minimum (296) to reduce the bottom-half processing at the
+   expense of adding extra overhead bytes due to the reduced packet size.
+   You may now actually be able to increase the MRU to regain the
+   efficiency.
+   
+   Beware: Do this slowly as the optimal may not be 1500. The flip buffer
+   in the serial/tty drivers is only 512 bytes.
+   
+   Q: What about going to newer kernel revisions?
+   
+   Although irqtune will work surprisingly well with just about any
+   kernel revision, the low level IRQ handlers and device drivers have
+   been vastly improved in the 2.0.X kernels. This will only improve
+   irqtune's effect. In fact, 2.0.X and irqtune actually complement one
+   another.

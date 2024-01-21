@@ -1,0 +1,356 @@
+dnl	This file is an input file used by the GNU "autoconf" program to
+dnl	generate the file "configure", which is run during installation
+dnl	to configure the system for the local environment.
+AC_INIT(tkined.h)
+
+#----------------------------------------------------------------------------
+#	Check if we should use gcc if available on this machine.
+#----------------------------------------------------------------------------
+
+AC_ARG_WITH(gcc, [  --with-gcc              use gcc for compilation],
+	use_gcc=1)
+if test "$use_gcc" = 1 ; then
+    AC_PROG_CC
+else
+    CC=${CC-cc}
+fi
+AC_SUBST(CC)
+AC_PROG_CPP
+AC_PROG_INSTALL
+AC_PREFIX_PROGRAM(tkined)
+
+#----------------------------------------------------------------------------
+#	Check if we should compile in support for rotation icons.
+#----------------------------------------------------------------------------
+
+AC_ARG_WITH(ncc1701, [  --with-ncc1701          use NCC 1701 rotating icon],
+    AC_DEFINE(NCCICON)
+    NCC_C=ncc1701.c
+    NCC_O=ncc1701.o
+)
+AC_SUBST(NCC_C)
+AC_SUBST(NCC_O)
+
+#----------------------------------------------------------------------------
+#	Check whether we should use the BLT library.
+#----------------------------------------------------------------------------
+
+AC_ARG_WITH(blt, [  --with-blt              use the BLT graph package],
+    use_blt=1,
+    use_blt=0
+)
+
+#----------------------------------------------------------------------------
+#       Check if we should load the tcl during startup.
+#----------------------------------------------------------------------------
+
+TCLC="\$(TCLC)"
+TCLO="\$(TCLO)"
+AC_ARG_WITH(auto-load, [  --with-source           source tcl scripts at startup],
+    AC_DEFINE(AUTO_LOAD)
+    TCLC=""
+    TCLO=""
+)
+AC_SUBST(TCLC)
+AC_SUBST(TCLO)
+
+#----------------------------------------------------------------------------
+#       Check which libraries the dynamic linker prefers.
+#----------------------------------------------------------------------------
+
+AC_CHECK_LIB(dld, dld_link, [LIBS="$LIBS -ldld"])
+AC_CHECK_LIB(dl, dlopen, [LIBS="$LIBS -ldl"])
+
+#----------------------------------------------------------------------------
+#	Check if tcl is installed on this system. Interactively ask
+#	for the directory if we can't find it in usual places.
+#----------------------------------------------------------------------------
+
+AC_ARG_WITH(tcl-include, 
+	[  --with-tcl-include      set the tcl include directory],
+	tcl_include=$withval)	
+AC_ARG_WITH(tcl-library,
+	[  --with-tcl-library      set the tcl library directory],
+	tcl_library=$withval)
+
+for f in $tcl_include $scotty_cv_path_tcl_inc $prefix/include /usr/local/tk4.0/include /usr/local/include /usr/local/include/tcl /usr/include /usr/include/tcl ; do
+    AC_MSG_CHECKING(for tcl.h in $f)
+    if test -f "$f/tcl.h" ; then
+	scotty_cv_path_tcl_inc=$f
+        TCL_INC="-I$f"
+        AC_MSG_RESULT(yes)	
+	break
+    else
+        AC_MSG_RESULT(no)
+    fi
+done
+
+while test -z "$TCL_INC" ; do
+    echo "Which directory contains tcl.h : "
+    read f
+    AC_MSG_CHECKING(for tcl.h in $f)
+    if test -f "$f/tcl.h" ; then
+	scotty_cv_path_tcl_inc=$f
+        TCL_INC="-I$f"
+        AC_MSG_RESULT(yes)	
+	break
+    else
+        AC_MSG_RESULT(no)
+    fi
+done
+
+AC_MSG_CHECKING(for tcl version number)
+tcl_major_version=`awk '/TCL_MAJOR_VERSION/ {print $3}' $f/tcl.h`
+tcl_minor_version=`awk '/TCL_MINOR_VERSION/ {print $3}' $f/tcl.h`
+tcl_version="$tcl_major_version.$tcl_minor_version"
+AC_MSG_RESULT("$tcl_version")
+
+if test 7 -ne $tcl_major_version ; then
+    AC_MSG_ERROR("tcl 7.4 or later needed")
+fi
+if test 4 -gt $tcl_minor_version ; then
+    AC_MSG_ERROR("tcl 7.4 or later needed")
+fi
+
+for f in $tcl_library $scotty_cv_path_tcl_lib $prefix/lib /usr/local/tk4.0/lib /usr/local/lib /usr/lib ; do
+    AC_MSG_CHECKING(for libtcl$tcl_version in $f)
+    if test -f "$f/libtcl$tcl_version.a" ; then
+	scotty_cv_path_tcl_lib=$f
+        TCL_LIB="$TCL_LIB $f/libtcl$tcl_version.a"
+        AC_MSG_RESULT(yes)
+	break
+    else
+        AC_MSG_RESULT(no)
+    fi
+done
+
+while test -z "$TCL_LIB" ; do
+    echo "Which directory contains libtcl$tcl_version.a : "
+    read f
+    AC_MSG_CHECKING(for libtcl$tcl_version in $f)
+    if test -f "$f/libtcl$tcl_version.a" ; then
+	scotty_cv_path_tcl_lib=$f
+        TCL_LIB="$TCL_LIB $f/libtcl$tcl_version.a"
+        AC_MSG_RESULT(yes)
+	break
+    else
+        AC_MSG_RESULT(no)
+    fi
+done
+
+AC_SUBST(TCL_LIB)
+AC_SUBST(TCL_INC)
+
+#----------------------------------------------------------------------------
+#	Check if tk is installed on this system. Interactively ask
+#	for the directory if we can't find it in usual places.
+#----------------------------------------------------------------------------
+
+AC_ARG_WITH(tk-include,
+	[  --with-tk-include       set the tk library directory],
+	tk_include=$withval)
+AC_ARG_WITH(tk-library,
+	[  --with-tk-library       set the tk library directory],
+	tk_library=$withval)
+
+for f in $tk_include $scotty_cv_path_tk_inc $tcl_include $prefix/include /usr/local/tk4.0/include /usr/local/include /usr/local/include/tcl /usr/include /usr/include/tcl /usr/X386/include /usr/X11/include ; do
+    AC_MSG_CHECKING(for tk.h in $f)
+    if test -f "$f/tk.h" ; then
+	scotty_cv_path_tk_inc=$f
+        TK_INC="-I$f"
+	AC_MSG_RESULT(yes)
+	break
+    else
+        AC_MSG_RESULT(no)
+    fi
+done
+
+while test -z "$TK_INC" ; do
+    echo "Which directory contains tk.h : "
+    read f
+    AC_MSG_CHECKING(for tk.h in $f)
+    if test -f "$f/tk.h" ; then
+	scotty_cv_path_tk_inc=$f
+        TK_INC="-I$f"
+	AC_MSG_RESULT(yes)
+	break
+    else
+        AC_MSG_RESULT(no)
+    fi
+done
+
+AC_MSG_CHECKING(for tk version number)
+tk_major_version=`awk '/TK_MAJOR_VERSION/ {print $3}' $f/tk.h`
+tk_minor_version=`awk '/TK_MINOR_VERSION/ {print $3}' $f/tk.h`
+tk_version="$tk_major_version.$tk_minor_version"
+AC_MSG_RESULT("$tk_version")
+
+if test 4 -ne $tk_major_version ; then
+    AC_MSG_ERROR("tk 4.0 or later needed")
+fi
+if test 0 -gt $tk_minor_version ; then
+    AC_MSG_ERROR("tcl 4.0 or later needed")
+fi
+
+for f in $tk_library $scotty_cv_path_tk_lib $tcl_library $prefix/lib /usr/local/tk4.0/lib /usr/local/lib /usr/lib /usr/X386/lib /usr/X11/lib ; do
+    AC_MSG_CHECKING(for libtk$tk_version in $f)
+    if test -f "$f/libtk$tk_version.a" ; then
+	scotty_cv_path_tk_lib=$f
+        TK_LIB="$f/libtk$tk_version.a"
+        AC_MSG_RESULT(yes)
+	break
+    else
+        AC_MSG_RESULT(no)
+    fi
+done
+
+while test -z "$TK_LIB" ; do
+    echo "Which directory contains libtk$tk_version.a : "
+    read f
+    AC_MSG_CHECKING(for libtk$tk_version in $f)
+    if test -f "$f/libtk$tk_version.a" ; then
+	scotty_cv_path_tk_lib=$f
+        TK_LIB="$f/libtk$tk_version.a"
+        AC_MSG_RESULT(yes)
+	break
+    else
+        AC_MSG_RESULT(no)
+    fi
+done
+
+AC_SUBST(TK_LIB)
+AC_SUBST(TK_INC)
+
+#----------------------------------------------------------------------------
+#	Check for Tcl_ValidateAllMemory and set TCL_MEM_DEBUG accordingly.
+#----------------------------------------------------------------------------
+
+oldLibs=$LIBS
+LIBS="$LIBS $TCL_LIB -lm"
+AC_CHECK_FUNC(Tcl_ValidateAllMemory,AC_DEFINE(TCL_MEM_DEBUG))
+LIBS=$oldLibs
+
+
+if test "$use_blt" = 1 ; then
+
+#----------------------------------------------------------------------------
+#	Check if BLT is installed on this system. Honour the options:
+#		--with-blt-library=path
+#----------------------------------------------------------------------------
+
+AC_ARG_WITH(blt-library,
+	[  --with-blt-library      set the blt library directory],
+	blt_library=$withval)
+
+for f in $blt_library $tkined_cv_path_blt_lib $prefix/lib  /usr/local/tk4.0/lib /usr/local/blt/lib /usr/local/lib /usr/lib /usr/X386/lib /usr/X11/lib ; do
+    AC_MSG_CHECKING(for libblt in $f)
+    if test -f "$f/libBLT.a" ; then
+	tkined_cv_path_blt_lib=$f
+        BLT_LIB="-L$f -lBLT"
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_BLT)
+	break
+    else
+        AC_MSG_RESULT(no)
+    fi
+done
+
+if test -z "$BLT_LIB" ; then
+    AC_WARN(You can adjust the blt library path to your directory with)
+    AC_WARN(libBLT.a using the following configure options:)
+    AC_WARN(        --with-blt-library=<path>)
+    AC_WARN(Could not find the blt library archive. Will try without blt.)
+fi
+
+AC_SUBST(BLT_LIB)
+
+fi
+
+#--------------------------------------------------------------------
+#	Locate the X11 header files and the X11 library archive.  Try
+#	the ac_find_x macro first, but if it doesn't find the X stuff
+#	(e.g. because there's no xmkmf program) then check through
+#	a list of possible directories.
+#--------------------------------------------------------------------
+
+AC_CHECK_PROG(tk_ok, xmkmf, 1, 0)
+if test $tk_ok = 1; then
+    AC_PATH_X
+fi
+if test "$XINCLUDE_DIR" != ""; then
+    x_includes="$XINCLUDE_DIR"
+fi
+if test "$x_includes" = /usr/include; then
+    XINCLUDES="# no special path needed"
+elif test "$x_includes" != ""; then
+    XINCLUDES=" -I$x_includes"
+else
+    AC_CHECKING(for X11 header files)
+    XINCLUDES="# no special path needed"
+    AC_TRY_CPP([#include <X11/Intrinsic.h>], , XINCLUDES="nope")
+    if test "$XINCLUDES" = nope; then
+        dirs="/usr/unsupported/include /usr/local/include /usr/X386/include /usr/include/X11R4 /usr/X11R5/include /usr/include/X11R5 /usr/openwin/include /usr/X11/include"
+        for i in $dirs ; do
+	    if test -r $i/X11/Intrinsic.h; then
+	        XINCLUDES=" -I$i"
+	    fi
+        done
+    fi
+fi
+if test "$XINCLUDES" = nope; then
+  AC_WARN(Couldn't find any X11 include files)
+  XINCLUDES="# no include files found"
+fi
+AC_SUBST(XINCLUDES)
+
+if test "$XLIBRARY_DIR" != ""; then
+    x_libraries="$XLIBRARY_DIR"
+fi
+if test "$x_libraries" = /usr/lib; then
+    XLIBSW=-lX11
+elif test "$x_libraries" != ""; then
+    XLIBSW="-L$x_libraries -lX11"
+else
+    AC_CHECKING(for X11 library archive)
+    AC_CHECK_LIB(X11, main, XLIBSW="-lX11", XLIBSW=nope)
+    if test "$XLIBSW" = nope; then
+	dirs="/usr/unsupported/lib /usr/local/lib /usr/X386/lib /usr/lib/X11R4 /usr/X11R5/lib /usr/lib/X11R5 /usr/openwin/lib /usr/X11/lib"
+	for i in $dirs ; do
+	    if test -r $i/libX11.a; then
+		XLIBSW="-L$i -lX11"
+	    fi
+	done
+    fi
+fi
+if test "$XLIBSW" = nope ; then
+    AC_CHECK_LIB(Xwindow, main, XLIBSW=-lXwindow)
+fi
+if test "$XLIBSW" = nope ; then
+    AC_WARN(Couldn't find the X11 library archive. Using -lX11.)
+    XLIBSW=-lX11
+fi
+AC_SUBST(XLIBSW)
+
+#----------------------------------------------------------------------------
+#	Check for the existence of various libraries.
+#----------------------------------------------------------------------------
+
+AC_CHECK_LIB(ieee,   main, [LIBS="$LIBS -lieee"])
+AC_CHECK_LIB(socket, main, [LIBS="$LIBS -lsocket"])
+AC_SUBST(LIBS)
+
+#----------------------------------------------------------------------------
+#	Checks for various include files missing on some machines.
+#----------------------------------------------------------------------------
+
+AC_CHECK_HEADERS(stdlib.h unistd.h malloc.h)
+
+#----------------------------------------------------------------------------
+#       Set the compiler to gcc -Wall if we have gcc available here.
+#----------------------------------------------------------------------------
+
+if test "$CC" = "gcc" ; then
+    CC="gcc -Wall"
+fi
+
+AC_OUTPUT(Makefile)

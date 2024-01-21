@@ -1,0 +1,119 @@
+*** matrices.c.orig	Fri Sep  9 12:25:21 1994
+--- matrices.c	Fri Sep  9 13:55:03 1994
+***************
+*** 270,275 ****
+--- 270,319 ----
+    (result -> inverse)[2][2] = 1.0 / vector -> z;
+    }
+  
++ void Compute_Matrix_Transform (result, matrix)
++ TRANSFORM *result;
++ MATRIX   *matrix;
++   {
++   register int i, j;
++   DBL temp, a11, a22, a33;
++ 
++   MIdentity ((MATRIX *)result -> matrix);
++   for ( i = 0 ; i < 3 ; i++ )
++ 	for ( j = 0 ; j < 3 ; j++ )
++ 	  (result -> matrix)[i][j] = (*matrix)[i][j];
++ 
++   /* Need to calculate the inverse. */
++   MIdentity ((MATRIX *)result -> inverse);
++   a11 = (result -> matrix)[1][1] * (result -> matrix)[2][2] -
++         (result -> matrix)[1][2] * (result -> matrix)[2][1];
++   a22 = (result -> matrix)[0][1] * (result -> matrix)[2][2] -
++         (result -> matrix)[0][2] * (result -> matrix)[2][1];
++   a33 = (result -> matrix)[0][1] * (result -> matrix)[1][2] -
++         (result -> matrix)[0][2] * (result -> matrix)[1][1];
++   temp =  (result -> matrix)[0][0] * a11 -
++           (result -> matrix)[1][0] * a22 +
++           (result -> matrix)[2][0] * a33;
++ 
++   if (temp == 0.0) return;
++ 
++   (result -> inverse)[0][0] = a11 / temp;
++   (result -> inverse)[0][1] = -a22 / temp;
++   (result -> inverse)[0][2] = a33 / temp;
++   (result -> inverse)[1][0] = ((*matrix)[1][2] * (*matrix)[2][0] -
++ 							   (*matrix)[1][0] * (*matrix)[2][2]) / temp;
++   (result -> inverse)[1][1] = ((*matrix)[0][0] * (*matrix)[2][2] -
++ 							   (*matrix)[0][2] * (*matrix)[2][0]) / temp;
++   (result -> inverse)[1][2] = ((*matrix)[0][2] * (*matrix)[1][0] -
++ 							   (*matrix)[0][0] * (*matrix)[1][2]) / temp;
++   (result -> inverse)[2][0] = ((*matrix)[1][0] * (*matrix)[2][1] -
++                                (*matrix)[1][1] * (*matrix)[2][0]) / temp;
++   (result -> inverse)[2][1] = ((*matrix)[0][1] * (*matrix)[2][0] -
++ 							   (*matrix)[0][0] * (*matrix)[2][1]) / temp;
++   (result -> inverse)[2][2] = ((*matrix)[0][0] * (*matrix)[1][1] -
++ 							   (*matrix)[0][1] * (*matrix)[1][0]) / temp;
++ 
++   }
++ 
+  /* AAC - This is not used, so it's commented out...
+  
+  void Compute_Inversion_Transform (result)
+*** parse.c.orig	Fri Sep  9 12:25:25 1994
+--- parse.c	Fri Sep  9 12:43:09 1994
+***************
+*** 2781,2786 ****
+--- 2781,2787 ----
+  TRANSFORM *Parse_Transform ()
+    {
+     TRANSFORM *New, Local_Trans;
++    MATRIX Local_Matrix;
+     VECTOR Local_Vector;
+  
+     Parse_Begin ();
+***************
+*** 2809,2814 ****
+--- 2810,2832 ----
+         Compute_Scaling_Transform(&Local_Trans, &Local_Vector);
+         Compose_Transforms (New, &Local_Trans);
+       END_CASE
++ 
++ 	 CASE (MATRIX_TOKEN)
++ 	   Parse_Vector (&Local_Vector);
++ 	   Local_Matrix[0][0] = Local_Vector.x;
++ 	   Local_Matrix[0][1] = Local_Vector.y;
++ 	   Local_Matrix[0][2] = Local_Vector.z;
++ 	   Parse_Vector (&Local_Vector);
++ 	   Local_Matrix[1][0] = Local_Vector.x;
++ 	   Local_Matrix[1][1] = Local_Vector.y;
++ 	   Local_Matrix[1][2] = Local_Vector.z;
++ 	   Parse_Vector (&Local_Vector);
++ 	   Local_Matrix[2][0] = Local_Vector.x;
++ 	   Local_Matrix[2][1] = Local_Vector.y;
++ 	   Local_Matrix[2][2] = Local_Vector.z;
++        Compute_Matrix_Transform(&Local_Trans, &Local_Matrix);
++        Compose_Transforms (New, &Local_Trans);
++ 	 END_CASE
+  
+       OTHERWISE
+         UNGET
+*** parse.h.old	Fri Sep  9 12:57:54 1994
+--- parse.h	Fri Sep  9 12:58:27 1994
+***************
+*** 247,250 ****
+  #define OPEN_TOKEN              193
+  #define FILTER_TOKEN            194
+  #define AGATE_TURB_TOKEN        195
+! #define LAST_TOKEN              196
+--- 247,251 ----
+  #define OPEN_TOKEN              193
+  #define FILTER_TOKEN            194
+  #define AGATE_TURB_TOKEN        195
+! #define MATRIX_TOKEN			196
+! #define LAST_TOKEN              197
+*** tokenize.c.orig	Fri Sep  9 12:25:48 1994
+--- tokenize.c	Fri Sep  9 12:43:08 1994
+***************
+*** 141,146 ****
+--- 141,147 ----
+    MAP_TYPE_TOKEN, "map_type",
+    MARBLE_TOKEN, "marble",
+    MATERIAL_MAP_TOKEN, "material_map",
++   MATRIX_TOKEN, "matrix",
+    MAX_INTERSECTIONS, "max_intersections",
+    MAX_TRACE_LEVEL_TOKEN, "max_trace_level",
+    MERGE_TOKEN,"merge",

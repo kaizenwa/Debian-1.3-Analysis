@@ -1,0 +1,885 @@
+.\"(c) Copyright 1992 by Panagiotis Tsirigotis
+.\"All rights reserved.  The file named COPYRIGHT specifies the terms 
+.\"and conditions for redistribution.
+.\"
+.\" $Id: xinetd.conf.man,v 1.1 1996/01/24 19:29:19 chuck Exp $
+.TH XINETD.CONF 5L "28 April 1993"
+.\" *************************** NAME *********************************
+.SH NAME
+xinetd.conf \- Extended Internet Services Daemon configuration file
+.\" *********************** DESCRIPTION ****************************
+.SH DESCRIPTION
+.B "xinetd.conf"
+is the configuration file that
+determines the services provided by \fBxinetd\fP.
+Any line whose first non-white-space character is a '#' is considered
+a comment line. Empty lines are ignored.
+.LP
+The file contains entries of the form:
+.RS
+.nf
+.ft B
+.sp
+service <service_name>
+{
+.RS
+.ft B
+<attribute> <assign_op> <value> <value> ...
+.I "..."
+.RE
+}
+.ft R
+.fi
+.RE
+.LP
+The assignment operator,
+.I assign_op,
+can be one of 
+.B '=', 
+.B '+=',
+.B '-='.
+The majority of attributes support only the simple assignment operator,
+.B '='.
+Attributes whose value is a set of values support all assignment operators.
+For such attributes,
+.B '+=' 
+means adding a value to the set and 
+.B '-='
+means removing a value from the set.
+A list of these attributes will be given
+after all the attributes are described.
+.LP
+Each entry defines a service identified by the \fIservice_name\fP.
+The following is a list of available attributes:
+.TP 17
+.B id
+This attribute is used to uniquely identify a service.
+This is useful because there exist services that can use different 
+protocols and need to be described with different entries in the
+configuration file.
+By default, the service id is the same as the service name.
+.TP
+.B type
+Any combination of the following values may be used:
+.RS
+.TP 12
+.B RPC
+if this is an RPC service
+.TP
+.B INTERNAL
+if this is a service provided by \fBxinetd\fP.
+.TP
+.B UNLISTED
+if this is a service not listed in a standard system file
+(like
+.I /etc/rpc 
+for RPC services, or
+.I /etc/services
+for non-RPC services).
+.RE
+.TP
+.B flags
+Any combination of the following flags may be used:
+.RS
+.TP 12
+.B REUSE
+Set the
+.I SO_REUSEADDR
+flag on the service socket (check
+.I "setsockopt(2)"
+for more information).
+.TP
+.B INTERCEPT
+Intercept packets or accepted connections in order to verify that they
+are coming from acceptable locations (internal or multi-threaded
+services cannot be intercepted).
+.TP
+.B NORETRY
+Avoid retry attempts in case of fork failure.
+.TP
+.B IDONLY
+Accept connections only when the remote end identifies the remote user
+(i.e. the remote host must run an identification server).
+This flag applies only to connection-based services.
+This flag is ineffective if the
+.B USERID
+log option is not used.
+.RE
+.TP
+.B socket_type
+Possible values for this attribute include:
+.RS
+.TP 12
+.I stream
+stream-based service
+.TP
+.I dgram
+datagram-based service
+.TP
+.I raw
+service that requires direct access to IP
+.TP
+.I seqpacket
+service that requires reliable sequential datagram transmission
+.RE
+.TP
+.B protocol
+determines the protocol that is employed by the service.
+The protocol must exist in
+.I /etc/protocols.
+If this
+attribute is not defined, the default protocol employed by the service
+will be used.
+.TP
+.B wait
+This attribute determines if the service is single-threaded or
+multi-threaded. If its value is \fIyes\fP the service is single-threaded;
+this means that \fBxinetd\fP will start the server and then it will stop 
+handling requests for the service until the server dies.
+If the attribute value is \fIno\fP, the service is multi-threaded and
+\fBxinetd\fP will keep handling new service requests.
+.TP
+.B user
+determines the uid for the server process. The user name must exist in
+.I /etc/passwd.
+This attribute is ineffective if the effective user ID 
+of \fBxinetd\fP is not super-user.
+.TP
+.B group
+determines the gid for the server process. The group name must exist in
+.I /etc/group.
+If a group is not specified, the group
+of \fIuser\fP will be used (from 
+.I /etc/passwd).
+This attribute is ineffective if the effective user ID 
+of \fBxinetd\fP is not super-user.
+.TP
+.B instances
+determines the number of servers that can be simultaneously active
+for a service (the default is no limit). The value of this
+attribute can be either a number or
+.B UNLIMITED
+which means that there is no limit.
+.TP
+.B nice
+determines the server priority. Its value is a (possibly negative) number;
+check nice(3) for more information.
+.TP
+.B server
+determines the program to execute for this service.
+.TP
+.B server_args
+determines the arguments passed to the server. In contrast to \fBinetd\fP,
+the server name should \fInot\fP be included in \fIserver_args\fP.
+.TP
+.B only_from
+determines the remote hosts to which the particular
+service is available.
+Its value is a list of IP addresses which can be specified in any
+combination of the following ways:
+.RS
+.TP 5
+.B a)
+a numeric address in the form of %d.%d.%d.%d. If the rightmost components are 
+0, they are treated as wildcards 
+(for example, 128.138.12.0 matches all hosts on the 128.138.12 subnet).
+0.0.0.0 matches all Internet addresses.
+.TP
+.B b)
+a factorized address in the form of %d.%d.%d.{%d,%d,...}.
+There is no need for all 4 components (i.e. %d.%d.{%d,%d,...%d} is also ok).
+However, the factorized part must be at the end of the address.
+.TP
+.B c)
+a network name (from
+.I /etc/networks)
+.TP
+.B d)
+a host name. All IP addresses of the specified host name will be used.
+.RE
+.TP
+.B ""
+Specifying this attribute
+without a value makes the service available to nobody.
+.TP
+.B no_access
+determines the remote hosts to which the particular
+service is unavailable. Its value can be specified in the same way as the
+value of the \fBonly_from\fP
+attribute. These two attributes determine the location access control 
+enforced by \fBxinetd\fP. If none of the two is specified for a service,
+the service is available to anyone. If both are specified for a service,
+the one that is the better match for
+the address of the remote host determines
+if the service is available to that host (for example, if the 
+\fBonly_from\fP list contains 128.138.209.0 and the
+\fBno_access\fP list contains 128.138.209.10
+then the host with the address 128.138.209.10 can not access the service).
+.TP
+.B access_times
+determines the time intervals when the service is available. An interval
+has the form \fIhour:min-hour:min\fP (connections 
+.I will 
+be accepted at the bounds of an interval). Hours can range from 0 to 23 and
+minutes from 0 to 59.
+.TP
+.B log_type
+determines where the service log output is sent. There are two formats:
+.RS
+.TP
+.B SYSLOG " \fIsyslog_facility [syslog_level]\fP"
+The log output is sent to syslog at the specified facility. Possible facility
+names include:
+.I daemon,
+.I auth,
+.I user,
+.I "local0-7."
+Possible level names include:
+.I emerg,
+.I alert,
+.I crit,
+.I err,
+.I warning,
+.I notice,
+.I info,
+.I debug.
+If a level is not present, the messages will be recorded at the
+.I info
+level.
+.TP
+.B FILE " \fIfile [soft_limit [hard_limit]]\fP"
+The log output is appended to \fIfile\fP which will be created if it does
+not exist. Two limits on the size of the log file can be optionally specified.
+The first limit is a soft one;
+.B xinetd 
+will log a message the first time this limit is exceeded (if 
+.B xinetd
+logs to syslog, the message will be sent at the 
+.I alert
+priority level).
+The second limit is a hard limit; 
+.B xinetd 
+will stop logging for the affected service (if the log file is a
+common log file, then more than one service may be affected)
+and will log a message about this (if
+.B xinetd
+logs to syslog, the message will be sent at the 
+.I alert
+priority level).
+If a hard limit is not specified, it defaults to the soft limit
+increased by 1% but the extra size must be within the parameters
+.SM LOG_EXTRA_MIN
+and
+.SM LOG_EXTRA_MAX
+which default to 5K and 20K respectively (these constants are defined in 
+\fIconfig.h\fP).
+.RE
+.TP
+.B log_on_success
+determines what information is logged when a server is started and when
+that server exits (the service id is always included in the log entry).
+Any combination of the following values may be specified:
+.RS
+.TP 12
+.B PID
+logs the server process id (if the service is implemented by \fBxinetd\fP
+without forking another process the logged process id will be 0)
+.TP
+.B HOST
+logs the remote host address
+.TP
+.B USERID
+logs the user id of the remote user using the RFC 1413 identification protocol.
+This option is available only for multi-threaded stream services.
+.TP
+.B EXIT
+logs the fact that a server exited along with the exit status or the
+termination signal
+(the process id is also logged if the
+.B PID
+option is used)
+.TP
+.B DURATION 
+logs the duration of a service session
+.RE
+.TP
+.B log_on_failure
+determines what information is logged when a server cannot be started
+(either because of a lack of resources or because of access control
+restrictions). The service id is always included in the log entry along
+with the reason for failure.
+Any combination of the following values may be specified:
+.RS
+.TP 12
+.B HOST
+logs the remote host address.
+.TP
+.B USERID
+logs the user id of the remote user using the RFC 1413 identification protocol.
+This option is available only for multi-threaded stream services.
+.TP 
+.B ATTEMPT
+logs the fact that a failed attempt was made
+(this option is implied by all others).
+.TP
+.B RECORD
+records information from the remote end in case the server could not
+be started. This allows monitoring of attempts to use the service.
+For example, the login service logs the local user, remote
+user and terminal type.
+Currently, the services that support this option are:
+.I login,
+.I shell,
+.I exec,
+.I finger.
+.RE
+.TP
+.B rpc_version
+determines the RPC version for a RPC service. The version can be
+a single number or a range in the form \fInumber\fP-\fInumber\fP.
+.TP
+.B rpc_number
+determines the number for an
+.I UNLISTED
+RPC service (this attribute is ignored if the service is not unlisted).
+.TP
+.B env
+The value of this attribute is a list of strings of the form 'name=value'.
+These strings will be added to the environment before
+starting a server (therefore the server's environment will include
+\fBxinetd\fP's environment plus the specified strings).
+.TP
+.B passenv
+The value of this attribute is a list of environment variables from
+\fBxinetd\fP's environment that will be passed to the server.
+An empty list implies passing no variables to the server
+except for those explicitly defined using the
+.I env
+attribute.
+(notice that you can use this attribute in conjuction with the
+.I env
+attribute to specify exactly what argument will be passed to the server).
+.TP
+.B port
+determines the service port. If this attribute is specified for a service 
+listed in
+.I /etc/services,
+it must be equal to the port number listed in that file.
+.LP
+You don't need to specify all of the above attributes for each service.
+The necessary attributes for a service are:
+.sp 1
+.PD .1v
+.RS
+.TP 18
+.B socket_type
+.TP
+.B user
+(non-\fIunlisted\fP services only)
+.TP
+.B server
+(non-\fIinternal\fP services only)
+.TP
+.B wait
+.TP
+.B protocol
+(\fIRPC\fP and \fIunlisted\fP services only)
+.TP
+.B rpc_version
+(\fIRPC\fP services only)
+.TP
+.B rpc_number
+(\fIunlisted\fP RPC services only)
+.TP
+.B port
+(\fIunlisted\fP non-RPC services only)
+.RE
+.PD
+.LP
+The following attributes support all assignment operators:
+.sp 1
+.PD .1v
+.RS
+.TP 18
+.B only_from
+.TP
+.B no_access
+.TP
+.B log_on_success
+.TP
+.B log_on_failure
+.TP
+.B passenv
+.TP
+.B env
+(does not support the
+.B '-='
+operator)
+.RE
+.PD
+.LP
+These attributes can also appear more than once in a service entry.
+The remaining attributes support only the 
+.B '='
+operator and can appear at most once in a service entry.
+.LP
+The configuration file may also contain a single defaults entry
+that has the form
+.LP
+.RS
+.nf
+.ft B
+defaults
+{
+.RS
+.ft B
+<attribute> = <value> <value> ...
+.I "..."
+.RE
+.ft B
+}
+.ft R
+.fi
+.RE
+.LP
+This entry provides default attribute values for service entries that
+don't specify those attributes. Possible default attributes:
+.sp 1
+.PD .1v
+.RS
+.TP 18
+.B log_type
+.TP
+.B log_on_success
+(cumulative effect)
+.TP
+.B log_on_failure
+(cumulative effect)
+.TP
+.B only_from
+(cumulative effect)
+.TP
+.B no_access
+(cumulative effect)
+.TP
+.B passenv
+(cumulative effect)
+.TP
+.B instances
+.TP
+.B disabled
+(cumulative effect)
+.RE
+.PD
+.LP
+Attributes with a cumulative effect can be specified multiple times
+with the values specified each time accumulating (i.e. '=' does
+the same thing as '+=').
+With the exception of
+.I disabled
+they all have the same meaning as if they were specified in a service entry.
+.I disabled
+determines services that are disabled even if they have entries in
+the configuration file. This allows for quick reconfiguration by
+specifying disabled services with the
+.I disabled
+attribute instead of commenting them out.
+The value of this attribute is a list of space separated service ids.
+.\" *********************** INTERNAL SERVICES ****************************
+.SH "INTERNAL SERVICES"
+.LP
+\fBxinetd\fP provides the following services internally (both
+stream and datagram based):
+.I echo,
+.I time,
+.I daytime,
+.I chargen,
+and
+.I discard.
+These services are under the same access restrictions as all other
+services except for the ones that don't require \fBxinetd\fP to fork
+another process for them. Those ones (\fItime\fP, \fIdaytime\fP,
+and the datagram-based \fIecho\fP, \fIchargen\fP, and \fIdiscard\fP) 
+have no limitation in the number of 
+.B instances.
+.LP
+.B xinetd
+also provides two
+.I UNLISTED
+internal stream-based services:
+.I servers
+and
+.I services.
+The former lists information about running servers while the latter
+provides a list of currently active services. 
+There is one service per line and each line contains the service name,
+protocol (e.g. "tcp") and port number.
+.\" *********************** NOTES ****************************
+.SH NOTES
+.IP 1. 4
+The following service attributes \fIcannot\fP be changed on reconfiguration:
+.B socket_type,
+.B wait,
+.B protocol,
+.B type.
+.IP 2.
+When the attributes
+.I only_from
+and
+.I no_access
+are not specified for a service (either directly or via \fIdefaults\fP)
+the address check is considered successful (i.e. access will not be
+denied).
+.IP 3.
+The address check is based on the IP address of the remote host and
+not on its domain address. We do this so that we can avoid
+remote name lookups which may take a long time (since
+.B xinetd
+is single-threaded, a name lookup will prevent the daemon from
+accepting any other requests until the lookup is resolved).
+The down side of this scheme is that if the IP address of a remote
+host changes, then access to that host may be denied until
+.B xinetd
+is reconfigured.
+Whether access is actually denied or not will depend on whether the
+new host IP address is among those allowed access. For example, if
+the IP address of a host changes from 1.2.3.4 to 1.2.3.5 and 
+only_from is specified as 1.2.3.0 then access will not be denied.
+.IP 4.
+If the
+.B USERID
+log option is specified and the remote host either does not run an 
+identification server or the server sends back a bad reply,
+access will not be denied unless the
+.I IDONLY
+service flag is used.
+.IP 5.
+Interception works by forking a process which acts as a filter
+between the remote host(s) and the local server. 
+This obviously has a performance impact so
+it is up to you to make the compromise between security and performance
+for each service.
+The following tables show the overhead of interception.
+The first table shows the time overhead-per-datagram for a UDP-based service
+using various datagram sizes.
+For TCP-based services we measured the bandwidth reduction 
+because of interception while sending
+a certain amount of data from client to server (the time overhead should
+the same as for UDP-based services but it is "paid" only by the first
+packet of a continuous data transmission).
+The amount of data is given
+in the table as \fIsystem_calls\fPx\fIdata_sent_per_call\fP, i.e.
+each
+.I "send(2)"
+system call transferred so many bytes of data. 
+The bandwidth reduction is given in terms of bytes per second and as
+a percentage of the bandwidth when interception is not performed.
+All measurements were done on a SparcStation IPC running SunOS 4.1.
+.sp 1
+.RS
+.RS
+.PD .1v
+.TP 25
+Datagram size (bytes)
+Latency (msec)
+.TP
+---------------------
+--------------
+.TP
+64
+1.19
+.TP
+256
+1.51
+.TP
+1024
+1.51
+.TP
+4096
+3.58
+.sp 2
+.TP
+Bytes sent
+Bandwidth reduction
+.TP
+----------
+-------------------
+.TP
+10000x64
+941 (1.2%)
+.TP
+10000x256
+4,231 (1.8%)
+.TP
+10000x1024
+319,300 (39.5%)
+.TP
+10000x4096
+824,461 (62.1%)
+.RE
+.RE
+.sp 1
+.\" *********************** EXAMPLE ****************************
+.SH EXAMPLE
+.LP
+.PD .1v
+.RS
+.nf
+#
+# Sample configuration file for xinetd
+#
+
+defaults
+{
+.RS
+.IP log_type 20
+= FILE /var/log/servicelog
+.IP log_on_success
+= PID
+.IP log_on_failure 
+= HOST RECORD
+.IP only_from
+= 128.138.193.0 128.138.204.0 128.138.209.0 
+.IP only_from
+= 128.138.252.1 
+.IP instances
+= 10
+.IP disabled
+= rstatd
+.RE
+}
+
+#
+# Note 1: the protocol attribute is not required
+# Note 2: the instances attribute overrides the default
+#
+service login
+{
+.RS
+.IP socket_type 20
+= stream
+.IP protocol
+= tcp
+.IP wait
+= no
+.IP user
+= root
+.IP server
+= /usr/etc/in.rlogind
+.IP instances
+= UNLIMITED
+.RE
+}
+
+#
+# Note 1: the instances attribute overrides the default
+# Note 2: the log_on_success flags are augmented
+#
+service shell
+{
+.RS
+.IP socket_type 20
+= stream
+.IP wait
+= no
+.IP user
+= root
+.IP instances
+= UNLIMITED
+.IP server
+= /usr/etc/in.rshd
+.IP log_on_success
++= HOST RECORD
+.RE
+}
+
+service ftp
+{
+.RS
+.IP socket_type 20
+= stream
+.IP wait
+= no
+.IP nice
+= 10
+.IP user
+= root
+.IP server
+= /usr/etc/in.ftpd
+.IP server_args
+= -l
+.IP instances
+= 4
+.IP log_on_success
++= DURATION HOST USERID
+.IP access_times
+= 2:00-9:00 12:00-24:00
+.RE
+}
+
+#
+# This entry and the next one specify internal services. Since this
+# is the same service using a different socket type, the id attribute
+# is used to uniquely identify each entry
+#
+service echo
+{
+.RS
+.IP id 20
+= echo-stream
+.IP type
+= INTERNAL
+.IP socket_type
+= stream
+.IP user
+= root
+.IP wait
+= no
+.RE
+}
+
+service echo
+{
+.RS
+.IP id 20
+= echo-dgram
+.IP type
+= INTERNAL
+.IP socket_type
+= dgram
+.IP user
+= root
+.IP wait
+= no
+.RE
+}
+
+service servers
+{
+.RS
+.IP type 20
+= INTERNAL UNLISTED
+.IP protocol
+= tcp
+.IP port
+= 9099
+.IP socket_type
+= stream
+.IP wait
+= no
+.RE
+}
+
+#
+# Sample RPC service
+#
+service rstatd
+{
+.RS
+.IP type 20
+= RPC
+.IP socket_type
+= dgram
+.IP protocol
+= udp
+.IP server
+= /usr/etc/rpc.rstatd
+.IP wait
+= yes
+.IP user
+= root
+.IP rpc_version
+= 2-4
+.IP env
+= LD_LIBRARY_PATH=/etc/securelib
+.RE
+}
+
+#
+# Sample unlisted service
+#
+service unlisted
+{
+.RS
+.IP type 20
+= UNLISTED
+.IP socket_type
+= stream
+.IP protocol
+= tcp
+.IP wait
+= no
+.IP server
+= /home/user/some_server
+.IP port
+= 20020
+.RE
+}
+.RE
+.PD
+.\" *********************** SEE ALSO ****************************
+.SH "SEE ALSO"
+.I "xinetd(1L),"
+.LP
+.I "xinetd.log(5)"
+.LP
+Postel J.,
+.I "Echo Protocol",
+RFC 862,
+May 1983
+.LP
+Postel J.,
+.I "Discard Protocol",
+RFC 863,
+May 1983
+.LP
+Postel J.,
+.I "Character Generator Protocol",
+RFC 864,
+May 1983
+.LP
+Postel J.,
+.I "Daytime Protocol",
+RFC 867,
+May 1983
+.LP
+Postel J., Harrenstien K.,
+.I "Time Protocol",
+RFC 868,
+May 1983
+.LP
+StJohns M.,
+.I " Identification Protocol",
+RFC 1413,
+February 1993
+.\" *********************** BUGS ****************************
+.SH BUGS
+.LP
+Supplementary group ids are not supported.
+.LP
+If the
+.B INTERCEPT
+flag is not used,
+access control on the address of the remote host is not performed when
+\fIwait\fP is \fIyes\fP and \fIsocket_type\fP is \fIstream\fP.
+.LP
+If the 
+.B INTERCEPT
+flag is not used,
+access control on the address of the remote host for
+services where \fIwait\fP is \fIyes\fP and \fIsocket_type\fP is \fIdgram\fP
+is performed only on the first packet. The server may then accept packets
+from hosts not in the access control list. This can happen with 
+.B RPC
+services.
+.LP
+There is no way to put a
+.SM SPACE
+in an environment variable.
+.LP
+When \fIwait\fP is \fIyes\fP and \fIsocket_type\fP is \fIstream\fP,
+the socket passed to the server can only accept connections.
+.LP
+The
+.B INTERCEPT
+flag is not supported for internal services or multi-threaded services.

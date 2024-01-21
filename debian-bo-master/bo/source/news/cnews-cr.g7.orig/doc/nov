@@ -1,0 +1,146 @@
+.TL
+The Design of a Common Newsgroup Overview Database for Newsreaders
+.AU
+Geoff Collyer
+.AI
+Software Tool & Die
+.AB
+Every new newsreader seems to come with a requirement
+for a private database of tens of megabytes of article headers.
+Some of these database maintenance programs are inordinately costly
+to run.
+We present the design and rationale of a newsreader database
+that is sharable by multiple newsreaders and relatively cheap to maintain.
+.AE
+.SH
+Background
+.PP
+Two of the most popular newsreaders,
+.I nn
+and
+.I trn ,
+have been around for several years and
+each has its own private binary database of article headers
+(and other information),
+which are intended to avoid the considerable expense of opening all
+the articles in a newsgroup in order to present a menu of choices
+to the user.
+.I nn 's
+database maintainer,
+.I nnmaster ,
+has been getting faster over the years
+and appears not to be much of a load on the system.
+.I trn 's
+database maintainer,
+.I mthreads ,
+manages to consume vast quantities of both CPU and disk bandwidth.
+Neither database format is documented,
+even by comments in the source code of its maintenance program
+(and
+.I trn 's
+is truly bizarre).
+Since the maintenance programs tended to be slow and run asynchronously
+with the rest of the news transport,
+new articles tended to be unavailable for some time after arrival to users
+of these news readers.
+The binary nature of the database files means that access over networks
+involves byte-swapping
+and dealing with the differing sizes of various data types across
+machine architectures.
+.PP
+To add to this discouraging scenario,
+new newsreaders,
+such as
+.I tin
+and
+.I tass ,
+have been appearing more recently,
+requiring their own private databases.
+Clearly something had to be done before private databases dwarfed the
+actual news spool and their maintenance programs consumed most of the
+resources of their host systems.
+.SH
+The New Scheme
+.PP
+.I relaynews
+(the C News analogue of B News's
+.I rnews )
+has the article headers in hand during processing of that article,
+so having it simply write a stream of all the article headers
+onto the end of a file
+is sufficient to make that information available cheaply
+and without making policy decisions about which headers to omit.
+Writing a little program that massages that stream
+into a more compact format,
+and updates the common database,
+completes the updating of the database.
+A nightly expire that deletes obsolete database entries completes
+database maintenance.
+.PP
+The database itself consists of a text file
+in each news spool directory with a fixed name
+(\c
+.B .overview ).
+Each line of such a file consists of commonly-needed header fields,
+separated by tabs.
+There is provision for extensions beyond the commonly-needed set,
+and these require only cook-book changes to the program that massages
+the header stream.
+Experimentation suggests that on-the-fly threading by
+.B References:
+headers is cheap enough
+that there is no benefit to storing threading information in the
+database,
+thereby avoiding the costly updating of said threading information.
+.PP
+A library to read and thread the overview files is provided.
+.br
+.ne 1i
+.SH
+Comparison of the Old and New Schemes
+.PP
+.I nn
+and
+.I trn
+have successfully had their database-reading routines
+replaced by calls on the common database reader library;
+most of the work here was emulating the peculiar assumptions each
+reader made about the work done by its database maintainer.
+Somewhat less work was understanding the interface presented by
+the database-reading routines to the rest of the reader.
+The new versions of these readers appear to consume somewhat more memory,
+but this may be curable by someone more knowledgable of the readers
+internals, and seems a small price to pay for the ability to use
+a common database.
+.I vnews
+has had thread-following added;
+the work here was primarily understanding the workings of
+.I vnews .
+.PP
+It seems that the new database and its access library
+are sufficient to meet the needs of modern newsreaders.
+The new database has no byte-ordering problems and should be
+easier to access over networks than the old databases.
+The new database is updated after each
+.I relaynews
+invocation in
+.I newsrun ,
+so articles are available to users quickly,
+and the incremental database updates seem to be cheap.
+The new database format is extensible,
+so future demands should not strain the database format.
+.PP
+The old private databases were generally not accessible via NNTP
+(unless one added the
+.I trn
+XTHREAD modifications to one's NNTP server),
+so the databases were generally exported via NFS.
+This seems like a sensible way to proceed
+and simply exporting
+.B /usr/spool/news
+via NFS
+(read-only if you like)
+will export the new database too.
+However,
+it is possible that the NNTP v2 or NNRP committees may
+make the new database accessible via NNTP or NNRP.

@@ -1,0 +1,142 @@
+#!@PERLPROG@
+# -*- perl -*-
+#
+# Pretty-print diff outputs with GNU enscript.
+# Copyright (c) 1996 Markku Rossi
+#
+# Author: Markku Rossi <mtr@iki.fi>
+#
+
+#
+# This file is part of GNU enscript.
+# 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; see the file COPYING.  If not, write to
+# the Free Software Foundation, 59 Temple Place - Suite 330,
+# Boston, MA 02111-1307, USA.
+#
+
+#
+# Original idea by Trent Fisher <trent@informix.com>
+# Thanks to Tero Kivinen <kivinen@iki.fi> for the first prototype. 
+#
+
+$file = shift(@ARGV);
+$gray = ".95";
+
+$program = $0;
+$program =~ s/.*\///g;
+
+sub usage {
+    warn "Usage: $program ORIGINAL_FILE < DIFF\n\n";
+    warn "Program reads a diff file from its standard input and annotates
+ORIGINAL_FILE to show the changes made to the file.  The easiest way to use 
+this program is to use it as an input filter for GNU enscript:
+
+  \$ enscript -G2re --filter='rcsdiff %s | diffpp %s' *.c *.h
+  \$ enscript -G2re --filter='diff %s~ %s | diffpp %s' *.c *.h
+
+";
+}
+
+if (!defined($file) || defined($ARGV[0])) {
+    &usage;
+    exit 1;
+}
+
+if ($file eq "--help") {
+    &usage;
+    exit 0;
+}
+
+if ($file eq "--version") {
+    warn "diffpp 1.0\n";
+    exit 0;
+}
+
+open(FP, $file) || die "$program: couldn't open file `$file' for input: $!\n";
+
+while (<STDIN>) {
+    if (/((\d+),)?(\d+)d(\d+)/) {
+	# Lines deleted.
+	if (defined($1)) {
+	    $from = $2;
+	} else {
+	    $from = $3;
+	}
+	&skip_to_line($4 - 1);
+	printf("\000ps{gsave -5 4 rmoveto %d {(-) show} repeat grestore}",
+	       $3 - $from + 1);
+    } elsif (/(\d+)a(\d+)(,(\d+))?/) {
+	# Lines added.
+	if (defined($3)) {
+	    $to = $4;
+	} else {
+	    $to = $2;
+	}
+	&skip_to_line($2 - 1);
+	printf("\000shade{$gray}");
+	&mark_to_line($to, "+");
+	printf("\000shade{1.0}");
+    } elsif (/(\d+)c(\d+)(,(\d+))?/) {
+	# Lines changed.
+	if (defined($3)) {
+	    $to = $4;
+	} else {
+	    $to = $2;
+	}
+	&skip_to_line($2 - 1);
+	printf("\000shade{$gray}");
+	&mark_to_line($to, "!");
+	printf("\000shade{1.0}");
+    } else {
+	next;
+    }
+}
+
+# Dump the tail.
+while (<FP>) {
+    print;
+}
+close(FP);
+
+sub skip_to_line {
+    ($line) = @_;
+
+    if ($line < 0) {
+	return;
+    }
+
+    while (<FP>) {
+	print;
+	if ($. >= $line) {
+	    last;
+	}
+    }
+}
+
+sub mark_to_line {
+    ($line, $marker) = @_;
+
+    if ($line < 0) {
+	return;
+    }
+
+    while (<FP>) {
+	print "\000ps{gsave -5 0 rmoveto ($marker) show grestore}";
+	print;
+	if ($. >= $line) {
+	    last;
+	}
+    }
+}

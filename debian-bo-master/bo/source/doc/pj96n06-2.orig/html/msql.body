@@ -1,0 +1,417 @@
+<!--
+	msql.html
+	Last modification: Tue, 15 Oct 1996 15:50:42 EET DST
+	msql.		mSQL e Web		PJ 6: mSQL e Web		Articoli
+  -->
+<font size=+2 color="#0000ff">Interfacciamo l'mSQL al Web</font>
+
+<address>
+	<p align=right>
+	<font size=+0>
+	di
+	<a href="mailto:lac0658@iperbole.bologna.it">
+	Nando Santagata</a>
+	</font>
+	</p>
+</address>
+
+<p>
+<font size=+2>N</font>ella scorsa puntata di questo serial sul WWW abbiamo fatto alcune
+considerazioni riguardo la necessità, in alcuni casi, di
+affidare i dati ad un gestore di database specializzato e abbiamo
+esaminato l'mSQL, un piccolo, ma veloce RDBMS interrogabile in SQL.<br>
+Abbiamo visto come compilarlo e installarlo, come creare databases e
+tavole, come popolare di dati le tavole e come interrogare il
+database.<br>
+Abbiamo inoltre creato un piccolo database di nomi e numeri di
+telefono, che useremo come dati di prova per i programmi che
+svilupperemo in questo articolo.
+<p>
+Per interfacciare questo RDBMS al Web dobbiamo ovviamente usare il
+protocollo CGI per far partire un nostro programma che si
+occupi di interrogare il database e riportare i dati al
+server http.<br>
+Finora abbiamo usato il linguaggio Perl per scrivere i nostri
+programmi CGI e dopo tutto le cose sono andate abbastanza bene,
+quindi non vedo il motivo di non continuare. Per interfacciare il Perl
+all'mSQL abbiamo bisogno di un <i>adattatore</i>, come lo chiama
+l'autore del modulo.<br>
+Il modulo in questione è
+<a href="#appendice">MsqlPerl-1.10.tar.gz</a>.
+<p>
+L'installazione di questo modulo è molto semplice, come del resto
+quella di tutti i moduli aggiuntivi del Perl: basta scompattare il
+file, entrare nella directory creata e dare i seguenti comandi:
+<p>
+<code>
+<pre>
+$ perl Makefile.PL
+$ make
+$ su -c 'make install'
+</pre>
+</code>
+<p>
+A questo punto il modulo aggiuntivo e i relativi manuali saranno
+installati nelle opportune directory (che il Perl desume dai dati
+registrati nella sua installazione corrente).<br>
+Per interfacciare il nostro programma al server http useremo
+il modulo CGI::Form, che abbiamo già avuto modo di
+provare in un precedente articolo (il terzo della serie).
+<p>
+Prima però familiarizziamo con il modulo appena installato e
+proviamolo scrivendo un programmino stand-alone, che non abbia grosse
+pretese internettiane, ma che ci possa mostrare i primi rudimenti di
+programmazione orientata all'mSQL.
+<p>
+<font size=+2 color="#0000ff">Un giro di prova</font>
+<p>
+La cosa più semplice che possiamo fare è di eseguire una
+query sui dati che giacciono all'interno del nostro DB:
+<p>
+<code>
+<pre>
+#!/usr/bin/perl
+
+use Msql;
+
+$dbh = Msql-&gt;connect;
+$dbh-&gt;selectdb('prova');
+$sth = $dbh-&gt;query('select * from indirizzi');
+while(@dati = $sth-&gt;fetchrow){
+	print &quot;@dati\n&quot;;
+}
+</pre>
+</code>
+<p>
+Esaminiamo questo programma riga per riga.
+La prima riga:
+<p>
+<code>
+use Msql;
+</code>
+<p>
+richiede al Perl di caricare il modulo che utilizzaremo. La riga:
+<p>
+<code>
+$dbh = Msql-&gt;connect;
+</code>
+<p>
+crea una connessione con il kernel dell'mSQL, (che altri non è
+che il demone <b>msqld</b>). La variabile <b>$dbh</b> contiene quindi un
+handle alla connessione (una reference all'oggetto creato).<br>
+La riga successiva specifica all'mSQL il database su cui vogliamo
+operare:
+<p>
+<code>
+$dbh-&gt;selectdb('prova');
+</code>
+<p>
+mentre la query vera e propria viene specificata così:
+<p>
+<code>
+$sth = $dbh-&gt;query('select * from indirizzi');
+</code>
+<p>
+sempre come metodo dell'oggetto che rappresenta la connessione al
+kernel del database. Questo metodo crea un handle alla query,
+che viene referenziato dalla variabile <b>$sth</b>.<br>
+Le tre righe successive:
+<p>
+<code>
+while(@dati = $sth-&gt;fetchrow){
+	print &quot;@dati\n&quot;;
+}
+</code>
+<p>
+non fanno altro che leggere una riga per volta il contenuto della
+tavola <b>indirizzi</b> in un array e stamparlo.<br>
+Se salviamo questo programma come <b>lettura</b>, lo rendiamo eseguibile
+(chmod u+x lettura)  possiamo lanciarlo con il comando:
+<p>
+<code>
+<pre>
+$ lettura
+</pre>
+</code>
+<p>
+e otterremo su standard output:
+<p>
+<code>
+<pre>
+1 Andrea Bianchi V. dei ciclamini, 42 01 123456
+2 Franco Neri V. dei salici, 69 02 234567
+3 Mario Rossi V. delle rose, 13 03 345678
+4 Filippo Verdi V.le dei pini, 17 04 456789
+</pre>
+</code>
+<p>
+<font size=+2 color="#0000ff">L'interfacciamento al Web</font>
+<p>
+Proviamo ora a riconsiderare il problema già affrontato
+nella seconda puntata di questa serie, della ricerca di numeri di
+telefono in un database, usando come chiave di ricerca i nomi.<br>
+All'epoca abbiamo risolto questo problema in modo diverso, usando un
+semplice file di testo e leggendolo con un programmino in Perl.<br>
+Riscriviamo ora quel programma in modo da interrogare un database
+mSQL.
+<p>
+Usiamo la stessa form usata allora:
+<p>
+<pre>
+
+&lt;!doctype html public '-//IETF//DTD HTML//EN'&gt;
+&lt;!-- Prima prova di form --&gt;
+
+&lthtml&gt
+&lthead&gt
+&lttitle&gtRicerca indirizzi e numeri di telefono&lt/title&gt
+&lt/head&gt
+&ltbody&gt
+
+&lth3&gt&ltcenter&gtFront end per la ricerca di indirizzi e numeri di
+telefono nel mio piccolo database di amici&lt/center&gt&lt/h3&gt
+&ltp&gt
+Inserisci il nome, o parte di questo nel campo e premi
+il tasto "Ricerca".
+&ltp&gt
+
+&ltform method=post action="http:/cgi-bin/ricerca"&gt
+Nome: &ltinput size=25 maxlength=25 name="nome"&gt
+&ltp&gt
+
+&ltinput type="submit" value="Ricerca"&gt
+
+&lt/body&gt
+&lt/html&gt
+</pre>
+<p>
+Se salviamo questa form come <b>prova.html</b> nella directory delle pagine
+HTML, possiamo leggerla nel nostro client usando come indirizzo:
+<p>
+<cite>
+http://localhost/prova.html
+</cite>
+<p>
+Ora dobbiamo scrivere il programma che risponderà alla form:
+<p>
+<code>
+<pre>
+#!/usr/bin/perl
+
+use Msql;
+use CGI::Form;
+
+$query = new CGI::Form;
+$nome = $query-&gt;param('nome');
+
+$dbh = Msql-&gt;connect;
+$dbh-&gt;selectdb('prova');
+$sth = $dbh-&gt;query(&quot;select * from indirizzi where nome like '%\u\L$nome%'&quot;);
+
+print $query-&gt;header;
+print $query-&gt;start_html(-title =&gt; 'Risultato della ricerca',
+                         -BGCOLOR =&gt; &quot;#00A0A0&quot;);
+
+while(@dati = $sth-&gt;fetchrow){
+	$flag = 1;
+	print&lt;&lt;EOR;
+&lt;b&gt;Nome:&lt;/b&gt; $dati[1]&lt;br&gt;
+&lt;b&gt;Indirizzo:&lt;/b&gt; $dati[2]&lt;br&gt;
+&lt;b&gt;Tel.&lt;/b&gt; $dati[3]&lt;p&gt;
+&lt;hr&gt;
+EOR
+}
+
+print&lt;&lt;EOF if $flag == 0;
+Mi spiace, ma non ho trovato nessuna persona di nome &lt;b&gt;\u\L$nome&lt;/b&gt;
+nel database.
+EOF
+
+print $query-&gt;end_html;
+</pre>
+</code>
+<p>
+Esaminiamo questo programma riga per riga. Le righe:
+<p>
+<code>
+<pre>
+use Msql;
+use CGI::Form;
+</pre>
+</code>
+<p>
+caricano i moduli che useremo per interfacciarci all'mSQL e al
+protocollo CGI. Le due righe successive:
+<p>
+<code>
+<pre>
+$query = new CGI::Form;
+$nome = $query-&gt;param('nome');
+</pre>
+</code>
+<p>
+come abbiamo visto nella terza parte di questa serie di articoli,
+servono per aprire il canale CGI e per leggere il contenuto del campo
+<b>nome</b> della form nella variabile Perl <b>$nome</b>. Le righe:
+<p>
+<code>
+<pre>
+$dbh = Msql-&gt;connect;
+$dbh-&gt;selectdb('prova');
+</pre>
+</code>
+<p>
+sono del tutto identiche alle analoghe del programmino precedente,
+mentre la successiva:
+<p>
+<code>
+$sth = $dbh-&gt;query(&quot;select * from indirizzi where nome like '%\u\L$nome%'&quot;);
+</code>
+<p>
+merita qualche riflessione.<br>
+Per chi non è pratico di SQL diciamo subito che l'operatore
+<b>like</b> serve per esprimere una clausola a cui devono sottostare i
+record estratti dal database: il campo indicato deve contenere
+una certa stringa, al cui interno possono essere presenti dei
+metacaratteri (un po' come l'asterisco nella shell).<br>
+Il metacarattere in questione, '<i>%</i>', fa le veci di un qualsiasi
+numero di caratteri.<br>
+Ciò che cerchiamo sono i record il cui campo
+<b>nome</b> contenga in una qualsiasi posizione la stringa immessa
+nella form. L'utente potrà quindi immettere il nome o il
+cognome della persona di cui vuole sapere il numero di telefono.
+<p>
+Il nostro database contiene i nomi e i cognomi con la prima lettera in
+maiuscolo, quindi dobbiamo fare in modo che la stringa immessa segua
+questa convenzione. Il modo più semplice di farlo è di
+far precedere alla variabile <b>$nome</b> le sequenze di escape Perl
+<b>\u\L</b>.<br>
+La sequenza <b>\L</b> rende minuscoli tutti i caratteri della stringa,
+mentre la sequenza <b>\u</b>, ne rende maiuscolo solo il primo
+(sì, avete indovinato: <b>\U</b> rende maiuscoli tutti i
+caratteri della stringa).
+<p>
+Le righe:
+<p>
+<code>
+<pre>
+print $query-&gt;header;
+print $query-&gt;start_html(-title =&gt; 'Risultato della ricerca',
+                         -BGCOLOR =&gt; &quot;#00A0A0&quot;);
+</pre>
+</code>
+<p>
+stampano l'header HTML della pagina di risposta che ci apprestiamo a
+scrivere, mentre il ciclo:
+<p>
+<code>
+<pre>
+while(@dati = $sth-&gt;fetchrow){
+	$flag = 1;
+	print&lt;&lt;EOR;
+&lt;b&gt;Nome:&lt;/b&gt; $dati[1]&lt;br&gt;
+&lt;b&gt;Indirizzo:&lt;/b&gt; $dati[2]&lt;br&gt;
+&lt;b&gt;Tel.&lt;/b&gt; $dati[3]&lt;p&gt;
+&lt;hr&gt;
+EOR
+}
+</pre>
+</code>
+<p>
+legge riga per riga il risultato della query e stampa i dati.<br>
+Osserviamo che se viene trovata almeno una riga, la variabile
+<b>$flag</b> assume il valore 1. Il valore di questa variabile
+viene testato all'uscita dal ciclo:
+<p>
+<code>
+<pre>
+print&lt;&lt;EOF if $flag == 0;
+Mi spiace, ma non ho trovato nessuna persona di nome &lt;b&gt;\u\L$nome&lt;/b&gt;
+nel database.
+EOF
+</pre>
+</code>
+<p>
+per stampare un messaggio nel caso non sia stata trovata nessuna
+persona rispondente al nome immesso.<br>
+L'ultima istruzione:
+<p>
+<code>
+print $query-&gt;end_html;
+</code>
+<p>
+stampa le righe HTML di fine pagina.
+<p>
+Se salviamo questo programma come <b>ricerca</b>, gli diamo permessi di
+lettura ed esecuzione per tutti e lo sistemiamo nella directory
+<i>cgi-bin</i> del nostro server, possiamo provare il funzionamento
+della form che abbiamo scritto.
+<p>
+Anche questa volta siamo riusciti a fare qualcosa di interessante con
+poche righe di programma, grazie alla grande potenza espressiva del
+Perl.
+<p>
+A rileggerci alla prossima puntata.
+<p>
+Per dubbi, congratulazioni, correzioni, insulti &amp altro scrivete
+a <a href="mailto:lac0658@iperbole.bologna.it">Nando Santagata</a>.
+<hr>
+<font size=+2 color="#0000ff"><a name="appendice">APPENDICE</a></h2>
+Il modulo citato si può trovare in uno dei siti del CPAN
+(Comprehensive Perl Archive Network) di cui vi elenco i siti in Europa:
+<p>
+<code>
+<pre>
+Austria
+<a href="ftp://ftp.tuwien.ac.at/pub/languages/perl/CPAN/">ftp://ftp.tuwien.ac.at</a>
+Belgium
+<a href="ftp://ftp.kulnet.kuleuven.ac.be/pub/mirror/CPAN/">ftp://ftp.kulnet.kuleuven.ac.be</a>
+Czech Republic
+<a href="ftp://sunsite.mff.cuni.cz/MIRRORS/ftp.funet.fi/pub/languages/perl/CPAN/">ftp://sunsite.mff.cuni.cz</a>
+Denmark
+<a href="ftp://sunsite.auc.dk/pub/languages/perl/CPAN/">ftp://sunsite.auc.dk</a>
+Finland <b>(CPAN master site)</b>
+<a href="ftp://ftp.funet.fi/pub/languages/perl/CPAN/">ftp://ftp.funet.fi</a>
+France
+<a href="ftp://ftp.ibp.fr/pub/perl/CPAN/">ftp://ftp.ibp.fr</a>
+<a href="ftp://ftp.pasteur.fr/pub/computing/unix/perl/CPAN/">ftp://ftp.pasteur.fr</a>
+Germany
+<a href="ftp://ftp.leo.org/pub/comp/programming/languages/perl/CPAN/">ftp://ftp.leo.org</a>
+<a href="ftp://ftp.rz.ruhr-uni-bochum.de/pub/CPAN/">ftp://ftp.rz.ruhr-uni-bochum.de</a>
+Greece
+<a href="ftp://ftp.ntua.gr/pub/lang/perl/">ftp://ftp.ntua.gr</a>
+Hungary
+<a href="ftp://ftp.kfki.hu/pub/packages/perl/CPAN/">ftp://ftp.kfki.hu</a>
+Poland
+<a href="ftp://ftp.pk.edu.pl/pub/lang/perl/CPAN/">ftp://ftp.pk.edu.pl</a>
+<a href="ftp://sunsite.icm.edu.pl/pub/CPAN/">ftp://sunsite.icm.edu.pl</a>
+Portugal
+<a href="ftp://ftp.ci.uminho.pt/pub/lang/perl/">ftp://ftp.ci.uminho.pt</a>
+Slovenia
+<a href="ftp://ftp.arnes.si/software/perl/CPAN/">ftp://ftp.arnes.si</a>
+Spain
+<a href="ftp://ftp.etse.urv.es/pub/mirror/perl/">ftp://ftp.etse.urv.es</a>
+<a href="ftp://ftp.rediris.es/mirror/CPAN/">ftp://ftp.rediris.es</a>
+Sweden
+<a href="ftp://ftp.sunet.se/pub/lang/perl/CPAN/">ftp://ftp.sunet.se</a>
+Switzerland
+<a href="ftp://ftp.switch.ch/mirror/CPAN/">ftp://ftp.switch.ch</a>
+the Netherlands
+<a href="ftp://ftp.cs.ruu.nl/pub/PERL/CPAN/">ftp://ftp.cs.ruu.nl</a>
+UK
+<a href="ftp://ftp.demon.co.uk/pub/mirrors/perl/CPAN/">ftp://ftp.demon.co.uk</a>
+<a href="ftp://sunsite.doc.ic.ac.uk/packages/CPAN/">ftp://sunsite.doc.ic.ac.uk</a>
+<a href="ftp://unix.hensa.ac.uk/mirrors/perl-CPAN/">ftp://unix.hensa.ac.uk</a>
+</pre>
+</code>
+<p>
+L'Italia non ha un sito CPAN (qualche volontario?).
+<p>
+Il modulo in questione si trova, a partire dalla directory del CPAN
+indicata per ogni server, in:
+<p>
+<code>
+<pre>
+modules/by-module/Msql
+</pre>
+</code>

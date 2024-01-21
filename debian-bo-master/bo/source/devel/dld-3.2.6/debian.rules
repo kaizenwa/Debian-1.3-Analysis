@@ -1,0 +1,60 @@
+#!/usr/bin/make -f
+
+package=dld
+version=3.2.6
+debian=3
+
+dist: binary source diff
+
+build:
+	$(checkdir)
+	$(MAKE) all info
+	touch build
+
+clean:
+	$(checkdir)
+	-rm -f build
+	$(MAKE) clean
+
+binary:		checkroot build
+	-rm -rf debian-tmp
+	mkdir debian-tmp debian-tmp/DEBIAN
+	install -d debian-tmp/usr/{lib,info,include}
+	install -d debian-tmp/usr/doc/copyright
+	sed -e '2s/=/$(version)/; 3s/=/$(debian)/' \
+		debian.control > debian-tmp/DEBIAN/control
+	cp debian.postinst debian-tmp/DEBIAN/postinst
+	cp debian.prerm debian-tmp/DEBIAN/prerm
+	chmod +x debian-tmp/DEBIAN/{postinst,prerm}
+	$(MAKE)  IROOT=debian-tmp
+	cp debian.README debian-tmp/usr/doc/copyright/dld
+	cp libdld.a debian-tmp/usr/lib/libdld.a
+	cp dld.info debian-tmp/usr/info/dld.info
+	cp dld.h debian-tmp/usr/include/dld.h
+	/bin/gzip -9vf debian-tmp/usr/info/dld.info
+	chown -R root.root debian-tmp
+	chmod -R g-ws,u+w,a+r debian-tmp
+	dpkg --build debian-tmp
+	mv debian-tmp.deb ../dld-$(version)-$(debian).deb
+
+define checkdir
+	test -f dld.c
+endef
+
+source:		clean
+	chmod +x debian.rules
+	cd .. && \
+	tar cf $(package)-$(version)-$(debian).tar $(package)-$(version) && \
+	gzip -9vf $(package)-$(version)-$(debian).tar
+ 
+diff:		clean
+	cd .. && \
+	(diff -ruN $(package)-$(version).orig $(package)-$(version) \
+	 >$(package)-$(version)-$(debian).diff; [ $$? = 1 ]) && \
+	gzip -9vf $(package)-$(version)-$(debian).diff
+
+checkroot:
+	$(checkdir)
+	test root = "`whoami`"
+
+.PHONY: binary source diff clean checkroot

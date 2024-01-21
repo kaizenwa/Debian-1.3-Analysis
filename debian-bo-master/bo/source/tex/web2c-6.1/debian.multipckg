@@ -1,0 +1,56 @@
+#!/usr/bin/make -f
+# debian.rules subroutine to make multiple binary packages
+# from one source. Each package has configuration files
+# with the name debian.*.<package>
+# This makefile should be called with PACKAGE=<package>.
+#
+# For the general theory of operation see debian.rules in this
+# directory.
+#
+.PHONY: binary
+
+p := $(shell grep "Package:" debian.control.$(PACKAGE) | cut -d' ' -f2)
+v := $(shell grep "Version:" debian.control.$(PACKAGE) | cut -d' ' -f2)
+r := $(shell grep "Package_Revision:" debian.control.$(PACKAGE) | cut -d' ' -f2)
+description := $(shell grep "Description:" debian.control.$(PACKAGE) | cut -d' ' -f2-)
+maintainer := $(shell grep "Maintainer:" debian.control.$(PACKAGE) | cut -d' ' -f2-3)
+
+pv  = $(p)-$(v)
+pvr = $(p)-$(v)-$(r)
+
+INST_BIN	=	install -g root -o root -m 755
+INST_DIR	=	install -g root -o root -d -m 755
+INST_DAT	=	install -g root -o root -m 644
+
+deb-tmp		=	debian-tmp
+DEBIAN		=	$(deb-tmp)/DEBIAN
+USR		=	$(deb-tmp)/usr
+
+
+binary: checkroot debian.copyright.$(PACKAGE)
+# Makes a binary package.
+	test -f stamp-build || make -f debian.rules build
+	-rm -rf $(deb-tmp)
+	$(INST_DIR)			$(deb-tmp)
+	$(INST_DIR)			$(DEBIAN)
+	-$(INST_DAT) debian.control.$(PACKAGE)		$(DEBIAN)/control
+	-$(INST_BIN) debian.preinst.$(PACKAGE)		$(DEBIAN)/preinst
+	-$(INST_BIN) debian.postinst.$(PACKAGE)		$(DEBIAN)/postinst
+	-$(INST_BIN) debian.prerm.$(PACKAGE)		$(DEBIAN)/prerm
+	-$(INST_BIN) debian.postrm.$(PACKAGE)		$(DEBIAN)/postrm
+	-$(INST_DAT) debian.conffiles.$(PACKAGE)	$(DEBIAN)/conffiles
+	$(INST_DIR)			$(USR)
+	$(INST_DIR)			$(USR)/doc
+	$(INST_DIR)			$(USR)/doc/copyright
+	$(INST_DAT) debian.copyright.$(PACKAGE)	$(USR)/doc/copyright/$(p)
+
+	make -f Makefile.$(PACKAGE) prefix=$(USR) install
+	dpkg --build `pwd`/$(deb-tmp)
+	mv $(deb-tmp).deb ../$(pvr).deb
+
+checkroot:
+	test root = "`whoami`"
+ 
+# Local Variables:
+#   mode: makefile
+# End:

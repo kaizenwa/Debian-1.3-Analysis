@@ -1,0 +1,105 @@
+code_gen.optdate code_gen.c code_gen.err code_gen.o : code_gen.m \
+	assoc_list.int \
+	bool.int \
+	call_gen.int \
+	char.int \
+	code_aux.int \
+	code_info.int \
+	code_util.int \
+	disj_gen.int \
+	globals.int \
+	hlds_goal.int \
+	hlds_module.int \
+	hlds_out.int \
+	hlds_pred.int \
+	instmap.int \
+	int.int \
+	io.int \
+	ite_gen.int \
+	list.int \
+	llds.int \
+	map.int \
+	mercury_builtin.int \
+	middle_rec.int \
+	mode_util.int \
+	options.int \
+	passes_aux.int \
+	prog_data.int \
+	require.int \
+	set.int \
+	shapes.int \
+	std_util.int \
+	string.int \
+	switch_gen.int \
+	term.int \
+	tree.int \
+	type_util.int \
+	unify_gen.int \
+	varset.int \
+	delay_info.int2 \
+	float.int2 \
+	getopt.int2 \
+	hlds_data.int2 \
+	mode_errors.int2 \
+	mode_info.int2 \
+	modes.int2 \
+	ops.int2 \
+	relation.int2 \
+	special_pred.int2 \
+	tree234.int2 \
+	unify_proc.int2
+
+code_gen.date : code_gen.m \
+	assoc_list.int3 \
+	bool.int3 \
+	call_gen.int3 \
+	char.int3 \
+	code_aux.int3 \
+	code_info.int3 \
+	code_util.int3 \
+	disj_gen.int3 \
+	globals.int3 \
+	hlds_goal.int3 \
+	hlds_module.int3 \
+	hlds_out.int3 \
+	hlds_pred.int3 \
+	instmap.int3 \
+	int.int3 \
+	io.int3 \
+	ite_gen.int3 \
+	list.int3 \
+	llds.int3 \
+	map.int3 \
+	mercury_builtin.int3 \
+	middle_rec.int3 \
+	mode_util.int3 \
+	options.int3 \
+	passes_aux.int3 \
+	prog_data.int3 \
+	require.int3 \
+	set.int3 \
+	shapes.int3 \
+	std_util.int3 \
+	string.int3 \
+	switch_gen.int3 \
+	term.int3 \
+	tree.int3 \
+	type_util.int3 \
+	unify_gen.int3 \
+	varset.int3 \
+	delay_info.int3 \
+	float.int3 \
+	getopt.int3 \
+	hlds_data.int3 \
+	mode_errors.int3 \
+	mode_info.int3 \
+	modes.int3 \
+	ops.int3 \
+	relation.int3 \
+	special_pred.int3 \
+	tree234.int3 \
+	unify_proc.int3
+
+code_gen.dir/code_gen_000.o: code_gen.m
+	rm -rf code_gen.dir
+	$(MCS) -s$(GRADE) $(MCSFLAGS) code_gen.m

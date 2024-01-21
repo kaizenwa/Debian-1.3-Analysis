@@ -1,0 +1,124 @@
+From: Shan Zhu <shanzhu@eesun1.tamu.edu>
+To: uri@watson.ibm.com
+Subject: Re: problem of using dip
+
+Hi, Uri,
+I actually solved the slip problem a few days ago. The following
+is the summary of how I solved the problems. The summary was also
+posted in the news group for other people.
+
+Thanks for your concern
+
+-shan
+
+__________________________________________________________________________
+
+I posted some questions regarding the setup of SLIP (with dynamic IP address
+assignment) using dip a few days
+ago. Thanks to a lot of friends on the network, the
+problems are solved. Since I also got several requests for the same problems,
+I'd like to summarize some important tips for those who are still
+struggling with their SLIP setups.  I think for those who use the terminal
+servers with static IP address assignment, the setup is quite simple (just
+get the sample script file and make some modifications). So, here, only the
+ case of dynamic IP address assignment is concerned.
+To my knowledge, there are two kinds of
+servers: one automatically (or by some commands) shows the IP address when
+you dial in.
+The other one uses BOOTP to send the IP address to the local systems (I believe
+most servers can also show IP address by some command, such as,
+"show port alt ip char" on Xyplex terminal servers, though). For those who
+use the first kind of servers, you can use the command "get $locip remote"
+(Note: not "get $rmtip remote") to capture the address,
+or if the IP address is not shown automatically, you
+should figure out what is the command to let the server show the address
+(you may need to ask the server managers since sometimes, the command
+is not that straightforward). For those who use the second type of servers
+(I mean  the servers not willing to show the address except through BOOTP).
+you may need the package of bootpc.v031.tgz at
+sunsite.unc.edu:pub/Linux/system/Network/admin.
+Since I didn't do this, I don't know the details about using BOOTP.
+
+For servers which can somehow show the IP address, the following tips
+ may be helpful to setup SLIP.
+
+1. Give a name as the hostname of your local system and
+   setup the domain name, such as tamu.edu in my case, for your local system.
+2. Put a name server in /etc/resolve.conf. You can take a look at some
+   existing systems in network for the format.
+3. For easier debugging, you can use interactive mode by "dip -t" and "term" to
+   login to your terminal server and try the commands you want to put in your
+   dip script.
+4. For those who use modems which need atdt as dial prefix, put an extra
+   "t" before the phone number since current dip uses atd as the prefix (you
+   need to make sure about your dip, though).
+5. According to my experience, using "\r" at the end of command lines you send
+   to remote server is better than using "\n". I don't know why.
+
+The above procedures are very effective for me. I am not sure they are the
+same for you, but at least you can try.
+The following is my script used for a Xyplex server.
+
+
+       main:
+         get $local jenny
+         get $remote 128.194.24.175
+
+         # Set the desired serial port and speed.
+         port /dev/cua2
+         speed 38400
+          reset
+
+         # Prepare for dialing.
+       #  send ATQ0V1E1X1
+         dial t845-1420
+         if $errlvl != 0 goto error
+         wait CONNECT 60
+         if $errlvl != 0 goto error
+
+         # We are connected.  Login to the system.
+       login:
+         send \r\r
+         wait name> 4
+         if $errlvl != 0 goto error
+         send <your userID>\r
+         wait word> 4
+         if $errlvl != 0 goto error
+         send <passwd>\r
+         wait  Choice: 4
+         if $errlvl != 0 goto error
+         send 1\r
+       loggedin:
+
+         # Set up the SLIP operating parameters.
+         get $mtu 1006 #you can put something less
+         # Set Destination net/address as type 'default' (vice an address).
+         # This is used by the 'route' command to set the kernel routing table.
+         # Some machines seem to require this be done for SLIP to work properly.
+
+         # Say hello and fire up!
+       done:
+         wait Xyplex>  4
+         if $errlvl != 0 goto error
+         send show port alt ip char\r
+         wait Address: 10
+         get $locip remote 10
+         if $errlvl != 0 goto error
+         wait Address: 10
+         get $locip remote 10
+         if $errlvl != 0 goto error
+         default
+         print CONNECTED to eeslip local at $locip
+         send set port internet slip enable\r
+         mode SLIP
+         goto exit
+       error:
+         print SLIP to $remote failed.
+       err:
+         print I am here.
+       exit:
+---------------------------------------
+
+Good luck
+
+--shan

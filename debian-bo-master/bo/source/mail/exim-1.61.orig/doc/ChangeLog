@@ -1,0 +1,393 @@
+Change log file for Exim from version 1.60
+------------------------------------------
+
+
+Version 1.61
+------------
+
+1. Calling Exim (incorrectly) with just the -h option (not followed by a
+number) causes a segmentation fault.
+
+2. Exim could crash when handling multiple directions for a single message,
+especially if caused by several chained aliases.
+
+
+Version 1.60
+------------
+
+1. Include extended eximstats script in this version.
+
+2. For historical reasons, the eximon script did its own check of the operating
+system to find where the "basename" and "hostname" commands were. This code has
+been replaced by settings derived from the main configuration files.
+
+3. A binary zero in the first line of a message body that was not separated
+from the headers by a blank line was not getting through.
+
+4. A sequence of two or more "bare" CR characters in a message was getting
+corrupted.
+
+5. I have found a recommendation that LF's without CR's in incoming SMTP should
+*not* be treated as line terminators, so Exim no longer does so, but it
+applies this rule only to external incoming SMTP. HA! Later there was
+discussion about this and it seems there are plenty of sites that do it, so
+change 67 below reverses this one.
+
+6. If there was a problem with one of the alternate configuration files, the
+error message gave the generic name rather than the name of the alternate file.
+
+7. If a file existence test (for require_files) causes an address to be
+deferred because it cannot determine whether the file exists or not, the
+deferment message now contains the strerror() output from the errno that was
+returned by stat(), to help in debugging.
+
+8. Make -bP output uid lists colon-separated.
+
+9. Add sender information to the log line when a recipient verify fails.
+
+10. Sender_address_relay wasn't working for non-regular expressions in cases
+where the sender was a local address that got rewritten such that the local
+part changed its length.
+
+11. Put signal(SIGCHLD, SIG_DFL) at the start of Exim to cope with MUAs that
+manage to call it with SIG_IGN set, which causes completed subprocesses not to
+wait for wait(). Also, detect ECHILD in wait() loops, log an anomaly, and break
+the loop.
+
+12. Fetched the latest version of the libident library (0.20) to distribute
+with Exim. It should get rid of some compiler warnings on HP-UX.
+
+13. Lines longer than 256 characters in lsearch lookups were being chopped.
+Increased the limit to 4096.
+
+14. Give new address in log entry when fixing up return paths for
+sender_verify_fixup.
+
+15. Insist that only an admin user may start the daemon or force a queue run
+with -q.
+
+16. Put the Exim version number into the daemon start-up log line.
+
+17. If the expansion of the hostlist item in a domainlist router was forced to
+fail, just fail the router. An unforced fail still freezes.
+
+18. Incorrect error message given for a string expansion if the expansion of a
+substring in a condition failed.
+
+19. Randomize MX records of equal priority, and randomize A records for
+multihomed hosts.
+
+20. Following discussion on the mailing list, the default configuration no
+longer contains ignore_status in the address_pipe transport.
+
+21. Messages listed with -bp are now sorted into file name order - which is the
+order of message arrival. This is fixing an oversight.
+
+22. Implemented log_level, always_bcc, queue_remote, -odqr, accept_8bitmime,
+helo_verify_nets.
+
+23. Failure of exec after SIGHUP logged on main log as well as panic log.
+
+24. Added OS configuration files for SCO SVR4.2MP (and maybe Unixware), as
+received from "Kevin" <kadokev@relay.ripco.com>.
+
+25. Typo in deliver.c fixed; would have caused a crash if a parallel remote
+delivery process failed to end cleanly.
+
+26. A substring consisting of just the character "@" in a domain list matches
+the primary name of the host. Thus local_domains = "@" is another way of doing
+local_domains_include_host, and it also works for other domain lists such as
+percent_hack_domains and the domains generic options of directors and routers.
+
+27. Reworked retry matching rules: (1) Allow file lookups; (2) local domains
+can appear without local parts, implying all local parts match; (3) check for
+domain as well as host for remote failures. Added -brt option for testing.
+
+28. Added -brw option for testing rewrite rules, and revamped the rewrite rule
+syntax to make more flexible.
+
+29. Colons can be got into colon-separated lists by doubling. This could be
+useful for lists of addresses, which sometimes contain colons (in quotes).
+
+30. Fixed obscurish bug in the code for scanning colon-separated strings. If a
+loop was exited in the middle, and the next string to be scanned was in fact
+NULL, then the remainder of the old string got scanned instead. Various odd
+effects resulted.
+
+31. Documented things in os.c and os.h in a new file called os.Configure, and
+added the omitted HAVE_SETRESUID to Makefile-Default.
+
+32. Improve the make files so that if the created makefile gets deleted owing
+to a bomb-out during an initial make, it automatically gets rebuilt next time.
+
+33. Improvements to the arch-type and os-type scripts.
+
+34. Added missing (void *) casts to the second arguments of read() and write().
+
+35. Give expanded pipe command in error messages when a pipe delivery fails,
+rather than the unexpanded version.
+
+36. If expansion of an argument in a pipe command failed, the pipe delivery
+process crashed rather than giving a sensible error message.
+
+37. Added connect_timeout to the smtp transport (I've realized how to do it).
+
+38. When the only viable MX records point to a non-existent host, a better
+error message than "unknown mail domain" is now given.
+
+39. An obscure case where a timeout would not operate for the writing of chunk
+of data has been fixed.
+
+40. Eximon: suppress queue display updates while a menu is displayed. This was
+previously the cause of some loops.
+
+41. With sender_verify set, if the verification suffers a temporary failure,
+Exim now goes on to read the headers and gives the 451 failure code after the
+data instead of after MAIL FROM, thus allowing it to log the headers.
+Furthermore, if sender_verify_fixup is set, it will now try to fix the sender
+in this case.
+
+42. When a local delivery is made to a pipe, file, or autoreply transport, and
+the immediate parent address of the final target is not the top-level address,
+that parent is shown in brackets after the address in the log entry.
+
+43. Fixed typo: MAILER_DAEMON => MAILER-DAEMON in default prefix line in pipe
+transport (it was ok in appendfile).
+
+44. Put SHELL=/bin/sh at the top of the make files to make them work in systems
+such as IRIX that use the SHELL variable and default to csh.
+
+45. Reorganized all code concerned with uids and gids to allow them to be
+negative for AIX. This has involved adding a flag variable to all those that
+need to have a set/unset indication. At the same time, ensure they all use the
+types uid_t and gid_t rather than int. This has been a pretty massive re-
+organization all round. I wonder how much I have broken?
+
+46. Option list for the forwardfile driver was out of alphabetical order; this
+could have led to some options not being accessible, but there were no
+complaints!
+
+47. If the file for forward file was specified as absolute, the directory
+wasn't getting passed over as HOME for pipe deliveries.
+
+48. Set the SIGCHLD signal to SIG_IGN rather than SIG_DFL in the process for
+receiving an incoming SMTP message. That way, child delivery processes should
+(on some systems at least) go away immediately they complete instead of
+becoming defunct and waiting for wait().
+
+49. Added max_rcpt to the smtp transport.
+
+50. Splitting of verify and fail_verify into separate _receiver and _sender
+options for routers and directors.
+
+51. Addition of verify_only to routers/directors.
+
+52. The final "message accepted" message for an incoming SMTP message now has
+the message id appended.
+
+53. Added log_subject and log_smtp_confirmation.
+
+54. If a number of addresses were passed to the smtp transport, and some were
+delivered to one host and some to another (because they received temporary
+failures from the first host), all but the first were logged with -> which
+isn't right. At the same time, made suppressed deliveries because of -N use
+"*>" in the log.
+
+55. Updated the cunning locking algorithm in appendfile, after consultation
+with its originator (the author or procmail). This will partly paper over the
+problem that is seen in those versions of Linux that do not update their inode
+cache after a link() call.
+
+56. Added "rewrite" options to aliasfile and forwardfile.
+
+57. Changed "*" to "D" in -bp output; may be less confusing.
+
+58. Added return_fail_output, log_output, log_fail_output to the pipe
+transport.
+
+59. The variable message_size contained only the count of bytes in the message
+body; the header lengths are now included.
+
+60. Added the quota option to appendfile.
+
+61. Added defensive code to exigrep to avoid Perl warning if a log line should
+be less than 20 characters.
+
+62. Makefile-Linux updated to point to X11R6, since I'm told that is now
+generally in use in various variants.
+
+63. Exinext: was not searching the output from exim_dumpdb in a
+case-independent way.
+
+64. Multi-line SMTP error responses were causing unexpected newlines in the
+log. Now shown with \n for the newlines, but sent as newlines in error
+messages.
+
+65. Replace occurrences of '&' in the gecos field with the login name; the
+first characters is uppercased. This is a fudge that seems to be found in many
+Unixes.
+
+66. For historical reasons, the script exim_install allowed overriding of the
+"cp" command by a user-set variable called "cp". Turns out that some versions
+of AIX have such a thing set. All the relevant variables are now preceded by
+"inst_".
+
+67. It seems there are sites that send only LF instead of CRLF in their SMTP
+transactions, and that smail and sendmail can handle them. Relax Exim's
+constraints so as to run with the herd.
+
+68. Added the "substr" operator and "match" condition to expansions.
+
+69. Added message_precedence expansion variable.
+
+70. Added the "w" flag to rewriting rules.
+
+71. The message id was appearing twice in log messages for manual status
+changes (e.g. adding recipients).
+
+72. There were originally so few options I just implemented a sequential
+search. There are now so many more that I have (with luck) speeded things up a
+bit by putting in a switch on the first character after the '-'.
+
+73. Addition of -qf, -qfl, and -ql options.
+
+74. Separation of home directory and current directory for local deliveries,
+and addition of new options to various directors and transports.
+
+75. The handling of select() and accept() failures in the daemon was copied
+from smail: a 5 second pause after each one, and crash the daemon after more
+than 10 in succession. The comment about the latter is that accept() fails
+continuously on some OS. However, it seems that genuine errors can occur here,
+and maybe the looping thing is now a dead duck. Changed Exim to carry on
+regardless, but to batch up successive error messages into a single message
+with a count. Messages are now written to the main log rather than the panic
+log, but if a batch gets up to 50, there is output to both logs.
+
+76. Added dns_retrans and dns_retry.
+
+77. Give the sender and the list of as-yet-undelivered addresses in the
+freeze_tell_mailmaster message.
+
+78. Made DB utilities more robust against corrupt files.
+
+79. Re-organized delivery recording to use a journal while delivering, and a
+single spool file update at the end. More robust against sub-process crashes
+after completing a delivery, and possibly even cheaper when many addresses
+involved.
+
+80. Exim crashed after successful SMTP delivery to a host whose identity was
+obtained from an expanded string set as the "hosts" parameter of the transport.
+Even without a successful delivery, it could crash if fallback hosts were
+involved and there was more than one SMTP connection made via the same
+transport in the same process.
+
+81. Eximon was crashing if "edit sender" or "mark delivered" was selected from
+the menu.
+
+82. Addition of simple macros to configuration file.
+
+83. Don't explicitly unlock DBM file before closing.
+
+84. Fixed obscure store-overwriting bug provoked by address-rewriting. Showed
+up when more than one message was received by SMTP in the same connection, and
+verify_recipients was turned on. Very dependent on precise store usage;
+changing a single line of the DATA changed things.
+
+85. If a process opens a Berkeley DB file and thereby causes it to be created,
+it doesn't actually write anything to the file immediately. Another process
+that opens the same file then gets an EINVAL error, since the data in the file
+is invalid. As the second process can't open the file, it can't try to lock it
+and wait for it to become available. Exim now tries several times, with pauses,
+if it gets EINVAL when trying to open a database file.
+
+86. Argument combinations "-bp -q" and "-bd -q" diagnosed as nonsensical.
+
+87. If the Exim is called as "rmail" treat it as equivalent to "exim -i";
+thus allowing UUCP messages to be input using non-SMTP mode ie preventing a
+single dot on a line from terminating the message.
+
+88. Bug in parsing lists of addresses in .forward and alias files; commas
+inside comments (brackets) were not being correctly skipped.
+
+98. Ignore empty addresses in alias and forward files (e.g. a line containing
+just a comment in brackets).
+
+100. Added skip_syntax_errors option to aliasfile & forwardfile.
+
+101. Added retry_use_local_part option to appendfile and pipe transports.
+Forced it "off" for deliveries by smtp batching local transports
+
+102. Filter processing. Expansion of conditions was happening while parsing the
+file, which meant that numerical variable insertions were not happening. Now
+the expansions happen when the conditions are tested, and the numerical
+variables remain in existence for ever after a regular expression test.
+
+103. Added recipients_max.
+
+104. Eximon: added the test links=0 for detecting log file rolling over, for
+Digital systems.
+
+105. Eximon: added BODY_MAX parameter to limit the amount of body shown.
+
+106: Eximon and -bp options: display message sizes.
+
+107. Added local_interfaces: specifies those interfaces to be considered as
+local for outgoing SMTP, and those on which to listen in the daemon.
+
+108. Added serialize_{hosts,nets} to smtp transport.
+
+109. Domainlist: added ability to specify transport on each item.
+
+110. Added ability to queryprogram router to return a string that is passed as
+a parameter to the transport. A general facility is now available, but
+currently only queryprogram makes use of it.
+
+111. Added some configuration structure for IPV6 so people can develop.
+
+112. Added log_ip_options and kill_ip_options.
+
+113. Added "batch" option to appendfile and pipe, and expansion variable
+$transport_recipients. In conjunction with "batch" this makes a more flexible
+interface to, e.g. UUCP.
+
+114. Added "expand" option to aliasfile.
+
+115. Re-jigged the -R code to stop it forking a subprocess for every message on
+the queue. It now does the testing first, and forks only when it hits a message
+it wants to deliver.
+
+116. Added sender_accept and sender_accept_recipients, cf the corresponding
+reject options.
+
+117. Added ETRN command (RFC 1985) and smtp_etrn{hosts,nets}.
+
+118. Added receiver_verify_except_{hosts,nets}.
+
+119. Permitting unqualified senders/recipients failed for all but the first
+message in an SMTP connection if the firsts message's sender/recipients *were*
+qualified.
+
+120. Changed appendfile so that it creates a lock file before opening the
+mailbox. This should reduce the window of risk when two exims are both
+delivering over NFS to the same mailbox.
+
+121. Ancient and obscure bug in reading in the spool header file fixed. The
+effect was to set incorrect balancing values in the tree of non-recipients.
+This in turn could lead to crashes when updating the tree. Also made the tree
+functions more proof against this happening again.
+
+122. Made -ov synonymous with -v. Sendmail distinguishes them, but does things
+that don't apply to Exim.
+
+123. Calling Exim as "runq" is equivalent to "exim -q".
+
+124. Renamed all structure fields called "errno" as "basic_errno" as errno is
+permitted to be a macro in ANSI C, and in some implementations it is.
+
+125. Did some code tidies to get rid of warnings from -Wall in gcc.
+
+126. Made scripts/os-type recognize "freebsd*" as FreeBSD.
+
+[Entries for earlier versions of Exim have been archived]
+
+****

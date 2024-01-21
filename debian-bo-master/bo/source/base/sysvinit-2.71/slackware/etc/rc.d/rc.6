@@ -1,0 +1,97 @@
+#! /bin/sh
+#
+# rc.6		This file is executed by init when it goes into runlevel
+#		0 (halt) or runlevel 6 (reboot). It kills all processes,
+#		unmounts file systems and then either halts or reboots.
+#
+# Version:	@(#)/etc/rc.d/rc.6	1.50	1994-01-15
+#
+# Author:	Miquel van Smoorenburg <miquels@cistron.nl>
+# Modified by:  Patrick J. Volkerding, <volkerdi@ftp.cdrom.com>
+#
+
+  # Set the path.
+  PATH=/sbin:/etc:/bin:/usr/bin
+
+  # Set linefeed mode to avoid staircase effect.
+  stty onlcr
+
+  echo "Running shutdown script $0:"
+
+  # Find out how we were called.
+  case "$0" in
+	*0)
+		message="The system is halted."
+		command="halt"
+		;;
+	*6)
+		message="Rebooting."
+		command=reboot
+		;;
+	*)
+		echo "$0: call me as \"rc.0\" or \"rc.6\" please!"
+		exit 1
+		;;
+  esac
+
+  # Kill all processes.
+  if [ "$1" != "fast" ]; then # shutdown did not already kill all processes
+    echo
+    echo "Sending all processes the TERM signal."
+    killall5 -15 
+    echo -n "Waiting for processes to terminate"
+    for loop in 0 1 2 3 4 5 6 7 ; do
+      sleep 1
+      echo -n "."
+    done
+    echo
+    echo "Sending all processes the KILL signal."
+    killall5 -9
+  fi
+
+  # Try to turn off quota and accounting.
+  if [ -x /usr/sbin/quotaoff ]
+  then
+	echo "Turning off quota."
+	/usr/sbin/quotaoff -a
+  fi
+  if [ -x /sbin/accton ]
+  then
+	echo "Turning off accounting."
+	/sbin/accton
+  fi
+
+  # Before unmounting file systems write a reboot or halt record to wtmp.
+  $command -w
+
+  # Save localtime
+  [ -e /usr/lib/zoneinfo/localtime ] && cp /usr/lib/zoneinfo/localtime /etc
+
+  # Asynchronously unmount any remote filesystems:
+  echo "Unmounting remote filesystems."
+  umount -a -tnfs &
+  sleep 1
+
+  # Turn off swap, then unmount local file systems.
+  echo "Turning off swap."
+  swapoff -a
+  echo "Unmounting local file systems."
+  umount -a -tnonfs
+  # Don't remount UMSDOS root volumes:
+  if [ ! "`mount | head -1 | cut -d ' ' -f 5`" = "umsdos" ]; then
+    mount -n -o remount,ro /
+  fi
+
+  # See if this is a powerfail situation.
+  if [ -f /etc/power_is_failing ]; then
+    echo "Turning off UPS, bye."
+    /usr/sbin/powerd -q
+    exit 1
+  fi
+
+  # Now halt or reboot.
+  echo "$message"
+  sleep 1
+  [ ! -f /etc/fastboot ] && echo "On the next boot fsck will be FORCED."
+  $command -f
+

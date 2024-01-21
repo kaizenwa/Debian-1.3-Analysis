@@ -1,0 +1,56 @@
+#! /bin/sh
+# Reports groups with more than $1 articles, >90% of all articles, or
+# or >$2KB of articles with expiry dates more than 10 days after their
+# arrival dates.  Defaults 15 and 500.
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+case "$#" in
+0)	minarts=15 ; minsize=500	;;
+2)	minarts=$1 ; minsize=$2		;;
+*)	echo "Usage: $0 [minarts minsize]" >&2 ; exit 2	;;
+esac
+
+cd $NEWSARTS
+egrep -v '~-' $NEWSCTL/history |
+	awk -F'	' 'NF > 2 {
+		n = split($2, f, "~")
+		if (f[2] != "-" && f[2]-f[1] > 864000) {
+			n = split($3, f, " ")
+			for (i = 1; i <= n; i++)
+				print f[i]
+		}
+	}' | tr . / | xargs $NEWSBIN/sizeof -i | sed 's;/[^/]* ; ;' |
+	( sort ; echo dummy ) |
+	awk '{
+		if ($1 != newsgroup) {
+			if (newsgroup != "")
+				print newsgroup, n, size
+			n = 0
+			size = 0
+			newsgroup = $1
+		}
+		n++
+		size += $2
+	}' |
+	while read group narts size
+	do
+		npresent=`ls -f $group | egrep '^[0-9]+$' | wc -l`
+		echo $group $narts $npresent $size
+	done | tr / . |
+	awk '	{ bad = "" }
+		$2 > '$minarts' {
+			bad = bad ", " $2 " articles"
+		}
+		$2 > 0.9*$3 {
+			bad = bad ", " $2 " out of " $3 " articles"
+		}
+		$4 > '$minsize'*1024 {
+			bad = bad ", " int(($4+512)/1024) "KB"
+		}
+		bad != "" {
+			print $1, "has", substr(bad, 3), "on long expiry"
+		}'

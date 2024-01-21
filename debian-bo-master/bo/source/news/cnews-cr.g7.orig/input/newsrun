@@ -1,0 +1,181 @@
+#! /bin/sh
+# Process spooled news.
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/input:$NEWSBIN/relay:$NEWSBIN/nov:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+# Options.
+hold=n
+debug=n
+sufpat=
+for dummy
+do
+	case "$1" in
+	-h)	hold=y		;;
+	'-#')	debug=y		;;
+	-s)	sufpat='.*\.'"$2"'$' ; shift	;;
+	--)	shift ; break	;;
+	-*)	echo "$0: unknown option \`$1'" >&2 ; exit 2	;;
+	*)	break		;;
+	esac
+	shift
+done
+
+# Go to our base of operations.
+here=$NEWSARTS/in.coming
+cd $here
+
+# Consider what grades we should process, and check for work.
+sawstop=n
+stoppat='^0\.'
+if test -r stop
+then
+	pat="$stoppat"
+	sawstop=y
+else
+	pat='^[0-9]'
+fi
+case "$1" in
+'')			;;
+*)	pat="^[$1]\."	;;
+esac
+pat="$pat$sufpat"
+if test " `ls | egrep \"$pat\" | wc -l`" -eq 0
+then
+	exit 0	
+fi
+
+# Lock against others running.
+lock -o LOCKinput $$ || exit 0
+trap "unlock LOCKinput ; trap 0 ; exit 0" 0 1 2 15
+
+# Misc. setup.
+stale="`staleness`"
+case "$stale" in
+'')	;;
+*)	stale="-o $stale"	;;
+esac
+
+# Master loop.
+bunch=50
+while :				# "while true", but : is faster
+do
+	# Find some work.  "sort -n" gets grades ordered right.
+	them="`ls | egrep \"$pat\" | sort -n | sed ${bunch}q`"
+	if test " $them" = " "		# if no work...
+	then
+		break			# NOTE BREAK OUT
+	fi
+
+	# Check space.  It is *probably* better to stop processing
+	# when things get too full.  (This test is actually a bit
+	# inaccurate since the batches may not be compressed, but it's
+	# good enough to catch major space problems.)
+	allsize=`sizeof $them`
+	# decompressed + articles = maybe 5*compressed
+	if test " `spacefor $allsize articles`" -gt 4	# lots of room
+	then
+		muchroom=y
+		# if bunches are a bit small, try a larger one next time
+		if test " $bunch" -lt 20
+		then
+			bunch=`expr $bunch + 5`
+		fi
+	else
+		muchroom=
+		# reduce bunch size for next time
+		bunch=`expr $bunch / 2 + 1`
+	fi
+
+	# Decompression etc.
+	list=
+	for f in $them
+	do
+		# If the stop file has come into existence, punch out to
+		# the outer loop to process what we've got and then rethink.
+		if test " $sawstop" = " n" -a -r stop
+		then
+			sawstop=y
+			pat="$stoppat"
+			break		# NOTE BREAK OUT
+		fi
+
+		# Space check, if we're close.
+		if test " $muchroom" != " y"
+		then
+			batchsize=`sizeof $f`
+			# again, decompressed + articles = maybe 5*compressed
+			if test " `spacefor $batchsize articles`" -le 4
+			then
+				# observe that list is always empty here
+				exit 0		# just no room
+			fi
+		fi
+
+		# Save a copy in hold if requested.
+		if test " $hold" = " y" -a -d hold
+		then
+			ln $f hold/$f
+		fi
+
+		# Decompress if necessary.
+		case $f in
+		*.Z)	text=`echo $f | sed 's/Z\$/t/'`
+			uncompress <$f >$text
+			;;
+		*.t)	text=$f ; : okay	;;
+		*)	text=${f}.t
+			uncompress <$f >$text 2>/dev/null ||
+				{ rm -f $text ; text=$f ; : okay ; }	;;
+		esac || ln $f bad/$f
+		if test " $f" != " $text"
+		then
+			rm -f $f
+		fi
+
+		# Empty batches need no processing.
+		if test -s $text
+		then
+			list="$list $text"
+		else
+			rm -f $text
+		fi
+
+		# If we are tight on space, run things one at a time.
+		if test " $muchroom" != " y" -a " $list" != " "
+		then
+			break		# NOTE BREAK OUT
+		fi
+	done
+
+	# Do it.  -c is an optimisation.  -u tells relaynews to unlink
+	# the ones that work.  -n records use of symlinks.
+	if test " $list" != " "
+	then
+		relaynews -c $here -n $NEWSCTL/symlinks.used -u $stale \
+					$list >>$NEWSCTL/log 2>>$NEWSCTL/errlog
+		case "$?" in
+		0)	;;
+		1)	;;	# bad input; news system okay
+		2)	;;	# news system needs human attention
+		*)	;;	# ugh, something really awful & unexpected
+		esac
+		doexplode
+		domkov			# update newsreader database
+		# Deal with the leftovers, if any; mv 2> is simple and quick.
+		mv $list bad 2>/dev/null
+		# And just in case that didn't work...
+		rm -f $list
+	fi
+	# if we're doing big bunches...
+	if test " $muchroom" = " y" -a " $bunch" -gt 5 -a " $debug" = " n"
+	then
+		sleep 45	# ...give somebody else a shot at the lock
+	fi
+	touchlock LOCKinput		# advertise that we're still alive
+done
+
+exit 0

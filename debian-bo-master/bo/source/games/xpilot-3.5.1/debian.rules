@@ -1,0 +1,61 @@
+#!/usr/bin/make -f
+# debian.rules file for xpilot-3.5.1
+# Based upon the sample debian.rules file by Ian Jackson.
+
+package=xpilot
+version=3.5.1
+debian=1
+
+pwd	:= $(shell pwd)
+arch	:= $(shell dpkg --print-architecture)
+
+build:
+	$(checkdir)
+	xmkmf -a
+	$(MAKE) LDFLAGS=-s prefix=/usr
+	touch build
+
+clean:
+	$(checkdir)
+	if test -f Makefile ; then $(MAKE) prefix=/usr clean ; fi
+	find doc lib src -name Makefile -print0 | xargs -0 -r rm
+	-rm -f Makefile contrib/Makefile contrib/msub/Makefile
+	-rm -f build
+	-rm -f *.bak Makefile
+	-rm -rf debian-tmp *~
+
+binary:	checkroot build
+	-rm -rf debian-tmp
+	mkdir debian-tmp debian-tmp/DEBIAN
+	install -d debian-tmp/usr/doc/copyright
+	sed -e 's/=ver/$(version)-$(debian)/; s/=arch/$(arch)/' \
+		debian.control > debian-tmp/DEBIAN/control
+	$(MAKE) LDFLAGS=-s prefix=$(pwd)/debian-tmp/usr install
+	$(MAKE) LDFLAGS=-s prefix=$(pwd)/debian-tmp/usr install.man
+	cp debian.README debian-tmp/usr/doc/copyright/$(package)
+	chown -R root.root debian-tmp
+	chmod -R g-ws debian-tmp
+	dpkg --build debian-tmp
+	mv debian-tmp.deb ../$(package)-$(version)-$(debian).$(arch).deb
+
+define checkdir
+	test -f src/xpilot.c
+endef
+
+source:		clean
+	chmod +x debian.rules
+	cd .. && \
+	tar cf $(package)-$(version)-$(debian).tar $(package)-$(version) && \
+	gzip -9vf $(package)-$(version)-$(debian).tar
+ 
+diff:		clean
+	cd .. && \
+	(diff -ruN $(package)-$(version).orig $(package)-$(version) \
+	 >$(package)-$(version)-$(debian).diff; [ $$? = 1 ]) && \
+	gzip -9vf $(package)-$(version)-$(debian).diff
+
+checkroot:
+	$(checkdir)
+	test root = "`whoami`"
+
+.PHONY: binary source diff clean checkroot

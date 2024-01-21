@@ -1,0 +1,197 @@
+# Makefile for Xconq documentation.
+# Copyright (C) 1993, 1994, 1995, 1996 Stanley T. Shebs.
+
+# Xconq is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+
+prefix = /usr/games
+
+exec_prefix = $(prefix)
+bindir = $(exec_prefix)/bin
+libdir = $(exec_prefix)/lib
+datadir = $(prefix)/lib/xconq
+mandir = $(prefix)/man
+man6dir = $(mandir)/man6
+infodir = $(prefix)/info
+docdir = $(datadir)/doc
+
+srcdir = .
+srcroot = $(srcdir)/..
+
+SHELL = /bin/sh
+
+INSTALL = install -c
+INSTALL_PROGRAM = $(INSTALL)
+INSTALL_DATA = $(INSTALL)
+
+CC = cc
+
+CFLAGS = -g
+
+MAKEINFO = makeinfo
+
+MAKEINFOFLAGS =
+
+TEX = tex
+
+TEXINDEX = texindex
+
+# Where to find texinfo; dist should include a recent one.
+
+TEXIDIR = .
+
+SET_TEXINPUTS = TEXINPUTS=${TEXIDIR}:.:$(srcdir):$$TEXINPUTS
+
+# Pretty output for your favorite fancy printer.
+
+#TROFFER = psroff
+#PRINTER = csps
+
+DOCFILES = \
+	xconq.texi \
+	play.texi \
+	commands.texi \
+	x11-sect.texi \
+	curses-sect.texi \
+	mac-sect.texi \
+	design.texi \
+	x11-dsect.texi \
+	curses-dsect.texi \
+	mac-dsect.texi \
+	refman.texi \
+	hacking.texi \
+	glossary.texi \
+	syms.texi \
+	syntax.texi
+
+# Host and target-dependent makefile fragments come in here.
+####
+# End of host and target-dependent makefile fragments.
+
+.c.o:
+	$(CC) -c $(ALL_CFLAGS) $<
+
+all:
+
+install:
+
+install-only:
+
+install-info: info
+	for i in *.info* ; do \
+		$(INSTALL_DATA) $$i $(infodir)/$$i ; \
+	done
+
+info: xconq.info
+
+xconq.info:	$(DOCFILES)
+	$(MAKEINFO) -I $(srcdir) -o ./xconq.info $(MAKEINFOFLAGS) $(srcdir)/xconq.texi
+
+dvi: playref.dvi gdlref.dvi xconq.dvi player.dvi
+
+playref.dvi: playref.texi commands.texi
+	$(SET_TEXINPUTS) $(TEX) $(srcdir)/playref.texi
+
+gdlref.dvi: gdlref.texi syntax.texi syms.texi
+	$(SET_TEXINPUTS) $(TEX) $(srcdir)/gdlref.texi
+
+syms.texi: syms.raw kwic
+	./kwic -dots -pad -breakup <syms.raw >syms.texi.new
+	$(srcdir)/../move-if-change syms.texi.new syms.texi
+
+syms.raw: getsyms.sh refman.texi
+	$(srcdir)/getsyms.sh $(srcdir)/refman.texi >syms.raw.new
+	$(srcdir)/../move-if-change syms.raw.new syms.raw
+
+# The main Xconq manual includes everything by default.
+
+xconq.dvi:	$(DOCFILES)
+	$(SET_TEXINPUTS) $(TEX) $(srcdir)/xconq.texi
+	$(TEXINDEX) xconq.??
+	$(SET_TEXINPUTS) $(TEX) $(srcdir)/xconq.texi
+
+# All-interface player's manual.
+
+player.dvi:	$(DOCFILES)
+	sed -e 's/@set DESIGNING/@clear DESIGNING/' \
+            -e 's/@set HACKING/@clear HACKING/' \
+            $(srcdir)/xconq.texi >player.texi
+	$(SET_TEXINPUTS) $(TEX) player.texi
+	$(TEXINDEX) player.??
+	$(SET_TEXINPUTS) $(TEX) player.texi
+
+# Unix-only player's manual.
+
+unixplay.dvi:	$(DOCFILES)
+	sed -e 's/@set DESIGNING/@clear DESIGNING/' \
+            -e 's/@set HACKING/@clear HACKING/' \
+            -e 's/@set MACINTOSH/@clear MACINTOSH/' \
+            $(srcdir)/xconq.texi >unixplay.texi
+	$(SET_TEXINPUTS) $(TEX) unixplay.texi
+	$(TEXINDEX) unixplay.??
+	$(SET_TEXINPUTS) $(TEX) unixplay.texi
+
+# Mac-only player's manual.
+
+macplay.dvi:	$(DOCFILES)
+	sed -e 's/@set DESIGNING/@clear DESIGNING/' \
+            -e 's/@set HACKING/@clear HACKING/' \
+            -e 's/@set UNIX/@clear UNIX/' \
+            $(srcdir)/xconq.texi >macplay.texi
+	$(SET_TEXINPUTS) $(TEX) macplay.texi
+	$(TEXINDEX) macplay.??
+	$(SET_TEXINPUTS) $(TEX) macplay.texi
+
+ps: playref.ps gdlref.ps xconq.ps player.ps
+
+playref.ps:	playref.dvi
+	dvips playref.dvi -o playref.ps
+
+gdlref.ps:	gdlref.dvi
+	dvips gdlref.dvi -o gdlref.ps
+
+xconq.ps:	xconq.dvi
+	dvips xconq.dvi -o xconq.ps
+
+player.ps:	player.dvi
+	dvips player.dvi -o player.ps
+
+html:	$(DOCFILES)
+	perl $(srcdir)/texi2html -split_section -glossary -menu -verbose $(srcdir)/xconq.texi
+
+kwic:	kwic.o
+	$(CC) $(CFLAGS) -o kwic kwic.o
+
+clean-info:
+	rm -f playref.info* gdlref.info*
+	rm -f xconq.info* player.info* unixplay.info* macplay.info*
+
+clean-dvi:
+	rm -f playref.dvi gdlref.dvi
+	rm -f xconq.dvi player.dvi unixplay.dvi macplay.dvi
+
+clean-ps:
+	rm -f *.ps
+
+clean:
+	rm -f playref.?? playref.??? gdlref.?? gdlref.???
+	rm -f xconq.?? xconq.???
+	rm -f player.texi player.?? player.???
+	rm -f unixplay.texi unixplay.?? unixplay.???
+	rm -f macplay.texi macplay.?? macplay.???
+	rm -f *.o
+	rm -f kwic
+	rm -f syms.raw
+
+distclean: clean
+	rm -f Makefile config.status syms.texi
+
+extraclean: distclean
+	rm -f *~* .*~*
+
+realclean: distclean
+
+Makefile: Makefile.in $(host_makefile_frag) $(target_makefile_frag)
+	$(SHELL) config.status

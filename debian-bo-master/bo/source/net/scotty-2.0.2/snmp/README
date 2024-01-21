@@ -1,0 +1,285 @@
+
+This directory contains a SNMPv1/v2 protocol stack that was written to
+support a TCL based programming interface. It was implemented by Sven
+Schmidt (vschmidt@ibr.cs.tu-bs.de) during his master thesis at the
+Technical University of Braunschweig, GERMANY. Some ideas for the TCL
+interface were inspired by previous work done by P.H. Kamp.
+
+The current version depends on the C interface of the event scheduler
+found in tk3.6, which is emulated by scotty (see event.h for details).
+Although we use this snmp package mainly with scotty, you can also use
+this snmp extension in a non standard wish. See the tkAppInit.c file
+for an example how to initialize this snmp library.
+
+Below is a short description of the syntax of the new SNMP TCL
+commands. The SNMPv1/v2 interface is implemented with two new TCL
+commands.  The first command deals with the Management Information
+Base (MIB) and is called mib. Its syntax is:
+
+	mib name        ?-exact? <name or oid>
+	mib oid         ?-exact? <name or oid>
+	mib syntax      ?-exact? <name or oid>
+	mib description ?-exact? <name or oid>
+	mib successor   ?-exact? <name or oid>
+	mib access	?-exact? <name or oid>
+
+The name, oid and syntax options retrieve the considered field of the
+OBJECT-TYPE macro. The description can be retrieved using the
+description command. The successor option returns all know direct 
+successors of a node and may be used by MIB browser programs. The return
+values are implicitely defined by the argument. If you query for successors
+providing an object identifier, you will get a list of object identifiers
+as a result list. If you query by name, you will get the names. Note,
+name are not unique and object identifier are faster. So use object identifier
+internally and convert them to `nice' names when you print them out.
+The -exact switch request exact matches only, that is a lookup as
+`mib -exact syntax sysDescr' is legal while `mib -exact syntax sysDescr.0'
+will fail. The exact switch has no meaning for the successor lookup
+since they are always done using exact lookups.
+
+The snmp command is used to create SNMP session handles. All
+operations are later done using session handles.
+
+	snmp session <options>
+	snmp info
+
+The snmp session command creates a new session handle and the snmp
+info command returns a list of all handles currently available.  An
+existing handle can be configured later. We assume that $s contains a
+handle created by snmp create:
+
+	$s configure [<options>]
+
+Called without any options, this command returns a keyed list of all
+currently configured options. Options may be specified in one of the
+following forms:
+
+SNMPv1:
+	-address   <ip address>
+	-port      <port number>
+	-community <community string>
+	-timeout    <time>
+	-retries   <number>
+
+SNMPv2:
+	-srcparty	<identity domain address port messagesize>
+	-srcpartypriv	<parameter>
+	-srcpartyauth	<parameter>
+	-dstparty	<identity domain address port messagesize>
+	-dstpartypriv 	<parameter>
+	-dstpartyauth	<parameter>
+	-context	<oid>
+
+SNMP operations are done using on of the following commands:
+
+	$s get     <var list>  [<callback>]
+	$s getnext <var list>  [<callback>]
+	$s set     <var list>  [<callback>]
+	$s getbulk nr max <var list> [<callback>]
+
+The SNMP operation will be done synchronously if no callback is
+defined. The command will return the result of the SNMP operation or
+an error. Asynchronous operations happen if you define at least one
+callback function. The callback will be called when a response is
+received or if did not receive an answer after some retries.
+
+The varbind will always contain the object identifier in the first
+element of the varbind list. Use an explicit mib name lookup to
+convert it to something more readable.
+
+The <callback> defintions can contain format strings that can be used
+to format the arguments used in the callback. An example:
+
+	$s get "sysDescr.0 sysUpTime.0" { puts "Answer from %S (%R): %V" }
+
+The format escapes are:
+
+	%V default varbind rendering (a list containing name, syntax
+	   and value for each varbind)
+
+	%R the request id
+
+	%S the session id
+
+	%E error status
+
+	%I error index
+
+	%A the network address of the agent
+
+	%P the port number of the agent
+
+There is another small goodie which makes walks easier. The walk
+subcommand just does a walk over a subtree and evaluates body foreach
+object in the subtree, which can be found in the variable var.
+
+	$s walk <var list> <var list> <body>
+
+There is currently no asynchronous version of this one.
+
+SNMP Traps are also supported. The syntax is quite simple:
+
+	$s bind "" trap <callback>
+
+The callback may contain the usual escapes described above. SNMPv1 traps
+look like SNMPv2 traps as described in RFC 1452. The first element in the
+varbind is the sysUpTime of the agent sending the trap and the second 
+element is the snmpTrapOID. See 1452 how enterprise specific traps are
+coded as an object identifier.
+
+To send traps to another manager, you can use the trap session command:
+
+	$s trap trapOid <var list>
+
+Note: You have to make sure that the session handle is configured to send
+traps to the correct port. The default port used when creating session handles
+is the snmp port 161. You have to switch it to something useful in most
+cases, e.g.
+
+	$s configure -port 162
+or
+	$s configure -dstparty "identity domain address 162 messagesize"
+
+The latest feature allows scotty to run as an SNMP agent. To initialize
+scotty as an agent, you have to create a session and turn this session
+into an agent:
+
+	$s configure -agent "" -port 1701
+
+The example above will create a listening socket on port 1701 and
+answer snmp request that are valid regarding the session handle $s
+(that is setting the community string on $s to foobar will only allow
+messages which also use the foobar community). The agent supports some
+buildin variables: The MIB-2 system group and the snmp statistics
+group. You can define you own MIB variables by writing down some ASN.1
+MIB definitions and loading them via the 'mib load' command. Now you
+can create instances using the following command:
+
+	$s instance <instance-oid> <varname> [<default>]
+
+This command create an instance with the object identifier
+instance-oid and links it to the tcl variable <varname>. A special
+binding command allows you to associate scripts to object identifier.
+
+
+You can use instance bindings to bind tcl procedures to variables,
+which gives a very easy way to implement agents that translate between
+management applications and real world hard- and software. The agents
+directory contains some example agent code.
+
+Below are some examples to see how to program with this tcl snmp interface:
+
+1. Simple SNMPv1 operations:
+
+    set s [snmp session -address 134.169.34.3]
+    $s get sysDescr.0
+    $s getnext [mib successor system]
+    $s destroy
+
+2. A set operation using a private community:
+
+    set txt "greetings from [exec hostname]"
+    set s [snmp session -address 134.169.34.3 -community private]
+    $s set [list [list sysName.0 "OCTET STRING" $txt] ]
+    $s destroy
+
+3. A no authentication no privacy configuration for a SNMPv2 agent:
+
+    set ip [netdb hosts address ftp.ibr.cs.tu-bs.de]
+    set s [snmp session]
+    $s configure -dstparty "1.3.6.1.6.3.3.1.3.$ip.1 UDP $ip 161 484"
+    $s configure -srcparty "1.3.6.1.6.3.3.1.3.$ip.2 UDP 0.0.0.0 161 484" 
+    $s configure -context  1.3.6.1.6.3.3.1.4.$ip.1
+    $s get "sysDescr.0 sysUpTime.0"
+    $s destroy
+
+4. A simple table walk.
+
+    set s [snmp session -address 134.169.34.3]
+    puts "Index ifInOctets  ifOutOctets Description"
+    $s walk x "ifIndex ifInOctets ifOutOctets ifDescr" {
+	set Index       [lindex [lindex $x 0] 2]
+	set ifInOctets  [lindex [lindex $x 1] 2]
+	set ifOutOctets [lindex [lindex $x 2] 2]
+	set ifDescr     [lindex [lindex $x 3] 2]
+	puts [format "%3u %12u %12u %s" \
+			$Index $ifInOctets $ifOutOctets $ifDescr]
+    }
+    $s destroy
+
+5. A simple trap handler (SNMP version 1).
+
+    proc traphandler {ip list} {
+	set msg "SNMP trap from $ip:"
+	foreach vb $list {
+	   append msg " [mib name [lindex $vb 0]]=\"[lindex $vb 2]\""
+	}
+	puts stderr $msg
+    }
+
+    set s [snmp session -port 162]
+    $s bind "" trap {traphandler %A "%V"}
+
+6. Sending some well known traps.
+
+   set s [snmp session -port 162]
+   $s trap coldStart ""
+   $s trap warmStart ""
+
+7. A simple agent with a counter SNMP variable (abusing sysLocation):
+
+   set s [snmp session -port 8161 -agent ""]
+
+   # Create a counter binding for the sysLocation variable:
+
+   $s bind sysLocation.0 get { 
+       incr sysLocation
+   }
+
+   # Send a set request to yourself to initialize the sysLocation 
+   # counter.
+
+   $s set {{sysLocation.0 1}} {puts "%E %V"}
+
+   # you can even send asynchronous requests to yourself :-)
+
+   $s get sysLocation.0 {puts "%V"}
+
+   # and you can add more bindings to the MIB tree
+
+   $s bind system get "puts {GET request on session %S from %A}"
+
+   $s get sysLocation.0 {puts "%V"}
+
+   # and you can do special things when variables are set
+
+   $s bind sysContact.0 set {
+       set sysContact [string toupper "%v"]
+       # a break makes sure that no other (default) bindings are invoked
+       break
+   }
+
+   $s set {{sysContact.0 foobar}} {puts "%E %V"}
+
+8. Another agent with a save Tcl interpreter using check/commit/rollback
+   bindings. This needs some more work to simplify things a lot more.
+
+   set i [interp create -safe]
+   $i alias puts puts stderr
+
+   set a [snmp session -agent $i -port 1701]
+   $a bind "" begin {puts ""}
+
+   $a bind sysContact set { puts {set %o.[%i] = %v} }
+   $a bind sysContact get { puts {get %o.[%i]} }
+   $a bind sysContact check {puts {check %o.[%i] = %v} }
+   $a bind sysContact commit { puts {commit %o.[%i] = %v} }
+   $a bind sysContact rollback { puts {rollback %o.[%i] = %v} }
+ 
+   set m [snmp session -port 1701]
+   $m set {{sysContact.0 "Bert Nase"}} {puts "%E@%I %V"}
+   $m get sysContact.0 {puts "%E@%I %V"}
+   $m set {{sysContact.0 ga} {sysDescr.0 no}} {puts "%E@%I %V"}
+   $m get sysContact.0 {puts "%E@%I %V"}
+   $m set {{sysContact.0 ga} {sysContact.0 gu} {sysDescr.0 no}} {puts "%E@%I %V"}
+   $m get sysContact.0 {puts "%E@%I %V"}

@@ -1,0 +1,732 @@
+		     <!-- -*-jfw-sgml-*- -->
+<!doctype document public "-//JFW//DTD Document//EN" [
+<!ENTITY % remark "ignore" >
+
+<!ENTITY % remote "IGNORE" >
+<![ %remote [<!ENTITY % local "ignore" > ]]>
+<!ENTITY % local "include" >
+
+<!ENTITY % epsfig "IGNORE" >
+<![ %epsfig [<!ENTITY % grphcs "IGNORE" >]]>
+<!ENTITY % grphcs "IGNORE" >
+<![ %grphcs [<!ENTITY % epsfig "IGNORE" >]]>
+
+<!-- Files and the source of the hard wired path -->
+
+<!ENTITY instdir system "instdir" >
+<!ENTITY notaent "notation.ent" >
+<!ENTITY Makefile "X2YMakefile" >
+<!ENTITY MkfPath "&instdir;/bin/&Makefile;" >
+
+<!--
+ We need %Literat in the prologe this is strange but thus we needto do
+ everything by ourself. Lets put together something to have also a
+ readable output.
+-->
+
+<!ENTITY % Literat "IGNORE">
+<![ %Literat [
+<!ENTITY epstogif system "epstogif">
+]]>
+
+<!ENTITY epstogif
+"# Here is the code from 'epstogif.sgml' (inlined version) omitted.
+# Please refer to the documentation of 'epstogif' for details." >
+
+]>
+
+<document face="1C 2S"
+author="J&oe;rg Wittenberger"
+inst="TU Dresden"
+>Notation handling programs
+
+This defines a bunch of scripts which are to handle the convertion of
+files using some of the typeset supported notations into forms
+suitable for the target formats.
+
+The names of all the final conversion files follow the scheme:
+
+<quote><var>notation<code>2<var>format</quote>
+
+This document is organized in order of the target format.
+
+Here is the file <code/notation.ent/ composed as well. The conversion
+scripts are called from this file. It goes into the <code/dtd/ 
+directory.
+
+First we declare the <code/ignore/ notation, which just prints a
+message about being used.
+
+<literate file="&notaent;"<verb>
+<!NOTATION ignore SYSTEM "echo Ignore Notation used for %s.">
+
+</verb</>
+<!-- no central Makefile!!
+
+We need a variable dependency rule in the Makefile:
+<literate file="&Makefile;"<verb>
+$(TARGET): $(SRC)
+
+</verb</>
+
+This makes the file to be created depending on the source (using the
+full path).
+
+Furthermore we need a magig target <code/.SUFFIXES/ extending the
+built in one with the unusual suffixes:
+<literate<verb>
+
+.SUFFIXES: .eps .gif .obj
+
+</verb</>
+-->
+
+<sect id="GIF">A converter to make gif's from eps
+
+This is done by a special script.
+
+NOT IMPLEMENTED YET.
+
+<sect id="ASCII converters">ASCII
+
+There are only a few notations representable in ascii:
+
+<literate file="&notaent;"<rverb>
+<![ %ASCII [
+
+<!NOTATION fig SYSTEM "echo Figure %s not representable." >
+<!NOTATION eps SYSTEM "echo Figure %s not representable." >
+<!NOTATION latex SYSTEM "&instdir;/bin/latex2lout %f %S" >
+<!NOTATION lout SYSTEM "cat %f" >
+<!NOTATION lfig SYSTEM "cat %f" >
+<!NOTATION roff SYSTEM "&instdir;/bin/roff2lout %f %S" >
+
+]]>
+
+</rverb</>
+
+<sect id="HTML converters">HTML
+
+At the moment the <code/GIF/ format is the most important except for
+things which can be converted in HTML. It's to expect soon, that 
+<code/GIF/ will be abondend because of legal resons. Up to now no
+successor is selected. So here comes the gif support. The successor is
+to be added later.
+
+<sect1 id="HTML notations">Notations
+
+<literate file="&notaent;"<rverb>
+<![ %HTML [
+
+<!NOTATION fig SYSTEM "&instdir;/bin/fig2html %f %S" >
+<!NOTATION eps SYSTEM "&instdir;/bin/eps2html %f %S" >
+<!NOTATION latex SYSTEM "&instdir;/bin/latex2html %f %S" >
+<!NOTATION lout SYSTEM "&instdir;/bin/lout2html %f %S" >
+<!NOTATION lfig SYSTEM "&instdir;/bin/lout2html %f %S" >
+<!NOTATION roff SYSTEM "&instdir;/bin/roff2html %f %S" >
+<!NOTATION tgif SYSTEM "&instdir;/bin/tgif2html %f %S">
+
+]]>
+
+</rverb</>
+
+<sect1 id="eps2html">eps2html
+
+<literate file="eps2html">
+<rverb>
+#!/bin/sh
+FILE=`basename $2 .eps`
+cat > /tmp/mk$$ <<EOF
+GS_LIB=&instdir;/bin
+
+$FILE.gif: $1
+	&instdir;/bin/pstogif $1 \$@ >/dev/null 2>/dev/null
+	-(giftrans -t "#ffffff" -o \$@.1 \$@ && mv -f \$@.1 \$@)
+EOF
+make -f /tmp/mk$$ 1>&amp;2
+rm /tmp/mk$$
+
+</rverb>
+</literate>
+
+See documentation of <code/epstogif/ for files and behavior of the
+rest of the code. This is the <![ %remote [remote]]><![ %local
+[local]]> version.
+
+Now echo the inclusion command to stdout:
+
+<literate<rverb>
+echo "&lt;IMG SRC=" \"$FILE.gif\" ">"
+</rverb</literate>
+
+Well, this uses a command pstogif. This has been copied from the
+LaTeX2HTML.
+
+<sect1 id=fig2html>fig2html
+
+<literate file="fig2html">
+<verb>
+#!/bin/sh
+BASE=`basename $1 .fig`
+EPSTOGIFFROM=$BASE.eps
+EPSTOGIFTO=`basename $2 .fig`.gif
+
+</verb</literate>
+
+The remote version once again uses <code/epstogif/.
+
+<![ %remote [ <literate<rverb>
+rcp $1 $REMOTENAME@$REMOTEHOST:remote/$BASE.fig
+rsh $REMOTEHOST -l $REMOTENAME \
+    fig2dev -L ps remote/$BASE.fig > $EPSTOGIFFROM
+&epstogif;
+rsh $REMOTEHOST -l $REMOTENAME rm -f remote/$BASE.fig
+</rverb></literate> ]]>
+
+<![ %local [
+The local version needs some more things localy
+
+<literate<rverb>
+cat > /tmp/mk$$ <<EOF
+GS_LIB=&instdir;/bin
+
+$EPSTOGIFTO: $1
+	fig2dev -L ps $1 $EPSTOGIFFROM
+	&instdir;/bin/pstogif $EPSTOGIFFROM \$@ >/dev/null 2>/dev/null
+	# Now attempt to make the white invisible
+	-(giftrans -t "#ffffff" -o \$@.1 \$@ && mv -f \$@.1 \$@)
+EOF
+make -f /tmp/mk$$ 1>&amp;2
+rm -f /tmp/mk$$ $EPSTOGIFFROM
+</rverb</> ]]>
+
+<literate<rverb>
+
+echo "&lt;IMG SRC=" \"$EPSTOGIFTO\" ">"
+</rverb</>
+
+<sect1 id="latex2html">latex2html
+
+This goes through two stages. First convert into eps, then call
+eps2html from the same package.
+
+<literate file="latex2html"<rverb>
+#!/bin/sh
+FILE=`basename $2 .tex`.eps
+&instdir;/bin/latex2eps- $1 $FILE
+&instdir;/bin/eps2html $FILE $FILE
+rm -f $FILE
+</rverb>
+</literate>
+
+<sect1 id="lout2html">lout2html
+
+This composes a simple lout file, defines a Galley without any size
+constraints and has the text find it's way there.
+
+<literate file="lout2html"<rverb>
+#!/bin/sh
+FILE=$2
+TMP1=T$FILE
+TMP2=$FILE.eps
+TARGET=$FILE.gif
+
+cat >$TMP1.lout <<EOF
+@SysInclude{fig}
+@SysInclude{eq}
+@SysInclude{graph}
+@SysInclude{doc}
+@Doc //
+@Text @Begin
+
+EOF
+
+cat $1 >>$TMP1.lout
+
+cat >>$TMP1.lout <<EOF
+
+@End @Text
+
+EOF
+
+cat >/tmp/mk$$ <<EOF
+$TARGET: $1
+	lout -EPS $TMP1.lout -o $TMP2
+	&instdir;/bin/pstogif $TMP2 \$@ >/dev/null 2>/dev/null
+	-(giftrans -t "#ffffff" -o \$@.1 \$@ && mv -f \$@.1 \$@)
+EOF
+make -f /tmp/mk$$ 1>&amp;2
+rm -f /tmp/mk$$ $TMP1.* T$SRC.ld $TMP2 lout.li
+echo "&lt;IMG SRC=" \"$TARGET\" ">"
+
+</rverb>
+</literate>
+
+<sect1 id="roff2html">roff2html
+
+Roff2html goes through 2 steps. First convert to encapsultated
+PostScript. This could eventually happen on a remote host, then
+tranfer to <code/eps2html/ from the typeset package.
+
+First we need to put some blank lines before the real
+document. Ghostscript will otherwise crop the first lines on some
+systems.
+
+<literate file="roff2html"<verb>
+#!/bin/sh
+FILE=$2.eps
+TMP=T$$
+cat - $1 > $TMP <<EOF
+
+
+EOF
+
+</verb>
+
+<![ %remote [ <verb>
+rcp $TMP $REMOTENAME@$REMOTEHOST:remote/$TMP
+rsh $REMOTEHOST -l $REMOTENAME "cd remote;\
+  gtbl $TMP | groff -Tps " >$FILE
+</verb> ]]> <![ %local [ <verb>
+gtbl $TMP | groff -Tps >$FILE
+</verb> ]]>
+
+<rverb>
+&instdir;/bin/eps2html $FILE $FILE
+rm $FILE $TMP
+</rverb>
+</literate>
+
+<sect1 id="tgif2html">tgif2html
+
+<literate file="tgif2html"<rverb>
+#!/bin/sh
+TMPBASE=`basename $1 .obj`
+TMPFILE=$TMPBASE.eps
+TARGET=`basename $2 .obj`.gif
+cat > /tmp/mk$$ <<EOF
+.SUFFIXES: .obj .eps
+$TARGET: $1
+	tgif -print -eps -o. $1 2> /dev/null
+	@# F****** silly GNU Make! Be carefull to back up.
+	@# This is, what a good make would resolve:
+	@#&instdir/bin/pstogif \$*.eps \$@ >/dev/null 2>/dev/null
+	@# But we need to say for pure people (e.q., on linux):
+	&instdir/bin/pstogif $TMPFILE \$@ >/dev/null 2>/dev/null
+	-(giftrans -t "#ffffff" -o \$@.1 \$@ && mv -f \$@.1 \$@)
+EOF
+make -f /tmp/mk$$ 1>&amp;2
+rm -f /tmp/mk$$ $TMPFILE
+echo "&lt;IMG SRC=" \"$TARGET\" ">"
+
+</rverb>
+
+</literate>
+
+
+<sect id="Info converters">Info
+
+Info understands almost nothing. Here the excerpt from the &notaent;
+file.
+
+<literate file="&notaent;"<verb>
+<![ %Info [
+
+<!NOTATION fig SYSTEM "echo Figure %s not representable." >
+<!NOTATION eps SYSTEM "echo Figure %s not representable." >
+<!NOTATION latex SYSTEM "cat %f" >
+<!NOTATION lout SYSTEM "cat %f" >
+<!NOTATION lfig SYSTEM "cat %f" >
+<!NOTATION roff SYSTEM
+	   "gtbl %f | groff -Tascii | col -b -f | sed -e '/^$/d'" >
+<!NOTATION tgif SYSTEM "echo Figure %s not representable." >
+]]>
+
+</verb</>
+
+<sect id="LaTeX conveters">LaTeX
+
+I don't know about all notations which can be included into LaTeX dvi
+files and the dvi driver they work with.
+
+<sect1 id="LaTeX notations">Notations
+
+<literate file="&notaent;"<rverb>
+<![ %LaTeX [
+
+<!NOTATION fig SYSTEM "&instdir;/bin/fig2latex %f %S">
+<!NOTATION eps SYSTEM "&instdir;/bin/eps2latex %f %s">
+<!NOTATION latex SYSTEM "cat %f" >
+<!NOTATION lout SYSTEM "&instdir;/bin/lout2latex %f %S" >
+<!NOTATION lfig SYSTEM "&instdir;/bin/lout2latex %f %S" >
+<!NOTATION roff SYSTEM "&instdir;/bin/roff2latex %f %S" >
+<!NOTATION tgif SYSTEM "&instdir;/bin/tgif2latex %f %S" >
+]]>
+
+</rverb</>
+
+<sect1 id="eps2latex">eps2latex
+
+<![ %epsfig [
+Using the <code/epsfig/ package. We only need to copy the eps file
+into the current directory and tell the command to LaTeX.
+
+<literate file="eps2latex"<verb>
+#!/bin/sh
+cp $1 $2
+echo \\epsfig{ file=$2 }
+</verb</>
+]]>
+
+<![ %grphcs [
+With the <code/graphics/ package we only need to copy the eps file
+into the current directory and the the command to LaTeX.
+
+<literate file="eps2latex"<verb>
+#!/bin/sh
+cp $1 $2
+echo \\includegraphics{$2}
+</verb</>
+]]>
+
+<sect1 id="fig2latex">fig2latex
+
+The <code/fig2dev/ supports LaTeX output. The <code/fig2latex/ script
+will make use of it. Drawback: you can't have some types of objects
+(e.g., splines) in the picture. For those pictures better convert them
+into eps and tell
+"sdc" (or whatever the final/current name is)
+to use notation eps.
+
+<literate file="fig2latex"<verb>
+#!/bin/sh
+
+</verb>
+<![ %remote [<verb>
+SRC=`basename $1`
+rcp $1 $REMOTENAME@$REMOTEHOST:remote/$SRC
+rsh $REMOTEHOST -l $REMOTENAME fig2dev -L latex remote/$SRC
+rsh $REMOTEHOST -l $REMOTENAME rm -f remote/$SRC
+</verb> ]]>
+<![ %local [ <verb>
+fig2dev -L latex $1
+</verb> ]]>
+</literate>
+
+<sect1 id="lout2latex">lout2latex
+
+From lout to LaTeX we need to have a special Layout with a Galley with
+unspecified dimensions. This way the produced eps file will be of the
+nessesary size.
+
+<literate file="lout2latex"<verb>
+#!/bin/sh
+SRC=T$2
+TMP=$SRC.lout
+TARGET=`basename $2 .lout`.eps
+
+cat >$TMP <<EOF
+@SysInclude{fontdefs}
+@SysInclude{langdefs}
+@SysInclude{fig}
+@SysInclude{eq}
+@SysInclude{graph}
+@SysInclude{dl}
+extend @DocumentLayout
+export @TextPlace @Text
+def @PlainLayout
+@Begin
+def @TextPlace { @Galley }
+def @Text into { @TextPlace&&preceding } right x 
+{
+ @InitialFont @Font @InitialBreak @Break @InitialColour @Colour
+ @InitialLanguage @Language x
+}
+@End @PlainLayout
+@Use{ @DocumentLayout }
+@Use{ @PlainLayout }
+@TextPlace
+//
+@Text @Begin
+
+EOF
+
+cat $1 >>$TMP
+
+cat >>$TMP <<EOF
+
+@End @Text
+
+EOF
+
+</verb>
+<rverb>
+cat >/tmp/mk$$ <<EOF
+$TARGET: $1
+	lout -EPS $TMP -o \$@
+EOF
+make -f /tmp/mk$$ 1>&amp;2
+rm -f /tmp/mk$$ $TMP $SRC.ld lout.li
+</rverb>
+
+<![ %epsfig [<verb>
+
+echo \\epsfig{file=$TARGET}
+</verb> ]]>
+<![ %grphcs [<verb>
+
+echo \\includegraphics{$TARGET}
+</verb>]]>
+
+</literate>
+
+<sect1 id="roff2latex">roff2latex
+
+The converter from roff to LaTeX goes through encapsulated PostScript.
+Therefore you need a roff command which can produce PostScript. Here 
+<code/groff/ is used.
+
+Unfortunatly groff can't write encapsulated PostScript. You need to
+have <code/bbset/ installed. (It comes with typeset.) See
+documentation for bbset for details.
+
+<literate file="roff2latex"<verb>
+#!/bin/sh
+TARGET=`basename $2`.eps
+</verb>
+
+<![ %local [ <rverb>
+cat > /tmp/mk$$ <<EOF
+$TARGET: $1
+	gtbl $1 | groff -Tps | &instdir;/bin/bbset >$TARGET
+EOF
+make -f /tmp/mk$$ 1>&amp;2
+rm /tmp/mk$$
+</rverb> ]]>
+<![ %remote [ <verb>
+FILE=`basename $1`
+rcp $1 $REMOTENAME@$REMOTEHOST:remote/$FILE
+rsh $REMOTEHOST -l $REMOTENAME "cd remote;\
+  gtbl $FILE | groff -Tps | ./bbset" >$TARGET
+rsh $REMOTEHOST -l $REMOTENAME rm remote/$FILE
+</verb>]]>
+<![ %epsfig [
+<verb>
+echo \\epsfig{ file=$TARGET }
+</verb>]]>
+<![ %grphcs [
+<verb>
+echo \\includegraphics{$TARGET}
+</verb>]]>
+</literate>
+
+<sect1 id="tgif2latex">tgif2latex
+
+<literate file="tgif2latex"<rverb>
+#!/bin/sh
+TARGET=`basename $2 .obj`.eps
+cat > /tmp/mk$$ <<EOF
+$TARGET: $1
+	@cp $1 $2
+	tgif -print -eps -o. $2 2> /dev/null
+	@rm $2
+EOF
+make -f /tmp/mk$$ 1>&amp;2
+rm /tmp/mk$$
+
+</rverb>
+<![ %epsfig [ <verb>
+echo \\epsfig{ file=$TARGET }
+</verb>]]>
+<![ %grphcs [ <verb>
+echo \\includegraphics{$TARGET}
+</verb>]]>
+</literate>
+
+<sect id="Lout converters">Lout
+
+Lout understands only two notations: native lout code and encapsulated
+PostScript.
+
+<sect1 id="Lout notations">Notations
+
+<literate file="&notaent;"<rverb>
+<![ %Lout [
+
+<!NOTATION eps SYSTEM "&instdir;/bin/eps2lout %f %S">
+<!NOTATION fig SYSTEM "&instdir;/bin/fig2lout %f %S">
+<!NOTATION latex SYSTEM "&instdir;/bin/latex2lout %f %S" >
+<!NOTATION lout SYSTEM "cat %f" >
+<!NOTATION lfig SYSTEM "cat %f" >
+<!NOTATION roff SYSTEM "&instdir;/bin/roff2lout %f %S" >
+<!NOTATION tgif SYSTEM "&instdir;/bin/tgif2lout %f %S">
+
+]]>
+
+</rverb</>
+
+<sect1 id="eps2lout">eps2lout
+
+Including eps into Lout documents is pretty simple:
+protect the file name and echo the lout code.
+
+<literate file="eps2lout"<verb>
+#!/bin/sh
+cp $1 $2
+
+echo @VContract{// @IncludeGraphic{ \"$2\" }// }
+</verb</>
+
+<sect1 id="fig2lout">fig2lout
+
+<literate file="fig2lout"<verb>
+#!/bin/sh
+FILE=`basename $2 .fig`
+SRC=`basename $1`
+TARGET=$FILE.eps
+
+</verb>
+<![ %remote [<verb>
+rcp $1 $REMOTENAME@$REMOTEHOST:remote/$SRC
+rsh $REMOTEHOST -l $REMOTENAME fig2dev -L ps remote/$SRC > $TARGET
+rsh $REMOTEHOST -l $REMOTENAME rm -f remote/$SRC
+</verb> ]]>
+<![ %local [ <rverb>
+cat > /tmp/mk$$ <<EOF
+$TARGET: $1
+	fig2dev -L ps $1 $TARGET
+EOF
+make -f /tmp/mk$$ 1>&amp;2
+rm /tmp/mk$$
+#old: fig2dev -L ps $1 $TARGET
+</rverb> ]]> <verb>
+
+#echo @IncludeGraphic{ \"$TARGET\" }
+echo @VContract{// @IncludeGraphic{ \"$TARGET\" }// }
+</verb</>
+
+<sect1 id="latex2lout">latex2lout
+
+<literate file="latex2lout"<rverb>
+#!/bin/sh
+TARGET=`basename $2 .tex`.eps
+&instdir;/bin/latex2eps- $1 $TARGET
+echo @IncludeGraphic{ \"$TARGET\" }
+</rverb</>
+
+<sect1 id="roff2lout">roff2lout
+
+<literate file="roff2lout"<verb>
+#!/bin/sh
+TARGET=$2.eps
+</verb>
+
+<![ %local [ <rverb>
+gtbl $1 | groff -Tps | &instdir;/bin/bbset >$TARGET
+</rverb> ]]>
+<![ %remote [ <verb>
+FILE=`basename $1`
+rcp $1 $REMOTENAME@$REMOTEHOST:remote/$FILE
+rsh $REMOTEHOST -l $REMOTENAME "cd remote;\
+  gtbl $FILE | groff -Tps | ./bbset" >$TARGET
+rsh $REMOTEHOST -l $REMOTENAME rm remote/$FILE
+</verb>]]>
+
+<verb>
+echo @IncludeGraphic{ \"$TARGET\" }
+</verb>
+</literate>
+
+<sect1 id="tgif2lout">tgif2lout
+
+<literate file="tgif2lout"<verb>
+#!/bin/sh
+TARGET=`basename $2 .obj`.eps
+
+</verb>
+<![ %remote [<rverb>
+SRC=`basename $1`
+rcp $1 $REMOTENAME@$REMOTEHOST:remote/$SRC
+rsh $REMOTEHOST -l $REMOTENAME &null
+"cd remote; tgif -print -eps $SRC; cat $TARGET" > $TARGET 2> /dev/null
+rsh $REMOTEHOST -l $REMOTENAME rm -f remote/$SRC remote/$TARGET
+</rverb> ]]>
+<![ %local [ <rverb>
+cat > /tmp/mk$$ <<EOF
+$TARGET: $1
+	@cp $1 $2
+	tgif -print -eps -o. $2 2> /dev/null
+	@rm $2
+EOF
+make -f /tmp/mk$$ 1>&amp;2
+rm /tmp/mk$$
+#old: tgif -print -eps -o. $1 2> /dev/null
+</rverb> ]]> <verb>
+
+echo @IncludeGraphic{ \"$TARGET\" }
+</verb</>
+
+<sect id="Man converters">Man
+
+Man also know about almost nothing. We don't need any script, just
+some comand lines:
+
+<literate file="&notaent;"<verb>
+<![ %Man [
+
+<!NOTATION fig SYSTEM "echo Figure %s not representable." >
+<!NOTATION eps SYSTEM "echo Figure %s not representable." >
+<!NOTATION latex SYSTEM "cat %f" >
+<!NOTATION lout SYSTEM "cat %f" >
+<!NOTATION lfig SYSTEM "cat %f" >
+<!NOTATION roff SYSTEM "tbl %f | eqn | pic " >
+<!NOTATION tgif SYSTEM "echo Figure %s not representable." >
+]]>
+
+</verb</>
+
+<sect id="latex2eps-">latex2eps-
+
+<note>
+Naming convention: the trailing - means this is not a complete handler
+for a notation, instead it produces a second format.
+</note>
+
+Converts $1 from latex into $2 eps.
+
+Please note, that you don't need a <code/\documenttype{..}/,
+<code/\begin{document}/ and <code/\end{document}/. Moreover you are
+supposed not to have any.
+
+<literate file="latex2eps-"<verb>
+#!/bin/sh
+FILE=`basename $1 .tex`
+TMPTEX=tmp$$
+cat > $TMPTEX.tex << EOF
+\documentstyle{article}
+\pagestyle{empty}
+\begin{document}
+EOF
+cat $1 >> $TMPTEX.tex
+echo ' \end{document}' >> $TMPTEX.tex
+</verb>
+
+<![ %remote [ <verb>
+rcp $TMPTEX.tex $REMOTENAME@$REMOTEHOST:remote/$TMPTEX.tex
+rsh $REMOTEHOST -l $REMOTENAME "cd remote;latex $TMPTEX.tex >/dev/null"
+rsh $REMOTEHOST -l $REMOTENAME "cd remote; \
+    dvips -q -E $TMPTEX; cat $TMPTEX.ps" >$FILE.eps
+rsh $REMOTEHOST -l $REMOTENAME "rm -f remote/$TMPTEX.*"
+</verb> ]]>
+
+<![ %local [ <rverb>
+latex $TMPTEX.tex >/dev/null
+dvips -q -E -o $FILE.eps $TMPTEX >/dev/null 2>/dev/null
+#dvips -q -E $TMPTEX
+#cat $TMPTEX.ps >$FILE.eps
+</rverb> ]]>
+
+<verb>
+rm -f $TMPTEX.*
+</verb>
+</literate>

@@ -1,0 +1,615 @@
+#!/usr/bin/perl
+#                                                                  -*- perl -*-
+
+# A rewrite of the ugly old C News inews (as of Jul.23, 1993 or C News XT 1.3)
+# Fast, feature enhanced and MIME conformant.
+# Written by Olaf Titz <olaf@inka.de>, Jun 95. Public domain.
+# $Id: inews,v 2.1 1995/11/10 22:25:27 olaf Exp $
+
+# This is supposed to work like the original, except for the following
+# additional features:
+# - Adds MIME headers if article has 8-bit characters.
+# - Encodes quoted-printable or with an external program if desired.
+# - Encodes headers as of MIME if they have 8-bit characters.
+# - Deletes redundant/forbidden distributions.
+# - Various Message-ID formats configurable.
+# - Checks header syntax, esp. address and date lines.
+# - "Trusted" users may supply From/Sender lines.
+# ...and missing features:
+# - The 64k size limit.
+# - Rewriting of obsolete control message syntax (get your readers fixed)
+# Options like -d and -x may appear only once due to getopts usage.
+
+# -----------------------------------------------------------------------------
+# Configurable options. Tailor this!
+
+$Charset = "iso-8859-1";    # Default for headers
+*MakeID = MakeID_cr;        # or _simple or _xt, see below
+*MakeAddr = MakeAddr_1;     # or _2, see below
+$newsmaster = "news";
+@trusted = ("root", "news", "uucp", "daemon"); 
+# users who may supply their own From/Sender lines or LOGNAME
+$userelay = 0;
+# Set this to 1 if your relaynews is setuid (older versions)
+
+# News configuration options
+# =()<$newsctl = "@<NEWSCTL>@";>()=
+$newsctl = "/var/lib/news";
+# =()<$newsbin = "@<NEWSBIN>@";>()=
+$newsbin = "/var/lib/news/bin";
+# =()<umask(@<NEWSUMASK>@);>()=
+umask(022);
+# =()<$ENV{PATH} = "@<NEWSPATH>@:$newsbin/relay:$newsbin/input:$newsbin";>()=
+$ENV{PATH} = "/bin:/usr/bin:$newsbin/relay:$newsbin/input:$newsbin";
+# End of configurable options.
+
+# -----------------------------------------------------------------------------
+$home=$ENV{HOME};
+@Month=("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec");
+$Suser="A-Za-z0-9._+!\$%&/=-";  # Characters that may appear in user names
+				# (but allowing for ! and % addressing)
+$Sdom="A-Za-z0-9_+\$/=-";       #                        ... in domain names
+$Saddr="[$Suser]+@[$Sdom]+((\\.[$Sdom]+)+)"; # internet address syntax
+# Don't change this. Code below depends on the correct order and nesting
+# of () subexpressions!
+
+select STDOUT; $|=1;
+require "getopts.pl";
+&Getopts("pd:ANVWx:hMDt:n:e:F:d:a:f:o:C:S");
+
+# inews -p : just feed given files to relaynews (obsolete!)
+if ($opt_p) {
+    $_ = join(" ", @ARGV);
+    exec "cat $_ | relaynews -r";
+    exit 1;
+}
+if ($opt_C) { # this is long gone
+    print STDERR "Use addgroup or generate a proper control message!\n";
+    exit 1;
+}
+
+$SIG{HUP}=$SIG{INT}=$SIG{PIPE}=$SIG{TERM}="Signal";
+# Temporary files
+$tmpdir=($ENV{TMPDIR} || "/tmp");
+$tmphdr="$tmpdir/in.$$.hdr";
+$tmpinb="$tmpdir/in.$$.inb";
+$tmpbdy="$tmpdir/in.$$.bdy";
+$tmpres="$tmpdir/in.$$.res";
+open(HEAD, ">$tmphdr") || &Bailout("");
+# Touch $tmpbdy for the benefit of dead.article
+# Article is assembled in $tmpinb first and then moved over to $tmpbdy
+open(BODY, ">$tmpbdy") || &Bailout("");
+open(BODY, ">$tmpinb") || &Bailout("");
+select BODY; $|=1; print BODY "\n";
+
+# -----------------------------------------------------------------------------
+# Try and find out the poster's name and host.
+if (open(F,"<$newsctl/mailname")) {
+    $host=<F>; close F;
+} else {
+    $host=`newshostname`;
+    if ($host=~tr/.//c) { $host.=".UUCP"; }
+}
+$host=~tr/\021-\176//cd;
+$user=(getlogin || (getpwuid($<))[0]);
+$trusted_user=grep(/$user/, @trusted);
+if ($trusted_user) {
+    $user=$ENV{LOGNAME} if $ENV{LOGNAME};
+}
+$user="nobody" unless $user; # the last resort
+$user=~s/\s.*//; $user=~s/[\!]*!//;
+$name=$ENV{NAME};
+if (!$name) {
+    if (open(F, "<$home/.name")) {
+	$name=<F>; $name=~tr/\021-\176//cd; close F;
+    } else {
+	@_=getpwnam($user);
+	if ($#_>0) {
+	    $name = $_[6];
+	} else {
+	    $name=`ypmatch "$user" passwd`;
+	    split(/:/, $name); $name=$_[4]; 
+	}
+	$name=~s/,.*$//;
+	# Tailor: for BTL RJE format, use this:
+	# $name=~s/^[^-]*-\s*//; $name=~s/ \(.*$//;
+	# otherwise, Berkeley "&" notation: capitalized login name
+        $name=~s/&/\u$user/;
+    }
+}
+
+# -----------------------------------------------------------------------------
+# Construct the standard headers.
+$from=&MakeAddr($name, $user, $host);
+@_=gmtime;
+%hdr=(
+      "path", "not-for-mail", # yes, this is standard usage by now
+      "from", $from,
+      "message-id", sprintf('<%s@%s>', &MakeID, $host),
+      "date", sprintf('%02d %s %04d %02d:%02d:%02d GMT',
+		      $_[3], $Month[$_[4]], $_[5]+1900, $_[2], $_[1], $_[0]),
+      "organization", ($opt_o || $ENV{ORGANIZATION}),
+      );
+@hdr=(control, newsgroups, path, from, subject, message-id, date, sender);
+# Syntax modes
+%hmo=("from",1, "sender",1, "reply-to",1, "approved",1,       # address field
+      "newsgroups",2, "message-id",2, "path",2, "control",2, 
+      "followup-to",2, "references",2, "distribution",2,
+      "also-control",2, "supersedes",2,                       # control text
+      "date",3, "expires",4,                                  # date
+      ); # everything else: arbitrary text
+
+if ($opt_a) { $hdr{"approved"} = $opt_a; }
+if ($opt_c) { $hdr{"control"} = $opt_c; }
+if ($opt_d) { $hdr{"distribution"} = $opt_d; }
+if ($opt_e) { $hdr{"expires"} = $opt_e; }
+if ($opt_f) { $hdr{"from"} = $opt_f; }
+if ($opt_n) { $hdr{"newsgroups"} = $opt_n; }
+if ($opt_r) { $hdr{"reply-to"} = $opt_r; }
+if ($opt_t) { $hdr{"subject"} = $opt_t; }
+if ($opt_F) { $hdr{"references"} = $opt_F; }
+
+# -----------------------------------------------------------------------------
+# Read the input. First see if there are headers (ignore -h anyway)
+$inbody=$lines=$contentlen=$UseMIME=0; $lasthdr="";
+Line: while(<>) {
+    if ($inbody) {
+	tr/\001-\007\013\015-\037//d; # no dirty tricks here
+	if (($inbody==1) && (tr/ \011\012//c)) { $inbody=2; }
+	# Ignore blank lines, including lines consisting entirely
+	# of whitespace, at start of body.
+	if ($inbody>1) {
+	    print BODY; ++$lines; $contentlen+=length;
+	    if (tr/\200-\377//) { $UseMIME=1; }
+	}
+	if (!tr/\012//) { print BODY "\n"; } # make sure last line is complete
+    } else {
+	chop;
+	if (/^\s/) {
+	    if ($lasthdr) { # squash header continuation line
+		s/^\s*/ /; $hdr{$lasthdr}.=$_; next Line;
+	    } else { # first line not a header
+		$inbody=1; $_.="\n"; redo Line;
+	    }
+	}
+	if (/^$/) {
+	    $inbody=1;
+	} elsif (/^([^ :]+):(\s+(.*))?/) { # Header syntax
+	    $lasthdr=$1; $lasthdr=~tr/A-Z/a-z/; $hdr{$lasthdr}=$3;
+	} else {
+	    if ($lasthdr) { # Non-header lines in header?
+		&Bailout("Header syntax error");
+	    } else { # Article starts with body
+		$inbody=1; $_.="\n"; redo Line;
+	    }
+	}
+    }
+}
+
+# -----------------------------------------------------------------------------
+# Input is done. Do the rest in the background.
+if (!($opt_N||$opt_W)) {
+    if (fork()>0) {
+	exit 0;
+    }
+}
+
+# Append signature, 4 lines is enough
+if ((!$opt_S) && (open(F, "<$home/.signature"))) {
+    print BODY "-- \n"; $siglines=1;
+  Sig: while(<F>) {
+      tr/\001-\007\013\015-\037//d; 
+      print BODY;
+      if (tr/\200-\377//) { $UseMIME=1; }
+      if (++$siglines>4) { last Sig; }
+  }
+    close F; $lines+=$siglines;
+}
+close BODY;
+
+# Additional header manipulations...
+if (!$hdr{"organization"}) {
+    if (open(F, "<$newsctl/organization")) {
+	$hdr{"organization"}=<F>; chop $hdr{"organization"};
+	close F;
+    }
+}
+$hdr{"path"}=~s/^$host\!//o; # for silly readers
+if (!$trusted_user) {
+    $hdr{"sender"}="";
+    if ($hdr{"from"} ne $from) {
+	$hdr{"sender"}=$from;
+    }
+}
+$hdr{"lines"}=$lines;
+$hdr{"distribution"}=~s/^(world)|(de)$//; # Take out forbidden distribs
+$ngs=$hdr{"newsgroups"}; $subj=$hdr{"subject"}; # save for later
+
+# -----------------------------------------------------------------------------
+# Output the headers, required standard headers first
+$HeadErr="";
+foreach $i (@hdr) {
+    printf HEAD "%s: %s\n", &canonhdr($i), &chkhdr($i,$hdr{$i}) if ($hdr{$i});
+    delete $hdr{$i};
+}
+foreach $i (keys %hdr) {
+    printf HEAD "%s: %s\n", &canonhdr($i), &chkhdr($i,$hdr{$i}) if ($hdr{$i});
+}
+close HEAD;
+
+# -----------------------------------------------------------------------------
+# Do additional encoding of the body, if required.
+$encoded=0;
+if ($hdr{"mime-version"}) {
+    $UseMIME=0; # MIME articles are left alone
+}
+if ($UseMIME) {
+    # encode if this article isn't MIME already, but needs encoding
+    # Find out which one to use.
+    $_=`gngp -a -r $ngs $newsctl/encodings 2>/dev/null`;
+    s/\n.*//g;
+    if (!$_) {
+	&Bailout("Can't find encoding for $ngs, 8bit chars not allowed");
+    }
+    ($g,$Charset,$Encoding,$f) = split(/\s+/, $_, 4);
+    if (($f) && ($f ne "-")) {
+	# Use an external program to encode
+	if (!system("$f <$tmpinb >$tmpbdy")) {
+	    $encoded=1;
+	    if (($Charset eq "-") || ($Encoding eq "-")) {
+		$UseMIME=0;
+	    }
+	} else {
+	    &Bailout("Error while encoding with $f");
+	}
+    } elsif ($Encoding eq "quoted-printable") {
+	# Quoted-printable encoding
+	open(F, "<$tmpinb") || &Bailout("");
+	open(BODY, ">$tmpbdy") || &Bailout("");
+	while(<F>) {
+	    chop; s/=/=3D/g; s/ $/=20/; s/\t$/=09/;
+	    while( /([^\021-\176])/ ) {
+		$_=sprintf("%s=%02X%s", $`, ord($1), $');
+	    }
+	    while (length>76) {
+		printf BODY "%s=\n", substr($_,0,75);
+		substr($_,0,75)="";
+	    }
+	    print BODY "$_\n";
+	}
+	close F; close BODY; $encoded=1;
+    }
+}
+if (!$encoded) {
+    unlink($tmpbdy);
+    link($tmpinb, $tmpbdy) || &Bailout("");
+}
+
+# -----------------------------------------------------------------------------
+# Output additional headers.
+if ($UseMIME) {
+    open(HEAD, ">>$tmphdr") || &Bailout("");
+    print HEAD "MIME-Version: 1.0
+Content-Type: text/plain; charset=$Charset
+Content-Transfer-Encoding: $Encoding\n";
+    # oops, this is nonstandard: Content-Length: $contentlen
+    close HEAD;
+}
+
+# Check the required headers etc.
+# Do this now that we have the header/body files for saving to dead.article.
+if (!$ngs) { &Bailout("Required Newsgroups header missing"); }
+if (!$subj) { &Bailout("Required Subject header missing"); }
+if (!$contentlen) { &Bailout("Empty article"); }
+if ($ngs=~/\s/) { &Bailout("Whitespace in Newsgroups header"); }
+if ($HeadErr) { &Bailout($HeadErr); }
+
+# -----------------------------------------------------------------------------
+# Now determine what to do with the article.
+# Look for the proper newsgroups
+$p=$hdr{"control"} ? "control" : $ngs;
+$p=~s/([].*+()[])/\\$1/g; $p=~tr/,/|/; # make the newsgroups an egrep pattern
+open(F, "egrep -e '^($p) ' $newsctl/active |") ||
+    &Bailout("Can't search the active file");
+# egrep has proven to be faster than doing the search here
+$valid=0;
+while (<F>) {
+    $valid=1;
+    ($i,$x,$y,$f)=split;
+    if ($f=~/^[nx]/) {
+	&Bailout("Posting to $i is not allowed");
+    }
+    if (($f=~/^m/) && (!$hdr{"approved"}) && (!$mailto)) {
+	# Determine where the moderator is.
+	$_=`sed 's/^backbone/all /' $newsctl/mailpaths | gngp -a -r $i 2>/dev/null`;
+	s/\n.*//g;
+	if (!$_) {
+	    &Bailout("Can't find the moderator for $i");
+	}
+	($p,$m)=split;
+	$i=~tr/./-/;
+	$mailto=sprintf($m, $i);
+    }
+}
+close F;
+if (!$valid) {
+    &Bailout("No valid newsgroups in $ngs");
+}
+
+# -----------------------------------------------------------------------------
+# Just print it
+# This is incompatible with C News as this won't mail an article to the
+# moderator if -N is given. I think this is more logical.
+if ($opt_N) {
+    if ($mailto) {
+	print STDOUT "# Would mail article to $mailto\n";
+    }
+    system "cat $tmphdr $tmpbdy";
+    &Cleanup(0);
+}
+
+# -----------------------------------------------------------------------------
+# Mail it to the moderator
+if ($mailto) {
+    $ret=system("cat $tmphdr $tmpbdy | mail $mailto") >>8;
+    if ($ret) {
+	&Bailout("Mail returned $ret");
+    } else {
+	print STDOUT "inews: Mailing your article to $mailto\n";
+	&Cleanup(0);
+    }
+}
+
+# -----------------------------------------------------------------------------
+# Look if we've got enough space. Wait for it if -A given.
+if ($opt_A) {
+    $rpt=0;
+    while (`spacefor 1 articles` < 1) {
+	if (++$rpt==5) {
+	    if (open(F, "|mail $newsmaster")) {
+		print F "Subject: Out of disk space\n\n";
+		print F "There is too little space for inews!";
+		close F;
+	    }
+	}
+	sleep 30;
+    }
+} else {
+    if (`spacefor 1 articles` < 1) {
+	&Bailout("Out of disk space while posting");
+    }
+}
+
+# -----------------------------------------------------------------------------
+# Finally, post the article.
+$ropts="-s";
+if (!$opt_V) { $ropts.=" -i"; }
+if ($opt_x) { $ropts.=" -x $opt_x"; }
+if ($opt_d) { $ropts.=" -d $opt_d"; }
+if ($userelay) {
+    $relaynews = "relaynews $ropts";
+} else {
+    $relaynews = "newsspool -g0";
+}
+
+if (open(F, "<$newsctl/server")) {
+    $server=<F>; $server=~tr/\021-\176//cd; close F;
+    $me=`hostname`; $me=~tr/\021-\176//cd;
+    if ($server eq $me) { $server=""; }
+}
+if ($server) {
+    # Post via rsh on the server machine.
+    open(F, ">$tmpres") || &Bailout("");
+    select F; $|=1;
+    print F "PATH=$ENV{PATH}\nexport PATH\ntmpf=/tmp/irsh\$\$\n";
+    print F "sed -e 's/^-//' >\$tmpf <<!\n";
+    close F;
+    system("cat $tmphdr $tmpbdy | sed -e 's/^/-/' >>$tmpres");
+    open(F, ">>$tmpres") || &Bailout("");
+    print F "!\n$relaynews <\$tmpf\necho status \$?\nrm -f \$tmpf\n";
+    close F; select STDOUT;
+    open(F, "rsh $server /bin/sh <$tmpres |") ||
+	&Bailout("Can't rsh to $server");
+    while(<F>) {
+	if (/^status (.*)/) { $ret=$1; } else { print STDOUT; }
+    }
+    close F;
+} else {
+    $ret=system("cat $tmphdr $tmpbdy | $relaynews") >>8;
+}
+if ($ret) {
+    $relaynews =~ s/\s.*//;
+    &Bailout("$relaynews returned $ret"); 
+}
+if (!-s "$newsctl/sys") {
+   &Bailout("warning: Article posted but won't be distributed - no sys file"); 
+}
+
+&Cleanup(0);
+
+# -----------------------------------------------------------------------------
+# Subroutines
+
+# --- Canonicalize header string
+sub canonhdr
+{
+    local($_)=@_;
+    tr/A-Z/a-z/; s/^(.)/\u$1/; s/-(.)/-\u$1/g;
+    if ($_ eq "Message-Id") { $_="Message-ID"; }
+    # defhdrs.awk claimed this is the correct spelling
+    s/^Nntp-/NNTP-/;
+    s/^Mime-/MIME-/;
+    return $_;
+}
+
+# --- Check header syntax and RFC1522ize
+sub chkhdr
+{
+    local($f,$_)=@_;
+    local($t)=$hmo{$f};
+    if ($t==1) { # address
+	/^\s*($Saddr)\s*$/o && do {
+	    return $1;
+	};
+	/^\s*($Saddr)\s+\((.*)\)\s*$/o && do {
+	    local($a,$r)=($1,$4);
+	    return sprintf("%s (%s)", $a, &mimetag($r));
+	};
+	/^([^<>()]*)\s*\<($Saddr)\>\s*$/
+	    && do {
+		local($r,$a)=($1,$2);
+		return sprintf("%s<%s>", &mimetag($r), $a);
+	    };
+	$HeadErr .= sprintf("%s header: address syntax error\n",
+				&canonhdr($f));
+	return $_;
+    }
+    elsif ($t==2) { # verbatim
+	if (tr/\011\021-\176//c) {
+	    $HeadErr .= sprintf("%s header: contains illegal characters\n",
+				&canonhdr($f));
+	}
+	return $_;
+    }
+    elsif ($t>=3) { # current/future date
+	local($d) = `getabsdate '$_' 2>/dev/null`;
+	local($f1,$f2) = ($t==3?90:1, $t==3?1:180);
+	if (!$d) {
+	    $HeadErr .= sprintf("%s header: date syntax error\n",
+				&canonhdr($f));
+	} elsif ($d<(time-3600*24*$f1)) {
+	    $HeadErr .= sprintf("%s header: too far in the past\n",
+				&canonhdr($f));
+	} elsif ($d>(time+3600*24*$f2)) {
+	    $HeadErr .= sprintf("%s header: too far in the future\n",
+				&canonhdr($f));
+	}	    
+	return $_;
+    }
+    else { # text
+	return &mimetag($_);
+    }
+}
+
+# --- RFC1522ize header contents
+sub mimetag
+{
+    local($_)=@_;
+    if (tr/\021-\176//c) {
+	# $UseMIME=1; the author of rfc1522 explicitly confirms that
+	# a MIME-Version header is unnecessary just for marking an rfc1522
+	# encoded header line!
+	s/=/=3D/g;
+	while( /([^\x20\x21\x23-\x26\x2a\x2b\x2d-\x3e\x40-\x5b\x5d-\x7e])/ ) {
+	    $_=sprintf("%s=%02X%s", $`, ord($1), $');
+	}
+	if (length($_)+length($Charset)>68) {
+	    # Split long fields. This is rather suboptimal and doesn't obey
+	    # the length limit in all cases, but better than nothing...
+	    split;
+	    foreach $i (@_) {
+		if ($i=~tr/=//) {
+		    $i=sprintf("=?%s?q?%s?=", $Charset, $i);
+		}
+	    }
+	    $_=join(" ", @_);
+	    s/\?= =\?$Charset\?q\?/_/go; # Squash adjacent encoded-words
+	    return $_;
+	}
+	s/ /_/g;
+	return sprintf("=?%s?q?%s?=", $Charset, $_);
+    }
+    return $_;
+}
+
+# --- Generate Message-ID string
+
+# Trivial algorithm
+sub MakeID_simple
+{
+    return sprintf("%ld.%d", time, $$);
+    # you could also use %l08X%04x or whatever
+}
+
+# C News XT algorithm
+sub MakeID_xt
+{
+    $MakeID_xt="ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+    $nMakeID_xt=length($MakeID_xt);
+    return &pMakeID_xt(int(time-627672773)/60) . &pMakeID_xt($$);
+    # Assumes PIDs won't wrap around in one minute. The magical constant
+    # is "the time I wrote this", according to mkid.c.
+}
+sub pMakeID_xt
+{
+    local($n,$_)=@_;
+    do {
+	$_.=substr($MakeID_xt,int($n%$nMakeID_xt),1);
+	$n=int($n/$nMakeID_xt);
+    } while($n);
+    return $_;
+}
+
+# C News Cleanup Release algorithm
+sub MakeID_cr
+{
+    # $MakeID_cr="0123456789ABCDEFGHIJKLMnopqrstuvwxyz";
+    # ouch, this is ugly, I prefer the following (no overlap possible):
+    $MakeID_cr="0123456789abcdefghijklmnopqrstuvwxyz";
+    $nMakeID_cr=length($MakeID_cr);
+    return &pMakeID_cr(time) . "." . &pMakeID_cr($$);
+}
+sub pMakeID_cr
+{
+    local($n,$_)=@_;
+    do {
+	$_=substr($MakeID_cr,int($n%$nMakeID_cr),1).$_;
+	$n=int($n/$nMakeID_cr);
+    } while($n);
+    return $_;
+}
+
+# --- Generate address string
+# gives From: Real Name <user@host>
+sub MakeAddr_1
+{
+    local($n,$u,$h)=@_;
+    return sprintf('%s%s<%s@%s>', $n, $n?" ":"", $u, $h);
+}
+# gives From: user@host (Real Name)
+sub MakeAddr_2
+{
+    local($n,$u,$h)=@_;
+    if ($n) {
+	return sprintf('%s@%s (%s)', $u, $h, $n);
+    }
+    return sprintf('%s@%s', $u, $h);
+}
+
+# --- Clean-up
+sub Signal
+{
+    &Bailout("Got SIG$_[0]");
+}
+
+sub Bailout
+{
+    local($_)=@_;
+    $_="Can't open temporary file" unless $_; # common case
+    print STDERR "inews: $_\n";
+    close HEAD; close BODY;
+    if (system "cat $tmphdr $tmpbdy >> $home/dead.article") {
+	print STDERR "inews: can't write $home/dead.article\n";
+    } else {
+	print STDERR "inews: article in $home/dead.article\n";
+    }
+    &Cleanup(1);
+}
+
+sub Cleanup
+{
+    unlink $tmphdr,$tmpinb,$tmpbdy,$tmpres;
+    exit $_[0];
+}
+# -----------------------------------------------------------------------------

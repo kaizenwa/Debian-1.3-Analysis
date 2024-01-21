@@ -1,0 +1,482 @@
+@node Extended Pascal
+@chapter About Pascal and Extended Pascal languages
+
+Pascal is a well-known programming language and hardly needs to
+be described here.  Notice, however, that some people's idea of
+Pascal is affected by acquaintance with such products as Turbo
+Pascal which differ from the Pascal standard and provide a lot
+of nonstandard extensions (some of which are compatible with
+the Extended Pascal standard).  Moreover, it is worth mentioning
+that the ISO Pascal standard defines two levels of the language,
+level 0 and level 1; the only difference between the levels is
+that level 1 supports the so-called conformant array schemas
+in parameter declarations.
+
+Extended Pascal is a standardized language which contains so
+significant extensions to Pascal that it is best regarded as
+a new language.  It is currently not very well known, and computer
+vendors do not seem to be eager to provide compilers for it.
+Thus, there is social need for GNU Pascal supporting Extended
+Pascal.
+
+@c This section was copied from the Extended Pascal FAQ,
+@c written by Berend de Boer.
+@c CIS: 100120,3121
+@c email: berend@@pobox.com
+
+@section A comparison of Borland Turbo Pascal with Extended Pascal
+
+As mentioned earlier, Turbo Pascal does not conform to any of the Pascal
+standards.  If you carefully chose a subset of unextended Pascal, you
+may be able to port code if you're lucky/careful.
+
+To be fair, Turbo Pascal has some wonderful features that make it very
+powerful in the environments in which it runs.  However, some of those
+@c
+@c here was: "those same features".  I disagree!!! -- PG, 2. Aug. 1996
+@c
+features are of little use on non Windows/DOS platforms and probably are
+not good candidates for standardization.
+
+There are several Turbo Pascal features which are semantically similar
+to features in unextended Pascal or Extended Pascal.  Here is a list of
+mappings between Turbo Pascal features and Extended Pascal features:
+
+@c Now the trouble begins: I have written a QuickStart guide for
+@c Borland Pascal users which contains essentially the same. -- PG, 2. Aug 1996
+
+@itemize @bullet
+@item
+Case constructs
+
+@enumerate a
+@item
+Extended Pascal uses @code{otherwise} instead of @code{else}.
+
+@emph{Borland Pascal}
+@smallexample
+case c of
+  'A' : ;
+  'B' : ;
+  else ...;
+end;
+@end smallexample
+
+@emph{Extended Pascal}
+@smallexample
+case c of
+  'A' : ;
+  'B' : ;
+  otherwise ...;
+end;
+@end smallexample
+
+@item
+Missing cases cause Extended Pascal compilers to halt. In the case
+statement above if you had no @code{otherwise} clause and char c had
+the value 'C', you got an error (note, this would be unnoticed in
+Borland Pascal).
+
+@end enumerate
+
+@item
+Procedure and function types and variables
+
+Here is an area of subtle differences.  Turbo Pascal has true
+procedure/function types but doesn't have standard Pascal's
+procedural/functional parameters.
+
+@emph{Borland Pascal}
+@smallexample
+type
+  CompareFunction = function(Key1, Key2 : string) : integer;
+
+function Sort(Compare : CompareFunction);
+begin
+  ...
+end;
+@end smallexample
+
+@emph{Extended Pascal}
+@smallexample
+function Sort(Compare : function(Key1, Key2 : string) : integer);
+begin
+  ...
+end;
+@end smallexample
+
+Moving from Turbo Pascal to Extended Pascal might be difficult
+if the Turbo Pascal program saves, compares, trades, etc. procedure
+values.  For example, an array of procedure values isn't possible
+in Extended Pascal.  Moving the other way is a little easier as
+show by the above examples.
+
+@item
+Strings
+
+@enumerate a
+@item
+Borland Pascal's string type has a special case, namely @code{string}
+without a length meaning the same as @code{string[255]}. There is no
+default in Extended Pascal so you have to change all string types
+to @code{string(255)}. Example:
+
+@smallexample
+var
+  s : string;
+@end smallexample
+
+becomes:
+@smallexample
+var
+  s : string(255);
+@end smallexample
+
+Note also that you have to use parentheses instead of brackets.
+
+@item
+A nice pitfall is the pointer to string as in:
+
+@smallexample
+type
+  PString = ^String;
+@end smallexample
+
+In Extended Pascal this is a pointer to a schema type! Don't
+forget to translate this to:
+
+@smallexample
+type
+  string255 = string(255);
+  PString = ^string255;
+@end smallexample
+
+If you indeed want to use String as a schema pointer you can
+define things like:
+
+@smallexample
+type
+  MyStr : ^String;
+begin
+  New(MyStr, 1024);
+end;
+@end smallexample
+
+to allocate 1024 bytes of string space.
+
+@item
+As you could see above, Extended Pascal has no 255 byte limit
+for strings. It is however save to assume a limit of about
+32000 bytes. At least Prospero's Extended Pascal limits
+strings to 32760 bytes. GNU Pascal seems to allow larger
+strings.  DEC Pascal limits strings to 65535 bytes.
+
+@end enumerate
+
+@item
+Constant variables
+
+@enumerate a
+@item
+Extended Pascal translates Borland's gruesome:
+
+@smallexample
+const
+  i:integer = 0;
+@end smallexample
+
+to:
+
+@smallexample
+var
+  i : integer value 0;
+@end smallexample
+
+@c "Much nicer ain't it?"
+@c I agree, but this is documentation, so be careful with opinions ...
+@c -- PG, 2. Aug. 1996
+
+@item
+@c Even nicer is that 
+You can also assign initialization values to types. Like:
+
+@smallexample
+type
+  MyInteger = integer value 0;
+
+var
+  i : MyInteger;
+@end smallexample
+
+All variables of type MyInteger are automatically initialized to
+0 when created.
+
+@item
+Constant arrays of type string are translated from:
+
+@smallexample
+const
+  MyStringsCount = 5;
+type
+  Ident = string[20];
+const
+  MyStrings : array [1..MyStringsCount] of Ident = (
+                'EXPORT', 'IMPLEMENTATION', 'IMPORT', 'INTERFACE',
+                'MODULE');
+@end smallexample
+
+to:
+
+@smallexample
+const
+  MyStringsCount = 5;
+type
+  Ident = string(20);
+var
+  MyStrings : array [1..MyStringsCount] of Ident value [
+    1:'EXPORT'; 2:'IMPLEMENTATION'; 3:'IMPORT';
+    4:'INTERFACE'; 5:'MODULE'];
+@end smallexample
+
+There seem to be pros and cons to each style.
+
+Some folks don't like having to specify an index since it requires
+renumbering if you want to add a new item to the middle.  However,
+if you index by an enumerated type, you might be able to avoid
+major renumbering by hand.
+
+@end enumerate
+
+@item
+Variant records
+@c does not hold any more for GNU Pascal. -- PG, 2. Aug. 1996
+
+The following construction is not allowed in Extended Pascal:
+@smallexample
+type
+  PersonRec = record
+    Age : integer;
+    case EyeColor : (Red, Green, Blue, Brown) of
+      Red, Green : (Wears_Glasses : Boolean);
+      Blue, Brown : (Length_of_lashes : integer);
+    end;
+  end;
+@end smallexample
+
+The variant field needs an explicit type. Code this as:
+
+@smallexample
+type
+  EyeColorType = (Red, Green, Blue, Brown);
+  PersonRec = record
+    Age : integer;
+    case EyeColor : EyeColorType of
+      Red, Green : (Wears_Glasses : Boolean);
+      Blue, Brown : (Length_of_lashes : integer);
+    end;
+  end;
+@end smallexample
+
+@item
+Units
+
+@enumerate a
+@item
+You can translate units almost automatically to Extended Pascal
+Modules, taking into account some differences of course.
+
+Extended Pascal does not automatically export everything named
+in a module, but you have to create seperate export clauses.
+
+For example translate the following unit:
+
+@smallexample
+unit A;
+
+interface
+
+uses
+  B, C;
+
+procedure D;
+
+implementation
+
+procedure D;
+begin
+end;
+
+end.
+@end smallexample
+
+to this module:
+
+@smallexample
+module A interface;
+
+export
+  A = (D);
+
+import
+  B;
+  C;
+
+procedure D;
+
+end.
+
+module A implementation;
+
+procedure D;
+begin
+end;
+
+end.
+@end smallexample
+
+You can have one or more export clauses and the name of an
+export clause doesn't have to be equal to the name of the
+module.
+
+You also see in this example how to translate the Borland
+Pascal "uses" clause to the Extended Pascal "import" clause.
+
+@item
+Borland Pascal allows you to have code in a unit that is
+executed once, at startup, to initialize things. You can
+translate this to Extended Pascal's "to begin do ..end"
+structure.
+
+@emph{Borland Pascal}
+@smallexample
+unit A;
+
+interface
+
+implementation
+
+begin
+  @{ do something @}
+end.
+@end smallexample
+
+@emph{Extended Pascal}
+
+@smallexample
+module A interface;
+end.
+
+module A implementation;
+
+to begin do begin
+  @{ do something @}
+end;
+
+end.
+@end smallexample
+
+Extended Pascal also has a @code{"to end do .... end"} so you can
+translate @code{Exit} handlers also.
+
+@end enumerate
+
+@item
+Files
+
+Extended Pascal treats files quite differently as Borland Pascal.
+I'm not going to treat file pointers, Get and Put here, but
+instead I focus on special Extended Pascal features.
+
+In Borland Pascal you can read any text file as follows:
+
+@smallexample
+var
+  t : text;
+  Line : string;
+begin
+  Assign(t, 'MYTEXT.TXT');
+  Reset(t);
+  while not eof(t) do  begin
+    readln(t, Line);
+    writeln(Line);
+  end;
+end;
+@end smallexample
+
+The @code{Assign} function associated the textfile @code{T} with the file
+@code{MYTEXT.TXT}.
+
+In Extended Pascal, files are considered entities external to your
+program. External entities, which don't need to be files, need to
+be bound to a variable your program. Any variable to which
+external entities can be bound needs to be declared bindable. So
+the variable declaration of t becomes:
+
+@smallexample
+var
+  t : bindable text;
+@end smallexample
+
+Extended Pascal has the bind function that binds a variable with
+an external entity.  Here is an Extended Pascal procedure that
+emulates the Assign procedure in Turbo Pascal.
+
+@smallexample
+procedure Assign(var t : text; protected Name : string);
+var
+  b : BindingType;
+begin
+  unbind (t);
+  b := binding (t);
+  b.Name := Name;
+  bind (t, b);
+  b := binding (t);
+end;
+@end smallexample
+
+Comments: the unbind procedure unbinds a bindable variable from
+its external entity. If it is not bound, nothing happens. The
+binding function initializes b. We call binding to set some fields
+of the BindingType record. Next we set the name field to the name
+of the file. Calling bind will bind t to the external entity. If
+we now call binding again, we get the current state of t's binding
+type. We can now check for example if the bind has succeeded by:
+
+@smallexample
+if not b.bound then
+  @{ do error processing @}
+@end smallexample
+
+Note that Prospero's Pascal defaults to creating the file if it
+does not exists! You need to use Prospero's local addition of
+setting @code{b.existing} to @code{true} to work-around this.
+
+I've not worked with binary files enough, so no advice yet on how
+to access them, but you access them much the same.
+
+As last an example of getting the size of a file.
+
+@smallexample
+function FileSize(filename : String) : LongInt;
+var
+  f : bindable file [0..MaxInt] of char;
+  b : BindingType;
+begin
+  unbind(f);
+  b := binding (f);
+  b.Name := filename;
+  bind(f, b);
+  b := binding(f);
+  SeekRead(f, 0);
+  if empty(f)
+    then  file_size := 0
+    else  file_size := LastPosition(f) + 1;
+  unbind(f);
+end(*file_size*);
+@end smallexample
+
+Prospero's Extended Pascal has a bug in this case. Replace the
+MaxInt in the type definition of f by a sufficiently large
+integer. GNU Pascal works correct in this case.
+
+@end itemize

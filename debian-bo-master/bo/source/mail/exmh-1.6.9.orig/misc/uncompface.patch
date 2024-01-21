@@ -1,0 +1,150 @@
+X-uri: <URL:http://www.cl.cam.ac.uk/users/pb>
+X-face: &@N3QE9h|>f`igFCkZ'a1`z=nNLXb}k>H(79G"V?@!&*yn)uhPBctF1vc}LD'{OA%$bsX+l 
+        [wN,I^G8kKj2NFxQrr@1C4QBC]hq5-%ZkV,^Zl/qE<0`zCQ1nM+]-N<^WG[H)]?d)A:L9AFgOU[Bj 
+        baY)uBAMz}h!fm^O0#
+To:	dingelde@igd.fhg.de
+cc:	exmh-users@parc.xerox.com, James Ashton <jaa@alfred.anu.edu.au>
+Subject: Re: buffered messages ("uncompface -X" patches)
+In-reply-to: Your message of Tue, 24 Jan 1995 22:14:23 -0800. <95Jan24.221432pst.7312@corvina.parc.xerox.com>
+Date:	Tue, 24 Jan 1995 23:50:01 -0800
+From:	Piete Brooks <Piete.Brooks@cl.cam.ac.uk>
+Message-ID: <"swan.cl.cam.:117920:950125075009"@cl.cam.ac.uk>
+
+In my mailbox this AM was a reply from the author of compface saying that he
+doesn't have the time to look after the compface routines right now, and that
+{un,}compface were intended as "sample" sources to show how to use the library.
+
+See below an initial stab (it was not intended for distributiuon -- I was
+expecting James to sanitize it when merging with the master sources!).
+The effect of this is that the requirement for "ikon2xbm" (and hence pbmplus,
+and all those extra processes, etc) disappears ...
+
+Here are the patches to uncompface to allow it to take "-X" ...
+
+*** cmain.c.dist	Thu Oct 24 03:28:07 1991
+--- cmain.c	Thu Dec 22 11:55:53 1994
+***************
+*** 29,32 ****
+--- 29,34 ----
+  char *outname = "<stdout>";
+  
++ int xbitmap=0;
++ 
+  /* basename of executable */
+  char *cmdname;
+*** file.c.dist	Wed Jun 19 07:29:13 1991
+--- file.c	Thu Dec 22 10:35:51 1994
+***************
+*** 128,131 ****
+--- 128,134 ----
+  	register char *s, *t;
+  	register int i, bits, digits, words;
++ 	extern int xbitmap;
++ 	int digsperword = DIGSPERWORD;
++ 	int wordsperline = WORDSPERLINE;
+  
+  	s = F;
+***************
+*** 132,135 ****
+--- 135,144 ----
+  	t = fbuf;
+  	bits = digits = words = i = 0;
++ 	if (xbitmap) {
++ 		sprintf(t,"#define noname_width 48\n#define noname_height 48\nstatic char noname_bits[] = {\n ");
++ 		while (*t) t++;
++ 		digsperword = 2;
++ 		wordsperline = 15;
++ 	}
+  	while (s < F + PIXELS)
+  	{
+***************
+*** 139,157 ****
+  			*(t++) = 'x';
+  		}
+! 		if (*(s++))
+! 			i = i * 2 + 1;
+! 		else
+! 			i *= 2;
+  		if (++bits == BITSPERDIG)
+  		{
+! 			*(t++) = *(i + HexDigits);
+  			bits = i = 0;
+! 			if (++digits == DIGSPERWORD)
+  			{
+  				*(t++) = ',';
+  				digits = 0;
+! 				if (++words == WORDSPERLINE)
+  				{
+  					*(t++) = '\n';
+  					words = 0;
+  				}
+--- 148,180 ----
+  			*(t++) = 'x';
+  		}
+! 		if (xbitmap) {
+! 			if (*(s++))
+! 				i = (i >> 1) | 0x8;
+! 			else
+! 				i >>= 1;
+! 		}
+! 		else {
+! 			if (*(s++))
+! 				i = i * 2 + 1;
+! 			else
+! 				i *= 2;
+! 		}
+  		if (++bits == BITSPERDIG)
+  		{
+! 			if (xbitmap) {
+! 				t++;
+! 				t[-(digits & 1) * 2] = *(i + HexDigits);
+! 			}
+! 			else *(t++) = *(i + HexDigits);
+  			bits = i = 0;
+! 			if (++digits == digsperword)
+  			{
++ 				if (xbitmap && (s >= F + PIXELS)) break;
+  				*(t++) = ',';
+  				digits = 0;
+! 				if (++words == wordsperline)
+  				{
+  					*(t++) = '\n';
++ 					if (xbitmap) *(t++) = ' ';
+  					words = 0;
+  				}
+***************
+*** 158,161 ****
+--- 181,188 ----
+  			}
+  		}
++ 	}
++ 	if (xbitmap) {
++ 		sprintf(t, "}\n");
++ 		while (*t) t++;
+  	}
+  	*(t++) = '\0';
+*** uncmain.c.dist	Thu Oct 24 03:28:07 1991
+--- uncmain.c	Thu Dec 22 09:58:34 1994
+***************
+*** 29,32 ****
+--- 29,34 ----
+  char *outname = "<stdout>";
+  
++ int xbitmap=0;
++ 
+  /* basename of executable */
+  char *cmdname;
+***************
+*** 60,63 ****
+--- 62,72 ----
+      if (*((*argv)++) == '/')
+        cmdname = *argv;               /* find the command's basename */
++ 
++   if (argc > 1 && !strcmp(argv[1], "-X"))
++     {
++       xbitmap++;
++       argc--;
++       argv++;
++     }
+  
+    if (argc > 3)

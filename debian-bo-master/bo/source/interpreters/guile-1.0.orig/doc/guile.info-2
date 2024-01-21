@@ -1,0 +1,1383 @@
+This is Info file guile.info, produced by Makeinfo version 1.67 from
+the input file guile.texi.
+
+
+File: guile.info,  Node: I/O Redirection,  Next: Soft Ports,  Prev: Structured I/O,  Up: Ports
+
+I/O Redirection
+===============
+
+ - Function: current-input-port
+ - Function: current-output-port
+ - Function: current-error-port
+     These each return the named port.
+
+ - Function: set-current-input-port PORT
+ - Function: set-current-output-port PORT
+ - Function: set-current-error-port PORT
+     These each establish the named port.
+
+ - Function: with-input-from-port PORT THUNK
+ - Function: with-output-to-port PORT THUNK
+ - Function: with-error-to-port PORT THUNK
+     Evaluate `thunk' with the named port set to PORT.
+
+     The binding of input, output or error port to PORT is valid within
+     the dynamic scope of the call to `with-*-to/from-port' but when
+     leaving that scope, the binding outside of the call to
+     `with-*-to/from-port' is restored.
+
+
+File: guile.info,  Node: Soft Ports,  Next: String Ports,  Prev: I/O Redirection,  Up: Ports
+
+Soft Ports
+==========
+
+  A "soft-port" is a port based on a vector of procedures capable of
+accepting or delivering characters.  It allows emulation of I/O ports.
+
+ - Function: make-soft-port VECTOR MODES
+     Returns a port capable of receiving or delivering characters as
+     specified by the MODES string (*note port-mode: Ports.).  VECTOR
+     must be a vector of length 6.  Its components are as follows:
+
+       0. procedure accepting one character for output
+
+       1. procedure accepting a string for output
+
+       2. thunk for flushing output
+
+       3. thunk for getting one character
+
+       4. thunk for closing port (not by garbage collection)
+
+     For an output-only port only elements 0, 1, 2, and 4 need be
+     procedures.  For an input-only port only elements 3 and 4 need be
+     procedures.  Thunks 2 and 4 can instead be `#f' if there is no
+     useful operation for them to perform.
+
+     If thunk 3 returns `#f' or an `eof-object' (*note eof-object?:
+     (r4rs)Input.) it indicates that the port has reached end-of-file.
+     For example:
+
+          (define stdout (current-output-port))
+          (define p (make-soft-port
+                     (vector
+                      (lambda (c) (write c stdout))
+                      (lambda (s) (display s stdout))
+                      (lambda () (display "." stdout))
+                      (lambda () (char-upcase (read-char)))
+                      (lambda () (display "@" stdout)))
+                     "rw"))
+          
+          (write p p) => #<input-output-soft#\space45d10#\>
+
+  [The set of functions needed to define a soft port could be improved
+upon.  For example, relying on single-character i/o neatly fits these
+ports into the standard R4RS i/o functions, but compromises a lot on
+potential performance when using soft ports.]
+
+
+File: guile.info,  Node: String Ports,  Next: File Ports,  Prev: Soft Ports,  Up: Ports
+
+String Ports
+============
+
+ - Function: call-with-output-string PROC
+ - Function: call-with-input-string STRING PROC
+     Call PROC with one argument, a `port'.
+
+     If the `port' is an output string, writes to the string accumulate
+     in a string which is returned from `call-with-input-string'.
+
+     If the `port' is an input string, reads from the port come from
+     STRING and the value of PROC is returned form
+     `call-with-input-string'.
+
+ - Function: with-input-from-string STRING THUNK
+ - Function: with-output-to-string THUNK
+ - Function: with-error-to-string THUNK
+     Evaluate THUNK with standard ports set to string ports.
+
+     `with-output-to-string' and `with-error-to-string' return the
+     string containing the corresponding output of thunk.
+
+     `with-input-from-string' returns the value of THUNK.
+
+
+File: guile.info,  Node: File Ports,  Next: Low-level File Port Operations,  Prev: String Ports,  Up: Ports
+
+File Ports
+==========
+
+ - Function: open-file STR MODE
+ - Function: open-input-file STR
+ - Function: open-output-file STR
+ - Function: open-io-file STR
+     Open a file, returning a PORT
+
+ - Variable: OPEN_READ
+ - Variable: OPEN_WRITE
+ - Variable: OPEN_BOTH
+     These are values that can be passed for the `mode' argument to
+     `open-file'.
+
+  [[Mode strings should be explained in detail (maybe cleaned up, too)]]
+
+ - Function: call-with-input-file STR PROC
+ - Function: call-with-output-file STR PROC
+     Call PROC with one argument, a port which is the file named by STR.
+
+     Both functions close the port after PROC returns.
+
+     Both return the value of PROC
+
+ - Function: with-input-from-file FILE THUNK
+ - Function: with-output-to-file FILE THUNK
+ - Function: with-error-to-file FILE THUNK
+     Evaluate THUNK in the scope of the proscribed i/o redirection.
+
+
+File: guile.info,  Node: Low-level File Port Operations,  Prev: File Ports,  Up: Ports
+
+Low-level File Port Operations
+==============================
+
+ - Function: port-revealed PORT
+ - Function: set-port-revealed! PORT N
+     Return (or set) the reveal count of PORT
+
+     Every port has an integer value, the "reveal count" of the port,
+     It is a reference count.  If the count is not 0 when a port is
+     reclaimed by the garbage collector, then that port will not be
+     automatically closed.
+
+
+File: guile.info,  Node: Equality,  Next: Hash Values,  Prev: Ports,  Up: Top
+
+Equality
+********
+
+  There are three built-in ways to compare objects for equality in
+Guile.  These are:
+
+ - Function: eq? &rest OBJ1 OBJ2 ...
+     Return `#t' if it is known that the arguments can not be
+     distinguished.
+
+     This is the fastest form of equality to check for, and is often
+     sufficient, but it exposes some implementation specific details.
+     For example:
+
+          (eq? 1 1)  => #t
+          (eq? 1.0 1.0) => #f
+
+ - Function: eqv? &rest OBJ1 OBJ2 ...
+     Return `#t' if it is known that only `eq?' can distinguish the
+     arguments.
+
+          (eq? 1.0 1.0) => #f
+          (eqv? 1.0 1.0) => #t
+
+  `eq?' and `eqv?' have the property that if they say objects A and B
+are equal, then mutations to A are also mutations to B.  The final
+equality predicate does not share that property:
+
+ - Function: equal? &rest OBJ1 OBJ2 ...
+     Return `#t' if it is known that the arguments are equal, modulo
+     future mutations.
+
+          (eq? "abc" "abc") => #f
+          (eqv? "abc" "abc") => #f
+          (equal? "abc" "abc") => #t
+          
+          (eq? '(a b c) '(a b c)) => #f
+          (eqv? '(a b c) '(a b c)) => #f
+          (equal? '(a b c) '(a b c)) => #t
+
+
+File: guile.info,  Node: Hash Values,  Next: Tag Values,  Prev: Equality,  Up: Top
+
+Hash Values
+***********
+
+  The system has built-in rules for computing hash values:
+
+ - Function: hash OBJ N
+ - Function: hashv OBJ N
+ - Function: hashq OBJ N
+     Compute a hash value for OBJ in the range 0..N-1.
+
+     `hash' returns the same value for any two objects that are
+     `equal?'.
+
+     `hashv' returns the same value for any two objects that are `eqv?'
+
+     `hashq' returns the same value for any two objects that are `eq?'
+
+
+File: guile.info,  Node: Tag Values,  Next: Dictionaries in General,  Prev: Hash Values,  Up: Top
+
+Tag Values
+**********
+
+  Values in Guile Scheme are partitioned into disjoint subsets called
+"tag groups".  Every object has an associated "tag number".  All the
+members of a tag group share the same tag number.  No two tag groups
+share the same tag number.  The tag numbers describe one, fairly natural
+way to divide Scheme objects up into types.
+
+ - Function: tag OBJ
+     Return the tag number of OBJ.
+
+  [The set of tag numbers will be documented later, as it becomes more
+stable.]
+
+
+File: guile.info,  Node: Dictionaries in General,  Next: Weak References,  Prev: Tag Values,  Up: Top
+
+Dictionaries in General
+***********************
+
+  A "dictionary" is defined to be any data structure that binds keys to
+values.  A wide variety of implementations and semantics are possible
+for dictionaries.  Some examples are association lists,
+keyword-argument lists, hash tables, weak hash tables, and so on.
+
+  Guile Scheme does not contain a universal "dictionary type" of which
+all actual dictionaries are instances and it does not contain a set of
+generic dictionary procedures that can operate on any dictionary,
+regardless of its actual type.  Instead, Guile defines some common
+minimal calling conventions that apply to all dictionaries.  There are
+three basic dictionary operators:
+
+ - Convention: <dictionary-type>-ref DICTIONARY KEY
+     Return the value bound to KEY in DICTIONARY.  Return #F if KEY has
+     no binding.
+
+ - Convention: <dictionary-type>-set! DICTIONARY KEY VALUE
+     Set the value bound to KEY in DICTIONARY.
+
+     This may construct a new head for the dictionary.  If your
+     dictionary is bound to X, be sure to use:
+
+          (set! x (<dictionary-type>-set! x key value))
+          
+          ;;; NOT:  (<dictionary-type>-set! x key value)
+
+ - Convention: <dictionary-type>-remove! DICTIONARY KEY
+     Set the value (if any) bound to KEY in DICTIONARY.
+
+     This may construct a new head for the dictionary.  If your
+     dictionary is bound to X, be sure to use:
+
+          (set! x (<dictionary-type>-remove! x key value))
+          
+          ;;; NOT:  (<dictionary-type>-remove! x key value)
+
+  Here is how to use these conventions.   Suppose that your code
+involves a dictionary-style data structure.   Initially you choose to
+use association lists.  At the top of the file put:
+
+     (define (make-widget-dictionary)   '())
+     (define widget-dictionary-ref assq-ref)
+     (define widget-dictionary-set! assq-set!)
+     (define widget-dictionary-remove! assq-remove!)
+
+  Later, you can change to hash tables by changing just those four
+lines:
+
+     (define (make-widget-dictionary)   (make-hash-table 73))
+     (define widget-dictionary-ref hashq-ref)
+     (define widget-dictionary-set! hashq-set!)
+     (define widget-dictionary-remove! hashq-remove!)
+
+  Another aspect of the dictionary calling convention is that for each
+type of dictionary data structure, three dictionary types are generally
+provided: one each for the possibilities of comparing keys using `eq?',
+`eqv?', and `equal?'.  We try to make it so that `eq?' and `eqv?'
+dictionary procedures are named with abbreviations using "q" and "v",
+while the `equal?' version uses no suffix character.  This convention
+gives the cleanest looking names to "equal?" based procedures:
+`hash-ref', `assoc-ref'.
+
+  Finally, some dictionary types can be extended beyond `eq?', `eqv?'
+and `equal?' to be based on an arbitrary equivalence relation.   When
+this is the case, a generalized form of the dictionary operators may be
+provided using the suffix "x" (as in `hashx-ref').  Compared to normal
+dictionary operators, the "x" forms take extra arguments of a
+dictionary-type-specific nature (see below).
+
+ - Function: assq-ref ALIST KEY
+ - Function: assq-set! ALIST KEY VALUE
+ - Function: assq-remove! ALIST KEY VALUE
+ - Function: assv-ref ALIST KEY
+ - Function: assv-set! ALIST KEY VALUE
+ - Function: assv-remove! ALIST KEY VALUE
+ - Function: assoc-ref ALIST KEY
+ - Function: assoc-set! ALIST KEY VALUE
+ - Function: assoc-remove! ALIST KEY VALUE
+ - Function: sloppy-assq-ref ALIST KEY
+ - Function: sloppy-assq-set! ALIST KEY VALUE
+ - Function: sloppy-assq-remove! ALIST KEY VALUE
+ - Function: sloppy-assv-ref ALIST KEY
+ - Function: sloppy-assv-set! ALIST KEY VALUE
+ - Function: sloppy-assv-remove! ALIST KEY VALUE
+ - Function: sloppy-assoc-ref ALIST KEY
+ - Function: sloppy-assoc-set! ALIST KEY VALUE
+ - Function: sloppy-assoc-remove! ALIST KEY VALUE
+ - Function: hashq-ref ALIST KEY
+ - Function: hashq-set! ALIST KEY VALUE
+ - Function: hashq-remove! ALIST KEY VALUE
+ - Function: hashv-ref ALIST KEY
+ - Function: hashv-set! ALIST KEY VALUE
+ - Function: hashv-remove! ALIST KEY VALUE
+ - Function: hash-ref ALIST KEY
+ - Function: hash-set! ALIST KEY VALUE
+ - Function: hash-remove! ALIST KEY VALUE
+     Standard-style dictionary functions for association lists and hash
+     tables.
+
+     The `sloppy-' varieties are robust even if the alist contains
+     elements that are not key-value pairs or if the alist is an
+     improper list.   In those same conditions, the non-sloppy
+     varieties signal an error.
+
+     Don't forget - mutations may construct a new head for an alist so:
+
+          ;;; don't say:
+          (assq-set! some-alist 'some-key some-value)
+          
+          ;;; when you mean:
+          
+          (set! some-alist (assq-set! some-alist 'some-key some-value))
+
+  For fine control over resource allocation, you can mix and match the
+hash table dictionary operators with the various kinds of weak hash
+table defined in the next chapter.
+
+ - Function: hashx-ref HASH-FN ASSOC-FN TABLE KEY ?DEFAULT?
+ - Function: hashx-set! HASH-FN ASSOC-FN TABLE KEY VALUE
+ - Function: hashx-remove! HASH-FN ASSOC-FN DELETE-FN TABLE KEY
+     Perform the basic dictionary operations on hash tables.
+
+     HASH-FN is the function to use to compute an integer hash value
+     for a key.
+
+     ASSOC-FN is a function with the same calling convention as `assoc'
+     but using a comparison function suitable for use with `hash-fn'.
+
+     DELETE-FN is a function with the same calling conventions as
+     `delq!'  but with an appropriate semantics for deleting the values
+     returned by ASSOC-FN.
+
+
+File: guile.info,  Node: Weak References,  Next: Evaluation,  Prev: Dictionaries in General,  Up: Top
+
+Weak References
+***************
+
+  Normally, if object A references object B, then object B is guaranteed
+to exist for as long as A does.   "weak references" are the exception
+to that rule.
+
+  An object A may weakly reference an object B, in which case B might
+cease to exist before A does.   The rule is that, when all the
+references to an object are weak references, the system is free to
+destroy the object and remove the references at any time.
+
+  There are several types in Guile that hold weak references to other
+objects.  These types are all vector-like objects - they answer `#t' if
+you ask `vector?'.
+
+  A "weak-vector" is like a vector, except that the elements of the
+vector are weakly referenced.  When a reference is removed from a weak
+vector, that element is replaced by `#f'.
+
+  [The convention of replacing values by `#f' means that weak vectors
+can't be used to represent collections of arbitrary objects since there
+would be no way to tell whether `#f' is really a member of the
+collection or an artifact of garbage collection.  This shortcoming might
+be addressed in the future by creating a distinct value, say
+`#collected', to replace references to weakly held objects.
+
+  In fact, Mike Djurfeldt's original implementation of weak vectors had
+such a value and I removed it for some reason.   Hrmm.]
+
+  A "weak-key-hash-table" is like a vector, except that if any elements
+of the vector are assoc lists, then the *keys* (`CAR's of key-value
+cells) of those lists are weakly referenced.  When a key is removed
+from such an assoc list because the object it refers to has been
+destroyed, the entire key-value cell for that key is removed from the
+assoc list. [Probably this should be called a weak-key-hash-table - the
+names of the procedures defined below may change accordingly.]
+
+  A "weak-value-hash-table" is like a vector, except that if any
+elements of the vector are assoc lists, then the *values* (`CDR's of
+key-value cells) of those lists are weakly referenced.  When a value is
+removed from such an assoc list because the object it refers to has
+been destroyed, the entire key-value cell for that value is removed
+from the assoc list.
+
+  A "doubly-weak-hash-table" is like a vector, except that if any
+elements of the vector are assoc lists, then both the *keys* and
+*values* (`CAR's and `CDR's of key-value cells) of those lists are
+weakly referenced.  When a key or value is removed from such an assoc
+list because the object it refers to has been destroyed, the entire
+key-value cell for that value is removed from the assoc list.
+
+ - Function: weak-vector? OBJ
+ - Function: weak-key-hash-table? OBJ
+ - Function: weak-value-hash-table? OBJ
+ - Function: doubly-weak-hash-table? OBJ
+     Return `#t' if OBJ is a weak vector (weak hash table), `#f'
+     otherwise.
+
+ - Function: weak-vector &rest OBJ1 OBJ2 ...
+ - Function: weak-key-hash-table &rest OBJ1 OBJ2 ...
+ - Function: weak-value-hash-table &rest OBJ1 OBJ2 ...
+ - Function: doubly-weak-table &rest OBJ1 OBJ2 ...
+     Create a new weak vector (hash table) containing the arguments.
+
+ - Function: make-weak-vector N &opt FILL
+ - Function: make-weak-key-hash-table N &opt FILL
+ - Function: make-weak-value-hash-table N &opt FILL
+ - Function: make-doubly-weak-hash-table N &opt FILL
+     Create a new weak vector (hash table) of size N.
+
+     If FILL is specified, all elements are initialized to that value.
+
+  The hash-table weak vectors are especially useful in combination with
+the hash table operators of the previous chapter.
+
+
+File: guile.info,  Node: Evaluation,  Next: Exception Handling with Catch and Throw,  Prev: Weak References,  Up: Top
+
+Evaluation
+**********
+
+  "Source forms" are list structures which obey the rules of Guile
+Scheme syntax.
+
+  "Evaluation" is the operation by which source forms are reduced to a
+process, a series of calls to primitive functions.
+
+  Evaluation has the job of resolving variable references, interpreting
+special forms, and carrying out function calls.   This section
+describes the interface to those capabilities.
+
+  An introduction to Scheme or the current "Revised Report on Scheme"
+are good places to learn about evaluation in more detail.  This
+overview is intended just as an informal reference.
+
+* Menu:
+
+* Managing Top Level Variables::
+* Evaluation and Function Application::
+* Quotation::
+* Promises::
+* Flow of Control::
+* Anonymous Procedures and Local Environments::
+
+
+File: guile.info,  Node: Managing Top Level Variables,  Next: Evaluation and Function Application,  Prev: Evaluation,  Up: Evaluation
+
+Managing Top Level Variables
+============================
+
+ - Syntax: defined? NAME
+     Evaluate `#t' if NAME has a top-level definition, `#f' otherwise.
+
+ - Syntax: define NAME EXPRESSION
+ - Syntax: define (NAME . FORMALS) EXP1 EXP2 ...
+ - Syntax: define ((NAME . FORMALS1) . FORMALS2) EXP1 EXP2 ...
+     Create a top-level binding for NAME to the value of EXPRESSION.
+
+     The second form of define:
+          (define (name arg1 arg2 ...)  exp1 exp2 ...)
+
+     is equivalent to:
+
+          (define name (lambda (arg1 arg2 ...) exp1 exp2...))
+
+     Thus, as with `lambda' itself, the first EXP1 in the definition's
+     body may be a documentation string; see *Note Anonymous Procedures
+     and Local Environments:: for a full description of this.
+
+     The form
+
+          (define ((name arg1 ...) arg2 ...)  exp1 exp2 ...)
+
+     means:
+
+          (define (name arg1...) (lambda (arg2 ...) exp1 exp2...))
+
+     The nesting can go on arbitrarily:
+
+          (define ((((name arg1...) arg2...) arg3...) arg4...) exp1 exp2 ...)
+          
+          ;; is like:
+          
+          (define (name arg1...)
+             (lambda (arg2...)
+                (lambda (arg3...)
+                   (lambda (arg4 ...)
+          	    exp1
+          	    exp2
+          	    ...))))
+
+
+  `defined?' and `define' can be combined to achieve the effect of
+conditional definition.  For example, the default initialization code
+for Guile contains this fragment:
+
+     (if (defined? array?)
+         (begin
+           (define uniform-vector? array?)
+           ....))
+
+ - Syntax: set! NAME EXPRESSION
+     Modify already-bound NAME to be bound to the value of EXPRESSION.
+
+
+File: guile.info,  Node: Evaluation and Function Application,  Next: Quotation,  Prev: Managing Top Level Variables,  Up: Evaluation
+
+Evaluation and Function Application
+===================================
+
+  These functions take a source form and return its value:
+
+ - Function: eval SRC
+ - Function: eval2 SRC ENV-FN
+     Return the value of evaluator SRC.
+
+     The second for, `eval2' take a parameter ENV-FN.  That parameter
+     is explained elsewhere (*note eval2; User Defined Top Levels::.).
+
+  In contrast to `eval', this function takes a procedure argument and a
+list of arguments to which that procedure should be applied:
+
+ - Function: apply PROC ARGS
+     Return the value of PROC applied to the elements of the list ARGS.
+
+
+File: guile.info,  Node: Quotation,  Next: Promises,  Prev: Evaluation and Function Application,  Up: Evaluation
+
+Quotation
+=========
+
+ - Syntax: quote EXPRESSION
+     Evaluates to EXPRESSION without evaluating it.
+
+ - Syntax: quasiquote TEMPLATE
+     Quasiquote is a convenient short-hand for writing expressions that
+     compose the functions and syntax `list', `vector', `cons', and
+     `quote'.
+
+     Put another way, it is a convenient way to write expressions
+     denoting "almost constant" values.
+
+     TEMPLATE should be a list (possibly improper but non-circular) or
+     vector.  The template is recursively copied with two exceptions.
+
+     If an element has the form `(unquote <exp>)', it is replaced by
+     the result of evaluating <exp>.
+
+     If the final element of a proper list has the form
+     `(unquote-splicing <exp>)', then the value of evaluating <exp>
+     becomes the tail of the list.
+
+          (let ((x 5))
+            `(1 (+ 2 3) ,(+ 4 x)))
+          
+          => (1 (+ 2 3) 9)
+          
+          (let ((x 5))
+            `(1 (+ 2 3) #(,(+ 4 x) a b)))
+          
+          => (1 (+ 2 3) #(9 a b))
+          
+          
+          (let ((naughts '(bowman tichy)))
+            `(kelvin , naughts))
+          
+          => (kelvin bowman tichy)
+
+     Quasiquotes nest, so:
+
+          ;; Note that the inner quasiquote prevents
+          ;; the outer quasiquote from evaluating one
+          ;; level of unquotes:
+          ;;
+          
+          `(1 2 `(3 ,(+ 4 ,(+ 1 5))))
+          =>
+          (1 2 (quasiquote (3 (unquote (+ 4 6)))))
+
+
+
+File: guile.info,  Node: Promises,  Next: Flow of Control,  Prev: Quotation,  Up: Evaluation
+
+Promises
+========
+
+  Promises are expressions whose evaluation is postponed until the
+result it will yield is needed.  The result of a promise may be
+requested more than once, but the expression is evaluated only once:
+
+ - Syntax: delay EXPRESSION
+     Return a PROMISE whose value comes from EXPRESSION.
+
+     EXPRESSION is not initially evaluated.
+
+ - Function: force PROMISE
+     Return the value of the expression of PROMISE.
+
+     The first time the value of a promise is forced, the promises
+     experssion is evaluated.
+
+     (define a-promise (let loop ((x 0))  (delay (cons x (loop (+ x 1))))))
+     
+     (force a-promise) => (0 . #<promise...>)
+     (force (cdr (force a-promise))) => (1 . #<promise...>)
+     (force (cdr (force (cdr (force a-promise))))) => (2 . #<promise...>)
+
+
+File: guile.info,  Node: Flow of Control,  Next: Anonymous Procedures and Local Environments,  Prev: Promises,  Up: Evaluation
+
+Flow of Control
+===============
+
+ - Syntax: begin EXP1 EXP2 EXP3
+     Evaluate EXP1, EXP2... in sequence, returning the value of the
+     last.
+
+ - Syntax: and EXP1 EXP2
+     Evaluate EXP1, EXP2... in sequence, stopping if one returns `#f'.
+
+     Return the value of the last evaluated expression.
+
+ - Syntax: or
+     Evaluate EXP1, EXP2... in sequence, stopping if one returns `#t'.
+
+     Return the value of the last evaluated expression.
+
+ - Syntax: if PRED-EXP EXP1 &opt EXP2
+     If PRED-EXP evaluates to a non-`#f' value, evaluate and return
+     EXP1.  Otherwise, if EXP2 is specified, evaluate it and return
+     that value.  Otherwise the value is unspecified.
+
+     Note that an `if' expression only evaluates one of EXP1 and `exp2'.
+
+ - Syntax: cond &rest (PRED-EXP1 EXP1A EXP1B...) (PRED-EXP2 EXP2A
+          EXP2B...) ...
+     Evaluate predicate expressions in order until one returns non-`#f'.
+     Then evaluate the corresponding expressions `expna expnb ...' and
+     return the value of the last such expression.
+
+     Note that a `cond' expression only evaluates one of EXP1, `exp2'...
+
+     A predicate expression `else' is equivalent to one which is `#t'.
+
+     As a special case, a clause may have the form:
+
+          (pred-exp => exp-proc)
+
+     In that case, if PRED-EXP evaluates to a non-`#f' value, EXP-PROC
+     must evaluate to a one argument procedure - that procedure is
+     called with the value of PRED-EXP and its value becomes the value
+     of the `cond'.
+
+ - Syntax: case SELECT-EXP ((VAL1 VAL2 ...) EXP1A EXP1B ...) ((VALN
+          VALN+1 ...) EXP2A EXP2B ...)
+     Evaluate SELECT-EXP and then evaluate the expressions in the
+     matching clause of the `case' statement, returning the value of
+     the last such expression.
+
+     Note that a `case' expression only evaluates one of EXP1, `exp2'...
+
+     The values VAL1 VAL2 ... are not evaluated.  The result of
+     evaluating SELECT-EXP is compared to these using `eqv?' (pxref
+     Equality).
+
+ - Function: call-with-current-continuation PROC
+     Apply PROC to a procedure which gives its argument to the current
+     continuation.
+
+     When the continuation procedure created by this function is called
+     with one argument, V, it causes the call to
+     `call-with-current-continuation' to immediately return V.
+
+     A continuation procedure may be called any number of times and so
+     CALL-WITH-CURRENT-CONTINUATION may return more than once.
+
+
+File: guile.info,  Node: Anonymous Procedures and Local Environments,  Prev: Flow of Control,  Up: Evaluation
+
+Anonymous Procedures and Local Environments
+===========================================
+
+ - Syntax: lambda FORMALS [DOCSTRING] BODY ...
+     Create a new anonymous function from FORMALS and BODY.  FORMALS is
+     a list of the function's formal parameters; applying the function
+     causes the BODY expressions to be evaluated in order.  The value
+     of the last BODY expression is the value returned from the
+     function.
+
+     The DOCSTRING is a string describing the function.  If it is more
+     than one line long, the first line should be a complete summary of
+     the function's purpose.  See `procedure-documentation', described
+     below.
+
+          ;; Applying an anonymous function to two arguments:
+          ( (lambda (a b) (+ a b))  1 2)
+          => 3
+
+
+ - Function: procedure-documentation PROC
+     Return the documentation string for PROC.
+
+          (define incr (lambda (n) "Add one to n." (+ n 1)))
+          (procedure-documentation incr)
+          => "Add one to n."
+
+ - Syntax: let ((V1 VAL1) (V2 VAL2) ...) EXP1 EXP2...
+ - Syntax: let* ((V1 VAL1) (V2 VAL2) ...) EXP1 EXP2...
+ - Syntax: letrec ((V1 VAL1) (V2 VAL2) ...) EXP1 EXP2...
+     Evaluate EXP1 EXP2 ... in the context of bindings for V1 V2...
+
+     Return the value of the last expression evaluated.
+
+     These create bindings for V1... that are local to the expression.
+     Similarly named variables in a containing `let', `lambda', or from
+     the top-level are shadowed.
+
+     VAL1 VAL2 etc. provide initial values for the new bindings.
+
+     In a `let', each of the value expressions (VAL1 etc) are evaluated
+     in the scope enclosing the let.
+
+     In a `let*', each of the value expressions are evaluated in the
+     scope enclosing the let augmented with the earlier occuring
+     bindings in the `let*'.   Thus, VAL2 is evaluated in the scope of
+     V1, VAL3 in the scope of V1 and V2 etc.
+
+     In a `letrec', each of the value expressions is evaluated in the
+     scope of all of the variables V1 V2 etc. after first initializing
+     those variables to the special value `#undefined'.   It is an error
+     if any expression in a program produces the value `#undefined'.
+
+     It is unspecified the order in which the evaluations of VAL1 etc.
+     are intermingled with giving V1 etc. the values form those
+     evaluations.
+
+ - Syntax: set! VAR-NAME VALUE VAR-NAME VALUE VAR-NAME VALUE ...
+     Modify the value of the variable named by VAR-NAME.
+
+     That variable is the innermost binding created by `let, let*,
+     letrec' `or lambda', or a top-level binding if none of those are
+     defined.
+
+     It is an error to `set!' a variable with no top-level and no local
+     binding.
+
+     Any number of variable/value pairs may be specified.  Assignments
+     are carried out from left to right.
+
+ - Syntax: let NAME ((V1 X1) (V2 X2) ...) EXP1 EXP2 ...
+     Equivalent to:
+          (letrec ((name (lambda (v1 v2 ...) exp1 exp2 ...)))
+             (name x1 x2 ...))
+
+ - Syntax: do ((V1 X1 I1) (V2 X2 I2)...) (TEST A1 A2...) B1 B2...
+     Equivalent to:
+          ;; Assuming that LOOP is not used in any
+          ;; of the expressions X1 X2 I1 TEST B1...
+          ;; and that it is distinct from V1 V2 etc...
+          ;;
+          (letrec ((loop (lambda (v1 v2 ...)
+          		 (if test
+          		     (begin a1 a2 ...)
+          		     (begin b1
+          			    b2
+          			    ...
+          			    (loop i1 i2 ...))))))
+             (loop x1 x2 ...))
+
+
+File: guile.info,  Node: Exception Handling with Catch and Throw,  Next: Dynamic Wind,  Prev: Evaluation,  Up: Top
+
+Exception Handling with Catch and Throw
+***************************************
+
+  These are the low level entry points to exceptions.  Individual
+subsystems may define their own uses for exceptions.
+
+ - Function: catch KEY THUNK HANDLER
+     Invoke THUNK in the dynamic context of HANDLER for exceptions
+     matching KEY.  If thunk throws to the symbol KEY, then HANDLER is
+     invoked this way:
+
+          (handler key args ...)
+
+     KEY may be a symbol.  In that case, THUNK takes no arguments.  If
+     THUNK returns normally, that is the return value of `catch'.
+
+     Handler is invoked outside the scope of its own `catch'.  If
+     HANDLER against throws to the same key, a new handler from further
+     up the call chain is invoked.
+
+     If the key is `#t', then a throw to *any* symbol will match this
+     call to `catch'.
+
+     Key may also be the value `#f'.  In that case, THUNK takes one
+     argument which will be passed a "jump buffer object".  A jump
+     buffer object may be used as the key argument to `throw' to throw
+     to a specific `catch' without an intervening search for a symbolic
+     key.
+
+ - Function: throw KEY &rest ARGS ...
+     Invoke the catch form matching KEY, passing ARGS to the HANDLER.
+
+     If the key is a symbol it will match catches of the same symbol or
+     of #t.  If no catch matches, the `throw-default-handler' property
+     of the key is checked.  If it is bound to a procedure, that
+     procedure is called:
+
+          (handler key args ...)
+
+     That procedure is called the "default handler".
+
+     If there is no handler at all, or if the default handler returns
+     to its caller, an error is signaled.
+
+     It is traditional in Scheme to implement exception systems using
+     `call-with-current-continuation', but his has not been done, for
+     performance reasons.  The implementation of
+     `call-with-current-continuation' is a stack copying implementation.
+     This allows it to interact well with ordinary C code.
+     Unfortunately, a stack-copying implementation can be slow -
+     creating a new continuation involves a block copy of the stack.
+
+     Instead of using `call-with-current-continuation', the exception
+     primitives are implemented as built-ins that take advantage of the
+     *upward only* nature of exceptions.
+
+
+File: guile.info,  Node: Dynamic Wind,  Next: First-class Variables,  Prev: Exception Handling with Catch and Throw,  Up: Top
+
+Dynamic Wind
+************
+
+ - Function: dynamic-wind IN-GUARD THUNK OUT-GUARD
+     All three arguments must be 0-argument procedures.
+
+     IN-GUARD is called, then THUNK, then OUT-GUARD.
+
+     If, any time during the execution of THUNK, the continuation of
+     the `dynamic-wind' expression is escaped non-locally, OUT-GUARD is
+     called.   If the continuation of the dynamic-wind is re-entered,
+     IN-GUARD is called.   Thus IN-GUARD and OUT-GUARD may be called
+     any number of times.
+
+          (define x 'normal-binding)
+          => x
+          
+          (define a-cont  (call-with-current-continuation
+          		  (lambda (escape)
+          		     (let ((old-x x))
+          		       (dynamic-wind
+          			  ;; in-guard:
+          			  ;;
+          			  (lambda () (set! x 'special-binding))
+          
+          			  ;; thunk
+          			  ;;
+          		 	  (lambda () (display x) (newline)
+          				     (call-with-current-continuation escape)
+          				     (display x) (newline)
+          				     x)
+          
+          			  ;; out-guard:
+          			  ;;
+          			  (lambda () (set! x old-x)))))))
+          
+          ;; Prints:
+          special-binding
+          ;; Evaluates to:
+          => a-cont
+          
+          x
+          => normal-binding
+          
+          (a-cont #f)
+          ;; Prints:
+          special-binding
+          ;; Evaluates to:
+          => a-cont  ;; the value of the (define a-cont...)
+          
+          x
+          => normal-binding
+          
+          a-cont
+          => special-binding
+
+
+
+File: guile.info,  Node: First-class Variables,  Next: eval2; User Defined Top Levels,  Prev: Dynamic Wind,  Up: Top
+
+First-class Variables
+*********************
+
+  All top level bindings are stored in locations called "variables".
+Variables are first class objects.
+
+ - Function: variable? OBJ
+     Return `#t' if OBJ is a variable;  `#f' otherwise.
+
+ - Function: make-variable INIT
+ - Function: make-variable INIT NAME-HINT
+     Return a new variable, bound to INIT.
+
+     The optional NAME-HINT is a symbolic name for the variable.  It
+     will be used in some error messages relating to the variable.
+
+ - Function: variable-ref VARIABLE
+     Return the current binding of VARIABLE.
+
+     It is an error to call `variable-ref' on a variable which is
+     unbound.
+
+ - Function: variable-set! VARIABLE VALUE
+     Modify the binding of VARIABLE.
+
+ - Function: builtin-variable NAME
+     Return the built-in variable for named NAME.  NAME must be a
+     symbol.
+
+     Even symbols with no top level bindings have built-in variables.
+     There is an unbounded supply of undefined variables.
+
+ - Function: variable-bound? VAR
+     Return `#t' if VAR is a bound variable; `#f' otherwise.
+
+ - Function: make-undefined-variable
+ - Function: make-undefined-variable NAME-HINT
+     Return a new variable, initially unbound.
+
+     The optional NAME-HINT a symbolic name for the variable.  It will
+     be used in some error messages relating to the variable.
+
+
+File: guile.info,  Node: eval2; User Defined Top Levels,  Next: First-class Modules,  Prev: First-class Variables,  Up: Top
+
+eval2; User Defined Top Levels
+******************************
+
+  Low level support is provided for multiple top levels.
+
+ - Function: eval2 FORM ENV-FN
+     Evaluate FORM in the top level environment described by ENV-FN.
+
+     ENV-FN is called this way:
+          (env-fn name defining?)
+
+     It should return a variable object for the symbol NAME.  Returning
+     `#f' indicates that NAME has no binding.
+
+     The boolean DEFINING? is `#t', then the lookup is for a `define'
+     form or the equivalent - a new variable may be created if none
+     already exists.
+
+     If `#f', then the request should not create a new binding.
+
+ - Function: repl PROMPT &optional ENV-FN
+     Run a read-eval-print loop on the current input, output and error
+     ports.
+
+     PROMPT is what to print before reading each expression.
+
+     If ENV-FN is specified, it is passed as the second argument to
+     `eval2' by the repl.
+
+
+File: guile.info,  Node: First-class Modules,  Next: Recursive Namespaces,  Prev: eval2; User Defined Top Levels,  Up: Top
+
+First-class Modules
+*******************
+
+  Module objects are anonymous, first-class objects representing
+top-level namespaces.  They are used, for example, to implement the
+simple module system described in following chapters.
+
+Warning
+-------
+
+  The interface to modules described in this chapter is slightly bogus.
+The lazy binder will eventually be a general purpose interface
+providing:
+
+     'find name		;; Return a variable for name or #f.
+     			;; If #f is returned, this indicates the variable
+     			;; is undefined.
+     			;;
+     
+     'define! name		;; Return a variable for name or #f.
+     			;; If #f is returned, this indicates the variable
+     			;; should be created and stored in the module
+     			;; obarray in the usual way.
+     			;;
+     
+     'for-each procedure	;; implement module-for-each for this module
+     
+     etc.
+
+  Additionally, three new types of weak vectors may be provided:
+weak-key-obarrays, weak-value-obarrays, and doubly-weak-obarrays.
+Corresponding to these and to the existing weak hash tables will be
+variations on the basic module data structure.
+
+  The modules interface comes in two parts: the module data structure
+itself and the interface between modules and `eval'.
+
+* Menu:
+
+* Module Data Structures::
+* Modules and Evaluation::
+
+
+File: guile.info,  Node: Module Data Structures,  Next: Modules and Evaluation,  Prev: First-class Modules,  Up: First-class Modules
+
+Module Data Structures
+======================
+
+  A module object is fundamentally a mapping from symbols to arbitrary
+objects, usually variables.
+
+  The mapping consists of module-local bindings, plus local-bindings
+inherited from the use-list of the module.   A module can be associated
+with a procedure called the "lazy-binding-proc" the function of which
+is to supply module-local bindings on-demand.
+
+ - Function: module? OBJ
+     Return `#t' if obj is a module, false otherwise.
+
+ - Function: make-module SIZE USE-LIST LAZY-BINDING-PROC
+     Create a new module.
+
+     SIZE is the size of the hash table to allocate.
+
+     USE-LIST is the initial list of modules from which to inherit
+     bindings.
+
+     LAZY-BINDING-PROC, which if not `#f' is called:
+
+          (lazy-binding-proc module symbol defining?)
+
+     is used to instantiate module-local variables on-demand.
+
+     It should return a variable object or `#f' for names that are not
+     locally defined, even on demand.
+
+     DEFINING?, if not `#f', indicates that the given name is being
+     defined as by a top level `define'.  In such a case, if the lazy
+     binder returns `#f', a new variable will be allocated by the
+     system.
+
+ - Function: module-locally-bound? MODULE SYMBOL
+     Return `#t' if SYMBOL is bound locally in MODULE.
+
+ - Function: module-bound? MODULE SYMBOL
+     Return `#t' if SYMBOL is bound locally or inherited in MODULE.
+
+ - Function: module-symbol-locally-interned? MODULE SYMBOL
+     Return `#t' if SYMBOL is interned locally in MODULE (*note
+     Obarrays::.).
+
+ - Function: module-symbol-interned? MODULE SYMBOL
+     Return `#t' if SYMBOL is interned or inherited in MODULE (*note
+     Obarrays::.).
+
+ - Function: module-local-variable MODULE SYMBOL
+     Return the variable locally bound in MODULE to SYMBOL (or `#f').
+
+ - Function: module-variable MODULE SYMBOL
+     Return the variable bound or inherited in MODULE to SYMBOL (or
+     `#f').
+
+ - Function: module-symbol-binding MODULE SYMBOL &opt VALUE
+     Return the value of the named variable in MODULE.
+
+     If there is no such variable, the behavior depends on VALUE.  If
+     VALUE is specified, it is returned.  Otherwise, an error is
+     signaled.
+
+ - Function: module-make-local-var! MODULE SYMBOL
+     Ensure that SYMBOL is locally bound in MODULE.
+
+ - Function: module-add! MODULE SYMBOL VARIABLE
+     Bind SYMBOL to VARIABLE locally in MODULE.
+
+ - Function: module-remove! MODULE SYMBOL
+     Remove binding of  SYMBOL in MODULE.
+
+ - Function: module-for-each PROC MODULE
+     Call PROC for each binding in MODULE with arguments `symbol
+     variable'.
+
+ - Function: make-scm-module
+     Create a module whose lazy-binder copies bindings from the builtin
+     module.
+
+ - Function: make-root-module
+     Create a module whose lazy-binder copies bindings to and from the
+     builtin module.
+
+ - Function: module-obarray M
+ - Function: module-obarray-set! M V
+     Return (or set) the obarray of M.
+
+ - Function: module-uses M
+ - Function: module-uses-set! M V
+     Return (or set) the use-list of M.
+
+ - Function: module-binder M
+ - Function: module-binder-set! M V
+     Return (or set) the binder of M.
+
+ - Function: module-name M
+ - Function: module-name-set! M V
+     Return (or set) the name used when `write' or `display' is passed M
+
+ - Function: module-ref MODULE NAME &opt DEFAULT
+     Returns the value of a variable in MODULE, bound to NAME.
+
+     If there is no such variable and the optional third argument
+     DEFAULT is present, it is returned; otherwise an error is signaled.
+
+
+File: guile.info,  Node: Modules and Evaluation,  Prev: Module Data Structures,  Up: First-class Modules
+
+Modules and Evaluation
+======================
+
+  The function `eval2' allows a program to define the top-level
+environment of code as it evaluated.   Naturally, this relates to
+modules.
+
+  Each module has an associated "eval closure", suitable for passing as
+the second argument to eval2:
+
+ - Function: module-eval-closure M
+ - Function: module-eval-closure-set! M V
+     Return (or set) the eval closure of M.
+
+     The default eval closure is:
+
+          (lambda (symbol define?)
+            (if define?
+              (module-make-local-var! this-module symbol)
+              (module-variable this-module symbol)))
+
+  One module and one eval closure are designated as the system defaults.
+Both can be set or checked with this interface:
+
+ - Function: current-module
+ - Function: set-current-module MODULE
+     Return (or set) the current module.
+
+     `set-current-module' also sets the system eval closure.
+
+
+File: guile.info,  Node: Recursive Namespaces,  Next: Declaring Modules,  Prev: First-class Modules,  Up: Top
+
+Recursive Namespaces
+********************
+
+  A hierarchical namespace emerges if we consider some module to be
+root, and variables bound to modules as nested namespaces.
+
+  A handful of routines manage variable names in hierarchical namespace.
+Each variable name is a list of elements, looked up in successively
+nested modules.
+
+     (nested-ref root-module '(foo bar baz))
+     => <value of baz as bound in bar as bound in foo as bound in the root>
+
+  There are:
+
+ - Function: nested-ref A-ROOT NAME
+ - Function: nested-set! A-ROOT NAME VAL
+ - Function: nested-define! A-ROOT NAME VAL
+ - Function: nested-remove! A-ROOT NAME
+     Standard dictionary operations for modules, taken as recursive
+     namespaces.  See *Note Dictionaries in General::.
+
+  `(current-module)' is a natural choice for a root module so for
+convenience there are also:
+
+ - Function: local-ref NAME
+ - Function: local-set! NAME VAL
+ - Function: local-define! NAME VAL
+ - Function: local-remove! NAME
+     Recursive namespace dictionary operators that implicitly work on
+     `current-module'.
+
+  There is a special syntax that is convenient when writing the names
+of variables in nested namespaces.
+
+  A token beginning "#/" followed by a symbol is short-hand for a list
+of symbols whose names are found by treating the "#/" as a
+slash-separated list of names:
+
+     #/foo/bar/baz	==	(foo bar baz)
+
+  The transformation is made by the reader so:
+
+     guile> '#/foo/bar/baz
+     (foo bar baz)
+
+  This syntax is handy and familar in expressions such as:
+
+     (local-ref '#/app/modules/utils/string-fun)
+     (local-set! '#/app/modules/utils/string-fun (make-module 73))
+
+  The variable `app' is bound to a module is used as the root of many
+conventionally named objects in Guile.  For example, modules created by
+the auto-loader are bound in `#/app/modules'.
+
+
+File: guile.info,  Node: Declaring Modules,  Next: Auto-Loading Modules,  Prev: Recursive Namespaces,  Up: Top
+
+Declaring Modules
+*****************
+
+  Programmer's can arrange to load Scheme source files into private
+namespaces and to selectively export definitions from those namespaces
+into other top-levels.
+
+  In the simplest case, this is done by putting a call to the macro
+`define-module' at the top of the file.
+
+ - Syntax: define-module MODULE-ID KW OPTION ....
+     Set the current module.  None of the arguments to define-module
+     are evaluated.
+
+     If the requested module does not yet exist, it is created.
+
+     If `define-module' occurs in a source file being loaded, then the
+     scope of this operation is for the remainder of the file or until
+     the next `define-module'.
+
+     MODULE-ID is a list of symbols, interpreted as a name in a
+     recursive namespace maintained by the auto-loader.  For example,
+     if you say:
+
+          (define-module #/utils/strings)
+
+     the auto-loader will create the new module and assign it the name
+     (relative to the current module when define-module is invoked):
+
+          #/app/modules/utils/strings
+
+     The module name passed to define-module can optionally be followed
+     by keywords and keyword value pairs.   The currently supported
+     keyword is:
+
+        * `:use-module module-id'
+
+          This indicates that the public definitions (see below) of the
+          named module should be made visible in the current module.
+          Assignment to the imported public variables is visible both
+          in the current module and in the module from which the
+          variables are imported.   If an imported id is bound using
+          `define', that definition shadows the imported one, and
+          creates a new variable, local to the current module.
+
+          `:use-module' can be repeated any number of times.  Each used
+          module is added to the end of the use list, so the first
+          occuring `:use-module' has highest precendence.  MODULE-ID is
+          a list of symbols.
+
+ - Function: process-define-module MODULE-NAME . KW-ARGS
+     Process arguments like `define-module', but return the new module.
+     The new module is not made the current module.
+
+     `process-define-module' is a normal procedure: all arguments are
+     evaluated.
+
+
+  Most modules locally contain a binding for the name
+`%module-public-interface'.  By convention, that variable is bound to
+another module.  Variables in a module which are intended to be shared
+with other modules are put into the public interface of the module.
+
+  When the `:use-module' keyword is passed to `define-module', it works
+this way.  We have the "new module" - the module being built by
+`define-module', and the "used module", the module named by the
+argument to `:use-module'.  To process a `:use-module' request,
+`define-module' first asks the auto-loader to produce the used module.
+Then it looks up the binding of `%module-public-interface' in the used
+module.  Finally, it adds the module bound to
+`%module-public-interface' to the *end* of the use-list of the new
+module.
+
+ - Syntax: define-public DEFINED-THING DEFINITION
+     `define-public' works just like `define', except that the
+     definition is also exported from the current module.  A definition
+     is exported by sharing the variable with the module bound to
+     `%module-public-interface'.
+
+
+File: guile.info,  Node: Auto-Loading Modules,  Next: Using Emacs and Guile,  Prev: Declaring Modules,  Up: Top
+
+Auto-Loading Modules
+********************
+
+  When a module is referenced using `define-module' or
+`process-define-module', the module name is "resolved".  "Resolved"
+means that if the module doesn't already exist, the auto-loader is
+asked to create it.
+
+  A module name is resolved this way:
+
+  "Auto-loader algorithm":  to load a module named `N'
+
+  1. If `(local-ref (append '#/app/modules N))' is not `#f', then
+     return that value.  Otherwise, the module must be loaded or
+     created.
+
+  2. If `N' is a list of length greater than 1, then it is a
+     "sub-module".  The parent module name is formed by dropping the
+     last element of `N', call this `N2'.  This step is: if `N' is the
+     name of a sub-module, then recursively apply the auto-loader
+     algorithm to `N2'.
+
+  3. Try to load a source file for `N'.   First, a relative file-name
+     is formed from `N' as described above (e.g. `#/widgets/simple' =>
+     `"widgets/simple"').  Second, the auto-loader tries loading a
+     series of file names, stopping at the first file found to exist
+     (and not be a directory).  The names are:
+
+        * <N>
+
+        * <N>.scm
+
+        * <N>/%module.scm
+
+     Each of these file-names is expanded along the list of file-names
+     bound to `%load-path'.
+
+  4. Hopefully by now the module has been created by one of the source
+     files automatically loaded.  If not, the variable
+     `%auto-loader-developer-mode' is checked.  If it is bound to a
+     non-`#f' value, then an empty is module is automatically created
+     and a warning issued.  If `%auto-loader-developer-mode' is `#f',
+     then an error is signaled.
+
+  By convention, programmers should try to maintain a one-to-one
+correspondance between source files and modules.  `define-module'
+should be used at most once per file, usually at the top of the source
+file.  Support is planned (for example, in Emacs Scheme mode) for
+features that rely on this convention.
+

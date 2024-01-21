@@ -1,0 +1,742 @@
+This is Info file guile-user.info, produced by Makeinfo version 1.67
+from the input file guile-user.texi.
+
+INFO-DIR-SECTION Guile -- GNU extension language
+START-INFO-DIR-ENTRY
+* guile-user: (guile-user).                     The Guile User Manual.
+END-INFO-DIR-ENTRY
+
+   Guile User Manual Copyright (C) 1996 Free Software Foundation
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+   Permission is granted to copy and distribute modified versions of
+this manual under the conditions for verbatim copying, provided that
+the entire resulting derived work is distributed under the terms of a
+permission notice identical to this one.
+
+   Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions, except that this permission notice may be stated in a
+translation approved by the Free Software Foundation.
+
+
+File: guile-user.info,  Node: Examples of Scheme threads,  Next: Dynamic roots,  Prev: Configuring Guile to use threads,  Up: Threads in Guile
+
+Examples of Scheme threads
+--------------------------
+
+   The first example demonstrates creating new threads to execute Scheme
+procedures.  I define a procedure that prints some stuff, sleeps, and
+then prints some more stuff.
+
+     ;; a simple procedure which prints some simple stuff -- also prints
+     ;; whether it is the only active thread
+     (define (simple-delay-proc)
+       (begin
+         (display "single-active-thread? returns ")
+         (display (single-active-thread?))
+         (newline)
+         (display "just entered delay-sample procedure\n")
+         (force-output)
+         (sleep 25)
+         (display "done with sleeping\n")
+         (force-output)))
+     
+     ;; invoke simple-delay-proc
+     (display "about to invoke simple-delay-proc in the current thread\n")
+     (simple-delay-proc)
+     
+     (display "\n-------------\n\n")
+     (display "about to invoke simple-delay-proc *in a new thread*\n")
+     (make-thread simple-delay-proc)
+     (display "\n-------------\n\n")
+     (display "now that all is done, single-active-thread? returns\n")
+     (display (single-active-thread?))
+
+   Now for a more complex example.  Here I use the `make-thread'
+procedure to start up many copies of that routine (with different
+arguments), each in its own thread.
+
+   You will notice that the `monitor' procedure is used.  Using
+`monitor' guarantees that simultaneous invocations of `(display ...)'
+will not step on each other.  This kind of resources `locking' is
+frequently necessary when programming with threads.
+
+   Also notice that at the end of this program I use the `join-thread'
+procedure.  This tells the original thread to yield control to the other
+threads until they have all returned.
+
+     ;; A first example of using threads that really shows that two threads
+     ;; are running.  This example works with cooperative threads (should
+     ;; also work with preemptive threads).
+     
+     (define (sample-thread delay)
+       (begin
+         (monitor
+          (display "this thread was invoked with a delay of ")
+          (display delay)
+          (newline)
+          (display "About to go to sleep:\n"))
+         (force-output)
+         (sleep delay)
+         (monitor
+          (display delay)
+          (display "-> done with sleeping")
+          (newline))
+         (force-output)))
+     
+     ;; arrange the threads we are creating in a list
+     (define list-of-threads (list (make-thread (lambda () (sample-thread 40)))
+     			      (make-thread (lambda () (sample-thread 90)))
+     			      (make-thread (lambda () (sample-thread 70)))
+     			      (make-thread (lambda () (sample-thread 55)))))
+     
+     ;; now invoke join-thread: this makes sure that the guile "read"
+     ;; statement (which waits for the next Scheme expression) does not
+     ;; block out the threads: join-thread will make sure they have all
+     ;; finished executing.
+     (for-each join-thread list-of-threads)
+     
+     (newline) (newline)
+     (display "all threads seem to have terminated\n")
+
+   Here's what it looks like when you run it:
+
+     guile> (load "sample-threads.scm")
+     this thread was invoked with a delay of  90
+     About to go to sleep:
+     this thread was invoked with a delay of  70
+     About to go to sleep:
+     this thread was invoked with a delay of  55
+     About to go to sleep:
+     this thread was invoked with a delay of  40
+     About to go to sleep:
+     40 -> done with sleeping
+     55 -> done with sleeping
+     70 -> done with sleeping
+     90 -> done with sleeping
+     
+     
+     all threads seem to have terminated
+     guile>
+
+
+File: guile-user.info,  Node: Dynamic roots,  Prev: Examples of Scheme threads,  Up: Threads in Guile
+
+Dynamic roots
+-------------
+
+   Guile offers primitives to create new dynamic roots.  A procedure
+can be called with `(call-with-dynamic-root proc error-handler)', in
+which case the calling environment is discarded (unwound), and a new
+environment is started for the evaluation of `(proc)'.
+
+   The rationale behind dynamic roots is mainily support for
+multi-threading (*note Threads in Guile::.): each thread should execute
+in its own dynamic root.  But they can also be used to get around escape
+procedures if you are invoking procedures that do not want to be escaped
+(*note Dynamic Roots: (scm)Dynamic Roots. for more detail on this).
+
+   Another possible use for dynamic roots is to throw in a quick bit of
+code which you would like executed with a clean slate.
+
+   Dynamic roots are described in recent versions of the SCM manual
+(*note Dynamic Roots: (scm)Dynamic Roots.).
+
+
+File: guile-user.info,  Node: Guile exceptions - catch and throw,  Next: Regular expression support,  Prev: Threads in Guile,  Up: Some other features of Guile
+
+Guile exceptions - catch and throw
+==================================
+
+   Guile provides a pair of primitive procedures, `(catch ...)' and
+`(throw ...)', which can be used to set up very clean exception
+handling mechanisms.
+
+   The paradigm is this: suppose you want to call a procedure which
+*might* encounter an exceptional circumstance.  This procedure would
+like to invoke an exception handler and then exit.
+
+   Here's how you would do it with *catch/throw*:
+
+     ;; an example of a program which handles exceptions with Guile's
+     ;; catch/throw mechanisms.
+     
+     ;; run this by loading the file with (load "catch-sample").  It will run
+     ;; the program (by running (catch ...).  You just type strings at the
+     ;; program, and see them echoed back.  If you type the word "err" (without
+     ;; quotes), it will (throw ...) an exception, and thus invoke the
+     ;; handler.  If you type "quit", it will exit normally.
+     
+     (define-module (guile) :use-module (ice-9 slib))  ; need interface to slib
+     
+     (require 'debug)
+     (require 'scanf)
+     (require 'line-i/o)
+     
+     (newline) (newline)
+     
+     ;; an example procedure; it's not particularly exciting: the user types
+     ;; words, and those are echoed back.
+     ;; The exciting thing here is that the procedure does a (throw ...)
+     ;; when the user types the word "err", and thus involves the handler
+     ;; set up by (catch ...).
+     (define (some-long-running-procedure)
+       (do ((str "")
+            (i 0 (+ i 1)))
+           ((equal? str "quit") "done")
+         (if (equal? str "err")
+     	(throw 'hi))
+         (display "prompt> ")
+         (set! str (car (scanf "%s")))
+         (display "one word was \"") (display str) (display "\"")
+         (newline)))
+     
+     ;; use (catch ...) to run our procedure (some-long-running-procedure),
+     ;; so that when it throws an exception, we catch that exception with
+     ;; our handler (the (lambda (key) ...) expression is the handler).
+     (catch 'hi
+            some-long-running-procedure
+            (lambda (key)
+     	 (begin
+     	   (newline) (newline)
+     	   (display "-----------------------------------------------\n")
+     	   (display "This is the HANDLER associated with (catch ...)\n")
+     	   (display "the key is ") (display key) (newline)
+     	   (display "-----------------------------------------------\n")
+     	   (newline) (newline))))
+
+   This program is in the examples directory, under
+`examples/misc/catch-sample.scm'.  Try running this program in Guile,
+type some words at it (they will be echoed back).  When you feel like
+it, type the word `err', or `quit'.
+
+   You will notice that typing `quit' will cause an ordinary return,
+whereas typing `err' causes `(throw ...)': the procedure
+`(some-long-running-procedure ...)' is escaped (and will never return),
+and the handler is invoked.  In fact, the string `we are done with the
+do loop' will not be printed when you quit with `err'.
+
+   So `throw' is an example of "escape procedure": the procedure that
+invokes `throw' will never regain control, and it will never return.
+
+     guile> (load "examples/exceptions/catch-sample.scm")
+     ;;; [junk output]
+     
+     prompt> some words
+     "some"
+     prompt> "words"
+     prompt> some more words
+     "some"
+     prompt> "more"
+     prompt> "words"
+     prompt> err
+     one word was "err"
+     
+     
+     -----------------------------------------------
+     This is the HANDLER associated with (catch ...)
+     the key is hi
+     -----------------------------------------------
+     
+     
+     #<unspecified>
+     ;Evaluation took 10 mSec (0 in scm_gc) 1209 cells work, 1131 bytes other
+     guile>
+
+     guile> (load "examples/exceptions/catch-sample.scm")
+     ;;; [junk output]
+     
+     prompt> some words
+     "some"
+     prompt> "words"
+     prompt> some more words
+     "some"
+     prompt> "more"
+     prompt> "words"
+     prompt> quit
+     one word was "quit"
+     
+     
+     
+     ----------------------------
+     we are done with the do loop
+     ----------------------------
+     
+     #<unspecified>
+     ;Evaluation took 10 mSec (0 in scm_gc) 947 cells work, 1128 bytes other
+     guile>
+
+   Here's an excercise: fix this program so that it will not print
+unnecessary `prompt>' strings when you have typed more than one word on
+a line.
+
+   The `catch/throw' formalism has a lot in common with the ANSI C
+`setjmp()/longjmp()' mechanism (`[AdvancedProgrammingUNIX], section
+7.10, page 174', also *note Non-Local Exits: (libc)Non-Local Exits.).
+The Scheme approach is defined more clearly (no standard specifies the
+behaviour of `setjmp()/longjmp()' well enough to allow programmers to
+write portable code), and benefits from Scheme's `lambda ()'
+expressions.
+
+   Exception handling methods like `catch' and `throw' are frequently
+built with the Scheme primitive `call-with-current-continuation'
+(usually abbreviated to `call/cc'): this is a very powerful procedure
+which allows escape and *reentry into escaped procedures*.  The
+directory `examples/exceptions' has a couple of implemetations of
+`catch/throw' using `call/cc'.
+
+   I will not discuss continuations here, since the `catch/throw'
+paradigm accounts for the most frequent use of continuations.  The more
+advanced books on Scheme (see `Scheme and the Art of Programming' and
+`The Seasoned Schemer' in *Note Where to find more Guile/Scheme
+resources::) intruduce continuations, and the *Revised(4) Report on the
+Algorithmic Language Scheme* (R4RS, *note Revised(4) Report on the
+Algorithmic Language Scheme: (r4rs)Control features.) gives the exact
+definition of the `call/cc' behaviour.
+
+   In Guile `catch' and `throw' are provided as primitives and not
+defined in terms of `call/cc', mostly for performance reasons.  They
+are documented in recent versions of the SCM manual (*note Exceptions:
+(scm)Exceptions.).
+
+
+File: guile-user.info,  Node: Regular expression support,  Prev: Guile exceptions - catch and throw,  Up: Some other features of Guile
+
+Regular expression support
+==========================
+
+   Another package included with Guile is Tom Lord's "rx" library.  Rx
+implements POSIX regular expressions using the *regular expression
+compiler* paradigm: a regular expression is compiled into a finite
+automaton which is capable of *accepting* input strings that belong to
+that regular language.
+
+   Here's how you call the rx library from Scheme.  Let us take the
+POSIX regular expression `"abc."' (which matches any string that starts
+`"abc"' and then has a single character) and see if it matches certain
+strings:
+
+     guile> (define r (regcomp "abc."))
+     r
+     ;Evaluation took 16 mSec (0 in scm_gc) 179 cells work, 345 bytes other
+     guile> r
+     #<regex 1bb388>
+     ;Evaluation took 0 mSec (0 in scm_gc) 45 cells work, 40 bytes other
+     guile> (regexec r "abc")
+     #f
+     ;Evaluation took 0 mSec (0 in scm_gc) 96 cells work, 55 bytes other
+     guile> (regexec r "abcd")
+     #(0 4)
+     ;Evaluation took 0 mSec (0 in scm_gc) 82 cells work, 64 bytes other
+     guile>
+
+   So the procedure is:
+
+  1. Compile the regular expression with `regcomp'.  This will return a
+     finite automaton which will recognize the given language.
+
+  2. Execute the finite automaton (with `regexec') to check for matches.
+
+   Here is the definition of the two most user-visible procedures that
+implement the regular expression interface:
+
+ - Rx: regcomp PATTERN FLAGS
+     Compile the regular expression pattern using POSIX rules.  Flags is
+     optional and should be specified using symbolic names:
+     REG_EXTENDED to use extended POSIX syntax; REG_ICASE for
+     case-insensitive matching; REG_NEWLINE to allow anchors to match
+     after newline characters in the string and to prevent . or [^...]
+     from matching newlines.  `(logior ...)'  can be used to combine
+     multiple flags. The default is to use POSIX basic syntax, which
+     makes + and ?  literals and \+ and \?  operators.  Backslashes in
+     pattern must be escaped if specified in a literal string e.g.,
+     "\\(a\\)\\?".
+
+ - Rx: regexec REGEX STRING MATCH-PICK FLAGS
+     Match string against the compiled POSIX regular expression regex.
+     match-pick and flags are optional.  Possible flags (which can be
+     combined using logior) are:
+
+     REG_NOTBOL: beginning of line operator won't match the beginning of
+     string (presumably because it's not the beginning of a line)
+
+     REG_NOTEOL: like REG_NOTBOL except for end-of-line.
+
+     If no match is possible, regexec returns #f.  Otherwise match-pick
+     determines the return value:
+
+     `#t' or unspecified: a newly-allocated vector is returned,
+     containing pairs with the indices of the matched part of string
+     and any substrings.
+
+     `""': a list is returned: the first element contains a nested list
+     with the matched part of string surrounded by the the unmatched
+     parts.  Remaining elements are matched substrings (if any).  All
+     returned substrings share memory with string.
+
+     `#f': regexec returns #t if a match is made, otherwise #f.
+
+     vector: the supplied vector is returned, with the first element
+     replaced by a pair containing the indices of the matched portion
+     of string and further elements replaced by pairs containing the
+     indices of matched substrings (if any).
+
+     list: a list will be returned, with each member of the list
+     specified by a code in the corresponding position of the supplied
+     list:
+
+     a number: the numbered matching substring (0 for the entire match).
+
+     `#\<': the beginning of string to the beginning of the part matched
+     by regex.
+
+     `#\>': the end of the matched part of string to the end of string.
+
+     `#\c': the "final tag", which seems to be associated with the "cut
+     operator", which doesn't seem to be available through the posix
+     interface.
+
+     e.g., `(list #\< 0 1 #\>)'.  The returned substrings share memory
+     with string.
+
+   Here are some other procedures that might be used when using regular
+expressions.
+
+ - Rx: compiled-regexp? OBJ
+     Test whether obj is a compiled regular expression.
+
+ - Rx: regexp->dfa REGEX FLAGS
+
+ - Rx: dfa-fork DFA
+
+ - Rx: reset-dfa! DFA
+
+ - Rx: dfa-final-tag DFA
+
+ - Rx: dfa-continuable? DFA
+
+ - Rx: advance-dfa! DFA
+
+   A pedagogical introduction to the sytax of regular expressions can be
+found in the Emacs manual (*note Syntax of Regular Expressions:
+(emacs)Syntax of Regular Expressions.).
+
+
+File: guile-user.info,  Node: Where to find more Guile/Scheme resources,  Next: Concept Index,  Prev: Some other features of Guile,  Up: Top
+
+Where to find more Guile/Scheme resources
+*****************************************
+
+* Menu:
+
+* Online resources::
+* Books and papers::
+* Other documents shipped with Guile::
+
+
+File: guile-user.info,  Node: Online resources,  Next: Books and papers,  Up: Where to find more Guile/Scheme resources
+
+Online resources
+================
+
+*[FSF]*
+     The Free Software Foundation home page `http://www.gnu.ai.mit.edu/'
+
+*[R4RS]*
+     William Clinger and Jonathan Rees, Editors.  Revised(4) Report on
+     the Algorithmic Language Scheme.  In `ACM Lisp Pointers IV'
+     (July-September 1991).
+
+     This can be found at URL
+     `http://www-swiss.ai.mit.edu/~jaffer/r4rs_toc.html' *Note
+     Revised(4) Report on the Algorithmic Language Scheme:
+     (r4rs)Standard procedures.
+
+*[SCM]*
+     Aubrey Jaffer.  SCM: a Portable Scheme Interpreter.  Version 1a5,
+     April 1994.
+
+     This can be found at URL
+     `http://www-swiss.ai.mit.edu/~jaffer/scm_toc.html'; the reference
+     is *Note Overview: (scm)Overview.
+
+*[SLIB]*
+     Todd R. Eigenschink, Dave Love, and Aubrey Jaffer.  SLIB, The
+     Portable Scheme Library.  Edition 2.01, for SLIB version 2a2,
+     January 1995.
+
+     This can be found at URL
+     `http://www-swiss.ai.mit.edu/~jaffer/slib_toc.html'.  The reference
+     is *Note Overview: (slib)Overview.
+
+*[JACAL]*
+     Aubrey Jaffer.  JACAL Symbolic Mathematics System.  Version 1a5,
+     April 1994.
+
+     This can be found at URL
+     `http://www-swiss.ai.mit.edu/~jaffer/jacal_toc.html'.  The
+     reference is *Note Overview: (jacal)Overview.
+
+*[GNUDL]*
+     The Gnudl documentation can be found at
+     `http://nis-www.lanl.gov/~rosalia/mydocs/', and the anonymous ftp
+     directory with the latest Gnudl snapshot is
+     `ftp://nis-ftp.lanl.gov/pub/users/rosalia/'
+
+*[INTRO]*
+     An online introduction to Scheme.  Brief, easy, gives a flavor for
+     the language.  It can be found at
+     `ftp://ftp.cs.indiana.edu/pub/scheme-repository/doc/pubs/intro.txt'
+
+*[GUILE-USER]*
+*[GUILE-PROGRAMMER]*
+     The online master version of this documentation can be found at URL
+     `http://nis-www.lanl.gov/~rosalia/mydocs/'
+
+*[GUILE-MAILING-LIST]*
+     The hypermail archive of the (misnamed) GEL mailing list:
+     <gel@cygnus.com> can be found at `http://www.cygnus.com/ml/guile/'
+
+*[TCL-WAR]*
+     The network traffic triggered by Stallman's article "Why you
+     should not use Tcl"; can be found at URL
+     `http://www.utdallas.edu/acc/glv/Tcl/war/'
+
+*[GUILE-PLANS]*
+     The network traffic triggered by Stallman's article "GNU Extension
+     Language Plans"; can be found at URL
+     `http://www.utdallas.edu/acc/glv/Tcl/war2/'
+
+*[LORD-GUILE-PAPER]*
+     Tom Lord's technical paper on Guile can be found at
+     `http://www.cygnus.com/library/ctr/guile.html'
+
+*[YAHOO-SCHEME]*
+     Yahoo Scheme index
+     `http://www.yahoo.com/Computers/Languages/Scheme/'
+
+*[YAHOO-TCL]*
+     Yahoo Tcl/Tk index
+     `http://www.yahoo.com/Computers/Languages/Tcl_Tk/'
+
+*[JAFFER]*
+     Aubrey Jaffer's home page `http://www-swiss.ai.mit.edu/~jaffer/'
+
+*[GALASSI]*
+     Mark Galassi's home page, `http://nis-www.lanl.gov/~rosalia/'
+
+*[POSIX]*
+     The POSIX programmer's guide
+     `http://intertain.com/store/POSIX_desc.html'
+
+*[YAHOO-OpenGL]*
+     Yahoo OpenGL index
+     `http://www.yahoo.com/Computers_and_Internet/Graphics/OpenGL/'
+
+*[GLUT]*
+     The GLUT home page
+     `http://reality.sgi.com/employees/mjk_asd/glut3/glut3.html'
+
+*[STK]*
+     The STk home page, at URL `http://kaolin.unice.fr/html/STk.html'
+
+*[SURFIT]*
+     The Surfit! home page, at URL `http://pastime.anu.edu.au/SurfIt/'
+
+*[SCSH]*
+     The SCSH home page, at URL
+     `http://www-swiss.ai.mit.edu/scsh/scsh.html'
+
+
+File: guile-user.info,  Node: Books and papers,  Next: Other documents shipped with Guile,  Prev: Online resources,  Up: Where to find more Guile/Scheme resources
+
+Books and papers
+================
+
+*[IEEE]*
+     `IEEE Standard 1178-1990.  IEEE Standard for the Scheme
+     Programming Language.'  IEEE, New York, 1991.
+
+*[SICP]*
+     Harold Abelson and Gerald Jay Sussman with Julie Sussman.
+     `Structure and Interpretation of Computer Programs.' MIT Press,
+     Cambridge, 1985.
+
+*[Simply]*
+     Brian Harvey and Matthew Wright.  `Simply Scheme: Introducing
+     Computer Science' MIT Press, 1994 ISBN 0-262-08226-8
+
+*[SchemeAndArt]*
+     George Springer and Daniel P. Friedman.  `Scheme and the Art of
+     Programming' MIT Press and McGraw-Hill, 1989 ISBN 0-262-19288-8
+     (MIT Press) ISBN 0-07-060522-X (McGraw-Hill).
+
+*[LittleSchemer]*
+     Daniel P. Friedman and Matthias Felleisen.  `The Little Schemer.'
+     MIT Press, Cambridge, 1996 ISBN 0-262-56099-2.
+
+*[SeasonedSchemer]*
+     Daniel P. Friedman and Matthias Felleisen.  `The Seasoned Schemer.'
+     MIT Press, Cambridge, 1996 ISBN 0-262-56100-X.
+
+*[AdvancedProgrammingUNIX]*
+     W. Richard Stevens.  `Advanced Programming in the UNIX
+     Environment.' Addison Wesley, Reading, Massachussetts, 1992 ISBN
+     0-201-56317-7.
+
+*[UNIXThreads]*
+     Charles J. Northrup.  `Programming with UNIX Threads.' Wiley, New
+     York, 1996 ISBN 0-471-13751-0.
+
+
+File: guile-user.info,  Node: Other documents shipped with Guile,  Prev: Books and papers,  Up: Where to find more Guile/Scheme resources
+
+Other documents shipped with Guile
+==================================
+
+   Guile ships with many other documents, beyond the User and Programmer
+manuals.  You can find them in miscellaneous subdirectories of
+`$srcdir/doc' in the Guile distribution.  Some of these are useful,
+others are hopelessly out of date.
+
+
+File: guile-user.info,  Node: Concept Index,  Next: Procedure and Variable Index,  Prev: Where to find more Guile/Scheme resources,  Up: Top
+
+Concept Index
+*************
+
+* Menu:
+
+* anonymous procedure:                   How to start up Guile - a quick tour.
+* Benson, Brent:                         What are scripting and extension languages.
+* bignumbers:                            Guile as a basic Scheme interpreter.
+* Blandy, Jim:                           History of Guile and its motivations.
+* Bourne shell:                          What are scripting and extension languages.
+* builtin functions:                     More interesting programming with libguile.
+* call-with-current-continuation:        Guile exceptions - catch and throw.
+* call/cc:                               Guile exceptions - catch and throw.
+* callback <1>:                          More interesting programming with libguile.
+* callback:                              How to start up Guile - a quick tour.
+* case sensitivity:                      How to characterize Guile.
+* catch:                                 Guile exceptions - catch and throw.
+* cell-object:                           Using Guile to write Guile programs.
+* closures:                              Using Guile to write Guile programs.
+* command line options:                  Invoking Guile.
+* continuations:                         Guile exceptions - catch and throw.
+* Cygnus Support:                        History of Guile and its motivations.
+* Dominion:                              What are scripting and extension languages.
+* dynamic roots:                         Dynamic roots.
+* Emacs Lisp:                            What are scripting and extension languages.
+* emacs regexp:                          Regular expression support.
+* escape procedure:                      Guile exceptions - catch and throw.
+* exception handling:                    Guile exceptions - catch and throw.
+* extending C programs:                  Guile in a library - using libguile.a.
+* extension languages:                   What are scripting and extension languages.
+* extension languages - examples:        What are scripting and extension languages.
+* extensions to R4RS:                    How to characterize Guile.
+* extensions to standard Scheme:         How to characterize Guile.
+* finite automaton:                      Regular expression support.
+* Free Software Foundation:              History of Guile and its motivations.
+* Galassi, Mark:                         Two world views.
+* gh_:                                   What is libguile -- high and low level.
+* GNU Data Language:                     Two world views.
+* GNU extension language:                Introduction - what is Guile.
+* GNU project:                           History of Guile and its motivations.
+* gnudl:                                 Two world views.
+* Guile:                                 Introduction - what is Guile.
+* heavyweight processes:                 What are threads.
+* hello world <1>:                       What is libguile -- high and low level.
+* hello world:                           Using Guile to write Guile programs.
+* Houston, Gary:                         The Guile interface to Posix.
+* invocation:                            Invoking Guile.
+* invoking ggl:                          Invoking Guile.
+* invoking Guile:                        Invoking Guile.
+* Jaffer, Aubrey:                        History of Guile and its motivations.
+* large programs:                        What are scripting and extension languages.
+* learn0:                                How to get started with libguile.
+* learn1:                                More interesting programming with libguile.
+* libguile <1>:                          What is libguile -- high and low level.
+* libguile:                              Guile in a library - using libguile.a.
+* libguile - step by step:               What learn1 is doing.
+* libscheme:                             What are scripting and extension languages.
+* lightweight processes:                 What are threads.
+* lisp dialects:                         Using Guile to write Guile programs.
+* list processing:                       Using Guile to write Guile programs.
+* locking resources:                     Examples of Scheme threads.
+* Lord, Tom:                             History of Guile and its motivations.
+* Lotus 1-2-3:                           What are scripting and extension languages.
+* master world:                          Two world views.
+* modules:                               Modules in Guile.
+* multithreaded programming:             Threads in Guile.
+* object based programming:              Using Guile to write Guile programs.
+* object oriented programming:           Using Guile to write Guile programs.
+* objects:                               Using Guile to write Guile programs.
+* options:                               Invoking Guile.
+* posix:                                 The Guile interface to Posix.
+* POSIX:                                 How to characterize Guile.
+* primitive procedures:                  What learn1 is doing.
+* recursion:                             Using Guile to write Guile programs.
+* regex:                                 Regular expression support.
+* registering C functions:               What learn1 is doing.
+* registering callbacks:                 What learn1 is doing.
+* regular expressions:                   Regular expression support.
+* report on Scheme:                      How to characterize Guile.
+* resource locking:                      Examples of Scheme threads.
+* Revised(4) Report on the Algorithmic Language Scheme: How to characterize Guile.
+* rx <1>:                                Regular expression support.
+* rx:                                    How to characterize Guile.
+* Scheme extensions:                     How to characterize Guile.
+* Scheme language - definition:          How to characterize Guile.
+* Scheme language - report:              How to characterize Guile.
+* Scheme programming tutorial:           Using Guile to write Guile programs.
+* scm_:                                  What is libguile -- high and low level.
+* scripting languages:                   What are scripting and extension languages.
+* scripting languages - examples:        What are scripting and extension languages.
+* SCSH:                                  The Guile interface to Posix.
+* Shivers, Olin:                         The Guile interface to Posix.
+* slib:                                  How to characterize Guile.
+* Stallman, Richard:                     History of Guile and its motivations.
+* synopsis:                              Invoking Guile.
+* syntactic closures:                    Using Guile to write Guile programs.
+* Tcl <1>:                               History of Guile and its motivations.
+* Tcl:                                   What are scripting and extension languages.
+* threads:                               Threads in Guile.
+* throw:                                 Guile exceptions - catch and throw.
+* Tk:                                    How to characterize Guile.
+* tutorial on Scheme programming:        Using Guile to write Guile programs.
+* widget callback:                       How to start up Guile - a quick tour.
+
+
+File: guile-user.info,  Node: Procedure and Variable Index,  Prev: Concept Index,  Up: Top
+
+Procedure and Variable Index
+****************************
+
+   This is an alphabetical list of all the procedures, macros and
+variables defined in the Guile User Manual.  Note that most of the
+procedures and variables in Guile are defined in the Guile Programmer's
+Manual.
+
+* Menu:
+
+* advance-dfa!:                          Regular expression support.
+* call-with-dynamic-root:                Dynamic roots.
+* catch:                                 Guile exceptions - catch and throw.
+* compiled-regexp?:                      Regular expression support.
+* dfa-continuable?:                      Regular expression support.
+* dfa-final-tag:                         Regular expression support.
+* dfa-fork:                              Regular expression support.
+* MAKE-CELL:                             Using Guile to write Guile programs.
+* regcomp:                               Regular expression support.
+* regexec:                               Regular expression support.
+* regexp->dfa:                           Regular expression support.
+* represent-matrix:                      Using Guile to write Guile programs.
+* reset-dfa!:                            Regular expression support.
+* send:                                  Using Guile to write Guile programs.
+* throw:                                 Guile exceptions - catch and throw.
+
+

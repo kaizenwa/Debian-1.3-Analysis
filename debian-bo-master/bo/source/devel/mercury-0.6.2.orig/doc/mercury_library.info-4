@@ -1,0 +1,1143 @@
+This is Info file mercury_library.info, produced by Makeinfo-1.63 from
+the input file library.texi.
+
+START-INFO-DIR-ENTRY
+* Mercury Library: (mercury_library). The Mercury Library Reference Manual
+END-INFO-DIR-ENTRY
+
+   This file documents the Mercury standard library.
+
+   Copyright (C) 1995 University of Melbourne.
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+   Permission is granted to copy and distribute modified versions of
+this manual under the conditions for verbatim copying, provided also
+that the entire resulting derived work is distributed under the terms
+of a permission notice identical to this one.
+
+   Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions.
+
+
+File: mercury_library.info,  Node: parser,  Next: pqueue,  Prev: ops,  Up: Top
+
+parser
+******
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     %
+     % file: parser.m.
+     % main author: fjh.
+     % stability: high.
+     %
+     % This file exports the predicate parser__read_term, which reads
+     % a term from the current input stream.  The parser and lexer are
+     % intended to exactly follow ISO Prolog syntax, but there are some
+     % departures from that for three reasons:
+     %
+     %	(1) I wrote some of the code at home when the ISO Prolog draft
+     %	    was at uni - so in some places I just guessed.
+     %	(2) In some places the lexer reports an error when it shouldn't.
+     %	(3) There are a couple of hacks to make it compatible with NU-Prolog
+     %	    syntax.
+     %
+     % The parser is a relatively straight-forward top-down recursive descent
+     % parser, made somewhat complicated by the need to handle operator
+     % precedences.  It uses `lexer__get_token_list' to read a list of tokens.
+     % It uses the routines in module `ops' to look up operator precedences.
+     %
+     %--------------------------------------------------%
+     
+     :- module parser.
+     :- interface.
+     :- import_module io, term_io.
+     
+     :- pred parser__read_term(read_term, io__state, io__state).
+     :- mode parser__read_term(out, di, uo) is det.
+     
+     	% The string is the filename to use for the current input stream;
+     	% this is used in constructing the term__contexts in the read term.
+     	% This interface is used to support the `:- pragma source_file'
+     	% directive.
+     :- pred parser__read_term(string, read_term, io__state, io__state).
+     :- mode parser__read_term(in, out, di, uo) is det.
+     
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: pqueue,  Next: queue,  Prev: parser,  Up: Top
+
+pqueue
+******
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     %
+     % file pqueue.m - implements a priority queue ADT.
+     % main author: conway.
+     % stability: high.
+     %
+     % A pqueue is a priority queue.  A priority queue holds a collection
+     % of key-value pairs; the interface provides operations to create
+     % an empty priority queue, to insert a key-value pair into a priority
+     % queue, and to remove the element with the lowest key.
+     %
+     % Insertion/removal is not guaranteed to be "stable"; that is,
+     % if you insert two values with the same key, the order in which
+     % they will be removed is unspecified.
+     %
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+     
+     :- module pqueue.
+     
+     :- interface.
+     
+     :- import_module list, std_util, assoc_list.
+     
+     :- type pqueue(_K, _V).
+     
+     	% Create an empty priority queue
+     :- pred pqueue__init(pqueue(_K, _V)).
+     :- mode pqueue__init(out) is det.
+     
+     	% Insert a value V with key K into a priority queue
+     	% and return the new priority queue.
+     :- pred pqueue__insert(pqueue(K, V), K, V, pqueue(K, V)).
+     :- mode pqueue__insert(in, in, in, out) is det.
+     
+     	% Remove the smallest item from the priority queue.
+     :- pred pqueue__remove(pqueue(K, V), K, V, pqueue(K, V)).
+     :- mode pqueue__remove(in, out, out, out) is semidet.
+     
+     	% Extract all the items from a priority queue by
+     	% repeated removal, and place them in an association
+     	% list.
+     :- pred pqueue__to_assoc_list(pqueue(K, V), assoc_list(K, V)).
+     :- mode pqueue__to_assoc_list(in, out) is det.
+     
+     	% Insert all the key-value pairs in an association list
+     	% into a priority queue.
+     :- pred pqueue__assoc_list_to_pqueue(assoc_list(K, V), pqueue(K, V)).
+     :- mode pqueue__assoc_list_to_pqueue(in, out) is det.
+     
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: queue,  Next: random,  Prev: pqueue,  Up: Top
+
+queue
+*****
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     
+     % File: queue.m.
+     % Main author: fjh.
+     % Stability: high.
+     
+     % This file contains a `queue' ADT.
+     % A queue holds a sequence of values, and provides operations
+     % to insert values at the end of the queue (queue__put) and remove them from
+     % the front of the queue (queue__get).
+     %
+     % This implementation is in terms of a pair of lists.
+     % The put and get operations are amortized constant-time.
+     
+     %--------------------------------------------------%
+     
+     :- module queue.
+     :- interface.
+     :- import_module int.
+     
+     :- type queue(T).
+     
+     	% `queue__init(Queue)' is true iff `Queue' is an empty queue.
+     
+     :- pred queue__init(queue(T)).
+     :- mode queue__init(out) is det.
+     
+     	% 'queue_equal(Q1, Q2)' is true iff Q1 and Q2 contain the same
+     	% elements in the same order.
+     
+     :- pred queue__equal(queue(T), queue(T)).
+     :- mode queue__equal(in, in) is semidet.
+     
+     	% `queue__is_empty(Queue)' is true iff `Queue' is an empty queue.
+     
+     :- pred queue__is_empty(queue(T)).
+     :- mode queue__is_empty(in) is semidet.
+     
+     	% `queue__is_full(Queue)' is intended to be true iff `Queue'
+     	% is a queue whose capacity is exhausted.  This
+     	% implementation allows arbitrary-sized queues, so queue__is_full
+     	% always fails.
+     
+     :- pred queue__is_full(queue(T)).
+     :- mode queue__is_full(in) is semidet.
+     
+     	% `queue__put(Queue0, Elem, Queue)' is true iff `Queue' is
+     	% the queue which results from appending `Elem' onto the end
+     	% of `Queue0'.
+     
+     :- pred queue__put(queue(T), T, queue(T)).
+     :- mode queue__put(in, in, out) is det.
+     
+     	% `queue__put_list(Queue0, Elems, Queue)' is true iff `Queue'
+     	% is the queue which results from inserting the items in the
+     	% list `Elems' into `Queue0'.
+     
+     :- pred queue__put_list(queue(T), list(T), queue(T)).
+     :- mode queue__put_list(in, in, out) is det.
+     
+     	% `queue__first(Queue, Elem)' is true iff `Queue' is a non-empty
+     	% queue whose first element is `Elem'.
+     
+     :- pred queue__first(queue(T), T).
+     :- mode queue__first(in, out) is semidet.
+     
+     	% `queue__get(Queue0, Elem, Queue)' is true iff `Queue0' is
+     	% a non-empty queue whose first element is `Elem', and `Queue'
+     	% the queue which results from removing that element from
+     	% the front of `Queue0'.
+     
+     :- pred queue__get(queue(T), T, queue(T)).
+     :- mode queue__get(in, out, out) is semidet.
+     
+     	% `queue__length(Queue, Length)' is true iff `Queue' is a queue
+     	% containing `Length' elements.
+     
+     :- pred queue__length(queue(T), int).
+     :- mode queue__length(in, out) is det.
+     
+     	% `queue__list_to_queue(List, Queue)' is true iff `Queue' is a queue
+     	% containing the elements of List, with the first element of List at
+     	% the head of the queue.
+     
+     :- pred queue__list_to_queue(list(T), queue(T)).
+     :- mode queue__list_to_queue(in, out) is det.
+     
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: random,  Next: rbtree,  Prev: queue,  Up: Top
+
+random
+******
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     %
+     % file: rand.m
+     % main author: conway
+     % stability: low
+     %
+     % Define a set of random number generator predicates. This implementation
+     % uses a threaded random-number supply. It could be made non-unique, but
+     % since each thread returns the same list of random numbers, in the interests
+     % of safety, it is declared with (backtrackable) unique modes.
+     %
+     %--------------------------------------------------%
+     
+     :- module random.
+     
+     :- interface.
+     
+     :- import_module int, list.
+     
+     :- type random__supply.
+     
+     :- pred random__init(int, random__supply).
+     :- mode random__init(in, uo) is det.
+     
+     :- pred random__random(int, random__supply, random__supply).
+     :- mode random__random(out, mdi, muo) is det.
+     
+     :- pred random__randmax(int, random__supply, random__supply).
+     :- mode random__randmax(out, mdi, muo) is det.
+     
+     :- pred random__test(int, int, list(int), int).
+     :- mode random__test(in, in, out, out) is det.
+     
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: rbtree,  Next: relation,  Prev: random,  Up: Top
+
+rbtree
+******
+
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+     %
+     %  Red-black tree module.
+     %  Main author: petdr.
+     %  Stability: medium.
+     %
+     %  Contains an implementation of red black trees.
+     %
+     % *** Exit conditions of main predicates ***
+     % insert:
+     %	fails if key already in tree.
+     % update:
+     %	changes value of key already in tree.  fails if key doesn't exist.
+     % set:
+     %	insert's or update's. Never fails.
+     %
+     % insert_duplicate:
+     %	insert's duplicate keys into the tree, never fails.  Search doesn't
+     %	yet support looking for duplicates.
+     %
+     % delete:
+     %	delete's a node from the tree if it exists.
+     % remove:
+     %	fails if node to remove doesn't exist in the tree.
+     %
+     % lookup:
+     %	Aborts program if key looked up doesn't exist.
+     % search:
+     %	Fails if key looked up doesn't exist.
+     %
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+     
+     :- module rbtree.
+     :- interface.
+     
+     :- import_module list, std_util, assoc_list.
+     
+     :- type rbtree(Key, Value).
+     
+     	% Initialise the data structure.
+     :- pred rbtree__init(rbtree(K, V)).
+     :- mode rbtree__init(out) is det.
+     
+     	% Insert's a new key-value pair into the tree.  Fails if key
+     	% already in the tree.
+     :- pred rbtree__insert(rbtree(K, V), K, V, rbtree(K, V)).
+     :- mode rbtree__insert(in, in, in, out) is semidet.
+     
+     	% Update's the value associated with a key.  Fails if the key
+     	% doesn't exist.
+     :- pred rbtree__update(rbtree(K, V), K, V, rbtree(K, V)).
+     :- mode rbtree__update(in, in, in, out) is semidet.
+     
+     	% Set's a value irregardless of whether key exists or not.  Never
+     	% fails.
+     :- pred rbtree__set(rbtree(K, V), K, V, rbtree(K, V)).
+     :- mode rbtree__set(in, in, in, out) is det.
+     
+     	% Insert a duplicate key into the tree.  Never fails.
+     :- pred rbtree__insert_duplicate(rbtree(K, V), K, V, rbtree(K, V)).
+     :- mode rbtree__insert_duplicate(in, in, in, out) is det.
+     
+     	% Lookup a value associated with a key.  Program abort's if key
+     	% doesn't exist.
+     :- pred rbtree__lookup(rbtree(K, V), K, V).
+     :- mode rbtree__lookup(in, in, out) is det.
+     
+     	% Search for a key-value pair using the key.  Fails if key doesn't
+     	% exist.
+     :- pred rbtree__search(rbtree(K, V), K, V).
+     :- mode rbtree__search(in, in, out) is semidet.
+     
+     	% Delete the key value pair associated with a key.  Does nothing
+     	% if the key doesn't exist.
+     :- pred rbtree__delete(rbtree(K, V), K, rbtree(K, V)).
+     :- mode rbtree__delete(in, in, out) is det.
+     
+     	% Remove the key value pair associated with a key.  Fails
+     	% if the key doesn't exist.
+     :- pred rbtree__remove(rbtree(K, V), K, rbtree(K, V)).
+     :- mode rbtree__remove(in, in, out) is semidet.
+     
+     	% Return's an in-order list of all the key's in the rbtree.
+     :- pred rbtree__keys(rbtree(K, V), list(K)).
+     :- mode rbtree__keys(in, out) is det.
+     
+     	% Return's a list of values such that the key's associated with the
+     	% values are in-order.
+     :- pred rbtree__values(rbtree(K, V), list(V)).
+     :- mode rbtree__values(in, out) is det.
+     
+     	% Count the number of elements in the tree
+     :- pred rbtree__count(rbtree(K, V), int).
+     :- mode rbtree__count(in, out) is det.
+     
+     :- pred rbtree__assoc_list_to_rbtree(assoc_list(K, V), rbtree(K, V)).
+     :- mode rbtree__assoc_list_to_rbtree(in, out) is det.
+     
+     :- pred rbtree__rbtree_to_assoc_list(rbtree(K, V), assoc_list(K, V)).
+     :- mode rbtree__rbtree_to_assoc_list(in, out) is det.
+     
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: relation,  Next: require,  Prev: rbtree,  Up: Top
+
+relation
+********
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     %
+     % file: relation.m.
+     % main author: bromage, petdr.
+     % stability: low.
+     %
+     % This module defines a data type for binary relations over reflexive
+     % domains.
+     %
+     % In fact, this is exactly equivalent to a graph/1 type.
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+     
+     :- module relation.
+     
+     :- interface.
+     :- import_module list, set, set_bbbtree, std_util, assoc_list.
+     
+     :- type relation(T).
+     
+     :- type relation_key.
+     
+     	% relation__init creates a new relation.
+     :- pred relation__init(relation(T)).
+     :- mode relation__init(out) is det.
+     
+     	% relation__add_element adds an element to the domain of a
+     	% relation.  Return the old relation_key if one already
+     	% exists.
+     :- pred relation__add_element(relation(T), T, relation_key, relation(T)).
+     :- mode relation__add_element(in, in, out, out) is det.
+     
+     	% relation__search_element returns the relation_key associated
+             % with a domain element.  Fail if the relation_key is not valid.
+     :- pred relation__search_element(relation(T), T, relation_key).
+     :- mode relation__search_element(in, in, out) is semidet.
+     
+     	% relation__lookup_element returns the relation_key associated
+             % with a domain element.  Abort if the relation_key is not valid.
+     :- pred relation__lookup_element(relation(T), T, relation_key).
+     :- mode relation__lookup_element(in, in, out) is det.
+     
+     	% relation__search_key returns the domain element associated
+     	% with a relation_key.  Fail if the relation_key is not valid.
+     :- pred relation__search_key(relation(T), relation_key, T).
+     :- mode relation__search_key(in, in, out) is semidet.
+     
+     	% relation__lookup_key returns the domain element associated
+     	% with a relation_key.  Abort if the relation_key is not valid.
+     :- pred relation__lookup_key(relation(T), relation_key, T).
+     :- mode relation__lookup_key(in, in, out) is det.
+     
+     	% relation__add adds an element to the relation.
+     :- pred relation__add(relation(T), relation_key, relation_key, relation(T)).
+     :- mode relation__add(in, in, in, out) is det.
+     
+     	% relation__add_assoc_list adds a list of elements to a
+     	% relation.
+     :- pred relation__add_assoc_list(relation(T),
+     		assoc_list(relation_key, relation_key), relation(T)).
+     :- mode relation__add_assoc_list(in, in, out) is det.
+     
+     	% relation__remove removes an element from the relation.
+     :- pred relation__remove(relation(T), relation_key, relation_key, relation(T)).
+     :- mode relation__remove(in, in, in, out) is det.
+     
+     	% relation__remove_assoc_list removes a list of elements
+     	% from a relation.
+     :- pred relation__remove_assoc_list(relation(T),
+     		assoc_list(relation_key, relation_key), relation(T)).
+     :- mode relation__remove_assoc_list(in, in, out) is det.
+     
+     	% relation__lookup checks to see if an element is
+     	% in the relation.
+     :- pred relation__lookup(relation(T), relation_key, relation_key).
+     :- mode relation__lookup(in, in, out) is nondet.
+     :- mode relation__lookup(in, in, in) is semidet.
+     
+     	% relation__reverse_lookup checks to see if an element is
+     	% in the relation.
+     :- pred relation__reverse_lookup(relation(T), relation_key, relation_key).
+     :- mode relation__reverse_lookup(in, out, in) is nondet.
+     :- mode relation__reverse_lookup(in, in, in) is semidet.
+     
+     	% relation__lookup_from returns the set of elements
+     	% y such that xRy, given an x.
+     :- pred relation__lookup_from(relation(T), relation_key, set(relation_key)).
+     :- mode relation__lookup_from(in, in, out) is det.
+     
+     	% relation__lookup_to returns the set of elements
+     	% x such that xRy, given some y.
+     :- pred relation__lookup_to(relation(T), relation_key, set(relation_key)).
+     :- mode relation__lookup_to(in, in, out) is det.
+     
+     	% relation__to_assoc_list turns a relation into a list of
+     	% pairs of elements.
+     :- pred relation__to_assoc_list(relation(T),
+     	assoc_list(relation_key, relation_key)).
+     :- mode relation__to_assoc_list(in, out) is det.
+     
+     	% relation__from_assoc_list turns a list of pairs of
+     	% elements into a relation.
+     % :- pred relation__from_assoc_list(assoc_list(T, T), relation(T)).
+     % :- mode relation__from_assoc_list(in, out) is det.
+     
+     	% relation__domain finds the set of all elements in the
+     	% domain of a relation.
+     :- pred relation__domain(relation(T), set(T)).
+     :- mode relation__domain(in, out) is det.
+     
+     	% relation__inverse(R, R') is true iff for all x, y
+     	% in the domain of R, xRy if yR'x.
+     :- pred relation__inverse(relation(T), relation(T)).
+     :- mode relation__inverse(in, out) is det.
+     
+     	% relation__compose(R1, R2, R) is true if R is the
+     	% composition of the relations R1 and R2.
+     % :- pred relation__compose(relation(T), relation(T), relation(T)).
+     % :- mode relation__compose(in, in, out) is det.
+     
+     	% relation__dfs(Rel, X, Dfs) is true if Dfs is a
+     	% depth-first sorting of Rel starting at X.  The
+     	% set of elements in the list Dfs is exactly equal
+     	% to the set of elements y such that xR*y, where
+     	% R* is the reflexive transitive closure of R.
+     :- pred relation__dfs(relation(T), relation_key, list(relation_key)).
+     :- mode relation__dfs(in, in, out) is det.
+     
+     	% relation__dfsrev(Rel, X, DfsRev) is true if DfsRev is a
+     	% reverse depth-first sorting of Rel starting at X.  The
+     	% set of elements in the list Dfs is exactly equal
+     	% to the set of elements y such that xR*y, where
+     	% R* is the reflexive transitive closure of R.
+     :- pred relation__dfsrev(relation(T), relation_key, list(relation_key)).
+     :- mode relation__dfsrev(in, in, out) is det.
+     
+     	% relation__dfs(Rel, Dfs) is true if Dfs is a depth-
+     	% first sorting of Rel, i.e. a list of the nodes in Rel
+     	% such that it contains all elements in the relation and all
+     	% the children of a node are placed in the list before
+     	% the parent.
+     :- pred relation__dfs(relation(T), list(relation_key)).
+     :- mode relation__dfs(in, out) is det.
+     
+     	% relation__dfsrev(Rel, DfsRev) is true if DfsRev is a reverse
+     	% depth-first sorting of Rel.  ie DfsRev is the reverse of Dfs
+     	% from relation__dfs/2.
+     :- pred relation__dfsrev(relation(T), list(relation_key)).
+     :- mode relation__dfsrev(in, out) is det.
+     
+     	% relation__dfs(Rel, X, Visit0, Visit, Dfs) is true
+     	% if Dfs is a depth-first sorting of Rel starting at
+     	% X providing we have already visited Visit0 nodes,
+     	% i.e.  a list of nodes such that all the unvisited
+     	% children of a node are placed in the list before the
+     	% parent.  Visit0 allows us to initialise a set of
+     	% previously visited nodes.  Visit is Dfs + Visit0.
+     :- pred relation__dfs(relation(T), relation_key, set_bbbtree(relation_key),
+     		set_bbbtree(relation_key), list(relation_key)).
+     :- mode relation__dfs(in, in, in, out, out) is det.
+     
+     	% relation__dfsrev(Rel, X, Visit0, Visit, DfsRev) is true if
+     	% DfsRev is a reverse depth-first sorting of Rel starting at X
+     	% providing we have already visited Visit0 nodes,
+     	% ie the reverse of Dfs from relation__dfs/5.
+     	% Visit is Visit0 + DfsRev.
+     :- pred relation__dfsrev(relation(T), relation_key,  set_bbbtree(relation_key),
+     		set_bbbtree(relation_key), list(relation_key)).
+     :- mode relation__dfsrev(in, in, in, out, out) is det.
+     
+     	% relation__is_dag(R) is true iff R is a directed acyclic graph.
+     :- pred relation__is_dag(relation(T)).
+     :- mode relation__is_dag(in) is semidet.
+     
+     	% relation__components(R, Comp) is true if Comp
+     	% is the set of the connected components of R.
+     :- pred relation__components(relation(T), set(set(relation_key))).
+     :- mode relation__components(in, out) is det.
+     
+     	% relation__cliques(R, Cliques) is true if
+     	% Cliques is the set of the strongly connected
+     	% components (cliques) of R.
+     :- pred relation__cliques(relation(T), set(set(relation_key))).
+     :- mode relation__cliques(in, out) is det.
+     
+     	% relation__reduced(R, Red) is true if Red is
+     	% the reduced relation (relation of cliques)
+     	% obtained from R.
+     :- pred relation__reduced(relation(T), relation(set(T))).
+     :- mode relation__reduced(in, out) is det.
+     
+     	% relation__tsort(R, TS) is true if TS is a
+     	% topological sorting of R.  It fails if R
+     	% is cyclic.
+     :- pred relation__tsort(relation(T), list(T)).
+     :- mode relation__tsort(in, out) is semidet.
+     
+     	% relation__atsort(R, ATS) is true if ATS is
+     	% a topological sorting of the cliques in R.
+     :- pred relation__atsort(relation(T), list(set(T))).
+     :- mode relation__atsort(in, out) is det.
+     
+     	% relation__sc(R, SC) is true if SC is the
+     	% symmetric closure of R.  In graph terms,
+     	% symmetric closure % is the same as turning
+     	% a directed graph into an undirected graph.
+     :- pred relation__sc(relation(T), relation(T)).
+     :- mode relation__sc(in, out) is det.
+     
+     	% relation__tc(R, TC) is true if TC is the
+     	% transitive closure of R.
+     :- pred relation__tc(relation(T), relation(T)).
+     :- mode relation__tc(in, out) is det.
+     
+     	% relation__rtc(R, RTC) is true if RTC is the
+     	% reflexive transitive closure of R.
+     :- pred relation__rtc(relation(T), relation(T)).
+     :- mode relation__rtc(in, out) is det.
+     
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: require,  Next: set,  Prev: relation,  Up: Top
+
+require
+*******
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     
+     :- module require.
+     
+     % Main author: fjh.
+     % Stability: medium to high.
+     
+     % This module provides features similar to <assert.h> in C.
+     
+     %--------------------------------------------------%
+     :- interface.
+     
+     :- pred error(string).
+     :- mode error(in) is erroneous.
+     
+     %	error(Message).
+     %		Abort with error message.
+     
+     
+     :- pred	require(pred, string).
+     :- mode	require((pred) is semidet, in) is det.
+     
+     %	require(Goal, Message).
+     %		Call goal, and abort with error message if Goal fails.
+     %		This is not as useful as you might imagine, since it requires
+     %		that the goal not produce any output variables.  In
+     %		most circumstances you should use an explicit if-then-else
+     %		with a call to error/1 in the "else".
+     
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: set,  Next: set_bbbtree,  Prev: require,  Up: Top
+
+set
+***
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     
+     % File: set.m.
+     % Main authors: conway, fjh, benyi.
+     % Stability: high.
+     
+     % This module provides a set ADT.
+     % The implementation represents sets using ordered lists.
+     % This file just calls the equivalent predicates in set_ordlist.
+     
+     %--------------------------------------------------%
+     
+     :- module set.
+     :- interface.
+     :- import_module bool, list.
+     
+     :- type set(T).
+     
+     	% `set__list_to_set(List, Set)' is true iff `Set' is the set
+     	% containing only the members of `List'.
+     
+     :- pred set__list_to_set(list(T), set(T)).
+     :- mode set__list_to_set(in, out) is det.
+     
+     	% `set__sorted_list_to_set(List, Set)' is true iff `Set' is the set
+     	% containing only the members of `List'.  `List' must be sorted.
+     
+     :- pred set__sorted_list_to_set(list(T), set(T)).
+     :- mode set__sorted_list_to_set(in, out) is det.
+     
+     	% `set__to_sorted_list(Set, List)' is true iff `List' is the list
+     	% of all the members of `Set', in sorted order.
+     
+     :- pred set__to_sorted_list(set(T), list(T)).
+     :- mode set__to_sorted_list(in, out) is det.
+     
+     	% `set__init(Set)' is true iff `Set' is an empty set.
+     
+     :- pred set__init(set(T)).
+     :- mode set__init(uo) is det.
+     
+     	% `set__singleton_set(Set, Elem)' is true iff `Set' is the set
+     	% containing just the single element `Elem'.
+     
+     :- pred set__singleton_set(set(T), T).
+     :- mode set__singleton_set(in, out) is semidet.
+     :- mode set__singleton_set(out, in) is det.
+     
+     	% `set__equal(SetA, SetB)' is true iff
+     	% `SetA' and `SetB' contain the same elements.
+     
+     :- pred set__equal(set(T), set(T)).
+     :- mode set__equal(in, in) is semidet.
+     
+     :- pred set__empty(set(T)).
+     :- mode set__empty(in) is semidet.
+     
+     	% `set__subset(SetA, SetB)' is true iff `SetA' is a subset of `SetB'.
+     
+     :- pred set__subset(set(T), set(T)).
+     :- mode set__subset(in, in) is semidet.
+     
+     	% `set__superset(SetA, SetB)' is true iff `SetA' is a
+     	% superset of `SetB'.
+     
+     :- pred set__superset(set(T), set(T)).
+     :- mode set__superset(in, in) is semidet.
+     
+     	% `set__member(X, Set)' is true iff `X' is a member of `Set'.
+     
+     :- pred set__member(T, set(T)).
+     :- mode set__member(in, in) is semidet.
+     :- mode set__member(out, in) is nondet.
+     
+     	% `set_is_member(X, Set, Result)' returns
+     	% `Result = yes' iff `X' is a member of `Set'.
+     
+     :- pred set__is_member(T, set(T), bool).
+     :- mode set__is_member(in, in, out) is det.
+     
+     	% `set__insert(Set0, X, Set)' is true iff `Set' is the union of
+     	% `Set0' and the set containing only `X'.
+     
+     :- pred set__insert(set(T), T, set(T)).
+     :- mode set__insert(di, di, uo) is det.
+     :- mode set__insert(in, in, out) is det.
+     
+     	% `set__insert_list(Set0, Xs, Set)' is true iff `Set' is the union of
+     	% `Set0' and the set containing only the members of `Xs'.
+     
+     :- pred set__insert_list(set(T), list(T), set(T)).
+     :- mode set__insert_list(in, in, out) is det.
+     
+     	% `set__delete(Set0, X, Set)' is true iff `Set' is the relative
+     	% complement of `Set0' and the set containing only `X', i.e.
+     	% if `Set' is the set which contains all the elements of `Set0'
+     	% except `X'.
+     
+     :- pred set__delete(set(T), T, set(T)).
+     % :- mode set__delete(di, in, uo) is det.
+     :- mode set__delete(in, in, out) is det.
+     
+     	% `set__delete_list(Set0, Xs, Set)' is true iff `Set' is the relative
+     	% complement of `Set0' and the set containing only the members of
+     	% `Xs'.
+     
+     :- pred set__delete_list(set(T), list(T), set(T)).
+     :- mode set__delete_list(in, in, out) is det.
+     
+     	% `set__remove(Set0, X, Set)' is true iff `Set0' contains `X',
+     	% and `Set' is the relative complement of `Set0' and the set
+     	% containing only `X', i.e.  if `Set' is the set which contains
+     	% all the elements of `Set0' except `X'.
+     
+     :- pred set__remove(set(T), T, set(T)).
+     :- mode set__remove(in, in, out) is semidet.
+     
+     	% `set__remove_list(Set0, Xs, Set)' is true iff Xs does not
+     	% contain any duplicates, `Set0' contains every member of `Xs',
+     	% and `Set' is the relative complement of `Set0' and the set
+     	% containing only the members of `Xs'.
+     
+     :- pred set__remove_list(set(T), list(T), set(T)).
+     :- mode set__remove_list(in, in, out) is semidet.
+     
+     :- pred set__remove_least(set(T), T, set(T)).
+     :- mode set__remove_least(in, out, out) is semidet.
+     
+     	% `set_union(SetA, SetB, Set)' is true iff `Set' is the union of
+     	% `SetA' and `SetB'.  If the sets are known to be of different
+     	% sizes, then for efficiency make `SetA' the larger of the two.
+     	% (The current implementation, using sorted lists with duplicates
+     	% removed is not sensitive to the ordering of the input arguments
+     	% but other set implementations may be, so observing this convention
+     	% will make it less likely that you will encounter problems if
+     	% the implementation is changed.)
+     
+     :- pred set__union(set(T), set(T), set(T)).
+     :- mode set__union(in, in, out) is det.
+     
+     	% `set__power_union(A, B)' is true iff `B' is the union of
+     	% all the sets in `A'
+     
+     :- pred set__power_union(set(set(T)), set(T)).
+     :- mode set__power_union(in, out) is det.
+     
+     	% `set__intersect(SetA, SetB, Set)' is true iff `Set' is the
+     	% intersection of `SetA' and `SetB'. If the two sets are
+     	% known to be unequal in size, then making SetA be the larger
+     	% set will usually be more efficient.
+     	% (The current implementation, using sorted lists with duplicates
+     	% removed is not sensitive to the ordering of the input arguments
+     	% but other set implementations may be, so observing this convention
+     	% will make it less likely that you will encounter problems if
+     	% the implementation is changed.)
+     
+     :- pred set__intersect(set(T), set(T), set(T)).
+     :- mode set__intersect(in, in, out) is det.
+     
+     	% `set__power_union(A, B)' is true iff `B' is the union of
+     	% all the sets in `A'
+     
+     :- pred set__power_intersect(set(set(T)), set(T)).
+     :- mode set__power_intersect(in, out) is det.
+     
+     	% `set__difference(SetA, SetB, Set)' is true iff `Set' is the
+     	% set containing all the elements of `SetA' except those that
+     	% occur in `SetB'
+     
+     :- pred set__difference(set(T), set(T), set(T)).
+     :- mode set__difference(in, in, out) is det.
+     
+     %--------------------------------------------------%
+
+
+File: mercury_library.info,  Node: set_bbbtree,  Next: set_ordlist,  Prev: set,  Up: Top
+
+set_bbbtree
+***********
+
+     %--------------------------------------------------%
+     % Copyright (C) 1995 University of Melbourne.
+     % This file may only be copied under the terms of the GNU Library General
+     % Public License - see the file COPYING.LIB in the Mercury distribution.
+     %--------------------------------------------------%
+     
+     % File: set_bbbtree.m.
+     % Main authors: benyi.
+     % Stability: low.
+     
+     % set_bbbtree - implements sets using bounded balanced binary trees.
+     
+     %--------------------------------------------------%
+     
+     :- module set_bbbtree.
+     
+     :- interface.
+     
+     :- import_module bool, list, std_util.
+     
+     :- type set_bbbtree(T).
+     
+     
+     	% `set_bbbtree__init(Set)' returns an initialized empty set.
+     
+     :- pred set_bbbtree__init(set_bbbtree(T)).
+     :- mode set_bbbtree__init(uo) is det.
+     
+     
+             % `set_bbbtree__empty(Set) is true iff `Set' is contains no elements.
+     
+     :- pred set_bbbtree__empty(set_bbbtree(T)).
+     :- mode set_bbbtree__empty(in) is semidet.
+     
+     
+     	% `set_bbbtree__size(Set, Size)' is true iff `Size' is the cardinality
+     	% of `Set'.
+     
+     :- pred set_bbbtree__size(set_bbbtree(T), int).
+     :- mode set_bbbtree__size(in, out) is det.
+     
+     
+     	% `set_bbbtree__member(X, Set)' is true iff `X' is a member of `Set'.
+     	% O(lg n) for (in, in) and O(1) for (out, in).
+     
+     :- pred set_bbbtree__member(T, set_bbbtree(T)).
+     :- mode set_bbbtree__member(in, in) is semidet.
+     :- mode set_bbbtree__member(out, in) is nondet.
+     
+     
+     	% `set_bbbtree__is_member(X, Set, Result)' is true iff `X' is a member
+     	% of `Set'.
+     
+     :- pred set_bbbtree__is_member(T, set_bbbtree(T), bool).
+     :- mode set_bbbtree__is_member(in, in, out) is det.
+     
+     
+     	% `set_bbbtree__least(Set, X)' is true iff `X' is smaller than all
+     	% the other members of `Set'.
+     
+     :- pred set_bbbtree__least(set_bbbtree(T), T).
+     :- mode set_bbbtree__least(in, out) is semidet.
+     :- mode set_bbbtree__least(in, in) is semidet.
+     
+     
+     	% `set_bbbtree__largest(Set, X)' is true iff `X' is larger than all
+     	% the other members of `Set'.
+     
+     :- pred set_bbbtree__largest(set_bbbtree(T), T).
+     :- mode set_bbbtree__largest(in, out) is semidet.
+     :- mode set_bbbtree__largest(in, in) is semidet.
+     
+     
+     	% `set_bbbtree__singleton_set(Set, X)' is true iff `Set' is the set
+     	% containing just the single element `X'.
+     
+     :- pred set_bbbtree__singleton_set(set_bbbtree(T), T).
+     :- mode set_bbbtree__singleton_set(uo, di) is det.
+     :- mode set_bbbtree__singleton_set(in, out) is semidet.
+     :- mode set_bbbtree__singleton_set(in, in) is semidet.
+     :- mode set_bbbtree__singleton_set(out, in) is det.
+     
+     
+     	% `set_bbbtree__equal(SetA, SetB)' is true iff `SetA' and `SetB'
+     	% contain the same elements.
+     
+     :- pred set_bbbtree__equal(set_bbbtree(T), set_bbbtree(T)).
+     :- mode set_bbbtree__equal(in, in) is semidet.
+     
+     
+     	% `set_bbbtree__insert(Set0, X, Set)' is true iff `Set' is the union of
+     	% `Set0' and the set containing only `X'.
+     
+     :- pred set_bbbtree__insert(set_bbbtree(T), T, set_bbbtree(T)).
+     :- mode set_bbbtree__insert(di, di, uo) is det.
+     :- mode set_bbbtree__insert(in, in, out) is det.
+     
+     
+     	% `set_bbbtree__insert_list(Set0, Xs, Set)' is true iff `Set' is
+     	% the union of `Set0' and the set containing only the members of `Xs'.
+     
+     :- pred set_bbbtree__insert_list(set_bbbtree(T), list(T), set_bbbtree(T)).
+     % :- mode set_bbbtree__insert_list(di, di, uo) is det.
+     :- mode set_bbbtree__insert_list(in, in, out) is det.
+     
+     
+     	% `set_bbbtree__delete(Set0, X, Set)' is true iff `Set' is the relative
+     	% complement of `Set0' and the set containing only `X', i.e.
+     	% if `Set' is the set which contains all the elements of `Set0'
+     	% except `X'.
+     
+     :- pred set_bbbtree__delete(set_bbbtree(T), T, set_bbbtree(T)).
+     :- mode set_bbbtree__delete(di, in, uo) is det.
+     :- mode set_bbbtree__delete(in, in, out) is det.
+     
+     
+     	% `set_bbbtree__delete_list(Set0, Xs, Set)' is true iff `Set' is the
+     	% relative complement of `Set0' and the set containing only the members
+     	% of `Xs'.
+     
+     :- pred set_bbbtree__delete_list(set_bbbtree(T), list(T), set_bbbtree(T)).
+     % :- mode set_bbbtree__delete_list(di, in, uo) is det.
+     :- mode set_bbbtree__delete_list(in, in, out) is det.
+     
+     
+     	% `set_bbbtree__remove(Set0, X, Set)' is true iff `Set0' contains `X',
+     	% and `Set' is the relative complement of `Set0' and the set
+     	% containing only `X', i.e.  if `Set' is the set which contains
+     	% all the elements of `Set0' except `X'.
+     
+     :- pred set_bbbtree__remove(set_bbbtree(T), T, set_bbbtree(T)).
+     :- mode set_bbbtree__remove(in, in, out) is semidet.
+     
+     
+     	% `set_bbbtree__remove_list(Set0, Xs, Set)' is true iff Xs does not
+     	% contain any duplicates, `Set0' contains every member of `Xs',
+     	% and `Set' is the relative complement of `Set0' and the set
+     	% containing only the members of `Xs'.
+     
+     :- pred set_bbbtree__remove_list(set_bbbtree(T), list(T), set_bbbtree(T)).
+     :- mode set_bbbtree__remove_list(in, in, out) is semidet.
+     
+     
+     	% `set_bbbtree__remove_least(Set0, X, Set)' is true iff the union if
+     	% `X' and `Set' is `Set0' and `X' is smaller than all the elements of
+     	% `Set'.
+     
+     :- pred set_bbbtree__remove_least(set_bbbtree(T), T, set_bbbtree(T)).
+     :- mode set_bbbtree__remove_least(in, out, out) is semidet.
+     
+     
+     	% `set_bbbtree__remove_largest(Set0, X, Set)' is true iff the union if
+     	% `X' and `Set' is `Set0' and `X' is larger than all the elements of
+     	% `Set'.
+     
+     :- pred set_bbbtree__remove_largest(set_bbbtree(T), T, set_bbbtree(T)).
+     :- mode set_bbbtree__remove_largest(in, out, out) is semidet.
+     
+     
+     	% `set_bbbtree__list_to_set(List, Set)' is true iff `Set' is the set
+     	% containing only the members of `List'. O(n lg n)
+     
+     :- pred set_bbbtree__list_to_set(list(T), set_bbbtree(T)).
+     % :- mode set_bbbtree__list_to_set(di, uo) is det.
+     :- mode set_bbbtree__list_to_set(in, out) is det.
+     
+     
+     	% `set_bbbtree__sorted_list_to_set(List, Set)' is true iff `Set' is the
+     	% set containing only the members of `List'.
+     	% `List' must be sorted. O(n).
+     
+     :- pred set_bbbtree__sorted_list_to_set(list(T), set_bbbtree(T)).
+     % :- mode set_bbbtree__sorted_list_to_set(di, uo) is det.
+     :- mode set_bbbtree__sorted_list_to_set(in, out) is det.
+     
+     
+     	% `set_bbbtree__sorted_list_to_set_len(List, Set, N)' is true iff
+     	% `Set' is the set set containing only the members of `List' and `N'
+     	% is the length of the list. If the length of the list is already known
+     	% then a noticable speed improvement can be expected over
+     	% `set_bbbtree__sorted_list_to_set' as a significant cost involved
+     	% with `set_bbbtree__sorted_list_to_set' is the call to list__length.
+     	% `List' must be sorted. O(n).
+     
+     :- pred set_bbbtree__sorted_list_to_set_len(list(T), set_bbbtree(T), int).
+     % :- mode set_bbbtree__sorted_list_to_set_len(di, uo, in) is det.
+     :- mode set_bbbtree__sorted_list_to_set_len(in, out, in) is det.
+     
+     
+     	% `set_bbbtree__to_sorted_list(Set, List)' is true iff `List' is the
+     	% list of all the members of `Set', in sorted order. O(n).
+     
+     :- pred set_bbbtree__to_sorted_list(set_bbbtree(T), list(T)).
+     :- mode set_bbbtree__to_sorted_list(di, uo) is det.
+     :- mode set_bbbtree__to_sorted_list(in, out) is det.
+     
+     
+     	% `set_bbbtree__union(SetA, SetB, Set)' is true iff `Set' is the union
+     	% of `SetA' and `SetB'.
+     
+     :- pred set_bbbtree__union(set_bbbtree(T), set_bbbtree(T), set_bbbtree(T)).
+     :- mode set_bbbtree__union(in, in, out) is det.
+     
+     
+     	% `set_bbbtree__power_union(Sets, Set)' is true iff `Set' is the union
+     	% of all the sets in `Sets'
+     
+     :- pred set_bbbtree__power_union(set_bbbtree(set_bbbtree(T)), set_bbbtree(T)).
+     :- mode set_bbbtree__power_union(in, out) is det.
+     
+     
+     	% `set_bbbtree__intersect(SetA, SetB, Set)' is true iff `Set' is the
+     	% intersection of `SetA' and `SetB'.
+     
+     :- pred set_bbbtree__intersect(set_bbbtree(T), set_bbbtree(T), set_bbbtree(T)).
+     :- mode set_bbbtree__intersect(in, in, out) is det.
+     
+     
+     	% `set_bbbtree__power_intersect(Sets, Set) is true iff `Set' is the
+     	% interscetion of the sets in `Sets'.
+     
+     :- pred set_bbbtree__power_intersect(set_bbbtree(set_bbbtree(T)),
+     								set_bbbtree(T)).
+     :- mode set_bbbtree__power_intersect(in, out) is det.
+     
+     
+     	% `set_bbtree__difference(SetA, SetB, Set)' is true iff `Set' is the
+     	%  set containing all the elements of `SetA' except those that
+     	% occur in `SetB'.
+     
+     :- pred set_bbbtree__difference(set_bbbtree(T), set_bbbtree(T), set_bbbtree(T)).
+     :- mode set_bbbtree__difference(in, in, out) is det.
+     
+     
+     	% `set_bbbtree__subset(SetA, SetB)' is true iff all the elements of
+     	% `SetB' are also elements of `SetA'.
+     
+     :- pred set_bbbtree__subset(set_bbbtree(T), set_bbbtree(T)).
+     :- mode set_bbbtree__subset(in, in) is semidet.
+     
+     
+     	% `set_bbbtree__superset(SetA, SetB)' is true iff all the elements of
+     	% `SetA' are also elements of `SetB'.
+     
+     :- pred set_bbbtree__superset(set_bbbtree(T), set_bbbtree(T)).
+     :- mode set_bbbtree__superset(in, in) is semidet.
+     
+     %--------------------------------------------------%
+     %--------------------------------------------------%
+     
+     % Implementation based on "Functional Pearls: Efficient sets - a balancing act"
+     % by Stephen Adams, J. Functional Programming 3 (4): 553-561, Oct 1993.
+     %
+     % Note:	set_bbbtree__concat4 and not set_bbbtree__concat3 represents the
+     %	function concat3 mentioned in the report.
+     %
+     % Predicates with the suffix `_r' in the names are predicates that accept an
+     % integer as an additional last argument. This integer is a ratio that is
+     % used to measure how much larger one tree is allowed to be compared to the
+     % other before some rotations are performed to rebalance them. These predicates
+     % are currently not exported but it maybe useful to do so so that users are
+     % able to influence the rebalancing process by specifying ratios.
+     %
+     % NOTE :
+     % The size of trees are measured in terms of number of elements and not height.
+     % Also the fact that ratio is an integer seems counter intuitive but it should
+     % be realized that this property is true at all levels of the tree. Hence the
+     % default ratio of 5 will not allow the two trees to differ in height by more
+     % that a few units.
+     %
+     % BUGS:
+     % Due to the presence of bugs in the compiler concerning destructive input and
+     % unique modes some predicates and modes are commented out. Once the bugs are
+     % removed the modes should be uncommented. Although some commented out
+     % predicates can simply be uncommented and their hacked versions deleted
+     % others will need to be rewritten. Three examples are the _r versions of
+     % union, intersection and difference. They all make the calls
+     % set_bbbtree__split_lt followed by set_bbbtree__split_gt with the right
+     % tree. If the right tree is declared destructive input then either the
+     % compiler must be smart enough to call set_bbbtree__split_lt
+     % non-destructively followed by the call to set_bbbtree__split_gt
+     % destructively or some rewriting must be done.
+     %
+     % IMPROVEMENTS:
+     % Speed improvements may be possible by the implementation of specific
+     % predicates for predicates such as `set_bbbtree__equal' as opposed to the
+     % use of other set operations.
+     %
+     %--------------------------------------------------%
+

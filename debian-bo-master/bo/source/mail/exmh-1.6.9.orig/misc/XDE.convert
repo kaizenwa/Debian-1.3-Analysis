@@ -1,0 +1,82 @@
+#!/import/tcl/bin/tclsh
+# Convert XDE mail folder into an MH mail folder.
+#
+# Every message begins with:
+#
+#  *start*
+#  00969 00071 UU 
+#  @00045 01536 ftffffffffffffffffffffffffffffff
+#  @Sender: foobar
+
+if {$argc != 2} {
+    puts stderr "Usage: XDE.convert xde-file  mh-folder-directory
+    exit 1
+}
+set infile [lindex $argv 0]
+set dir [string trimleft [lindex $argv 1] +]
+
+if ![file isdirectory ~/Mail/$dir] {
+    exec mkdir [glob ~/Mail]/$dir
+}
+if [catch {exec mhpath +$dir new} path] {
+    puts stderr "$dir: $path"
+    exit 1
+}
+if [catch {open $infile} in] {
+    puts stderr "$infile: $in"
+    exit 1
+}
+
+while {[gets $in line] >= 0} {
+    if [regexp {^\*start\*} $line] {
+	break
+    }
+}
+set i [file tail $path]
+set state prelude
+while {[gets $in line] >= 0} {
+    switch $state {
+	prelude {
+	    if [regexp {^([0-9]+|@)} $line] {
+		continue
+	    }
+	    if [catch {open $path w 0600} out] {
+		puts stderr "$path: $out"
+		exit 1
+	    }
+	    puts stderr [file tail $path]
+	    puts $out $line
+	    set state body
+	}
+	body {
+	    if [regexp {^(.*)(\*start\*)$} $line x leader] {
+		if {[string length $leader] != 0} {
+		    puts $out $leader
+		}
+		set state prelude
+		close $out
+		incr i
+		set path [file dirname $path]/$i
+		continue
+	    }
+	    if [regexp {^<----RFC822 headers-----} $line] {
+		set state rfc822
+		continue
+	    }
+	    puts $out $line
+	}
+	rfc822 {
+	    if [regexp {^-----RFC822 headers---->} $line] {
+		set state blank
+		continue
+	    }
+	}
+	blank {
+	    set state body
+	    if {[string length $line] != 0} {
+		puts $out $line
+	    }
+	}
+    }
+}
+close $out

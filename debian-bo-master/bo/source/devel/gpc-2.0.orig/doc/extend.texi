@@ -1,0 +1,1583 @@
+@node Extensions
+@chapter GNU Pascal extensions
+
+@section Extensions to ISO-7185 Pascal language
+
+GPC contains a number of extensions to the ISO 7185 Pascal language.
+
+Most of these extensions are written so that they should conform to the
+international standard ISO/IEC 10206 : 1991, Information technology --
+Programming Languages -- Extended Pascal.
+
+GPC is not yet fully compliant to the requirements of the Extended
+Pascal language.
+
+The following Extended Pascal features are implemented:
+@itemize @bullet
+@item I/O from/to strings
+@item append file open mode: @code{extend(File)}
+@item binding of external objects (GPC supports only binding of files)
+@item complex dyadic operations @code{+,-,/,*} and monadic @code{-,+}
+@item complex exponentiation operators (@code{POW} and @code{**})
+@item complex functions (@code{sqr,arctan,sqrt,exp,ln,sin,cos})
+@item complex number info with @code{re, im} and @code{arg} functions
+@item complex numbers constructed by @code{cmplx} or @code{polar}
+@item constant expressions
+@item direct access I/O
+@item exponentiation operators (@code{POW} and @code{**})
+@item function result variable
+@item functions returning structured types
+@item generalized @code{Succ/Pred} (@code{val := succ (val, 5);})
+@item @code{gettimestamp, date, time}
+@item @code{halt} procedure
+@item initial values to type declarations and/or variable declarations
+@item local variable declarations may dynamically select the type and size
+@item @code{maxchar/minreal/maxreal/epsreal} values.
+@item modules are partially supported (@@@@incomplete, see below)
+@item non-decimal numbers, base from 2 through 36: @code{base#number}
+@item pointer and component access of structured return values 
+@item protected parameters
+@item ranges and otherwise in case statements and variant records
+@item read procedure can read strings from text files
+@item relaxation of rules on number & order of declarations
+@item required module interfaces @code{StandardInput} and @code{StandardOutput}
+@item restricted types
+@item set extensions (symmetric difference(@code{XOR}) and @code{CARD})
+@item short circuit logical operators (@code{AND_THEN, OR_ELSE})
+@item standard numeric input (ISO 6093)
+@item string and char values are compatible
+@item string catenations with "@code{+}"
+@item string comparisons with and without padding
+@item string functions (@code{trim,substr,index,length})
+@item string schema (variable length strings)
+@item string schema discriminant 'Capacity' dynamically set with NEW
+@item substring variables (@code{str[5..7] := 'foo';})
+@item type inquiry
+@item underscore in identifiers
+@item zero fieldwidth output
+@end itemize
+
+GPC extensions @emph{not} in Extended Pascal:
+@itemize @bullet
+@item alphanumeric labels
+@item assembler code inclusion with access to variables
+@item character escapes in strings
+@item close file (@@@@ @code{unbind(F)} also closes a bound file @code{F})
+@item computed goto
+@item function pointers
+@item @code{halt} procedure may have a numeric exit status parameter
+@item @code{mark/release}
+@item optional file name in @code{reset/rewrite/extend} as a string
+@item @code{return / break / continue} statements
+@item simple "modules" in addition to the Extended Pascal modules.
+@item @code{sizeof/alignof} functions
+@item @code{string[ XX ]} works like @code{string(XX)} as a string schema
+type selector
+@item storage qualifiers in variable declarations
+@item synonyms for @code{otherwise}: @code{others} and @code{default}
+@item taking address of labels
+@item taking address of objects
+@item type casts
+@item type qualifiers
+@item module initializers can be run in user specified order
+@item source file preprosessor
+@end itemize
+
+@subsection Extended Pascal features still missing from GPC
+@itemize @bullet
+@item set member iteration (@code{FOR ch IN [ 'a'..'z','0'..'9' ] DO...})
+@item set types with variable bounds
+@item structured value constructors
+@item general schema types & make @code{NEW} work with them
+@item some features of the module interface missing
+@item subrange lower bound as an expression
+  (this is *hard* to do with an LALR(1) parser in single pass!
+   GPC allows upper bound as an arbitrary expression;
+   lower bound must now be an identifier, a constant or a
+   variable name.)
+@end itemize
+
+@subsection I/O to text files:
+
+GPC implements "lazy" text file I/O, i.e. do a @code{PUT} as soon
+as you can and do @code{GET} as late as you can.
+
+This should avoid most of the problems sometimes considered
+to be the most stupid feature of Pascal.
+
+When passing a file buffer as parameter the buffer
+is validated when the parameter is passed.
+@@@@ Perhaps it would be nice to hack it to be validated when
+the VAR parameter is referenced...
+
+When any lazy file is @code{RESET}, the file buffer state is set
+to undefined. It is validated on the first reference to it.
+Now this is also true for terminal devices.
+
+
+@subsection Variable length strings in GPC:
+
+Extended Pascal has a "type selector" feature called schema
+types.
+
+GPC does not yet implement general schema types, but the
+@code{STRING SCHEMA} is now implemented.
+
+(An example of a (unimplemented) schemata would be, e.g:
+
+@smallexample
+Matrix (N,M: Positive_int) = array [ 1..N, 1..M ] of integer;
+@end smallexample
+ 
+Here the @code{M} and @code{N} are discriminant identifiers.)
+
+A @code{STRING SCHEMA} is the only predefined schema type in Extended
+Pascal, with one required discriminant identifier "@code{Capacity}".
+
+The string schema type, if explicitely defined, could look like:
+
+@smallexample
+TYPE string(capacity) = packed array [ 1..capacity ] of char;
+@end smallexample
+
+Internally GPC implements @code{STRING SCHEMA} as follows:
+
+The type representing the @code{SCHEMA TYPE} is a @code{RECORD_TYPE} node,
+with the following fields:
+
+@smallexample
+STRING  = RECORD
+    Capacity : integer;
+    length   : integer;
+    string   : packed array [ 1..Capacity ] of char;
+  END;
+@end smallexample
+
+The "@code{Capacity}" field may be directly referenced by user,
+
+"@code{length}" is referenced by a predefined string function
+@code{LENGTH(str)} and contains the current string length.
+
+"@code{string}" contains the chars in the string.
+
+The "@code{string}" and "@code{length}" fields can not be directly referenced
+by a user program.
+
+References to the schema discriminants are allowed, and
+the @code{WITH} statement is also allowed, so one can say:
+
+@smallexample
+var str : string (80);
+begin
+   writeln (str.capacity),         (* writes 80 *)
+
+   with str do
+     writeln (capacity);           (* writes 80 *)
+end;
+@end smallexample
+
+When a new @code{SCHEMA_TYPE} is created, the discriminant identifier
+fields need to be initialized. GPC initializes the new schema
+type discriminant identifiers of every @code{VAR_DECL} node before it
+executes any instructions of the procedure, function or
+program where the string variable is declared.
+
+If new internal schema types are created (for conversion
+of fixed-string or char type parameters to a string schema
+formal parameter), the discriminant identifiers are
+initialized immediately. The discriminant identifiers
+of @code{PARM_DECL} nodes are not initialized separately, they
+get their values from the actual parameters.
+
+If a parameter is a @code{SCHEMA_NAME} (a schema with no discriminant
+identifiers), a proto string schema is used as the type
+of the parameter.
+
+@itemize @bullet
+@item
+VAR-parameter:
+An actual parameter to a formal schema name must be of
+@code{STRING_SCHEMA} type. The type of the actual parameter is used
+instead of the proto schema for the formal parameter.
+
+@item
+VALUE-parameter:
+An actual parameter to a schema name may be either a
+@code{STRING_SCHEMA} type, a fixed string type or a char type.  If
+the actual parameter is a string schema type, that is used
+instead of the proto schema. If it is not a schema, a new
+variable length string @code{VAR_DECL} is created, the actual
+parameter is copied to the new variable and the "@code{capacity}"
+field is set to the length of the actual variable.
+@end itemize
+
+Variable length string parameters look like:
+
+@example
+PROGRAM Zap (output);
+
+TYPE
+   stype = string (10);
+   sptr  = ^string;
+
+VAR
+   str  : stype;
+   str2 : string(100000);
+   dstr : ^string;
+   zstr : sptr;
+   len  : integer value 256;
+
+  (* "string" accepts any length of strings *)
+  PROCEDURE foo(z: string);
+
+  BEGIN
+    writeln ('Capacity : ',z.capacity);
+    writeln ('Length   : ',length (z));
+    writeln ('Contents : ',z);
+  END;
+
+  (* Another way to use dynamic strings *)
+  PROCEDURE bar(slen : integer);
+
+  var
+    lstring : string (slen);
+    foostr  : type of lstring;
+
+  BEGIN
+    lstring := 'Hello World!';
+    foo (lstring);
+    foostr := 'Ent@{ miksi juuri t@{m@{?';
+@c --JJ-- 960715 : what's this ?? TeX hates it...
+@c That's probably Finnish.  Quote braces with `@'.  -- PG, 2. Aug. 1996
+@c (PS: We should add German and Dutch examples. :-)
+    foo(foostr);
+  END;
+
+BEGIN
+  str   := 'KUKKUU';
+  str2  := 'A longer string variable';
+
+  new (dstr, 1000);     @{ Select the string Capacity with NEW @}
+  dstr^ := 'The max length of this is 1000 chars';
+  new (zstr, len);
+  zstr^ := 'This should fit here';
+
+  foo(str);
+  foo(str2);
+  foo('This is a constant string');
+  foo('R');             @{ A char parameter to string routine @}
+  foo('');              @{ An empty string @}
+  foo (dstr^);
+  foo (zstr^);
+  bar (10000);
+END. (* Zap *)
+@end example
+
+In the above example, the required procedure @code{NEW} was used
+to select the capacity of the strings. Procedure "@code{BAR}" also has
+a string whose size depends of the parameter passed to it
+and another string whose type will be the same than the type of
+the first string ("@code{type of}" construct).
+
+All string and char types are compatible as long as the
+destination string is long enough to hold the source in
+assignments. If the source string is shorter than the
+destination, the destination is automatically blank padded if
+the destination string is not of string schema type.
+
+
+@subsection String routine (mostly in library):
+
+@code{S1} and @code{S2} may be of string or char type.
+@code{S} is of string type.
+
+@table @code
+@item WRITESTR (s, write-parameter-list)
+@item READSTR (s, read-parameter-list)
+Write to a string and read from a string.
+The parameter lists are identical to write/read from @code{TEXT}
+files. The semantics is closely modeled after
+file I/O.
+
+@item INDEX(s1,s2)
+If @code{S2} is empty, return 1 else if @code{S1} is empty return 0
+else returns the position of @code{s2} in @code{s1} (an integer).
+
+@item LENGTH (s1)
+Return the length of @code{S1} (an integer from @code{0..Capacity})
+
+@item TRIM (s1)
+Returns a new string with spaces stripped of the end of @code{S}.
+
+@item SUBSTR (s1, i)
+@item SUBSTR (s1, i, j)
+If @code{J} is missing it is calculated as: @code{J := LENGTH (S1) - I + 1;}
+Return a new substring of @code{S1} that contains @code{J} characters
+starting from @code{I}.
+
+@item EQ (s1,s2)
+@item NE (s1,s2)
+@item LT (s1,s2)
+@item LE (s1,s2)
+@item GT (s1,s2)
+@item GE (s1,s2)
+Lexicographic comparisons of @code{S1} and @code{S2}. Returns boolean result.
+Strings are not padded with spaces.
+
+@item s1  = s2
+@item s1 <> s2
+@item s1  < s2
+@item s1 <= s2
+@item s1  > s2
+@item s1 >= s2
+Pascal string compare of @code{S1} and @code{S2}. Returns boolean result.
+Shorter string is blank padded to length of the longer one.
+@end table
+
+@subsection No name space pollution with extensions:
+
+In GPC you are free to re-define everything that is not a
+reserved word in ISO 7185 Pascal in your program.
+
+All Extended Pascal additional "reserved words" may be redefined,
+so you do not have to modify your code for GPC if you have an
+identifier like @code{RESTRICTED} or @code{VALUE} or some such.
+@@@@ This violates Extended Pascal standard.
+
+You may also redefine words like @code{INTEGER} and @code{CHAR} if you like.
+
+@@@@ NOTE: The *only* exception to the redefinition rule currently
+is the word @code{INLINE} (to make routines inline compiled), because I
+added it in front of @code{PROCEDURE} or @code{FUNCTION}.  But I think I will
+change the syntax later and make @code{INLINE} a directive instead of a
+reserved word.
+
+@subsection Compile time switches:
+
+to get info of possible clashes of keywords and other
+info of your program constructs that gpc thinks are "non-standard"
+use the switch "@code{-pedantic}" when compiling. See the GCC info files.
+
+@@@@ I have not tested the switches like -Wall very much. If you do,
+@@@@ give me info of error messages that don't make sense in Pascal.
+
+@@@@ As a rule, GPC implements most of the switches GCC implements,
+and a couple of more that can not currently be set.
+
+
+@subsection Implemented directives:
+
+@table @code
+@item FORWARD
+Required by pascal standard.
+
+@item EXTERNAL
+External routine which starts with a capital letter. (e.g. calling external
+function "@code{foo()}" will actually call "@code{Foo()}")
+
+@item EXTERN
+Same as external
+
+@item C
+Calls external routine "@code{foo()}" as "@code{foo()}"
+(no capitalization of the first letter)
+
+@item C_LANGUAGE
+Same as C.
+	
+@item STATIC
+Make a function static in C sense.
+@end table
+	
+@smallexample
+PROGRAM foo;
+	
+PROCEDURE gotoxy(x,y: Integer); C;
+	
+BEGIN
+  gotoxy(10,10); (* Call external routine "gotoxy" *)
+END.
+@end smallexample
+
+@subsection Set operations:
+
+GPC supports standard Pascal set operations. In addition it
+supports the extended Pascal set operation symmetric
+difference (@code{set1 >< set2}) operation (a @code{XOR} of the set
+elements).
+
+It also has a function that counts the elements in the set:
+@samp{a := card (set1)}
+
+@strong{NOTE}:
+the set operations are still under construction, e.g. the set
+code does not fully work in the 64 bit Alpha machines.
+
+@subsection Initial values to type denoters:
+
+A type (or variable) may be initialized to a value of
+expression when it is declared, as in:
+
+@example
+program zap;
+
+type
+   int10   = integer value 10;
+   footype = real;
+   mytype  = char value pred('A');
+   etype   = (a,b,c,d,e,f,g) value d;
+
+var
+   ii  : int10;                     (* Value of ii set to 10 *)
+   ch  : mytype  value pred('z');
+   aa  : integer value ii+10;
+   foo : footype value sqrt(aa);
+   e1  : etype;                     (* value set to d *)
+   e2  : etype value g;             (* value set to g *)
+
+begin
+end.
+@end example
+
+Extended pascal requires the type initializers to be
+constant expressions. GPC allows any valid expression.
+
+Note, however, that the expressions that affect the size
+of storage allocated for objects (e.g. the length of
+arrays) may contain variables only inside functions or
+procedures.
+
+GPC evaluates the initial values used for the type
+when an identifier is declared for that type.
+If a variable is declared with a type-denoter that
+uses a type-name which already has an initial value
+the latter initialization has precedence.
+
+@@@@ GPC does not know how to calculate constant
+values for math functions in the runtime library
+at compile time, e.g. @samp{exp(sin(2.4567))}, so you should
+not use these kind of expressions in object size
+expressions. (Extended Pascal allows this).
+
+@subsection Date and time routines:
+
+Predefined date and time routines:
+
+@table @code
+@item procedure gettimestamp(VAR t: Timestamp);
+@item function date(t: Timestamp) : packed array [ 1..DATE_LENGTH ] of char;
+@item function time(t: Timestamp) : packed array [ 1..TIME_LENGTH ] of char;
+@end table
+
+@code{DATE_LENGTH} and @code{TIME_LENGTH} are implementation dependent
+constants. See E.20 and E.22 in chapter IMPLEMENTATION DEPENDENT FEATURES
+to find out these values for GPC.
+
+@code{GetTimeStamp(t)} fills the record T with values. If they are
+valid, the boolean flags are set to TRUE.
+
+@code{TimeStamp} is a required predefined type in extended pascal standard.
+(It may be extended in an implementation.)
+
+The required part of the type looks like:
+@smallexample
+TimeStamp = PACKED RECORD
+		     DateValid,
+		     TimeValid : Boolean;
+		     year      : integer;
+		     month     : 1 .. 12;
+		     day       : 1 .. 31;
+		     hour      : 0 .. 23;
+		     minute    : 0 .. 59;
+		     second    : 0 .. 59;
+		   END;
+@end smallexample
+
+@@@@ NOTE:
+@code{TimeStamp} may be later extended in GPC to contain the
+following fields at the end of the @code{TimeStamp} record:
+
+@smallexample
+Dst_used   : Boolean;     (* If daylight savings are used *)
+TimeZone   : Integer;     (* Positive if WEST, in minutes *)
+Weekday    : 0..6;        (* 0 is Sunday *)
+TimerValid : Boolean;     (* Is the following timer valid *)
+us_Timer   : Integer;     (* A microsecond timer that is a 32 bit
+                             modulus of the timer returned by the
+                             system. *)
+@end smallexample
+
+Fields @code{Dst_used, TimeZone} and @code{WeekDay} will be valid when
+@code{DateValid} is @code{TRUE}. Field @code{us_Timer} will be valid when
+@code{TimerValid} is @code{TRUE}.
+
+@subsection Complex type and operations:
+
+The following sample programs illustrates most of the
+@code{COMPLEX} type operations. In addition monadic @code{+} and
+@code{-} are supported and dyadic @code{+,-,*,/} operations.
+
+@example
+program complex_test(output);
+
+var
+   z1,z2       : complex;
+   len, angle  : real;
+
+begin
+   z1 := cmplx (2,1);
+   writeln;
+   writeln ('Complex number Z1 is: (',re(z1):1,',',im(z1):1,')');
+   writeln;
+
+   z2 := conjugate(z1); @{ GPC extension @}
+   writeln ('Conjugate of Z1 is: (',re(z2):1,',',im(z2):1,')');
+   writeln;
+   len   := abs (z1);
+   angle := arg (z1);
+   writeln ('The polar representation of Z1 is LENGTH=',len:1,
+            ' ANGLE=',angle:1);
+   writeln;
+
+   z2    := polar (len, angle);
+   writeln ('Converting (LENGTH,ANGLE) back to (X,Y) gives: (',
+             re(z2):1,',',im(z2):1,')');
+   writeln;
+   writeln ('The following operations operate on the complex number Z1');
+   writeln;
+
+   z2 := arctan (z1);
+   writeln ('arctan:  R=',re(z2),', I=',im(z2));
+
+   z2 := z1 ** 3.141;
+   writeln ('**3.141: R=',re(z2),', I=',im(z2));
+   @{ cos, ln, exp, sqrt and sqr exist also @}
+
+   z2 := sin(z1);
+   writeln ('sin:     R=',re(z2),', I=',im(z2));
+
+   z2 := z1 pow 8;
+   writeln ('POW 8:   R=',re(z2),', I=',im(z2));
+
+   z2 := z1 pow (-8);
+   writeln ('POW (-8):  R=',re(z2),', I=',im(z2));
+end.
+@end example
+
+@subsection Direct access files:
+
+@@@@ Not tested.
+@@@@ Write a demo program.
+
+@smallexample
+type
+  Dfile = file [ 1 .. 100 ] of integer;
+var
+  F : Dfile;
+  P, N : 1..100;
+@end smallexample
+	   
+Declares a type for a file that contains 100 integers.
+
+The following direct access routines may be applied to a
+direct access file:
+
+@table @code
+@item SeekRead   (F, N);        @{ Open file in Inspection mode, seek to record N @}
+@item SeekWrite  (F, N);        @{ Open file in Generation mode, seek to record N @}
+@item SeekUpdate (F, N);        @{ Open file in Update mode, seek to record N @}
+@item Update (F);               @{ Writes F^, position not changed. F^ kept. @}
+@item p := Position (F);        @{ Return current record number @}
+@item p := LastPosition (F);    @{ Return the last record number in file @}
+@end table
+
+If the file is open for Inspection or Update, @code{GET} may be applied.
+If the file is open for Generation or Update, @code{PUT} may be applied.
+
+@@@@ GPC acts like the file would always start at record number 0,
+and subtracts/adds the lower index from the record number.
+If you think this is incorrect, let me know.
+
+
+@subsection Restricted types:
+
+Extended Pascal defines restricted types as:
+
+@smallexample
+restricted-type = 'restricted' type-name .
+@end smallexample
+
+A value of a restricted type may be passed as a value parameter
+to a formal parameter possessing its underlying type, or returned
+as the result of a function. A variable of a restricted type may
+be passed as a variable parameter to a formal parameter possessing
+the same type or its underlying type. No other operations, such as
+accessing a component of a restricted type value or performing
+arithmetic, are possible.
+
+@example
+program zap;
+
+type
+   unres_rec =  record
+                  a :  integer;
+                end;
+
+   res =  restricted unres_rec;
+
+var
+   r1 :  unres_rec;
+   r2 :  res;
+
+   i  :  restricted integer;       
+   k  :  integer;       
+
+  function zap(p : unres_rec) : res;
+  var
+     ures :  unres_rec;
+
+  begin
+     @{ The parameter is treated as unrestricted, even though the actual
+       parameter may be a restricted object @}
+     ures.a := p.a;
+
+     @{ Legal to assign a return value @}
+     zap := ures;
+  end; @{ zap @}
+
+begin
+   r1.a := 354;
+
+   @{ Assigning a restricted return value to a restricted object @}
+   @{ @@@@ Verify if this should really be allowed????? @}
+   r2 := zap(r1);
+
+   @{ Passing a restricted object to unrestericted formal parameter is ok @}
+   r2 := zap(r2);
+
+   @{ *** The following are illegal *** @}
+   r2.a := 100;	    @{ field access @}
+   r1 := r2;        @{ := source is restricted type @}
+   r2 := r1;        @{ := target is restricted type @}
+   r1 := zap(r2);   @{ := a restricted return value to unrestricted object @}
+   i  := 16#ffff;   @{ := target is restricted type @}
+   k  := i + 2;     @{ Arithmetic with restricted type @}
+end.
+@end example
+
+@subsection Extended Pascal modules:
+
+@@@@ Gpc does not yet support:
+
+@itemize @bullet
+@item renaming with '@code{=>}'
+@item @code{QUALIFIED} interfaces
+@item @code{PROTECTED} export variables
+@item @code{ONLY}
+@item @code{IMPORT} does not work semantically correct.
+@item @code{EXPORT} does not work semantically correct.
+@item exported ranges (compiler calls @code{abort()})
+@item module parameter lists
+@end itemize
+
+Gpc should be able to parse full Extended Pascal module syntax.
+But all the features are not implemented yet.
+
+You may load one PROGRAM and several MODULEs to make up
+one pascal program. A single file may contain zero or more
+modules and/or zero or one programs.
+
+@strong{Please NOTE}:
+If you have many modules in the same file, the variable
+and function declarations are visible after the point they
+have been declared in the implementation even if the interface
+does not export them. But they do not become visible only
+by including the interface to another file and separate
+compiling that (so you do need to export them now).
+(@@@@ unfortunately, currently this applies only to variables
+ and functions; all other things are visible after the interface
+ has been compiled whether or not you exported them.)
+
+The nicest way to handle the module interface in separate
+compilation environment is to use the non-standard
+
+@smallexample
+#include "module-interface.ph"
+@end smallexample
+
+feature. You can collect your module interfaces to a single
+directory and include them from there by using the
+"@code{-I DIR}" switches to specify the include file search paths
+to the compiler. (See the GNU CPP manual for more info).
+
+There is currently no attempt to avoid name clashes
+of separate compiled modules when they are linked together.
+(The exported variables and functions having the same name
+ in different modules will clash!!!)
+
+Sample module code with separate @code{INTERFACE} and @code{IMPLEMENTATION}
+parts follows:
+
+@example
+MODULE foobar Interface;	(* INTERFACE *)
+	
+  EXPORT catch22 = (footype,setfoo,getfoo);
+
+  TYPE footype = integer;
+
+  PROCEDURE setfoo(f: footype);
+  FUNCTION  getfoo: footype;
+
+END. @{ module foobar interface @}
+
+
+MODULE foobar Implementation;	(* IMPLEMENTATION *)
+
+  IMPORT StandardInput;
+         StandardOutput;
+
+  VAR foo : footype;
+
+  @{ Note: the effect is the same as the Forward directive would have:
+    parameter lists and return types are not "allowed" in the declaration
+    of exported routines. @}
+  PROCEDURE setfoo;
+  BEGIN
+    foo := f;
+  END;
+
+  FUNCTION getfoo;
+  BEGIN
+    getfoo := foo;
+  END;
+
+  TO BEGIN DO
+    BEGIN
+      foo := 59;
+      writeln ('Just an example of a module initializer. See comment below');
+    END;
+
+  TO END DO
+   BEGIN
+     foo := 0;
+     writeln ('Goodbye');
+   END;
+	
+END. @{ foobar implementation @}
+@end example
+
+Alternatively the module interface and implementation may
+be combined as follows:
+
+@example
+MODULE foobar;			(* ALTERNATIVE METHOD *)
+	
+  EXPORT catch22 = (footype,setfoo,getfoo);
+
+  TYPE footype = integer;
+
+  PROCEDURE setfoo(f: footype);
+  FUNCTION getfoo: footype;
+
+  END; @{ NOTE: this END is required here, even if the
+         module-block below would be empty. @}
+
+  VAR foo : footype;
+
+  PROCEDURE setfoo;
+  BEGIN
+    foo := f;
+  END;
+
+  FUNCTION getfoo;
+  BEGIN
+    getfoo := foo;
+  END;
+
+END. @{ module foobar @}
+@end example
+
+Either one of the two methods may be used with:
+
+@smallexample
+PROGRAM what(output);
+
+import catch22;
+	
+BEGIN
+  setfoo (999);
+  writeln (getfoo);
+END.
+@end smallexample
+
+The @code{INTERFACE} has to be in the same file as the program/module that
+uses it's exported names.  Otherwise GPC does not know anything
+about it and fails to compile the file.
+
+@ignore
+
+@@@@ What is the portable way to avoid this? It could be done
+@@@@ with the #include "interface.p" but that is not portable.
+@@@@ Neither is deriving the file name from the interface name.
+@@@@ Suggestions, please. Portable suggestions preferred :-)
+@@@@
+@@@@ How about making the compiler front end read some user
+@@@@ defined compiling-environment description file that
+@@@@ binds the imported names to some machine specific files
+@@@@ and pass the info to the compiler? This way the source
+@@@@ does not need to have any knowledge of the extenal binding.
+
+I solved the problem, so this is obsolete. -- PG, 2. Aug. 1996
+
+@end ignore
+
+@subsection Somewhat simpler GPC modules are also supported:
+
+@strong{Note}: this is not supported in Extended Pascal standard.
+
+This is a simpler module support that does not
+require exports, imports, module headers etc.
+
+These non-standard simple Gpc modules look like
+(does not have an export part, does not have a separate
+ module-block, does not use import/export features.)
+
+@example
+MODULE foobar;
+  TYPE footype = integer;
+  VAR foo: footype;
+
+  PROCEDURE setfoo(f: footype);
+  BEGIN
+    foo := f;
+  END;
+
+  FUNCTION getfoo: footype;
+  BEGIN
+    getfoo := foo;
+  END;
+END.
+
+PROGRAM what(output);
+
+  (* In case the module foobar is loaded from another file *)
+  PROCEDURE setfoo(f: footype); External;
+  FUNCTION  getfoo: footype;    External;
+
+BEGIN
+  setfoo (999);
+  writeln (getfoo);
+END.
+@end example
+
+
+@subsection Module initialization and finalization:
+
+@code{TO BEGIN DO} module initialization and @code{TO END DO} module
+finalization constructs are supported if the GNU compiler supports
+constructors and destructors in your target machine. (It always does if you
+use the GNU Linker).
+
+If the initialization and finalizations do not work by default, but
+you have the GNU Linker, use option @code{-fgnu-linker} when compiling the
+program.
+
+I re-implemeted the standard I/O handling and now the input and
+output can also be used from the initialization and finalization
+parts.
+
+@@@@ Try these, send me bug reports. These are not tested.
+
+
+@subsection Binding of objects to external names:
+
+GPC supports the extended pascal @code{bind,unbind} and @code{binding}
+operations when applied to files.
+
+The compiler will currently reject binding of other object
+types (@@@@ Perhaps the run time system should do the rejection?)
+
+GPC implements extensions to the required predefined record type
+BindingType:
+
+@smallexample
+BindingType = PACKED_RECORD
+                Bound             : Boolean;
+                Extensions_Valid  : Boolean;
+                Writable          : Boolean;
+                Readable          : Boolean;
+                Existing          : Boolean;
+                Error             : Integer;    @{ Unused currently @}
+                Size              : Integer;    @{ # of elements or -1 @}
+                Name              : String (BINDING_NAME_LENGTH);
+              END;
+@end smallexample
+
+The fields @code{BOUND} and @code{NAME} are required by the standard. All
+other fields are extensions.
+
+The meaning of the extensions to the @code{BindingType} record type,
+and the value of @code{BINDING_NAME_LENGTH} is defined in this document,
+section IMPLEMENTATION DEFINED FEATURES (E.14). It is a compiler
+constant, the run time system accepts any length.
+
+The @code{Size} field is a latest addition to @code{BindingType;} I added
+that because the direct access files actually require that the file
+is not bigger that the definition; and @code{lastposition(file)} does
+not work before the file is opened. The "@code{Size}" field can then
+be used to determine the size before @code{open}, and if the upper
+bound of the direct access file is a variable one should be able
+to open files of any size without violating the standard.
+
+The following is an example of the binding:
+
+@example
+program z(input,output,f);
+
+var
+   f :  text;
+   
+procedure bindfile (varf :  text);
+var
+   b : BindingType;
+
+begin
+  unbind (f);
+  b := binding (f);
+  repeat
+    write ('Enter file name:');
+    readln (b.name);
+    bind (f, b);
+    b := binding (f);
+    if not b.bound then
+      writeln ('File not bound--try again');
+  until b.bound;
+end;
+
+begin
+
+  bindfile (f);
+
+  (* Now the file F is bound to an external file.
+   *
+   * You can use the implementation defined fields
+   * to check if the file is Readable, Writable and
+   * if it Exists. These are valid if the.Extensions_Valid
+   * field is TRUE.
+   *)   
+end.
+@end example
+
+@subsection Function pointers:
+
+GPC suports also function pointers and calls through them.
+This is a non-standard feature.
+
+@smallexample
+program zap(output);
+
+type
+    proc_ptr = ^ procedure (integer);
+
+var
+    pvar : proc_ptr;
+
+procedure write_int(i: integer);
+begin
+  writeln ('Integer: ',i:1);
+end;
+
+begin
+  (* PVAR points to function WRITE_IT *)
+  pvar := &write_int;
+
+  (* Dereferencing a function pointer calls the function *)
+  pvar^(12345);
+end.
+@end smallexample
+
+@subsection String catenation:
+
+Gpc supports string catenation with the '@code{+}' operator.
+All string-types are compatible, so you may catenate any chars,
+fixed length strings and variable length strings with each other.
+
+@smallexample
+program scat (input, output);
+
+var
+   ch          : char;
+   str         : string(100);
+   str2	       : string(50);
+   fstr        : packed array [ 1 .. 20 ] of char;
+
+begin
+   ch   := '$';
+   fstr := 'demo';        @{ padded with blanks @}
+   write ('Give me some chars to play with: ');
+   readln (str);
+   str := '^' + 'prefix:' + str + ':suffix:' + fstr + ch;
+   writeln ('Len' + 'gth = ', length (str));
+   writeln (str);
+end.
+@end smallexample
+
+@subsection Type qualifiers:
+
+@@ New feature.
+@@ Currently gpc runtime does not know anything about these.
+@@ These may change/or get removed...
+
+As an extension, GPC allows you to use type qualifiers:
+@table @code
+@item __byte__
+8 bit integer
+@item __short__
+Short integer (16 bits) or real type (32 bits)
+@item __long__
+Long integer or real type
+@item __longlong__
+long long integer type (64 bits)
+@item __unsigned__
+Unsigned INTEGER type
+@end table
+
+The @code{__unsigned__} works for all integer types, also those
+that have been previously declared with some other type
+qualifier, like @code{__short__}. The other qualifiers do not accept
+types that have already been modified with a type qualifier.
+
+The syntax to use the qualifiers:
+
+@smallexample
+type-denoter > TYPE-QUALIFIER type-name
+@end smallexample
+
+(The metasymbol @samp{>} means type-denoter has also other meanings)
+
+Most of these should be done with subranges anyway.
+However, '@code{__short__ real}' can not be done like that, neither can
+'@code{__unsigned__ integer}' or '@code{__longlong__ integer}'.
+
+@example
+program zap(output);
+
+type
+   byte     = __byte__     integer;
+   longint  = __long__     integer;
+   float    = __short__    real;
+   u_long   = __unsigned__ longint;
+   verylong = __longlong__ integer;
+
+var
+  i8  : byte;
+  i16 : __short__ integer;
+  foo : u_long;
+  pi  : float;
+  big : verylong;
+
+begin
+  pi  := 3.141592654;
+  i16 := 1000;
+  big := MaxInt * i16;
+  i8  := 127;
+
+  (*
+   * Hmm, does not work because constant is treated as an integer,
+   * and this is too large. Need a method to specify long constants.
+   *
+   * What is the syntax in other Pascal compilers? Suggestions, please!
+   *
+
+  foo := 16#deadbeef;
+
+   *)
+end.
+@end example
+
+@subsection Accessing command line arguments:
+
+The following module accesses the command line with
+@code{ParamStr} and @code{ParamCount} functions.
+
+These follow the Un*x semantics, so that 
+@itemize @bullet
+@item @code{arg[0]} == program name,
+@item @code{arg[1] .. arg[ParamCount-1]} are the arguments.
+@end itemize
+
+@example
+MODULE command_line interface;
+
+EXPORT cmdline = (Max_length, Arg_type, ParamStr, ParamCount);
+
+CONST
+   Max_length = 255;     @{ Max length of each argument.
+                           If some arg is longer, the run time system
+                           traps it. @}
+
+TYPE
+  Arg_type = String(Max_length);
+
+  FUNCTION ParamCount: Integer;
+
+  FUNCTION ParamStr (arg_num: integer): Arg_type;
+END. @{ command_line interface @}
+
+MODULE command_line implementation;
+
+  @{ These are in the GPC runtime library @}
+  FUNCTION _p_paramcount : Integer; C;
+  FUNCTION _p_paramstr (num: Integer; VAR str: String): Boolean; C;
+
+  FUNCTION ParamCount;
+  BEGIN
+     ParamCount := _p_paramcount;
+  END; @{ ParamCount @}
+
+  FUNCTION ParamStr;
+  
+  VAR
+   Str       : Arg_type;
+   Success     : Boolean;
+
+  BEGIN
+     Success := _p_paramstr (arg_num, Str);
+
+     (* Should perhaps do something else on failure.
+      *
+      * Now it returns the empty string, which is also a valid
+      * parameter.
+      *)
+     IF Success THEN
+        ParamStr := Str
+     else
+        ParamStr := '';
+  END; @{ ParamStr @}
+END. @{ command_line implementation @}
+
+
+@{ The program below, when compiled with the interface module and
+  linked with the implementation module, accesses the command
+  line arguments. @}	
+
+program zap (output);
+
+import cmdline;
+
+var
+   counter : integer;
+
+begin
+   writeln ('Program fetches command line arguments and outputs one per line');
+   writeln ('Max length of each argument is ',Max_Length:1,' characters');
+
+   for counter := 0 to ParamCount-1 do
+      writeln ('Command line arg ',counter:1,' is "',paramstr(counter),'"');
+end.
+@end example
+
+@c This section is part of "README.TURBO"
+@c Written by: Peter Gerwinski, pege@mail.theo-phys.uni-essen.de
+@c comments / suggestions / bug reports welcome
+@c Created on 16. Oct. 1995 for gpc-1.1-2.6.3
+@c Last change: 1. Nov. 1995, version 1.11
+
+@section Borland Extensions in GNU Pascal
+
+GNU Pascal implements these Borland extensions to the ISO Pascal language:
+
+@itemize @bullet
+@item
+Program headline:  The @code{Program} headline may be omitted in TP/BP.
+If the headline is given, the parameters @code{Input} and @code{Output} are
+optional.  I modified GPC such that it warns about a missing program
+header, but warns about missing @code{Input} and @code{Output} parameters
+only if @code{pedantic}.
+
+@item
+Units:  Extended Pascal "Modules" are not too different from TP/BP
+"Units".  The main difference is that modules do not automatically
+export everything mentioned in the interface part, but they need
+additional export clauses.  (Why?  For what does the interface part
+serve if not just to document what should be exported?)  So I im-
+plemented TP/BP "Units".  A Unit exports everything declared in the
+interface section.  The exported interface has the name of the Unit
+and is compatible with Extended Pascal Module interfaces since I
+just used the same routines.
+
+I got in trouble with "Interface" and "Implementation" which must
+be reserved words in order to compile a Unit.  On the other hand
+side they must remain redefinable to stay compatible to ISO 7185.
+I solved the problem by implementing a mechanism to "enable" and
+"disable" keywords.  When the identifier "Unit" or "Module" is
+read, "Interface" and "Implementation" are enabled as keywords.
+When compiling a valid ISO 7185 program, "Program" must be the
+first identifier, and "Interface" and "Implementation" are disabled
+and have no special meaning.  At the "end." of each compilation,
+everything is set back, so one project can mix ISO 7185 and 10206
+plus Borland standard.
+
+(By the way:  The "GNU specific" module definition is almost
+identical to the PXSC standard (see below: Operators).  With an
+additional keyword `global' which puts a declaration into an
+export interface with the name of the module, it will be the
+same.  I am planning to implement this too.)
+
+@item
+Protected formal parameters:  Using the same mechanism as above
+(and an additional hack in gpc-lex.c), I solved the "protected"
+problem.  All the following works now:
+ 
+@smallexample
+Procedure Foo ( protected a, b, c: Integer );      (* 3 args *)
+Procedure Foo ( a, b, c, protected: Integer );     (* 4 args *)
+Procedure Foo ( a, b, protected, c: Integer );     (* 4 args *)
+Procedure Foo ( protected: Integer );              (* 1 arg  *)
+Procedure Foo ( Var protected: Integer );          (* 1 arg  *)
+Procedure Foo ( protected protected: Integer );    (* 1 arg  *)
+@end smallexample
+
+Furthermore, I implemented "Const" as an alternative to "protected"
+(according to Borland Pascal)
+
+@item
+Compiler directives vs. preprocessor:  UCSD and Borland treat
+comments beginning with a '$' immediately following the opening
+`@{' or `(*' as a compiler (or preprocessor) directive.  When a
+single character plus a `+' or `-' follows, this is also called a
+compiler switch, often associated with a command-line option.
+All these directives are case-insensitive.
+
+For this extension, only the principle idea, not the implementation
+is related to Borland and UCSD.  It is okay (at least between
+Borland and UCSD) to have compiler-dependent compiler-switches.
+Only the include directive (*$I FileName *) is "standard" in both
+(now in three) Pascal dialects.
+
+Some Borland extensions are -- of course not by chance -- just an
+alternative notation for C preprocessor directives.  But there are
+differences:  Borland Pascal "preprocessor" definitions go into
+another name space than the program's definitions.  Therefore you
+can (*$D define *) so-called "conditionals" and check them via
+(*$ifdef *), but the program will not see these defines, so macros
+do not exist.  Since it was easier, makes no difference in most
+cases, and is in fact an extension, I left (*$define s*) visible to
+the program.  And I did not forbid to use the other C preprocessor
+directives in the Pascal style.  (Like this, there may be more than
+one in the same line ... )
+
+I implemented the following directives  (The examples simultane-
+ously illustrate different possible notations):
+
+@smallexample
+(*$B+*)  or  @{$B+@}            Boolean complete evaluation
+(*$B-*)  or  @{$B-@}            --short-circuit
+
+(*$c+*)  or  @{$c+@}            --c-numbers
+
+(*$E+,L+,N+*)                 --char-escapes, --lazy-io,
+                              --nested-comments
+
+(* These switches are local and can change during one compile *)
+
+@{$p+@}                         --pedantic
+@{$P-@}                         end of --pedantic
+
+(*$I FileName *)              #include "filename.pas"
+
+@{$m Hello! @}                  write message "Hello!" to stderr
+
+(*$D FOO bar *)               #define FOO bar
+@{$define CMULB@}               #define CMULB
+
+(*$include <hello.ph> *)      #include <hello.ph>
+
+                              #ifdef FOO
+(*$ifdef FOO*) ... (*$endif*)   ...
+                              #endif
+
+(* ... and all the other C preprocessor directives ... *)
+@end smallexample
+
+By the way:  I implemented an option --borland-pascal symmetrically
+to --extended-pascal and --object-pascal.  But I couldn't figure out
+what they serve for since I didn't notice any difference in the
+compiler's behaviour with and without these options.  Nevertheless,
+I made --borland-pascal to switch on --nested-comments, so it has
+at least one effect :-).
+
+@item
+Bit manipulations:  The TP/BP bit shift operators "shl" and "shr" do 
+now exist in GPC; bitwise "and", "or", "xor", and "not" for integer
+values are allowed.  Warning is given, if "pedantic" -- like for all
+non-ISO extensions.
+
+@smallexample
+2#100101 and ( 1 shl 5 ) = 2#100000
+@end smallexample
+
+I could not restrain, but also implemented "and", "or", "xor" and
+"not" as "procedures":
+
+@smallexample
+x:= 7;
+and ( x, 14 );          (* yields 6 *)
+xor ( x, 3 );           (* yields 5 *)
+@end smallexample
+
+(This is a feature I often missed with Borland Pascal.)
+
+@item
+Increment, decrement:  The TP/BP built-in Procedures "inc" and "dec"
+do now exist in GPC.
+
+@smallexample
+Var
+  x: Integer;
+  c: Char;
+
+inc ( i );      (* i:= i + 1; *)
+dec ( i, 7 );   (* i:= i - 7; *)
+inc ( c, 3 );   (* c:= chr ( ord ( c ) + 3 ); *)
+@end smallexample
+
+@item
+Min, max:  These are a GNU extension and work for reals as well as
+for ordinal types.  Mixing of reals and integers is okay (result
+is real).
+
+@item
+Memory management:  TP/BP allows dynamic memory management with `GetMem'
+and `FreeMem':
+
+@smallexample
+GetMem ( MyPtr, 1024 );       FreeMem ( MyPtr, 1024 );
+@end smallexample
+
+GPC now supports this and also a "function-style" call to `GetMem':
+
+@smallexample
+MyPtr:= GetMem ( 1024 );
+@end smallexample
+
+(see also: New in context of Object Orientated Programming)
+
+One somehow strange feature of Borland is *not* supported:  You can
+free parts of a variable with FreeMem, while the rest is still used
+and can be FreeMem'ed later by another pointer:
+
+@smallexample
+Type
+  Vector = array [ 0..65535 ] of Integer;
+  VecPtr = ^Vector;
+
+Var
+  p, q: VecPtr;
+
+  ...
+ 
+  GetMem ( p, 1024 * SizeOf ( Integer ) );
+  q:= &p^ [ 512 ];
+  ...
+  FreeMem ( p, 512 * SizeOf ( Integer ) );
+  ...
+  FreeMem ( q, 512 * SizeOf ( Integer ) );
+@end smallexample
+
+@item
+Hex numbers:  TP/BP hex numbers with a leading `$' are now supported
+by GPC parallel to base#number.
+
+@smallexample
+$cafe = 2#1100101011111110
+@end smallexample
+
+@item
+Typed constants vs. initialized variables:  TP/BP "typed constants"
+can now be used in GPC too.  Currently, they are just initialized
+variables (as in TP/BP), but they will be changed at least to read-
+only variables.  (Or at least a warning will be given when trying
+to change their values.)  I recommand to use typed constants only
+for effective constants and use Extended Pascal initialized variables
+as initialized variables.
+
+@smallexample
+Const
+  A: Integer = 7;
+  B: array [ 1..3 ] of Char = ( 'B', 'a', 'r' );
+     (* TP/BP also would also understand " = 'Bar'; ". *)
+  Foo: record
+    x, y: Integer;
+  end (* Foo *)
+    = ( x: 3; y: 4 );
+@end smallexample
+
+Borland and ISO style for the right-hand side are both supported.
+
+Once working on this, I also implemented VAX Pascal variable ini-
+tializing with `:=' (as an alternative to `value') and also with
+`=' (like in Borland "initialized variables").
+
+Warning: This was one of my last changes and is not yet stable.  I
+could not, for example, recover from 3 shift/reduce conflicts and 1
+reduce/reduce conflict.  This causes trouble when the type (for
+example a subrange) ends up with an expression such that the parser
+takes the `=' as a relational operator.
+     
+@item
+Absolute variables:  The "absolute" clause does now exist in GPC,
+but only for superposition of variables, not for giving an abso-
+lute address for variables.  (The latter application is useful only
+in the DOS platform anyway.)
+
+@smallexample
+Procedure ReadVar ( Var x: Void; TypeChoice: Char );
+
+Var
+  xInt: Integer absolute x;
+  xChar: Char absolute x;
+  xStr: String ( 80 ) absolute x;
+
+begin (* ReadVar *)
+  ...
+end (* ReadVar *);
+@end smallexample
+
+@item
+AsmName directive:  As a GNU extension, I implemented a new direc-
+tive `AsmName'.  While the `extern' directive capitalizes the first
+character of the declared name and the `C' directive makes every-
+thing lowercase, this directive allows the user to specify the
+assembler name as a string constant:
+
+@smallexample
+Function MyFunc: Integer; AsmName 'MyPrettyFunc_';
+@end smallexample
+
+With this extension it is possible to access all external functions,
+for example the XT interface functions, and not only those written
+in lowercase.
+
+My first idea to use `external' for this purpose (to avoid name space
+pollution) conflicts with another Borland extension not yet implemen-
+ted:  In Borland Pascal, the declaration
+
+@smallexample
+Procedure Foo; external 'MyLib';
+@end smallexample
+
+means that the procedure Foo should be imported by name ("Foo") from
+a dynamic link library "mylib.dll".
+
+@item
+Open arrays:  Borland Pascal "open array" formal parameters are now
+implemented into GPC.  Within the function body, they have integer
+type index with lower bound 0.  (Conformant arrays are probably better
+but are incompatible to other languages.)
+
+@item
+Address operator:  The address operator is "@code{@@}" in TP/BP.
+Implemented into GPC as an alternative to "@code{@w{&}}".
+
+@item
+Variant records:  Variant records may now be constructed with a
+subrange type, too.  E.g. "@code{case 1..3 of ...}" is allowed now.
+
+@item
+Objects (classes):  The Borland Pascal Object Extensions are almost
+fully implemented into GPC.  This includes inheritance, virtual and
+non-virtual methods, constructors, destructors, pointer compati-
+bility, extended `New' syntax (with constructor call and/or as a
+"function"), extended `Dispose' syntax (with destructor call).
+
+The Borland "standard" is different from the ISO draft (which I
+have never seen), but it should not be too difficult now to im-
+plement that too (plus the Borland Delphi Object Extensions which
+*might* be identical to the ISO draft).
+
+@smallexample
+Type
+  MyParentPtr = ^MyParentObj;
+  MyPtr = ^MyObj;
+    
+MyParentObj = object
+  ...
+end (* MyParentObj *);
+
+MyObj = object ( MyParentObj )
+  a, b, c: Integer;
+  Constructor Init;
+  d, e: Char;    (* GNU extension: Data fields *)
+  Destructor Fini; virtual;(* and methods may be mixed   *)
+  Procedure Foo ( x: Integer );
+  Function Bar: Char; virtual;
+  (* "private" is not (yet) implemented *)
+end (* MyObj *);
+
+Var
+  My: MyParentPtr;
+
+...
+  
+Constructor MyObj.Init;
+
+begin (* MyObj.Init *)
+  inherited Init;
+  a:= 0;
+  MyParentObj.Bar;
+end (* MyObj.Init *);
+
+...
+
+My:= New ( MyPtr, Init );
+My^.Foo ( 3 );
+Dispose ( My, Fini );
+New ( My, Init );
+with My^ do
+  writeln ( Bar );
+@end smallexample
+
+  
+I first tried to recycle parts of the C++ and/or ObjC frontend, but
+I gave up after a few hours.  Since I was not able to understand
+how they work, I re-invented and implemented my own Object frontend
+-- the third one I noticed in the GNU compiler family.  Sorry.
+
+@item
+Operators:  This extension is not from Borland but from the PXSC
+(Pascal eXtensions for Scientific Calculations) standard and allows
+redefinition of operators.  It must explicitly be enabled either by
+the compiler directive $X+ ("extended syntax") or by a command line
+option "--pascal-sc" or "--extended-syntax".
+
+@smallexample
+(*$X+*)
+
+Type
+  Vec3 = record
+    x, y, z: Real;
+  end (* Vec3 *);
+
+Var
+  a, b, c: Vec3;
+
+Operator + ( u, v: Vec3 ) w: Vec3;
+
+begin (* Vec3 + Vec3 *)
+  w.x:= u.x + v.x;
+  w.y:= u.y + v.y;
+  w.z:= u.z + v.z;
+end (* Vec3 + Vec3 *);
+
+...
+
+c:= a + b;
+@end smallexample
+
+Extended Pascal would require an equal sign before the return value
+variable specification (`w' in the above example) while PXSC for-
+bids it.  Therefore I allow the equal sign to be present or not,
+both in a function declaration as well as in an operator declaration.
+
+@end itemize

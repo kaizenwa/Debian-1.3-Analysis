@@ -1,0 +1,65 @@
+#include "copyright.h"
+
+#include "s1"
+#include "s2"
+#include "s3"
+#include "s4"
+#include "s5"
+#include "s6"
+#include "s7"
+#include "s8"
+#include "s9"
+#include "s10"
+#include "s11"
+#include "s12"
+#include "s13"
+#include "d1"
+#include "d2"
+#include "d3"
+#include "d4"
+#include "d5"
+#include "d6"
+#include "d7"
+#include "d8"
+#include "d9"
+#include "d10"
+#include "d11"
+#include "d12"
+#include "d13"
+#include "c1"
+#include "c2"
+#include "c3"
+#include "c4"
+#include "c5"
+#include "c6"
+#include "c7"
+#include "c8"
+#include "c9"
+#include "c10"
+#include "c11"
+#include "c12"
+#include "c13"
+#include "h1"
+#include "h2"
+#include "h3"
+#include "h4"
+#include "h5"
+#include "h6"
+#include "h7"
+#include "h8"
+#include "h9"
+#include "h10"
+#include "h11"
+#include "h12"
+#include "h13"
+
+char *card_bits[52] = {
+    h1_bits, h2_bits, h3_bits, h4_bits, h5_bits, h6_bits, h7_bits, h8_bits,
+    h9_bits, h10_bits, h11_bits, h12_bits, h13_bits,
+    d1_bits, d2_bits, d3_bits, d4_bits, d5_bits, d6_bits, d7_bits, d8_bits,
+    d9_bits, d10_bits, d11_bits, d12_bits, d13_bits,
+    c1_bits, c2_bits, c3_bits, c4_bits, c5_bits, c6_bits, c7_bits, c8_bits,
+    c9_bits, c10_bits, c11_bits, c12_bits, c13_bits,
+    s1_bits, s2_bits, s3_bits, s4_bits, s5_bits, s6_bits, s7_bits, s8_bits,
+    s9_bits, s10_bits, s11_bits, s12_bits, s13_bits, 
+};

@@ -1,0 +1,295 @@
+"Editor*font:				-*-lucida-*-r-*-*-12-*",
+"Editor*editWindow*font:			-*-lucidatypewriter-medium-r-*-*-14-*",
+"Editor*buttons*orientation:		horizontal",
+"Editor*buttons*showGrip:		False",
+"Editor*input:                           TRUE",
+"Editor*MenuButton*cursor:		hand2",
+"Editor*Command*cursor:			hand2",
+"Editor*SimpleMenu*cursor:		hand2",
+"Editor*Toggle*cursor:			hand2",
+"Editor*editWindow.autoFill:		True",
+"Editor*editWindow.scrollVertical:	Always",
+"Editor.textwidth:			80",
+"Editor.textheight:			30",
+"Editor.AutoIndent:			True",
+"Editor*editWindow.wrap:			Word",
+"Editor.PrintCommand:			lpr -p -T %t %f",
+"Editor.Tabsize:				8",
+"Editor.EnableBackups:			True",
+"Editor.BackupNameSuffix:		~",
+"Editor.MaxScrollbreak:			3",
+"Editor*value.translations:  #override \
+                                <Key>Escape: select-all() delete-selection()",
+"Editor*tab_text.translations: #override \
+                                <Key>Escape: select-all() delete-selection() \\n \
+				<Key>Return: no-op()",
+"Editor*sed_text.translations: #override \
+                                <Key>Escape: select-all() delete-selection()",
+"Editor*search_text.translations: #override \
+                                <Key>Escape: select-all() delete-selection()                ",
+"Editor*replace_text.translations: #override \
+                                <Key>Escape: select-all() delete-selection()",
+"Editor*command_text.translations: #override \
+                                <Key>Escape: select-all() delete-selection()\\n \
+				<Key>Return: no-op()",
+"Editor*pipe_text.translations: #override \
+                                <Key>Escape: select-all() delete-selection()\\n \
+				<Key>Return: no-op()",
+"Editor*line_text.translations: #override \
+				<Key>Escape: select-all() delete-selection()",
+"Editor.filemenu.load.label:	Open          o",
+"Editor.filemenu.insert.label:	Insert        i",
+"Editor.filemenu.save.label:	Save          s",
+"Editor.filemenu.saveas.label:	Save as",
+"Editor.filemenu.savesel.label:	Save Selection",
+"Editor.filemenu.print.label:	Print",
+"Editor.filemenu.printsel.label:	Print Selection",
+"Editor.filemenu.quit.label:	Exit          e",
+"Editor.editmenu.cut.label:	Cut",
+"Editor.editmenu.paste.label:	Paste",
+"Editor.editmenu.right.label:	Shift Selection right",
+"Editor.editmenu.left.label:	Shift Selection left",
+"Editor.jumpmenu.line.label:	Line          l",
+"Editor.jumpmenu.begin.label:	Begin",
+"Editor.jumpmenu.end.label:		End",
+"Editor.jumpmenu.selstart.label:	Selection Start",
+"Editor.jumpmenu.selend.label:	Selection End",
+"Editor.searchmenu.search.label:		Search          f",
+"Editor.searchmenu.search_selection.label:	Search Selection",
+"Editor.searchmenu.replace.label:		Replace         f",
+"Editor.searchmenu.replace_selection.label:	Replace Selection",
+"Editor.searchmenu.find_bracket.label:	Find bracket",
+"Editor.searchmenu.check_brackets.label:	Check brackets",
+"Editor.spezialmenu.options.label:	Options",
+"Editor.spezialmenu.call_sed.label:	Call sed",
+"Editor.spezialmenu.help.label:	Help",
+"Editor.spezialmenu.about.label:	About",
+"Editor.commandsmenu.command0.label:	Command",
+"Editor.pipesmenu.pipe0.label:	Pipe",
+"Editor*commands: LatexPS	latex $stripped; dvips $stripped.dvi -o $stripped.ps; ghostview $stripped.ps &\\n\
+LatexDVI	latex $stripped; xdvi $stripped.dvi &\\n\
+Make	make\\n\
+CC	cc $stripped.c -o $stripped\\n\
+NewEditor	1>/dev/null 2>/dev/null editor &\\n\
+Manual	mantitle=`head $selection`;man $mantitle | sed \"s/.//g\"",
+"Editor*pipes: Date	date",
+"Editor.overwritetranslations:  #replace \
+	<Key>~: isoAccent() \\n \
+	<Key>^: isoAccent() \\n \
+	<Key>': isoAccent() \\n \
+	<Key>`: isoAccent() \\n \
+	<Key>\\\": isoAccent() \\n \
+	Meta<Key>i: xedCallMenu(filemenu.insert) \\n \
+	Meta<Key>o: xedCallMenu(filemenu.load) \\n \
+	Meta<Key>s: xedCallMenu(filemenu.save) \\n \
+	Meta<Key>e: xedCallMenu(filemenu.quit) \\n \
+	Meta<Key>l: xedCallMenu(jumpmenu.line) \\n \
+	Meta<Key>f: xedCallMenu(searchmenu.search) \\n \
+	Meta<Key>x: kill-selection() \\n \
+	<Key>L10:kill-selection() \\n \
+	<Key>R7: beginning-of-file() \\n \
+	<Key>R9: previous-page() \\n \
+	<Key>R13: end-of-file() \\n \
+	<Key>R15: next-page() \\n \
+	<Key>Home: beginning-of-file() \\n \
+	<Key>Prior: previous-page() \\n \
+	<Key>End: end-of-file() \\n \
+	<Key>Next: next-page() \\n \
+	Shift<Key>Up: previous-page() \\n \
+	Shift<Key>Down: next-page() \\n \
+	Shift<Key>Left: backward-word() \\n \
+	Shift<Key>Right: forward-word() \\n \
+	Ctrl<Key>Up: beginning-of-file() \\n \
+	Ctrl<Key>Down: end-of-file() \\n \
+	Ctrl<Key>Left: beginning-of-line() \\n \
+	Ctrl<Key>Right: end-of-line() \\n \
+	Meta<Key>m: xedCallMenu(paned.buttons.editmode) \\n \
+Ctrl<Key>A:	beginning-of-line() \\n\
+Ctrl<Key>B:	backward-character() \\n\
+Ctrl<Key>C:	insert-selection(CUT_BUFFER0) \\n\
+Ctrl<Key>D:	delete-next-character() \\n\
+Ctrl<Key>E:	end-of-line() \\n\
+Ctrl<Key>F:	forward-character() \\n\
+Ctrl<Key>G:     multiply(Reset) \\n\
+Ctrl<Key>H:	delete-previous-character() \\n\
+Ctrl<Key>J:	newline-and-indent() \\n\
+Ctrl<Key>K:	kill-to-end-of-line() \\n\
+Ctrl<Key>L:	redraw-display() \\n\
+Ctrl<Key>M:	newline() \\n\
+Ctrl<Key>N:	next-line() \\n\
+Ctrl<Key>O:	newline-and-backup() \\n\
+Ctrl<Key>P:	previous-line() \\n\
+Ctrl<Key>R:	search(backward) \\n\
+Ctrl<Key>S:	search(forward) \\n\
+Ctrl<Key>T:     transpose-characters() \\n\
+Ctrl<Key>U:	multiply(4) \\n\
+Ctrl<Key>V:	next-page() \\n\
+Ctrl<Key>W:	kill-selection() \\n\
+Ctrl<Key>Y:	insert-selection(SECONDARY) \\n\
+Ctrl<Key>Z:	scroll-one-line-up() \\n\
+Meta<Key>B:	backward-word() \\n\
+Meta<Key>F:	forward-word() \\n\
+Meta<Key>I:	insert-file() \\n\
+Meta<Key>K:	kill-to-end-of-paragraph() \\n\
+Meta<Key>Q:     form-paragraph() \\n\
+Meta<Key>V:	previous-page() \\n\
+Meta<Key>Y:	insert-selection(PRIMARY, CUT_BUFFER0) \\n\
+Meta<Key>Z:	scroll-one-line-down() \\n\
+:Meta<Key>d:	delete-next-word() \\n\
+:Meta<Key>D:	kill-word() \\n\
+:Meta<Key>h:	delete-previous-word() \\n\
+:Meta<Key>H:	backward-kill-word() \\n\
+:Meta<Key>\\\\<:	beginning-of-file() \\n\
+:Meta<Key>\\\\>:	end-of-file() \\n\
+:Meta<Key>]:	forward-paragraph() \\n\
+:Meta<Key>[:	backward-paragraph() \\n\
+~Shift Meta<Key>Delete:		delete-previous-word() \\n\
+ Shift Meta<Key>Delete:		backward-kill-word() \\n\
+~Shift Meta<Key>BackSpace:	delete-previous-word() \\n\
+ Shift Meta<Key>BackSpace:	backward-kill-word() \\n\
+<Key>Home:	beginning-of-file() \\n\
+:<Key>KP_Home:	beginning-of-file() \\n\
+<Key>End:	end-of-file() \\n\
+:<Key>KP_End:	end-of-file() \\n\
+<Key>Next:	next-page() \\n\
+:<Key>KP_Next:	next-page() \\n\
+<Key>Prior:	previous-page() \\n\
+:<Key>KP_Prior: previous-page() \\n\
+<Key>Right:	forward-character() \\n\
+:<Key>KP_Right: forward-character() \\n\
+<Key>Left:	backward-character() \\n\
+:<Key>KP_Left:	backward-character() \\n\
+<Key>Down:	next-line() \\n\
+:<Key>KP_Down:	next-line() \\n\
+<Key>Up:	previous-line() \\n\
+:<Key>KP_Up:	previous-line() \\n\
+<Key>Delete:	delete-previous-character() \\n\
+:<Key>KP_Delete: delete-previous-character() \\n\
+<Key>BackSpace:	delete-previous-character() \\n\
+<Key>Linefeed:	newline-and-indent() \\n\
+<Key>Return:	newline() \\n\
+:<Key>KP_Enter:	newline() \\n\
+Ctrl<Key>backslash:	reconnect-im() \\n\
+<Key>Kanji:	reconnect-im()\\n\
+	<Key>:		xedskiplineend() delete-next-character() insert-char() \\n\
+<EnterWindow>:	enter-window() \\n\
+<LeaveWindow>:	leave-window() \\n\
+<FocusIn>:	focus-in() \\n\
+<FocusOut>:	focus-out() \\n\
+<Btn1Down>:	select-start() \\n\
+<Btn1Motion>:	extend-adjust() \\n\
+<Btn1Up>:	extend-end(PRIMARY, CUT_BUFFER0) \\n\
+<Btn2Down>:	insert-selection(PRIMARY, CUT_BUFFER0) \\n\
+<Btn3Down>:	extend-start() \\n\
+<Btn3Motion>:	extend-adjust() \\n\
+<Btn3Up>:	extend-end(PRIMARY, CUT_BUFFER0)",
+"Editor.inserttranslations:  #replace \
+	<Key>~: isoAccent() \\n \
+	<Key>^: isoAccent() \\n \
+	<Key>': isoAccent() \\n \
+	<Key>`: isoAccent() \\n \
+	<Key>^: isoAccent() \\n \
+	Meta<Key>i: xedCallMenu(filemenu.insert) \\n \
+	Meta<Key>o: xedCallMenu(filemenu.load) \\n \
+	Meta<Key>s: xedCallMenu(filemenu.save) \\n \
+	Meta<Key>e: xedCallMenu(filemenu.quit) \\n \
+	Meta<Key>l: xedCallMenu(jumpmenu.line) \\n \
+	Meta<Key>f: xedCallMenu(searchmenu.search) \\n \
+	Meta<Key>x: kill-selection() \\n \
+	<Key>L10:kill-selection() \\n \
+	<Key>R7: beginning-of-file() \\n \
+	<Key>R9: previous-page() \\n \
+	<Key>R13: end-of-file() \\n \
+	<Key>R15: next-page() \\n \
+	<Key>Home: beginning-of-file() \\n \
+	<Key>Prior: previous-page() \\n \
+	<Key>End: end-of-file() \\n \
+	<Key>Next: next-page() \\n \
+	Shift<Key>Up: previous-page() \\n \
+	Shift<Key>Down: next-page() \\n \
+	Shift<Key>Left: backward-word() \\n \
+	Shift<Key>Right: forward-word() \\n \
+	Ctrl<Key>Up: beginning-of-file() \\n \
+	Ctrl<Key>Down: end-of-file() \\n \
+	Ctrl<Key>Left: beginning-of-line() \\n \
+	Ctrl<Key>Right: end-of-line() \\n \
+	Meta<Key>m: xedCallMenu(paned.buttons.editmode) \\n \
+Ctrl<Key>A:	beginning-of-line() \\n\
+Ctrl<Key>B:	backward-character() \\n\
+Ctrl<Key>C:	insert-selection(CUT_BUFFER0) \\n\
+Ctrl<Key>D:	delete-next-character() \\n\
+Ctrl<Key>E:	end-of-line() \\n\
+Ctrl<Key>F:	forward-character() \\n\
+Ctrl<Key>G:     multiply(Reset) \\n\
+Ctrl<Key>H:	delete-previous-character() \\n\
+Ctrl<Key>J:	newline-and-indent() \\n\
+Ctrl<Key>K:	kill-to-end-of-line() \\n\
+Ctrl<Key>L:	redraw-display() \\n\
+Ctrl<Key>M:	newline() \\n\
+Ctrl<Key>N:	next-line() \\n\
+Ctrl<Key>O:	newline-and-backup() \\n\
+Ctrl<Key>P:	previous-line() \\n\
+Ctrl<Key>R:	search(backward) \\n\
+Ctrl<Key>S:	search(forward) \\n\
+Ctrl<Key>T:     transpose-characters() \\n\
+Ctrl<Key>U:	multiply(4) \\n\
+Ctrl<Key>V:	next-page() \\n\
+Ctrl<Key>W:	kill-selection() \\n\
+Ctrl<Key>Y:	insert-selection(SECONDARY) \\n\
+Ctrl<Key>Z:	scroll-one-line-up() \\n\
+Meta<Key>B:	backward-word() \\n\
+Meta<Key>F:	forward-word() \\n\
+Meta<Key>I:	insert-file() \\n\
+Meta<Key>K:	kill-to-end-of-paragraph() \\n\
+Meta<Key>Q:     form-paragraph() \\n\
+Meta<Key>V:	previous-page() \\n\
+Meta<Key>Y:	insert-selection(PRIMARY, CUT_BUFFER0) \\n\
+Meta<Key>Z:	scroll-one-line-down() \\n\
+:Meta<Key>d:	delete-next-word() \\n\
+:Meta<Key>D:	kill-word() \\n\
+:Meta<Key>h:	delete-previous-word() \\n\
+:Meta<Key>H:	backward-kill-word() \\n\
+:Meta<Key>\\\\<:	beginning-of-file() \\n\
+:Meta<Key>\\\\>:	end-of-file() \\n\
+:Meta<Key>]:	forward-paragraph() \\n\
+:Meta<Key>[:	backward-paragraph() \\n\
+~Shift Meta<Key>Delete:		delete-previous-word() \\n\
+ Shift Meta<Key>Delete:		backward-kill-word() \\n\
+~Shift Meta<Key>BackSpace:	delete-previous-word() \\n\
+ Shift Meta<Key>BackSpace:	backward-kill-word() \\n\
+<Key>Home:	beginning-of-file() \\n\
+:<Key>KP_Home:	beginning-of-file() \\n\
+<Key>End:	end-of-file() \\n\
+:<Key>KP_End:	end-of-file() \\n\
+<Key>Next:	next-page() \\n\
+:<Key>KP_Next:	next-page() \\n\
+<Key>Prior:	previous-page() \\n\
+:<Key>KP_Prior: previous-page() \\n\
+<Key>Right:	forward-character() \\n\
+:<Key>KP_Right: forward-character() \\n\
+<Key>Left:	backward-character() \\n\
+:<Key>KP_Left:	backward-character() \\n\
+<Key>Down:	next-line() \\n\
+:<Key>KP_Down:	next-line() \\n\
+<Key>Up:	previous-line() \\n\
+:<Key>KP_Up:	previous-line() \\n\
+<Key>Delete:	delete-previous-character() \\n\
+:<Key>KP_Delete: delete-previous-character() \\n\
+<Key>BackSpace:	delete-previous-character() \\n\
+<Key>Linefeed:	newline-and-indent() \\n\
+<Key>Return:	newline() \\n\
+:<Key>KP_Enter:	newline() \\n\
+Ctrl<Key>backslash:	reconnect-im() \\n\
+<Key>Kanji:	reconnect-im()\\n\
+<Key>:		insert-char() \\n\
+<EnterWindow>:	enter-window() \\n\
+<LeaveWindow>:	leave-window() \\n\
+<FocusIn>:	focus-in() \\n\
+<FocusOut>:	focus-out() \\n\
+<Btn1Down>:	select-start() \\n\
+<Btn1Motion>:	extend-adjust() \\n\
+<Btn1Up>:	extend-end(PRIMARY, CUT_BUFFER0) \\n\
+<Btn2Down>:	insert-selection(PRIMARY, CUT_BUFFER0) \\n\
+<Btn3Down>:	extend-start() \\n\
+<Btn3Motion>:	extend-adjust() \\n\
+<Btn3Up>:	extend-end(PRIMARY, CUT_BUFFER0)",

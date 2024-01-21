@@ -1,0 +1,111 @@
+#! /bin/sh
+# postnews - post news article
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+oldpath="$PATH"
+newpath=$NEWSCTL/bin:$NEWSBIN:$NEWSPATH
+PATH=$newpath
+export PATH
+umask 077				# private
+
+tmp=/tmp/pn$$
+tmpcopy=/tmp/pnc$$
+term="rm -f $tmp $tmpcopy ; trap 0 ; exit 0"
+trap "$term" 0 1 2
+
+if test " $VISUAL" != " "
+then
+	edit="$VISUAL"
+elif test " $EDITOR" != " "
+then
+	edit="$EDITOR"
+else
+	edit=/bin/ed
+fi
+
+newline='
+'
+
+case "$1" in
+'')	if test -r $NEWSCTL/postdefltgroup
+	then
+		defg="`cat $NEWSCTL/postdefltgroup`"
+		dprompt=" [$defg]"
+	else
+		defg=
+		dprompt=
+	fi
+	ans=
+	while test " $ans" = " "
+	do
+		echo "Newsgroup(s)$dprompt? " | tr -d "$newline"
+		read ans
+		case "$ans" in
+		'')	if test " $defg" != " "
+			then
+				ans="$defg"
+			fi
+			;;
+		esac
+	done
+	echo "Newsgroups: $ans" >$tmp
+	;;
+
+-h)	cat $2 >$tmp
+	;;
+
+*)	echo "Newsgroups: $1" >$tmp
+	;;
+esac
+
+case "$1" in
+-h)	;;
+
+*)	subj=
+	while test " $subj" = " "
+	do
+		echo 'Subject: ' | tr -d "$newline"
+		read subj
+	done
+	echo "Subject: $subj" >>$tmp
+	if test -r $NEWSCTL/postdefltdist
+	then
+		echo "Distribution: `cat $NEWSCTL/postdefltdist`" >>$tmp
+	fi
+	;;
+esac
+
+echo >>$tmp
+echo "REPLACE THIS LINE WITH YOUR TEXT (leave the preceding blank line alone)" >>$tmp
+cp $tmp $tmpcopy
+
+trap : 2
+PATH="$oldpath"
+$edit $tmp
+PATH=$newpath
+trap "$term" 2
+
+while cmp -s $tmp $tmpcopy
+do
+	echo 'This posting does not appear to have been edited properly.'
+	echo 'Abandon it [y] ? ' | tr -d "$newline"
+	read ans
+	case "$ans" in
+	''|y*|Y*)
+		rm -f $tmp
+		exit 0
+		;;
+	esac
+
+	echo 'Editing again...  Please check it over carefully.'
+	trap : 2
+	PATH="$oldpath"
+	$edit $tmp
+	PATH=$newpath
+	trap "$term" 2
+done
+
+echo 'Posting...'
+$NEWSBIN/inject/inews -h <$tmp

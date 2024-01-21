@@ -1,0 +1,38 @@
+#! /bin/sh
+# newsflag - change the flag (4th field of active) for a newsgroup
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/maint:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+usage="Usage: $0 groupname {y|n|m|x|=realgroup}"
+
+case $# in
+2)	;;
+*)	echo "$usage" >&2 ; exit 2	;;
+esac
+
+cd $NEWSCTL
+
+lock -v LOCK $$ 5 || exit 1
+status=1
+trap "unlock LOCK ; trap 0 ; exit \$status" 0 1 2 15
+
+if awk 'BEGIN { found = 0 }
+	$1 == "'"$1"'" { $4 = "'"$2"'" ; found = 1 }
+	{ print }
+	END {
+		if (found == 1)
+			exit 0
+		else
+			exit 1
+	}' active >active.new
+then
+	mv active active.old && mv active.new active
+	status=0
+else
+	echo "$0: cannot find newsgroup \`$1'" >&2
+	rm active.new
+fi

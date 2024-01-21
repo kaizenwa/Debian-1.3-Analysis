@@ -1,0 +1,109 @@
+# Generated automatically from Makefile.in by configure.
+#
+# $Id: Makefile.in,v 1.5 1997/02/26 03:32:46 eric Rel $
+#
+## Makefile for mkisofs.
+
+#### Start of system configuration section. ####
+
+srcdir = .
+
+CC = gcc
+
+INSTALL = /usr/bin/install -c
+INSTALL_PROGRAM = ${INSTALL}
+INSTALL_DATA = ${INSTALL} -m 644
+
+LIBS = 
+
+prefix = /usr/local
+exec_prefix = $(prefix)
+
+bindir = $(exec_prefix)/bin
+
+# Where to put the manual pages.
+mandir = $(prefix)/man/man8
+# Extension (not including `.') for the manual page filenames.
+manext = 8
+
+#### End of system configuration section. ####
+
+CFLAGS=-g -O -c -I.
+LDFLAGS=
+OBJS=mkisofs.o tree.o write.o hash.o rock.o exclude.o multi.o \
+		files.o match.o name.o fnmatch.o eltorito.o
+
+World: mymkisofs
+
+Makefile: Makefile.in configure
+	./configure
+	echo "Type make again to build mkisofs."
+
+configure:  configure.in
+	autoconf
+
+mymkisofs: Makefile $(OBJS) 
+	$(CC) $(LDFLAGS) -o mymkisofs  $(OBJS)
+	strip mymkisofs
+
+install: mkisofs mkisofs.8
+	[ -d $(bindir) ] || mkdir $(bindir)
+	[ -d $(mandir) ] || mkdir $(mandir)
+	$(INSTALL_PROGRAM) mkisofs $(bindir)/mkisofs
+	-$(INSTALL_DATA) $(srcdir)/mkisofs.8 $(mandir)/mkisofs.$(manext)
+
+tree.o: tree.c mkisofs.h iso9660.h exclude.h config.h Makefile
+	$(CC) $(CFLAGS) tree.c
+
+write.o: write.c mkisofs.h iso9660.h config.h Makefile
+	$(CC) $(CFLAGS) write.c
+
+hash.o: hash.c mkisofs.h  config.h Makefile
+	$(CC) $(CFLAGS) hash.c
+
+rock.o: rock.c mkisofs.h iso9660.h config.h Makefile
+	$(CC) $(CFLAGS) rock.c
+
+exclude.o: exclude.c exclude.h config.h Makefile
+	$(CC) $(CFLAGS) exclude.c
+
+match.o: match.c match.h config.h Makefile
+	$(CC) $(CFLAGS) match.c
+
+files.o: files.c iso9660.h mkisofs.h config.h Makefile
+	$(CC) $(CFLAGS) files.c
+
+fnmatch.o: fnmatch.c fnmatch.h config.h Makefile
+	$(CC) $(CFLAGS) fnmatch.c
+
+multi.o: multi.c iso9660.h mkisofs.h config.h Makefile
+	$(CC) $(CFLAGS) multi.c
+
+name.o: name.c iso9660.h mkisofs.h config.h Makefile
+	$(CC) $(CFLAGS) name.c
+
+mkisofs.o: mkisofs.c iso9660.h mkisofs.h exclude.h config.h Makefile
+	$(CC) $(CFLAGS) mkisofs.c
+
+eltorito.o: eltorito.c iso9660.h mkisofs.h config.h Makefile
+	$(CC) $(CFLAGS) eltorito.c
+
+clean:
+	/bin/rm -f *.o core mymkisofs *~ #*#
+	/bin/rm -f config.status config.log config.cache config.h
+
+#
+# All .h files except for config.h get copied.
+#
+dist:   Makefile
+	(mydir=`basename \`pwd\``;\
+	cd .. && tar -cvvf - $$mydir/README $$mydir/README.eltorito \
+	$$mydir/configure.in $$mydir/configure $$mydir/config.h.in \
+	$$mydir/Makefile.in  $$mydir/make.com $$mydir/TODO \
+	$$mydir/COPYING $$mydir/ChangeLog $$mydir/*.8 $$mydir/*.c \
+	$$mydir/mkisofs.spec \
+	$$mydir/install-sh $$mydir/[d-z]*.h \
+	$$mydir/cdwrite.c.diff $$mydir/README.session \
+	| gzip -9 > $${mydir}.tar.gz)
+
+

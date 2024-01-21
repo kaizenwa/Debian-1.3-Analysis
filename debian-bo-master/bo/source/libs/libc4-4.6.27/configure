@@ -1,0 +1,394 @@
+#! /bin/sh
+#
+# Changes by H.J.Lu
+# Original version Mitchum Dsouza <m.dsouza@mrc-apu.cam.ac.uk>
+#
+# Simple libc configuration script tested with `bash' and `ksh' and
+# Sun `sh'
+
+# The following two are the ANSI sequences for start and end embolden
+case $TERM in
+vt*|ansi*|con*|xterm*)
+  S=[1m
+  E=[m
+  ;;
+*)
+  S=
+  E=
+  ;;
+esac
+
+# Define some defaults
+TARGET_OS=linux
+HOST_ROOTDIR=/usr
+HOST_BINDIR=${HOST_ROOTDIR}/bin
+TARGET_ROOTDIR=/
+STATIC_SHARED=
+SPEED=fast
+BAD_GCCVERSION="Invalid gcc version"
+LIBGCC=`gcc --print-libgcc-file-name`
+
+# Get the latest nys directory
+NYSDIR="`echo nys* | awk '{print $NF}'`"
+
+if [ -f ./config.in ]; then 
+	 grep = ./config.in | .
+fi
+
+response() {
+	echo -n "$1 [$2] ? " 1> /dev/tty
+	read answer
+	if [ x${answer} = x ]; then
+		echo $2
+	else
+		echo ${answer}
+	fi
+}
+
+getresponse ()
+{
+  OLD_TARGET_MACHINE=${TARGET_MACHINE}
+
+  case ${TARGET_ARCH} in
+  i*86|pentium)
+    TMP=4 
+    ;;
+  *)
+    TMP=m;
+    ;;
+  esac
+  TARGET_ARCH=`response "Build 386, 486 or m68k library code (486 default) 4/3/m" "${TMP}"`
+
+  case i${TARGET_ARCH} in
+  i4)
+    TARGET_MACHINE=i486-linux
+    TARGET_ARCH_486=true;
+    TARGET_ARCH=i386;
+    ;;
+  i3)
+    TARGET_MACHINE=i386-linux
+    TARGET_ARCH_486=false;
+    TARGET_ARCH=i386;
+    ;;
+  im)
+    TARGET_MACHINE=m68k-linux
+    TARGET_ARCH_486=false;
+    TARGET_ARCH=m68k;
+    ;;
+  *)
+    echo Unknown arch: \"${TARGET_ARCH}\".
+    exit 1
+    ;;
+  esac
+
+  TARGET_MACHINE=`response "The target platform" "${TARGET_MACHINE}"`
+  TARGET_OS=`response "The target OS" "${TARGET_OS}"`
+
+  TMP=a
+  STATIC_SHARED=`response "Build targets (static/shared default) s/a" "${TMP}"`
+  case i${STATIC_SHARED} in
+  is)
+    STATIC_SHARED=true
+    ;;
+  *)
+    STATIC_SHARED=
+    ;;
+  esac
+  
+  get_host_rootdir $TARGET_MACHINE
+  HOST_ROOTDIR=`response "Root path to $TARGET_MACHINE related files" "${HOST_ROOTDIR}"`
+  HOST_BINDIR=`response "Bin path to gcc" "${HOST_BINDIR}"`
+  GCCVERSION=`response "The gcc version" "${GCCVERSION}"`
+
+  TMP=f
+  SPEED=`response "Fast build/save space (fast default) f/s" "${TMP}"`
+  case i${SPEED}x in
+  ifx)
+    SPEED=fast
+    ;;
+  *)
+    SPEED=
+    ;;
+  esac
+
+  MAKE=`response "GNU \\\`make' executable" "${MAKE}"`
+  TARGET_ROOTDIR=`response "Root path to installation dirs" "${TARGET_ROOTDIR}"`
+
+  if [ x${NYSDIR} != x ]; then
+  TMP=n
+  NYS=`response "Build a NYS libc from ${NYSDIR} (y default)  y/n" "${TMP}"`
+  case i${NYS}x in
+  iyx)
+    NYS=true
+    ( cd jump/libc-nys; ./genfuncs )
+    ;;
+  *)
+    NYS=
+    ;;
+  esac
+  fi
+}
+
+showdefaults ()
+{
+  echo 
+  echo *******Current defaults********
+  echo
+  if [ ${TARGET_ARCH_486} = "true" ]; then
+    echo "Build ${S}${TARGET_MACHINE}${E} library for ${S}i486${E} running ${S}${TARGET_OS}${E}"
+  else
+    echo "Build ${S}${TARGET_MACHINE}${E} library for ${S}${TARGET_ARCH}${E} running ${S}${TARGET_OS}${E}"
+  fi
+  if [ x${STATIC_SHARED} = x"true" ]; then
+    echo "Build targets are ${S}static and shared libraries only${E}."
+  else
+    echo "Build targets are ${S}static, shared, debug and profile libraries${E}."
+  fi
+  echo "Root path to ${S}${TARGET_MACHINE}${E} related files is ${S}${HOST_ROOTDIR}${E}"
+  echo "Bin path to gcc is ${S}${HOST_BINDIR}${E}"
+  echo "The version of gcc to be used is ${S}${GCCVERSION}${E}"
+  if [ x${SPEED} = x"fast" ]; then
+    echo "Build option is ${S}fast build${E}."
+  else
+    echo "Build option is ${S}save space${E}."
+  fi
+  echo "GNU \`make' executable is ${S}${MAKE}${E}"
+  echo "Root path to installation dirs is ${S}${TARGET_ROOTDIR}${E}"
+  if [ x${NYS} != x -a x${NYSDIR} != x ]; then
+    echo "Build a NYS libc from ${S}${NYSDIR}${E}."
+  fi
+
+  echo
+}
+
+get_gnu_make ()
+{
+  make_list="make gmake gnumake"
+  gf=0
+  v=
+
+  for m in $make_list
+  do
+    $m -v 2> /dev/null | grep GNU > /dev/null 2>&1
+    if [ $? = 0 ]; then
+      gf=1
+      TMP=`$m -v 2> /dev/null | head -1 | grep GNU | cut -f4 -d' '`
+      v="$TMP $v"
+      case $TMP in
+      3.7*|3.8*|3.9*|4*|5*|6*|7*|8*|9*)
+        MAKE=$m
+        return
+       ;;
+      esac
+    fi
+  done
+
+  if [ $gf = 1 ]; then
+    echo GNU make version, $v are found. Need GNU make 3.70 or above.
+  else
+    echo No GNU make is found. Need GNU make 3.70 or above.
+  fi
+  exit 1
+}
+
+get_target_rootdir ()
+{
+  if [ -d /home/linux ]; then
+    TARGET_ROOTDIR=/home/linux
+  fi
+}
+
+get_host_rootdir ()
+{
+  target=$1
+#  LIBGCC=`gcc --print-libgcc-file-name`
+
+  if [ ${LIBGCC} != libgcc.a ]; then
+    position=2
+    TMP=`echo $LIBGCC | cut -f$position -d'/'`
+    HOST_ROOTDIR=
+    HOST_ROOTDIR=$HOST_ROOTDIR/$TMP
+    until [ $TMP = "lib" ]
+    do
+      position=`expr $position + 1`
+      TMP=`echo $LIBGCC | cut -f$position -d'/'`
+      HOST_ROOTDIR=$HOST_ROOTDIR/$TMP
+    done
+    HOST_ROOTDIR=`(cd $HOST_ROOTDIR/..; pwd)`
+    HOST_BINDIR=${HOST_ROOTDIR}/bin
+  fi
+}
+
+get_default_gcc_version ()
+{
+#  LIBGCC=`gcc -b $1 --print-libgcc-file-name`
+
+  if [ ${LIBGCC} != libgcc.a ]; then
+    position=2
+    TMP=`echo $LIBGCC | cut -f$position -d'/'`
+    until [ $TMP = "gcc-lib" ]
+    do
+      position=`expr $position + 1`
+      TMP=`echo $LIBGCC | cut -f$position -d'/'`
+    done
+    position=`expr $position + 2`
+    GCCVERSION=`echo $LIBGCC | cut -f$position -d'/'`
+  else
+    GCCVERSION="${BAD_GCCVERSION}"
+  fi
+}
+
+get_default_gcc_target ()
+{
+#  LIBGCC=`gcc --print-libgcc-file-name`
+
+  if [ ${LIBGCC} != libgcc.a ]; then
+    position=2
+    TMP=`echo $LIBGCC | cut -f$position -d'/'`
+    until [ $TMP = "gcc-lib" ]
+    do
+      position=`expr $position + 1`
+      TMP=`echo $LIBGCC | cut -f$position -d'/'`
+    done
+    position=`expr $position + 1`
+    DEFAULT_GCC_TARGET=`echo $LIBGCC | cut -f$position -d'/'`
+  fi
+}
+
+get_target_info ()
+{
+#  LIBGCC=`gcc --print-libgcc-file-name`
+
+  if [ ${LIBGCC} != libgcc.a ]; then
+    position=2
+    TMP=`echo $LIBGCC | cut -f$position -d'/'`
+    GCC_LIB_DIR=
+    GCC_LIB_DIR=$GCC_LIB_DIR/$TMP
+    until [ $TMP = "gcc-lib" ]
+    do
+      position=`expr $position + 1`
+      TMP=`echo $LIBGCC | cut -f$position -d'/'`
+      GCC_LIB_DIR=$GCC_LIB_DIR/$TMP
+    done
+    TARGET_MACHINE=`(cd $GCC_LIB_DIR; echo *linux*)`
+    if [ xx"${TARGET_MACHINE}"xx != xxxx ]; then
+      if [ `echo $TARGET_MACHINE | wc -w` != 1 ]; then
+	echo More than one Linux targets found:
+	echo "	$TARGET_MACHINE"
+	echo $TARGET_MACHINE | grep $DEFAULT_GCC_TARGET > /dev/null
+	if [ $? = 0 ]; then
+	  TARGET_MACHINE=$DEFAULT_GCC_TARGET
+	else
+	  TARGET_MACHINE=`echo $TARGET_MACHINE | cut -f1 -d ' '`
+	fi
+	echo \"$TARGET_MACHINE\" is chosen.
+      fi
+      TARGET_OS=linux
+      case $TARGET_MACHINE in
+      *486*)
+	TARGET_ARCH_486=true
+	TARGET_ARCH=i386
+	;;
+      *386*)
+	TARGET_ARCH_486=false
+	TARGET_ARCH=i386
+	;;
+      *68*)
+	TARGET_ARCH_486=false
+	TARGET_ARCH=m68k
+	;;
+      *)
+	echo Oops: Unknown target machine "$TARGET_MACHINE".
+	;;
+      esac
+    fi
+  fi
+}
+
+get_host_info ()
+{
+  # First check out who you are.
+  HOST_OS=`uname -s`
+
+  case $HOST_OS in
+  [Ll][Ii][Nn][Uu][Xx])
+    HOST_OS=linux
+    HOST_ROOTDIR=/usr
+    HOST_BINDIR=${HOST_ROOTDIR}/bin
+    TARGET_ROOTDIR=/
+    get_default_gcc_target
+    TARGET_ARCH=`uname -m`
+    case $TARGET_ARCH in
+    *386*)
+     TARGET_ARCH_486=false
+     TARGET_ARCH=i386
+     ;;
+    *486*)
+     TARGET_ARCH_486=true
+     TARGET_ARCH=i386
+     ;;
+    *68*)
+     TARGET_ARCH_486=false
+     TARGET_ARCH=m68k
+     ;;
+    esac
+    ;;
+  *)
+    get_host_rootdir $TARGET_MACHINE
+    get_target_rootdir
+    ;;
+  esac
+}
+
+get_default_gcc_target
+get_target_info
+get_host_info
+get_gnu_make
+get_default_gcc_version $TARGET_MACHINE
+#GCCVERSION=`gcc --version`
+get_host_rootdir $TARGET_MACHINE
+
+showdefaults
+if [ "${GCCVERSION}" = "${BAD_GCCVERSION}" ]; then
+  echo Please provide a valid gcc version: ${S}${BAD_GCCVERSION}${E}!
+  echo
+  ans=n
+else
+  ans=`response "Values correct (y/n)" "y"`
+fi
+
+while [ x${ans} != x -a x${ans} != xy ]
+do
+  getresponse
+  showdefaults
+  if [ "${GCCVERSION}" = "${BAD_GCCVERSION}" ]; then
+    echo Please provide a valid gcc version: ${S}${BAD_GCCVERSION}${E}!
+    echo
+    ans=n
+  else
+    ans=`response "Values correct (y/n)" "y"`
+  fi
+done
+
+{
+  echo STATIC_SHARED="${STATIC_SHARED}"
+  echo MAKE="${MAKE}"
+  echo SPEED="${SPEED}"
+  echo HOST_ROOTDIR="${HOST_ROOTDIR}"
+  echo HOST_BINDIR="${HOST_BINDIR}"
+  echo TARGET_ROOTDIR="${TARGET_ROOTDIR}"
+  echo ifeq \(\$\(ELF\), true\)
+  echo TARGET_MACHINE="${TARGET_MACHINE}elf"
+  echo else
+  echo TARGET_MACHINE="${TARGET_MACHINE}"
+  echo endif
+  echo TARGET_OS="${TARGET_OS}"
+  echo TARGET_ARCH="${TARGET_ARCH}"
+  echo TARGET_ARCH_486="${TARGET_ARCH_486}"
+  echo GCCVERSION="${GCCVERSION}"
+  if [ x${NYS} != x -a x${NYSDIR} != x ]; then
+	echo NYS="${NYS}"
+	echo NYSDIR="${NYSDIR}"
+	echo MAKE="${MAKE} NYS=${NYS}" 
+  fi
+} > config.in

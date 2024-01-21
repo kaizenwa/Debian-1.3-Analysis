@@ -1,0 +1,145 @@
+#!/bin/sh
+
+# Script to debianize a regular source archive
+# This script is to be called from within the source archive
+# If it has one parameter then a native debian archive will be generated
+# and no .orig directory made.
+#
+# Christoph Lameter, <clameter@debian.org> October 10, 1996
+
+function process_file()
+{
+	sed -e "s/#PACKAGE#/$PACKAGE/g" \
+		-e "s/#VERSION#/$VERSION/g" \
+		-e "s/#EMAIL#/$EMAIL/g" \
+		-e "s/#DATE#/$DATE/g" \
+		-e "s&#DOCS#&$DOCS&g" \
+		-e "s&#CONFIGURE#&$CONFIGURE&g" \
+		-e "s&#INSTALL#&$INSTALL&g" \
+		-e "s&#CLEAN#&$CLEAN&g" \
+		-e "s/#USERNAME#/$USERNAME/g"
+}
+
+LIB=/usr/lib/deb-make
+
+# Generate all the values we need
+if [ "$EMAIL" = "" ]; then
+	EMAIL="$USER@`cat /etc/mailname`"
+fi
+echo "Email-Address		: $EMAIL"
+
+DATE="`822-date`"
+echo "Date used		: $DATE"
+
+USERNAME=`awk -F: -vUSER=$USER '$1 == USER { print $5; }' /etc/passwd`
+
+if [ "$USERNAME" = "" -a -x /usr/bin/ypmatch ]; then
+	# Give NIS a try
+	USERNAME=`ypmatch $USER passwd.byname|awk -F: '{ print $5; }'`
+fi
+
+if echo $USERNAME | grep -q "\,"; then
+	X=`expr index "$USERNAME" ","`
+	X=`expr $X - 1`
+	USERNAME=`expr substr "$USERNAME" 1 $X`
+fi
+
+echo "Maintainer		: $USERNAME"
+
+# Analyze the directory name
+NAME=`expr $PWD : '.*/\(.*\)'`
+
+if ! echo $NAME | grep -q "\-"; then
+	echo "Current directory name must be <package>-<version> for debmake to work!"
+	echo "No underscores are allowed!"
+	exit 1
+fi
+
+VERSION=`expr $NAME : '.*-\([^-]*\)'`
+PACKAGE=`expr $NAME : '\(.*\)-[^-]*'`
+
+if expr $PACKAGE : '[a-z][+:a-z0-9-]*$' >/dev/null = 0; then
+	echo "Illegal package name $PACKAGE. Must be lowercase letters and digits, + and : ."
+	exit 1
+fi
+
+echo "Package Name		: $PACKAGE"
+echo "Version			: $VERSION"
+
+echo -ne "\nType of Package (S=Single Binary, M=Multi-Binary, L=Library, X=Abort? s/m/l/x "
+read A
+case $A in
+ s|S|m|M|l|l)
+		;;
+ *)	echo "Abort: Not debianized"
+	exit 1
+esac
+
+PTYPE=`echo $A|tr A-Z a-z`
+
+# Setup the original archive
+if [ "$1" = "" ]; then
+	if [ -d ../$NAME.orig ]; then
+		echo "Skipping copying to $NAME.orig since $NAME.orig exists"
+	else
+		cp -a ../$NAME ../$NAME.orig
+	fi
+fi
+
+# Figure out where documentation is
+DOCS=`ls README* *.README [rR]eadme* *.[rR]eadme [Bb][Uu][Gg][Ss] \
+	*[cC][hH][aA][Nn][Gg][Ee][lL][oO][gG]* *[cC][hH][aA][Nn][Gg][Ee][sS]* \
+	[tT][oO][dD][oO] 2>/dev/null | tr "\\n" " "`
+
+if [ -f configure ]; then
+	CONFIGURE='./configure --prefix=/usr'
+	INSTALL='make install prefix=`pwd`/debian/tmp/usr'
+	CLEAN='make distclean'
+else
+	CONFIGURE=""
+	INSTALL='make install DESTDIR=`pwd`/debian/tmp'
+	CLEAN='make clean'
+fi
+
+# Customize files
+mkdir debian
+cd debian
+# General Files
+X=`(cd $LIB/debian;ls)`
+for i in $X; do
+	process_file <$LIB/debian/$i >$i
+done
+
+# Special Files
+X=`(cd $LIB/debian$PTYPE;ls)`
+for i in $X; do
+	process_file <$LIB/debian$PTYPE/$i >$i
+done
+
+# Variations for the native files.
+if [ "$1" ]; then
+	# Native Files
+	X=`(cd $LIB/native;ls)`
+	for i in $X; do
+		process_file <$LIB/native/$i >$i
+	done
+fi
+
+X="`ls package* 2>/dev/null`"
+if [ "$X" ]; then
+	for i in $X; do
+		mv $i `echo $i|sed -e "s/^package/$PACKAGE/"`
+	done
+fi
+
+chmod a+x rules
+
+if [ "$CONFIGURE" ]; then
+	echo "$PACKAGE debianized. It uses a configure script which probably"
+	echo "means that you do not have to edit the Makefile."
+else
+	echo "$PACKAGE debianized. Please edit the files in the debian directory now"
+	echo "and check that the Makefile puts the binaries into \$DESTDIR and not in /"
+fi
+
+exit 0

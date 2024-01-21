@@ -1,0 +1,129 @@
+#
+# tktests/Makefile.in  --
+#
+# Makefile for Extended Tcl Tk tests.
+# 
+#------------------------------------------------------------------------------
+# Copyright 1992-1995 Karl Lehenbauer and Mark Diekhans.
+#
+# Permission to use, copy, modify, and distribute this software and its
+# documentation for any purpose and without fee is hereby granted, provided
+# that the above copyright notice appear in all copies.  Karl Lehenbauer and
+# Mark Diekhans make no representations about the suitability of this
+# software for any purpose.  It is provided "as is" without express or
+# implied warranty.
+#------------------------------------------------------------------------------
+# $Id: Makefile.in,v 5.0 1995/07/25 06:00:40 markd Rel $
+#------------------------------------------------------------------------------
+#
+SHELL = /bin/sh
+
+#------------------------------------------------------------------------------
+# Autoconfig defines that can be overridden in Config.mk
+
+CC          = @CC@
+srcdir      = @srcdir@
+srcbasedir  = @srcbasedir@
+bldbasedir  = @bldbasedir@
+VPATH       = @srcdir@
+prefix      = @prefix@
+exec_prefix = @exec_prefix@
+ARCH        = @TCL_ARCH@
+XINCLUDES   = @XINCLUDES@
+LIBS        = @LIBS@ @MATH_LIBS@
+XLIBSW      = @XLIBSW@
+
+#------------------------------------------------------------------------------
+# Include user-editable defines.
+
+@MAKEINCLUDE@ @MAKEQUOTE@${bldbasedir}/Config.mk@MAKEQUOTE@
+
+#------------------------------------------------------------------------------
+
+LIBTK        = ${TK_UCB_LIB}/libtk.a
+LIBTKX       = ../tksrc/libtkx.a
+LIBTCL       = ${TCL_UCB_LIB}/libtcl.a
+LIBTCLX      = ../src/libtclx.a
+
+LDLIBS = -L../tksrc -ltkx -L${TK_UCB_LIB} -ltk ${XLIBSW} \
+	 -L../src -ltclx -L${TCL_UCB_LIB} -ltcl ${LIBS} ${XLDLIBS}
+
+CC_FLAGS = ${CPPFLAGS} ${XCFLAGS} ${CFLAGS} \
+           -I${srcbasedir}/src -I${bldbasedir}/src -I${srcbasedir}/tksrc \
+           -I${TK_UCB_SRC} -I${TCL_UCB_SRC} ${XINCLUDES}
+
+LD_FLAGS =  ${XLDFLAGS} ${XCFLAGS} ${CFLAGS}
+
+.c.o:
+	${CC} ${CC_FLAGS} -c $<
+
+#------------------------------------------------------------------------------
+
+OBJS= tktest.o tkSquare.o
+
+#------------------------------------------------------------------------------
+# Compile the test proram.  It is generated from the Tk test program with 
+# a sed script.
+#
+
+all: tktest runtest
+
+tktest: tktest.o tkSquare.o ${LIBTKX_A} ${LIBTK_A} ${LIBTCLX_A} ${LIBTCL_A}
+	${CC} ${LD_FLAGS} tktest.o tkSquare.o ${LDLIBS} -o tktest || \
+	    (rm -f tktest; exit 1)
+
+tktest.o: tktest.c
+
+tkSquare.o: tkSquare.c
+
+tktest.c: ${TK_UCB_SRC}/tkTest.c
+	rm -f tktest.c	
+	echo '#include "../src/tclXconf.h"' >tktest.c
+	sed -e 's/Tcl_Init(/TclX_Init(/' \
+	    -e 's/Tk_Init(/TkX_Init(/' \
+	    -e 's/Tk_Main(/TkX_Main(/' \
+	    -e '/tcl_RcFileName =/d' ${TK_UCB_SRC}/tkTest.c >>tktest.c
+
+tkSquare.c: ${TK_UCB_SRC}/tkSquare.c
+	rm -f tkSquare.c	
+	echo '#include "../src/tclXconf.h"' >tkSquare.c
+	cat ${TK_UCB_SRC}/tkSquare.c >>tkSquare.c
+
+#------------------------------------------------------------------------------
+# Generate scripts to point the TCLX_LIBRARY/TKX_LIBRARY environment variable
+# at the local master directories so tktest can be run.
+
+runtest:
+	@echo '#!/bin/sh'                                           >runtest
+	@echo "TCLX_LIBRARY=${bldbasedir}/tclmaster"               >>runtest
+	@echo "TKX_LIBRARY=${bldbasedir}/tkmaster"                 >>runtest
+	@echo "TCL_PROGRAM=${bldbasedir}/src/tcl"                  >>runtest
+	@echo "TESTWISH=${bldbasedir}/tktests/tktest"              >>runtest
+	@echo "export TCLX_LIBRARY TKX_LIBRARY TCL_PROGRAM"        >>runtest
+	@echo "if [ \$$# = 0 ]"                                    >>runtest
+	@echo "then"                                               >>runtest
+	@echo "    exec \$$TESTWISH"                               >>runtest
+	@echo "else"                                               >>runtest
+	@echo "    exec \$$TESTWISH \"\$$@\""                      >>runtest
+	@echo "fi"                                                 >>runtest
+	chmod a+rx runtest
+
+#------------------------------------------------------------------------------
+# Run the UCB and Extended Tcl tests.
+
+test: all
+	echo "cd ${TK_UCB_SRC}/tests; source all; exit" | ./runtest -n tktest
+
+#------------------------------------------------------------------------------
+
+clean:
+	-rm -f ${OBJS} tktest.c tkSquare.c tktest runtest
+
+#------------------------------------------------------------------------------
+# Restore to the distributed state.
+
+distclean: clean
+	rm -f Makefile
+
+# Disable Sun's parallel make, it doesn't get the dependencies right.
+.NO_PARALLEL:

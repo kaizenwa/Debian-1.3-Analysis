@@ -1,0 +1,286 @@
+;;; -*-Emacs-Lisp-*-
+;;;
+;;; $Id: TM-MK,v 7.49 1997/02/11 11:31:05 morioka Exp $
+;;;
+
+(defun config-tm ()
+  (let (prefix exec-prefix)
+    (setq prefix (car command-line-args-left))
+    (and prefix
+	 (not (string-equal "NONE" prefix))
+	 (progn
+	   (defvar PREFIX prefix)
+	   (setq command-line-args-left (cdr command-line-args-left))
+	   )
+	 (setq exec-prefix (car command-line-args-left))
+	 (progn
+	   (defvar EXEC_PREFIX exec-prefix)
+	   ;;(setq command-line-args-left (cdr command-line-args-left))
+	   )))
+  (load-file "TM-CFG")
+  (load-file "../emu/EMU-ELS")
+  (load-file "../tl/TL-ELS")
+  (load-file "../bitmap-mule/BITMAP-ELS")
+  (load-file "../mu/MU-ELS")
+  (load-file "../mel/MEL-ELS")
+  (load-file "TM-ELS")
+  (load-file "../tm-mh-e/TMH-ELS")
+  (load-file "../tm-mail/TMAIL-ELS")
+  (load-file "../tm-vm/TM-VM-ELS")
+  (princ (format "PREFIX=%s\tEXEC_PREFIX=%s\n" PREFIX EXEC_PREFIX))
+  )
+
+(defun directory= (dir1 dir2)
+  (string= (file-name-as-directory dir1)(file-name-as-directory dir2))
+  )
+
+(defun make-mime-setup (lisp-dir
+			tl-path bitmap-path mu-path mel-path tm-path)
+  (if (file-exists-p "mime-setup.el")
+      (delete-file  "mime-setup.el")
+    )
+  (let ((buf (let (vc-follow-symlinks)
+	       (find-file "mime-setup.el.in")
+	       )))
+    (goto-char (point-min))
+    (re-search-forward "^;;; Code:\n" nil t)
+    (setq buffer-read-only nil)
+
+    ;; generate tl setting
+    (let ((tl-absolute-path (expand-file-name tl-path lisp-dir)))
+      (if (MEMBER tl-absolute-path default-load-path
+		  :test (function directory=))
+	  (insert "\n(require \'tl-misc)")
+	(insert
+	 (format "
+
+\(let ((load-path
+       (cons \"%s\"
+             load-path)))
+  (require \'tl-misc)
+  )
+\(add-path \"%s\")" tl-absolute-path tl-path))
+	))
+    
+    ;; generate MU load-path setting
+    (and bitmap-modules
+	 (or (MEMBER (expand-file-name bitmap-path lisp-dir)
+		     default-load-path
+		     :test (function directory=))
+	     (insert (format "\n(add-path \"%s\")" bitmap-path))
+	     ))
+    
+    ;; generate MU load-path setting
+    (or (MEMBER (expand-file-name mu-path lisp-dir)
+		default-load-path
+		:test (function directory=))
+	(insert (format "\n(add-path \"%s\")" mu-path))
+	)
+    
+    ;; generate MEL load-path setting
+    (or (MEMBER (expand-file-name mel-path lisp-dir)
+		default-load-path
+		:test (function directory=))
+	(insert (format "\n(add-path \"%s\")" mel-path))
+	)
+    
+    ;; generate tm load-path setting
+    (or (MEMBER (expand-file-name tm-path lisp-dir)
+		default-load-path
+		:test (function directory=))
+	(insert (format "\n(add-path \"%s\")" tm-path))
+	)
+    
+    ;; generate tm external-methods path setting
+    (or (string= METHOD_DIR exec-directory)
+	(insert
+	 (format "\n
+(defvar mime-viewer/external-progs%s
+  \"*Directory containing tm external methods.\")
+
+(add-to-list 'exec-path mime-viewer/external-progs)
+
+(let ((paths (parse-colon-path (getenv \"PATH\"))))
+  (or (member mime-viewer/external-progs paths)
+      (setenv \"PATH\"
+	      (mapconcat (function identity)
+			 (append paths (list mime-viewer/external-progs))
+			 path-separator))
+      ))
+"
+		 (let ((dir (file-relative-name METHOD_DIR data-directory)))
+		   (if (< (length dir) (length METHOD_DIR))
+		       (concat "\n  (expand-file-name \""
+			       dir "\" data-directory)")
+		     (setq dir (file-relative-name METHOD_DIR
+						   (expand-file-name "~/")))
+		     (if (< (length dir) (length METHOD_DIR))
+			 (concat "\n  (expand-file-name \"~/"
+				 dir "\")")
+		       (concat " \"" METHOD_DIR "\"")
+		       )))
+		 ))
+	)
+    (write-file "mime-setup.el")
+    ))
+
+(defun compile-tm ()
+  (config-tm)
+  (print load-path)
+  (require 'mel-u)
+  (require 'tm-edit)
+  (load "rmailsum")
+  (require 'tm-mh-e)
+  (make-mime-setup LISPDIR
+		   TL_RELATIVE_DIR BITMAP_RELATIVE_DIR
+		   MU_RELATIVE_DIR MEL_RELATIVE_DIR
+		   TM_KERNEL_RELATIVE_DIR)
+  (compile-elisp-modules emu-modules		"../emu")
+  (compile-elisp-modules tl-modules		"../tl")
+  (compile-elisp-modules bitmap-modules		"../bitmap-mule")
+  (compile-elisp-modules mu-modules-to-compile	"../mu")
+  (compile-elisp-modules mel-modules		"../mel")
+  (compile-elisp-modules tm-modules-to-compile	".")
+  (compile-elisp-modules tm-mh-e-modules	"../tm-mh-e")
+  (compile-elisp-module  'mime-setup		".")
+  (require 'gnus)
+  (cond ((featurep 'gnus-ems)
+	 (load "../gnus-mime/Gnus-MIME-ELS")
+	 (compile-elisp-modules gnus-mime-modules-to-compile "../gnus-mime")
+	 )
+	(t
+         (load "../tm-gnus/TGNUS-ELS")
+	 (compile-elisp-modules tm-gnus-modules-to-compile "../tm-gnus")
+	 ))
+  (compile-elisp-modules tm-mail-modules	"../tm-mail")
+  (compile-elisp-modules tm-vm-modules-to-compile "../tm-vm")
+  )
+
+(defun install-tm ()
+  (config-tm)
+  (princ (format "%s\n" emacs-version))
+  (install-elisp-modules emu-modules	 "../emu"	EMU_DIR)
+  (install-elisp-modules tl-modules	 "../tl"	TL_DIR)
+  (install-elisp-modules bitmap-modules "../bitmap-mule" BITMAP_DIR)
+  (install-elisp-modules mu-modules	 "../mu"	MU_DIR)
+  (install-elisp-modules mel-modules	 "../mel"	MEL_DIR)
+  (install-elisp-modules tm-modules	 "."		TM_KERNEL_DIR)
+  (install-elisp-modules tm-mh-e-modules "../tm-mh-e"	TM_MHE_DIR)
+  ;;(install-tm-gnus)
+  (require 'gnus)
+  (cond ((featurep 'gnus-ems)
+	 (load "../gnus-mime/Gnus-MIME-ELS")
+	 (install-elisp-modules gnus-mime-modules
+				"../gnus-mime" Gnus_MIME_DIR)
+	 )
+	(t
+	 (load "../tm-gnus/TGNUS-ELS")
+	 (install-elisp-modules tm-gnus-modules "../tm-gnus" TM_GNUS_DIR)
+	 ))
+  (install-elisp-modules tm-mail-modules "../tm-mail"	TM_MAIL_DIR)
+  (install-elisp-modules tm-vm-modules	 "../tm-vm"	TM_VM_DIR)
+  (install-elisp-modules '(mime-setup)	 "."	SETUP_FILE_DIR)
+  )
+
+(defun install-execs ()
+  (config-tm)
+  (install-files BINS	    BIN_SRC_DIR    BIN_DIR)
+  (install-files METHODS METHOD_SRC_DIR METHOD_DIR nil t)
+  )
+
+
+(defun update-xemacs-source ()
+  (setq LISPDIR (expand-file-name "../lisp" data-directory))
+  (load-file "TM-CFG")
+  (setq EMU_DIR TL_DIR)
+  (setq SETUP_FILE_DIR TM_KERNEL_DIR)
+  (load-file "../emu/EMU-ELS")
+  (load-file "../tl/TL-ELS")
+  (load-file "../mu/MU-ELS")
+  (load-file "../mel/MEL-ELS")
+  (load-file "TM-ELS")
+  (load-file "../tm-mh-e/TMH-ELS")
+  (load-file "../tm-mail/TMAIL-ELS")
+  (load-file "../tm-vm/TM-VM-ELS")
+  
+  (copy-file "mime-setup.el.in" "mime-setup.el" t t)
+  (set-file-modes "mime-setup.el" (+ (* 6 64) (* 4 8) 4))
+  (compile-elisp-modules emu-modules		"../emu")
+  (compile-elisp-modules tl-modules		"../tl")
+  (compile-elisp-modules mu-modules-to-compile	"../mu")
+  (compile-elisp-modules mel-modules		"../mel")
+  (compile-elisp-modules tm-modules-to-compile	".")
+  (compile-elisp-modules tm-mh-e-modules	"../tm-mh-e")
+  (compile-elisp-module  'mime-setup		".")
+  (require 'gnus)
+  (load "../gnus-mime/Gnus-MIME-ELS")
+  (compile-elisp-modules gnus-mime-modules-to-compile "../gnus-mime")
+  (compile-elisp-modules tm-mail-modules	"../tm-mail")
+  (compile-elisp-modules tm-vm-modules-to-compile "../tm-vm")
+  
+  (install-elisp-modules emu-modules	 "../emu"	EMU_DIR)
+  (install-elisp-modules tl-modules	 "../tl"	TL_DIR)
+  (install-elisp-modules mu-modules	 "../mu"	MU_DIR)
+  (install-elisp-modules mel-modules	 "../mel"	MEL_DIR)
+  (install-elisp-modules tm-modules	 "."		TM_KERNEL_DIR)
+  (install-elisp-modules tm-mh-e-modules "../tm-mh-e"	TM_MHE_DIR)
+  (install-elisp-modules gnus-mime-modules "../gnus-mime" Gnus_MIME_DIR)
+  (install-elisp-modules tm-mail-modules "../tm-mail"	TM_MAIL_DIR)
+  (install-elisp-modules tm-vm-modules	 "../tm-vm"	TM_VM_DIR)
+  (install-elisp-modules '(mime-setup)	 "."	SETUP_FILE_DIR)
+
+  (setq METHOD_DIR (expand-file-name "../lib-src" data-directory))
+  (install-files METHODS METHOD_SRC_DIR METHOD_DIR nil t)
+  
+  (install-file "sinfo.dtd" "../sinfo"
+		(expand-file-name "../etc/sgml" data-directory)
+		nil t)
+  
+  (install-files '("tm-edit-en.sgml"	"tm-edit-en.texi"
+		   "tm-edit-ja.sgml"	"tm-edit-ja.texi"
+		   "tm-en.sgml"		"tm-en.texi"
+		   "tm-ja.sgml"		"tm-ja.texi"
+		   "tm-view-en.sgml"	"tm-view-en.texi"
+		   "tm-view-ja.sgml"	"tm-view-ja.texi"
+		   )
+		 "doc"
+		 (expand-file-name "../man/tm" data-directory)
+		 nil t)
+  (install-files '("tm-edit-en.info"	"tm-edit-ja.info"
+		   "tm-en.info"		"tm-ja.info"
+		   "tm-view-en.info"	"tm-view-ja.info"
+		   )
+		 "doc"
+		 (expand-file-name "../info" data-directory)
+		 nil t)
+  (install-files '("gnus-mime-en.sgml"	"gnus-mime-en.texi"
+		   "gnus-mime-ja.sgml"	"gnus-mime-ja.texi"
+		   )
+		 "../gnus-mime"
+		 (expand-file-name "../man/tm" data-directory)
+		 nil t)
+  (install-files '("gnus-mime-en.info"	"gnus-mime-ja.info")
+		 "../gnus-mime"
+		 (expand-file-name "../info" data-directory)
+		 nil t)
+  (install-files '("tm-mh-e-en.sgml"	"tm-mh-e-en.texi"
+		   "tm-mh-e-ja.sgml"	"tm-mh-e-ja.texi"
+		   )
+		 "../tm-mh-e"
+		 (expand-file-name "../man/tm" data-directory)
+		 nil t)
+  (install-files '("tm-mh-e-en.info"	"tm-mh-e-ja.info")
+		 "../tm-mh-e"
+		 (expand-file-name "../info" data-directory)
+		 nil t)
+  (install-files '("tm-vm_en.texi")
+		 "../tm-vm"
+		 (expand-file-name "../man/tm" data-directory)
+		 nil t)
+  (install-files '("tm-vm_en.info")
+		 "../tm-vm"
+		 (expand-file-name "../info" data-directory)
+		 nil t)
+  )
+
+;;; TM-MK ends here

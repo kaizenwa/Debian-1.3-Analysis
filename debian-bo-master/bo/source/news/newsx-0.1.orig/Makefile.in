@@ -1,0 +1,222 @@
+#  NOTE: make changes in Makefile.in and run configure
+#  $Id: Makefile.in,v 1.35 1996/11/22 12:31:52 src Exp $
+#
+#  Makefile for newsx
+#  must be root to make install
+# 
+#  copyright 1996 Egil Kvaleberg, egilk@sn.no
+#  the GNU General Public License applies
+#
+VERSION=@VERSION@
+VERDATE=@VERDATE@
+
+SHELL=/bin/sh
+
+# Installation bin and man directories:
+prefix=@prefix@
+INSTALL_BIN=/usr/lib/newsbin
+INSTALL_MAN=@mandir@/man8
+
+# Everything from here should be handled by configure...
+
+# Main news directory:
+NEWSCTL=@NEWSCTL@
+
+# News spool directory:
+NEWSSPOOL=@NEWSSPOOL@
+
+# Default to INN or Cnews:
+INN_MODE=@INN_MODE@
+
+# News user:
+NEWSUSER=@NEWSUSER@
+
+# C compiler:
+CC=@CC@
+
+# C compilation flags:
+CDEFINES=@DEFS@
+CFLAGS=@CFLAGS@ ${CDEFINES}
+#BUG: CFLAGS= -O3 -g -Wall
+# for linux and olsd style a.out format:
+#CFLAGS= -b i486-linuxaout
+
+# Loader flags:
+LDFLAGS=@LDFLAGS@
+
+# Libraries needed
+LIBS=@LIBS@
+
+# Everything from this point on probably doesn't need changing...
+
+# Name of this directory:
+NEWSX_VER=newsx-${VERSION}
+
+NEWSX_TGZ=${NEWSX_VER}.tar.gz
+
+SOURCE = main.c doit.c auth.c despool.c putarticle.c pull.c getarticle.c \
+	 history.c hash.c lock.c sys.c active.c msgid.c socket.c server.c \
+	 exec.c logmsg.c telnet.c script.c title.c
+
+OBJECT = $(SOURCE:%.c=%.o)	    
+
+MANIFEST = README newsx.man HISTORY description README.in \
+	   ${SOURCE} tune.h common.h nntp.h proto.h news.h \
+	   mkcrc.c mkcrc.rc crc.h sock.h \
+	   Makefile.in configure config.h.in configure.in check.rc \
+	   tiny.server newsxstat.rc \
+	   dbz.c dbz.h
+
+MANIFEST_FULL = IAFA-PACKAGE ${MANIFEST} COPYING newsx newsx.8 Makefile
+
+####
+
+all: newsx newsx.8
+
+newsx: ${OBJECT}
+	${CC} ${CFLAGS} ${LDFLAGS} ${OBJECT} -o newsx ${LIBS}
+
+${OBJECT}: 
+
+dep:
+	rm -f .depend
+	make .depend
+
+.depend:
+	echo '# Program dependencies' >.depend
+	gcc -MM ${SOURCE} -DHAVE_SOCKET=1 >>.depend
+
+# include a dependency file if one exists
+ifeq (.depend,$(wildcard .depend))
+include .depend
+endif
+
+#Makefile: Makefile.in
+#	./configure
+#	make
+
+Makefile: config.status Makefile.in
+	$(SHELL) config.status
+
+config.status: configure
+	$(SHELL) config.status --recheck
+
+.depend: version.h
+
+version.h: Makefile
+	@(echo "/* NOTE: don't change this file, see Makefile.in */";\
+	  echo "#define VERSION   \"${VERSION}\"";\
+	  echo "#define NEWSCTL   \"${NEWSCTL}\"";\
+	  echo "#define NEWSSPOOL \"${NEWSSPOOL}\"";\
+	  echo "#define INN_MODE  ${INN_MODE}") > $@
+	@echo "Version ${VERSION}"
+
+newsx.8: Makefile newsx.man
+	@(echo ".\\\" NOTE: don't change this file. it is auto-generated.";\
+	  echo ".\\\" make changes in 'newsx.man' and/or 'Makefile.in'.";\
+	  echo ".ds a ${NEWSSPOOL}";\
+	  echo ".ds b ${INSTALL_BIN}";\
+	  echo ".ds c ${NEWSCTL}";\
+	  echo ".ds u ${NEWSUSER}";\
+	  echo ".TH NEWSX 8 \"${VERDATE}\" \"V${VERSION}\"";\
+	  cat newsx.man ) > $@
+	@echo "#$@"
+
+newsx.lsm: Makefile description ${NEWSX_TGZ}
+	@(printf "                %8d %s\n" `ls -l ${NEWSX_TGZ} \
+				   | colrm 1 33 | colrm 10 21`;\
+	  printf "                %8d %s\n" `ls -l newsx.lsm \
+				   | colrm 1 33 | colrm 10 21`) > files.tmp
+	@(echo "Begin3";\
+	  echo "Title:          newsx";\
+	  echo "Version:        ${VERSION}";\
+	  echo "Entered-date:   ${VERDATE}";\
+	  cat description;\
+	  echo "Primary-site:   sunsite.unc.edu /pub/Linux/system/News";\
+	  cat files.tmp;\
+	  echo "Alternate-site: ftp.sn.no       /user/egilk";\
+	  echo "Original-site:  ftp.sn.no       /user/egilk";\
+	  echo "Copying-policy: GPL";\
+	  echo "End") > $@
+	@rm -f files.tmp
+	@echo "#$@"
+
+IAFA-PACKAGE: Makefile description
+	@(echo "Title:          newsx";\
+	  echo "Version:        ${VERSION}";\
+	  cat description;\
+	  echo "Maintained-at:  sunsite.unc.edu /pub/Linux/system/News";\
+	  echo "                ftp.sn.no       /user/egilk";\
+	  echo "Copying-policy: Freely Redistributable";\
+	  echo "End") > $@
+	@echo "#$@"
+
+mostlyclean: 
+	-rm -f *.o core check.stdout check.stderr check.folder check.log
+	-rm -f -r check.spool
+
+clean: mostlyclean
+	-rm -f version.h newsx.8 .depend config.cache newsx mkcrc
+
+distclean: clean
+	rm -f Makefile config.status config.log config.h stamp-config
+
+maintainer-clean: distclean
+	rm -f configure config.h.in
+
+configure: configure.in 		## Comment-me-out in distribution
+	autoconf			## Comment-me-out in distribution
+config.h.in: configure.in		## Comment-me-out in distribution
+	autoheader			## Comment-me-out in distribution 
+
+##crc.h: mkcrc.rc
+##	./mkcrc.rc >crc.h
+
+crc.h: mkcrc.c
+	${CC} mkcrc.c -o mkcrc
+	./mkcrc >crc.h
+
+# TAGS:
+# info:
+# dvi:
+# check: BUG:self tests
+
+shar:
+	shar -V -s -l60 -onewsx.shar ${MANIFEST}
+
+dist: ${NEWSX_TGZ} newsx.lsm rcs
+
+rcs:
+	ci -l -m"${VERSION}" ${MANIFEST}
+
+${NEWSX_TGZ}: ${MANIFEST_FULL}
+	strip newsx
+	mv Makefile Makefile.tmp
+	printf "all:\n\t./configure\n\tmake\n" > Makefile
+	tar -czf ${NEWSX_TGZ} -C .. $(MANIFEST_FULL:%=${NEWSX_VER}/%)
+	rm Makefile
+	mv Makefile.tmp Makefile
+	# ln -f ${NEWSX_TGZ} newsx.tar.gz
+
+install: install_pgm install_dir
+
+install_dir: 
+	if [ ! -d ${NEWSSPOOL}/in.hosts ]; then \
+	    echo Creating directory ${NEWSSPOOL}/in.hosts ;\
+	    mkdir ${NEWSSPOOL}/in.hosts ;\
+	    chown ${NEWSUSER} ${NEWSSPOOL}/in.hosts ;\
+	fi
+
+install_pgm: ${INSTALL_BIN}/newsx ${INSTALL_MAN}/newsx.8
+
+${INSTALL_BIN}/newsx: newsx
+	install -s newsx $@
+	chown ${NEWSUSER} $@
+
+${INSTALL_MAN}/newsx.8: newsx.8
+	install newsx.8 $@
+
+uninstall: 
+	-rm -f ${INSTALL_BIN}/newsx
+	-rm -f ${INSTALL_MAN}/newsx.8
+

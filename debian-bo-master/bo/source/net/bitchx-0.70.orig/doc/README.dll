@@ -1,0 +1,94 @@
+
+BitchX dll functions.
+
+We can now create dll modules for BitchX. currently we can insert commands,
+alias's, new ctcp's, variables and numerics.
+Currently only systems that have the libdl library are really supported with 
+this, but others will be supported as time and access to the systems comes
+up.
+
+Depending on the type we are inserting will determine which header files
+will need to be included in the module source.
+
+	alias		alias.h
+	ctcp		ctcp.h
+	commands	edit.h
+	variable	vars.h
+	numeric		numbers.h
+
+This is as well as the following includes irc.h and struct.h at the very
+least.
+
+An example module pkga.c is included that adds one of each type to BitchX.
+All internal BitchX functions are available for your use because we compile
+with -rdynamic as the LDFLAGS. Current variables can be modified from
+your dll module as well.
+
+The following structures are implemented and need to be filled out by you
+the module writer. In ALL cases the dll function will override an internal
+of the same name. Just like a script. Note that only the first matching
+function will actually execute. Once a module has been loaded there is no
+current method of deleting the module. Maybe something for the future. The
+method used to insert the dll functions may be changed to make it somewhat
+easier to accomplish. This won't however effect the current method.
+
+IrcVariable  	/set variable_name value
+	name		name of this variable
+	string		string value of this variable
+	integer		char,bool or int value of this variable
+	type    	BOOL_TYPE_VAR(integer), STR_TYPE_VAR(string),
+			CHAR_TYPE_VAR(integer), INT_TYPE_VAR(integer)
+	func		function to be called when modifying this variable
+			void (*func) _((Window *, char *, int))
+				current window, char * val, int	value	
+
+CtcpEntryDll	/ctcp nick page
+	name		name of ctcp
+	flag		action modifiers of CTCP_SPECIAL, CTCP_REPLY,
+			CTCP_INLINE, CTCP_NOLIMIT, CTCP_TELLUSER
+			these values can be or'd (|) together.
+	desc		what does this ctcp do. (For Clientinfo)
+	func		function to call when we recieve this ctcp
+		char * (*func) _((CtcpEntryDll *, char *, char *,char *))
+		current ctcp dll value, from, to, rest of args
+	repl		function to call for a reply
+		char * (*func) _((CtcpEntryDll *, char *, char *,char *))
+		current ctcp dll value, from, to, rest of args
+
+BuiltInDllFunctions  $misc()
+	name		name of this function.
+	func		function to call.
+		char *(*func)(char *)
+	NOTE: 	all functions must return a malloc string of either "" or some
+		value. NEVER return NULL.
+
+NumericFunction    on 001
+	name		name of this numeric. Can be anything, used when
+			inserting into the list.
+	number		the actual number of this numeric
+	func		the function to call with this numeric.
+		int (*func)(char *, char *, char **)
+			from, to, arglist
+		return 1 if you want the real numeric to run
+		return 0 if you don't.
+
+IrcCommandDll    /command
+	name		name of this command
+	server_func	what to send to the server
+	func		function to call.
+		void (*func) (IrcCommandDll *, char *, char *, char *)
+			current dll *, command, args, and subargs.
+
+As a user please remember this. ALL of these functions can add various
+commands to BitchX. So please be VERY cautious in what modules you load. It
+would be possible for someone to take over your irc client very easily or
+make you execute commands that maybe you didn't want to (ie rm -rf ~/).
+Modules cannot be unloaded once loaded as well.
+
+Currently SunOS, Linux Alpha and Linux should
+compile easily. HPUX may also compile using this source.
+
+
+							Colten Edwards
+							panasync
+

@@ -1,0 +1,211 @@
+# procmailrc for AKS
+#
+# Basic philosophy:
+#
+#  1. Mail is assumed to be MH-based
+#  2. Drop all daemon-based mail in +admin
+#  3. If mail is from NOACKS list, drop in +inbox
+#  4. If mail is to ME, and not an ack, and an ack hasn't
+#     been sent recently, generate an auto-ack
+#  5. Scan mail for junk & drop
+#  6. Leave any remaining mail in +other
+#  7. If any maildrops fail (file system full, drop in $DEFAULT, then $FAILDROP)
+#  
+SHELL=/bin/sh
+
+PROCDIR=/eci/procmail
+BIN=$PROCDIR/bin
+LIB=$PROCDIR/lib
+
+FORMAIL=$BIN/formail
+PROCMAIL=$BIN/procmail
+
+PATH=$PATH:/usr/local/bin:$BIN
+MAILDIR=$HOME/Mail
+LOGFILE=$MAILDIR/Log
+
+# Where mail gets placed as a *last* resort
+FAILDROP=/fs/dokoka/aks/failed.maildrop
+
+# Mail folders to drop things into
+INBOX=inbox/.
+ADMIN=admin/.
+OTHER=other/.
+
+MY_ADDR=aks@hub.ucsb.edu
+MY_NAMES="(aks|alan|stebbens|a.stebbens|alan.stebbens)"
+FROMSIG="Alan's Mailer-Daemon <$MY_ADDR>"
+
+STAFF='(aks|toad|em|mce|stu|stefan|theodora|bruno)'
+REQUEST='((ccse|request|help|problem)(-(dist|staff))?)'
+NOACKUSERS='(rog|tel|probert|movie)'
+NOACKS="($STAFF|$REQUEST|$NOACKUSERS)$POST_ADDR_SPAN"
+
+VERBOSE=off
+
+# Do the duplicate mail check
+INCLUDERC=$LIB/dupcheck.rc
+
+# Pull in the standard header patterns
+INCLUDERC=$LIB/headers.rc
+
+# Define a pattern matching UCSB mail address (also matches user@host; ie:
+# no domain)
+FROM_UCSB="$FROM.*\.ucsb\.edu"
+
+# Detect loops right away -- and stop them
+:0:
+* $ ^X-Loop: *$MY_ADDR
+$INBOX
+    :0e:
+    $DEFAULT
+	:0e:
+	$FAILDROP
+
+# If the mail is to me, do some special things
+:0
+* ^TO(aks)
+{
+    # Check on special mail
+    :0:
+    * ^Subject:.*eci[12] fsupdate
+    $ADMIN
+	:0e:
+	$DEFAULT
+	    :0e:
+	    $FAILDROP
+
+    ############################################
+    # Check for any commands on the Subject line
+    ############################################
+    INCLUDERC=$LIB/commands.rc
+
+    # Don't ack our staff or people who we don't want to send acks to
+    :0:
+    * $ $FROM$NOACKS
+    $INBOX
+	:0e:
+	$DEFAULT
+	    :0e:
+	    $FAILDROP
+
+    # Do any autoacknowledgements
+    INCLUDERC=$LIB/ackmail.rc
+
+    # If the mail is directly to me, -> +inbox
+    :0:
+    * $ $TO(aks)([,@]|$)
+    $INBOX
+	:0e:
+	$DEFAULT
+	    :0e:
+	    $FAILDROP
+
+    # If the mail is to an administrative alias, -> +admin
+    :0:
+    * $ ^TO($REQUEST|$STAFF)$POST_ADDR_SPAN
+    $ADMIN
+	:0e:
+	$DEFAULT
+	    :0e:
+	    $FAILDROP
+
+    # Otherwise drop it all in default personal box
+    :0: 
+    $INBOX
+	:0e:
+	$DEFAULT
+	    :0e:
+	    $FAILDROP
+
+}
+
+# We're having mail loop problems when a system goes "south" (loses
+# its network connection
+
+:0h:
+* ^To: *(MAILER-DAEMON|root|Postmaster)@engineering.ucsb.edu
+* ^From: *(MAILER-DAEMON|root|Postmaster)@engineering.ucsb.edu
+* ^Subject:.*(Returned mail: Deferred|Unable to return to sender)
+/dev/null
+
+# Trash the PLP errors
+:0h:
+* ^From:.*\(PLP printer daemon\)
+* ^Subject:.*(e1|e2|cad)(ps1|ps2)(-(eci2|axle|wheel))? printer job
+/dev/null
+
+# Now back to our regularly scheduled filtering
+
+:0:
+* ^TO(hostmaster@hub)
+$ADMIN
+    :0e:
+    $DEFAULT
+	:0e:
+	$FAILDROP
+
+# One of the tagged subjects
+:0:
+* ^Subject: *(Re: *)?\[UCSB
+$ADMIN
+    :0e:
+    $DEFAULT
+	:0e:
+	$FAILDROP
+
+# If it is mail to one of the networking lists, place in +inbox
+:0:
+* ^TO(cnc(-(info|bbone|policy|outreach))?)@
+$INBOX
+    :0e:
+    $DEFAULT
+	:0e:
+	$FAILDROP
+
+# It is not mail specifically to me; must be a candidate for
+# junkmail filtering..
+INCLUDERC=$HOME/.junkmailrc
+
+# If it is mail to one my lists, put into +other
+:0:
+* ^TO(((help|info|bug)-)?gnu-(emacs|utils|([0-9a-zA-Z]+-)?sources)|\
+	mh-users|procmail|SmartList|MailAgent|Majordomo(-(users|workers))?|\
+	list-managers|com-priv-digest-dist|amd-workers|\
+	perl-users|sybase-l|(info-)?ietf(-announce(-request)?)?)@
+$OTHER
+    :0e:
+    $DEFAULT
+	:0e:
+	$FAILDROP
+
+# If the mail is to an administrative alias, -> +admin
+:0:
+* $ ^TO($REQUEST|$STAFF)$POST_ADDR_SPAN
+$ADMIN
+    :0e:
+    $DEFAULT
+	:0e:
+	$FAILDROP
+
+# If mail is from some kind of daemon, drop it in the +admin folder
+:0:
+* ^FROM_MAILER
+$ADMIN
+    :0e:
+    $DEFAULT
+	:0e:
+	$FAILDROP
+
+# Drop any remaining into my $INBOX
+
+:0:
+$INBOX
+    :0e:
+    $DEFAULT
+	:0e:
+	$FAILDROP
+
+:
+    ? test -f foo
+    /dev/null

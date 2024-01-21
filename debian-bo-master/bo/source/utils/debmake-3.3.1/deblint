@@ -1,0 +1,193 @@
+#!/bin/sh
+#
+# Script to check up on a binary .deb file if it follows policy
+# Christoph Lameter, <clameter@debian.org> January 30, 1997
+
+if [ "$1" = "" ]; then
+	echo "Must specify package name"
+	exit 1
+fi
+
+if expr "$1" : "/.*" >/dev/null; then
+        PACKAGE=$1
+else
+        PACKAGE=`pwd`/$1
+fi
+
+function first()
+{
+	echo "$1"
+}
+
+mkdir /tmp/$$
+cd /tmp/$$
+
+# unpack package
+if ! ar x $PACKAGE; then
+	echo "Cannot unpack $PACKAGE"
+	rm -rf /tmp/$$
+	exit 1
+fi
+
+if [ ! -f debian-binary ]; then
+	echo "$PACKAGE is not a debian binary package"
+	rm -rf /tmp/$$
+	exit 1
+fi
+
+if ! tar zpxf data.tar.gz; then
+	echo "No files found in $PACKAGE"
+	rm -rf /tmp/$$
+	exit 1
+fi
+
+rm data.tar.gz
+mkdir DEBIAN
+if ! (cd DEBIAN;tar zpxf ../control.tar.gz) ; then
+	echo "No control-files found in $PACKAGE"
+	rm -rf /tmp/$$
+	exit 1
+fi
+
+rm control.tar.gz debian-binary
+
+# Package Processing begins
+if [ ! -f DEBIAN/control ]; then
+	echo "No control file found. Aborting ...."
+	rm -f /tmp/$$
+	exit 1
+fi
+
+# Check suid bits
+X=`find . -type f -perm +6000`
+if [ "$X" ]; then
+	for i in $X; do
+		echo "Warning: file using suid bits bypassing suidmanager `ls -l $i`"
+	done
+fi
+
+
+# Check up on stuff in etc directory
+if [ -d etc ]; then
+	if [ -f DEBIAN/conffiles ]; then
+		for i in `find etc -type f`; do
+			if ! grep -q $i DEBIAN/conffiles; then
+				echo "Warning: File $i provided in binary but is not listed as a conffile!"
+			fi
+		done
+	else
+		echo "Warning: Files installed in etc and no conffile!"
+	fi
+fi
+
+if [ -f DEBIAN/conffiles ]; then
+	for i in `cat DEBIAN/conffiles`; do
+		if [ ! -e ./$i ]; then
+			echo "Warning: Configuration file $i not provided in binary package!"
+		fi
+	done
+fi
+
+if [ ! -d usr/doc ]; then
+	echo "Warning: No documentation provided!"
+else
+	if [ ! -f `first usr/doc/*/changelog*` ]; then
+		echo "Warning: /usr/doc/package/changelog* missing!"
+	fi
+	if [ ! -f `first /usr/doc/*/copyright*` ]; then
+		echo "Warning: /usr/doc/package/copyright missing!"
+	fi
+fi
+
+	
+# Check for libraries provided by the package
+SHLIBS=`find lib usr/lib usr/X11R6/lib -type f -name "lib*.so.*" 2>/dev/null`
+if [ "$SHLIBS" != "" ]; then
+	for i in $SHLIBS; do
+		LIBRARY=`expr $i : ".*/\(.*\)\.so\..*"`
+		VERSION=`expr $i : ".*/.*\.so\.\(.*\)"`
+		MAJOR=`expr $VERSION : "\([0-9]*\)\."`
+		LIBSTUB=`expr $i : "\(.*\/.*\.so\)\..*"`
+		if [ ! -L $LIBSTUB.$MAJOR ]; then
+			echo "Warning: ELF Library link $LIBRARY.so.$MAJOR missing"
+		fi
+		if [ ! -f DEBIAN/shlibs ]; then
+			echo "Error: ELF Library provided and no shlibs file!"
+		else
+			if ! grep -q "$LIBARY$MAJOR" DEBIAN/shlibs; then
+				echo "Error: ELF Library $i provided and not included in shlibs file!"
+			fi
+		fi
+	done
+fi
+
+# Check executables
+X=`find . -type f -perm +111| tr "\n" " "`
+if [ "$X" ]; then
+	for i in $X; do
+		case "`file $i`" in
+			*ELF*)
+				if ! file $i|grep -q "stripped"; then
+					echo "Warning: Unstripped executable $i"
+				fi
+				;;
+			*script*)
+#				echo "$i Script"
+				;;
+			*perl*)	
+#				echo "$i PERL"
+				;;
+			*)	echo "$i WARNING: Strange executable: `file $i`"
+		esac
+		# Check if manpages exist
+ 		BINPATH="`expr "$i" : "\./\(.*\)/.*"`"
+		BINNAME="`expr "$i" : "\./.*/\(.*\)"`"
+		case "$BINPATH" in
+			DEBIAN|etc/cron*|etc/init.d)	SECTION=""
+				;;
+			sbin|usr/sbin)	SECTION="8"
+				;;
+			usr/X11R6/bin)	SECTION="1"
+				;;
+			bin|usr/bin)	SECTION="1"
+				;;
+			usr/games)	SECTION="6"
+				;;
+			*)	SECTION=""
+				echo "Warning: Executable in an unusual location $BINPATH/$BINNAME"
+				;;
+		esac
+		if [ "$SECTION" ]; then
+			Y=`find usr/man usr/X11R6/man -name "$BINNAME.*" 2>/dev/null`
+			if [ "$Y" = "" ]; then
+				echo "Warning : Executable $BINPATH/$BINNAME has no manpage!"
+			fi
+		fi
+	done
+fi
+
+# Check Symlinks
+for i in `find . -type l`; do
+	DIRECTORY=`expr $i : "\(.*\)/[^/]*"`
+	NAME=`expr $i : ".*/\([^/]*\)"`
+	LINKVAL=`ls -l $DIRECTORY/$NAME | awk '{ print $11;}'`
+	if [ ! -e $DIRECTORY/$LINKVAL ]; then
+		echo "Error: Dangling symlink $i pointing to $LINKVAL"
+	fi
+done
+
+# Some checks
+if [ -d usr/local ]; then
+	echo "Warning: usr/local directory exists in $PACKAGE!"
+fi
+
+# Check used ids in the package
+X=`find . -uid +199 -o -gid +199`
+if [ "$X" -a `id -u` = 0 ]; then
+	for i in $X; do
+		echo "Warning: Files $i has illegal user or group id in package $PACKAGE"
+	done
+fi
+
+rm -rf /tmp/$$
+exit 0

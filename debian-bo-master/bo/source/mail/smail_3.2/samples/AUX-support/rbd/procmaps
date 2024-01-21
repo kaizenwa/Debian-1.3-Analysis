@@ -1,0 +1,80 @@
+#!/bin/sh
+# @(#) procmaps - Process incoming Usenet maps
+# @(#) procmaps,v 1.1 1994/10/18 08:52:56 nm4 Exp
+#
+# Bob Denny - Tue Sep 24 14:14:29 1991
+#
+# This script handles the processing of incoming Usenet maps. The Cnews
+# system on this machine "feeds" the map articles (using the 'f' method)
+# to a fake host named mapsink, using /usr/spool/uumaps/work/batch as the
+# file to receive the article names to "feed" to mapsink. The effect is
+# that, whenever any map articles are received, there will be a "batch"
+# file in /usr/spool/uumaps/work. This file contains a list of netnews
+# articles which contain the updated SHAR map sources.
+#
+# If we find a 'batch' file there, it indicates that a map update has
+# arrived. First, we use getmap(8) to extract the articles from the news
+# base and unshar the map source, placing them into /usr/spool/uumaps.
+# NOTE: getmap(8) takes a snapshot of the list, so it is protected from 
+# the case where maps arrive during this process. Next we use mkpath(8)
+# to rebuild the paths database used by smail for routing, and mkuuwho(8)
+# to rebuild the database used by the uuwho command.
+#
+# This is designed to be run daily by cron. It exits with success if
+# there are no new maps to process.
+#
+# Bob Denny - Fri Oct 11 09:25:16 1991
+#	Clear getmap.log after sending via mail. Rearrage order of
+#	info in mail message.
+# Bob Denny - Fri Nov  1 09:04:05 1991
+#	Change POSTMASTER to denny
+# Bob Denny - Wed Dec 18 07:36:02 1991
+#	Fix wildcard ref to uuwho to eliminate "." (no longer dbm-style)
+# Bob Denny - Wed Jan 29 16:58:48 1992
+#	Don't fail map rebuild if getmap failed. Fairly often articles
+#	are cancelled and that causes getmap to report an error. Just
+#	go on and rebuild the map, but send a message detailing the
+#	getmap failure.
+#
+POSTMASTER=denny
+
+if [ ! `whoami` = root ]
+then
+	echo "Sorry, $0 must be run by user root"
+fi
+
+MAPS=/usr/spool/uumaps
+WORK=/usr/spool/uumaps/work
+BIN=/usr/local/etc
+MAPDB=/usr/local/lib/smail
+
+if [ ! -f $WORK/batch ] ; then
+	exit 0				# No problem if no work to do!
+fi
+
+> $WORK/getmap.log			# Clear old contents of log
+/bin/su news -c "umask 113 ; $BIN/getmap"
+if [ -f $WORK/getmap.err ] ; then
+	/usr/bin/mailx -s "Getmap failed" $POSTMASTER <$WORK/getmap.err
+######	exit 1
+fi
+
+$BIN/mkpath 1>/tmp/procmap$$ 2>&1
+$BIN/mkuuwho 1>/dev/null 2>&1
+chmod 0644 $MAPDB/paths* $MAPDB/uuwho*
+
+/usr/bin/mailx -s "UUCP Map rebuilt" $POSTMASTER <<EOF
+ 
+At `date` the UUCP maps and uuwho database were rebuilt.
+
+The following is the transcript of map article retrieval (getmap):
+
+`cat $WORK/getmap.log`
+
+The following is the output of mkpath:
+
+`cat /tmp/procmap$$`
+EOF
+
+rm /tmp/procmap$$
+

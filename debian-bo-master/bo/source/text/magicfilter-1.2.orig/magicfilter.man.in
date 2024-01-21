@@ -1,0 +1,391 @@
+.TH MAGICFILTER 8 "Version 1.2" "March 1996" \" -*- nroff -*-
+.SH NAME
+magicfilter \- automatic configurable printer filter
+.SH SYNOPSIS
+.B magicfilter
+config-file [\-c] [\-n user] [\-h host] [\-iindent] [\-\-debug] [other-options]
+.SH DESCRIPTION
+.B magicfilter
+is an extensible and customizable automatic printer filter.  It
+selects an appropriate conversion technique for the input data by
+seeking for
+.IR "magic numbers" ,
+and then utilizing the appropriate conversion utility.
+.PP
+.B magicfilter
+is primarily intended for use as the ``input filter'' by the
+.B lpd
+print spooler.  The options accepted by
+.B magicfilter
+are exactly the ones passed to the input filter by
+.BR lpd .
+.SS OPTIONS
+Typically
+.B magicfilter
+will be invoked by
+.B lpd
+and hence provided the right options automatically.  This list is
+included for reference only.
+.PP
+Note that only the
+.I \-n
+and
+.I \-h
+options may have spaces between the option letter and the option value.
+.TP
+.I \-c
+Copy the input to the output without any conversion whatsoever (used
+by
+.B lpd
+whenever the
+.I \-l
+option is passed to the
+.B lpr
+program).
+.TP
+.I "\-nuser, \-n user"
+The login name of the user who submitted the job.  Available to
+subfilters as
+.BR $LPUSER .
+.TP
+.I "\-hhost, \-h host"
+The host on which the job was submitted.  Available to subfilters as
+.BR $LPHOST .
+.TP
+.I "\-iindent"
+A numeric option passed by
+.BR lpd ;
+can be set by the user by the
+.I \-i
+option to
+.BR lpr.
+Although nominally used for the amount of indentation requested,
+.B magicfilter
+makes it available to subfilters for any useful purpose as
+.BR $LPINDENT .
+.TP
+.I "\-Cclassname"
+LPRng class (priority) name.  Available to subfilters as
+.BR $LPCLASS .
+.TP
+.I "\-Fformat"
+Format letter (passed by LPRng only).  When used as input filter (if)
+this will be
+.IR f ,
+when used as other filter types it will be the option character
+corresponding to this filter.  Available to subfilters as
+.BR $LPFORMAT .  
+.TP
+.I "\-Jjobname"
+The name of the printer job (passed by LPRng only).  Available to
+subfilters as
+.BR $LPJOB .
+.TP
+.I "\-Kcopies"
+Copy count (passed by LPRng only).  Available to subfilters as
+.BR $LPCOPIES .
+.TP
+.I "\-Lbannername"
+User name from the banner page (passed by LPRng only).  Available to
+subfilters as
+.BR $BANNERNAME .
+.TP
+.I "\-Pprinter"
+Printer name (passed by LPRng only).  Available to subfilters as
+.BR $PRINTER .
+.TP
+.I "\-Qqueuename"
+Spool queue name (passed by LPRng only).  Available to subfilters as
+.BR $LPQUEUE .
+.TP
+.I "\-Raccountinfo"
+Accounting information (passed by LPRng only).  Available to
+subfilters as 
+.BR $LPACCT .
+.TP
+.I "\-Zoptions"
+LPRng ``Z-options''.  The LPRng
+.B lpr
+program supports a
+.I \-Z
+option, which can be used to pass arbitrary information to the printer
+filters.  Available to subfilters as
+.BR $ZOPT .
+.TP
+.TP
+.I \-\-debug
+Write the name of each facility invoked (together with any options) to
+standard error.  This can be useful for debugging complicated
+configuration files.
+.TP
+.I "other options"
+Any other options, such as the
+.IR \-w ,
+.IR \-l ,
+.IR \-x ,
+and
+.I \-y 
+options typically passed by
+.B lpd
+are ignored.
+.SS RUNNING MAGICFILTER FROM LPD
+To run
+.B magicfilter
+from
+.B lpd
+it should be entered as one of the filters in the
+.I /etc/printcap
+file.  Typically, it will be the input filter (if).  Since most
+version of
+.B lpd
+do not accept arguments entered as part of the filter name, typically
+the filter name entered into the
+.I /etc/printcap
+file will simply be the name of the configuration file, which is set
+executable and starts with the line:
+.PP
+.B #! XXX_BINDIR_XXX/magicfilter
+.PP
+Most UNIX kernels will then be able to treat the configuration file
+itself as if it was the actual program.
+.PP
+For systems which do not support the ``#!-hack'', the filter set in
+the if entry should point to
+.B magicfilter
+directly, and the accounting file (af) entry should point to the
+configuration file.  This, however, is a less general, and hence less
+desirable solution.
+.PP
+This version of
+.B magicfilter
+supports the enhanced 
+.B lpd
+included with the LPRng package from
+.IR dickory.sdsu.edu .
+.SS THE CONFIGURATION FILE
+The configuration file is used by
+.B magicfilter
+to redirect various types of data to the various conversion utilities.
+The configuration file is printer-specific, and often system-specific,
+depending on the available conversion programs.  For example, a system
+which has GhostScript installed would be able to print PostScript to a
+non-PostScript printer, whereas other systems typically would not.
+
+The configuration file contains a sequence of lines of the form:
+.PP
+.I "offset	magic	facility"
+.PP
+where the
+.I offset
+represents the location of the indentification string in the data
+format,
+.I magic
+represents the identification string itself,
+.I facility
+represents the type of action to take.
+
+Blank lines and lines with a hash mark (#) as the first nonblank
+character are ignored.  A line may be continued onto the next line by
+ending the line in a backslash (\e).
+
+The
+.I offset
+is a nonnegative integer, which can be represented either in decimal
+form (default), octal form (preceded by
+.IR 0 ),
+or hexadecimal form (preceded by
+.IR 0x ).
+
+The
+.I magic
+is a string of characters, which may include C-style \e-escape
+sequences.  In addition, the sequence \e? can be used to represent a
+``wildcard'' byte.  If the string includes spaces, the spaces have to
+be preceded by a backslash, or the entire string must be enclosed in
+double quotation marks.
+
+For ambiguous matches, the first match is used.  Hence, the most
+specific match should always be placed first in the file.  In
+addition, the last line may be of the form:
+.PP
+\fBdefault\fR	\fIfacility\fR
+.PP
+which designates a default action to be used in case no other action
+matches.  This will typically be the action for plain text.
+.SS FACILITIES
+.B magicfilter
+provides the following options for the
+.I facility
+field in the configuration file:
+.TP
+\fBcat\fR [\fIprefix\fR [\fIsuffix\fR]]
+Copy the input to the output without any conversion, like the
+.B cat
+command.  If the optional
+.I prefix
+and
+.I suffix
+strings are specified, they are transmitted to the printer immediately
+before and after the data itself.  The
+.I prefix
+and
+.I suffix
+strings are specified in the same way as the
+.I magic
+string (except that the wildcard sequence \e? is not permitted), and like
+the
+.I magic
+sequence can contain any control character, including nulls (\e0).  To
+specify a
+.I suffix
+without a
+.IR prefix ,
+specify an empty
+.I prefix
+string enclosed in double quotes (i.e. "").
+.TP
+\fBtext\fR [\fIprefix\fR [\fIsuffix\fR]] 
+Copy the input to the output, but add carriage return characters
+before every line feed and form feed character in the file, and a line
+feed-form feed sequence at end of file.
+The
+.I prefix
+and
+.I suffix
+arguments are treated the same way as for the
+.B cat
+facility; the
+.IR suffix ,
+if present, is added after the final line feed-form feed sequence.
+.TP
+\fBpostscript\fR
+Same as the
+.B text
+facility, except add an ASCII EOT (Ctrl-D) character to the end of the
+data.  This lets a PostScript printer know that the end of the job has
+been reached.  This is functionally equivalent to the command
+.TP
+.I " "
+\fBtext\fR "" \e004
+.TP
+\fBignore\fR
+Ignore the job; do not provide any output whatsoever.
+.TP
+\fBreject\fR \fImessage\fR
+Same as the
+.B ignore
+facility, but attempt to send an email message to the user who
+submitted the job to inform that a job has been rejected and why.
+.TP
+\fBfilter\fR \fIcommand\fR
+Run the given
+.IR command ,
+feeding it the input data, and sending the output data to the printer.
+The environment variables
+.BR LPUSER ,
+.BR LPHOST ,
+and
+.B LPINDENT
+is set to the values of the user, host and indent options passed to
+.BR magicfilter .
+Since the
+.I command
+is fed to
+.I /bin/sh
+it may contain shell special characters, and the sequences
+.BR $LPUSER ,
+.BR $LPHOST ,
+and
+.B $LPINDENT
+can be used to access the values of the passed environment variables.
+If the
+.B lpd
+daemon on the system is LPRng, the following environment variables are also
+available, see the
+.B OPTIONS
+section for details:
+.BR LPCLASS ,
+.BR LPFORMAT ,
+.BR LPJOB ,
+.BR LPCOPIES ,
+.BR BANNERNAME ,
+.BR PRINTER ,
+.BR LPQUEUE ,
+.BR LPACCT ,
+and
+.BR ZOPT .
+.TP
+\fBpipe\fR \fIcommand\fR
+Same as the
+.B filter
+facility, except that the output data is fed back into
+.B magicfilter
+for reprocessing.  This is used for external filter programs which
+themselves do not produce a format that the printer can accept, but
+which can be futher processed to obtain such a format.
+.TP
+\fBffilter\fR \fIcommand\fR
+.sp -0.5
+.TP
+\fBfpipe\fR \fIcommand\fR
+Same as the
+.B filter
+and
+.B pipe
+facilities, respectively, except that the input is written to a
+temporary file before being fed to the filter program given by
+.IR command .
+This is useful for programs which require seekable input, such as
+.BR dvips ,
+or which need to do multiple passes over an input file, such as
+.BR grog .
+The environment variable
+.B FILE
+is set to the name of the temporary file (and, like the other ones, it
+can be accessed on the command line as
+.BR $FILE ).
+.SH HINTS
+Using the
+.B pipe
+facility together with
+.B zcat
+or
+.B gunzip
+lets you transparently print compressed files.
+.PP
+The
+.B pbmplus
+or
+.B netpbm
+collections of image conversion utilities contain a large number of
+very useful external filter programs.
+.PP
+You will probably want to examine the sample configuration files
+included with the
+.B magicfilter
+distribution before creating your own.
+.SH BUGS
+Some data formats cannot be easily identified by a simple fixed-offset
+magic number check.
+.PP
+Providing large offsets can cause
+.B magicfilter
+to take up lots of memory.  Fortunately, large offsets for magic
+numbers are pretty much unheard of.
+.PP
+Currently, there is no protection against the
+.B pipe
+or
+.B fpipe
+facilities going into an infinite loop.
+.PP
+.SH AUTHOR
+H. Peter Anvin <hpa@zytor.com>
+.SH SEE ALSO
+.BR printcap (5),
+.BR lpr (8),
+.BR dvips (1),
+.BR grog (1),
+.BR gs (1),
+.BR gzip (1),
+.BR troff (1).

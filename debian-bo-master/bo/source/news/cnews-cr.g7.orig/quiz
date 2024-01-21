@@ -1,0 +1,557 @@
+#! /bin/sh
+PATH=:/bin:/usr/bin
+
+# configuration variables to remember for next time
+vars='newsuid newsgid newsarts newsov newsctl
+	newsbin newspath newsumask newsconfig newscrisis newsmaster
+	addrsize fake storeval faststdio fakehdrs ranlib make include
+	cc copts ldopts postlibs uucptype dftype dfdirs
+	archive spacelow nfsgroup server rbin bin faststrchr sftype'
+# where to remember them, by default
+memory=conf/quiz.def
+
+cat <<!
+This interactive command will set up control files needed to build
+and install C News.  It will not actually build or install anything
+itself, so feel free to abort and start again.
+
+You probably need your system manuals handy.  You definitely need pencil
+and paper handy, for taking notes.
+
+When a question is asked in the form \`How are you [okay]? ', the
+answer in brackets is what you will get if you just hit RETURN.
+(If you want to give an empty string as the answer, type a single
+\`-' instead.)  If you type a line starting with \`!', the rest of
+the line will be run as a shell command, and the question will be
+asked again.
+!
+
+ask=conf/ask
+yesno=conf/yesno
+notinlist=conf/notinlist
+chmod +x $ask $yesno $notinlist conf/useanswers
+
+case $# in
+0)	;;
+*)	memory="$1"	;;
+esac
+if test -r $memory
+then
+	echo
+	tmp=`$yesno 'Do you want to use your previous answers as defaults' no`
+	case "$tmp" in
+	yes)	echo
+		echo 'Picking up defaults, from last run...'
+		. $memory
+		echo 'got them'
+		;;
+	esac
+fi
+
+cat <<!
+
+C News wants to keep most of its files under a uid which preferably
+should be all its own.  Its programs, however, can and probably should
+be owned by another user, typically the same one who owns most of the
+rest of the system.  (Note that on a system running NFS, any program
+not owned by "root" is a gaping security hole.)
+!
+newsuid=`$ask 'What user id should be used for news files' ${newsuid-news}`
+newsgid=`$ask 'What group id should be used for news files' ${newsgid-news}`
+
+cat <<!
+
+You have to decide the locations, in the file system, of four major
+parts of C News:  the article tree, the overview files (which may be
+in the article tree, or may be elsewhere), the control files, and the
+programs.  These locations are known, within much of the software, by
+the names of the environment variables used to hold them.  There are
+some traditional choices, not always the most reasonable in retrospect,
+that some reader software may depend on.
+
+purpose		variable	traditional location	reasonable location
+-------		--------	--------------------	-------------------
+article tree	NEWSARTS	/usr/spool/news		/var/news
+overview files	NEWSOV		/usr/spool/news		/var/news
+control files	NEWSCTL		/usr/lib/news		/etc/news
+programs	NEWSBIN		/usr/lib/newsbin	/usr/libexec/news
+
+!
+newsarts=`$ask 'Where should the article tree go' ${newsarts-/var/news}`
+newsov=`$ask 'Where should overview files go' ${newsov-/var/news}`
+newsctl=`$ask 'Where should control files go' ${newsctl-/etc/news}`
+newsbin=`$ask 'Where should programs go' ${newsbin-/usr/libexec/news}`
+
+case "$newspath" in
+'')	pathok=no	;;
+*)	echo
+	echo "Is   $newspath"
+	echo 'the correct path to follow to find standard programs on your'
+	pathok=`$yesno 'system' yes`
+	;;
+esac
+
+case "$pathok" in
+no)	newspath='/bin:/usr/bin'
+	echo
+	echo 'C News by default assumes that all normal Unix programs can be'
+	echo 'found in /bin or /usr/bin.  Modern systems mostly have messed'
+	echo 'this up, sometimes pretty badly, and other directories like'
+	echo '/usr/ucb or /usr/contrib/bin often must be searched to find'
+	echo 'programs which one would think would be standard.'
+	while :
+	do
+		echo 'Is there any other directory which should be searched'
+		more=`$yesno 'to find standard programs on your system' no`
+		case "$more" in
+		no)	break	;;
+		esac
+		dir=`$ask 'What is the full name of the directory' /urk`
+		bef=`$yesno 'Should it go after (as opposed to before) the others' yes`
+		case "$bef" in
+		no)	newspath="$dir:$newspath"	;;
+		yes)	newspath="$newspath:$dir"	;;
+		esac
+	done
+	;;
+esac
+
+cat <<!
+
+C News normally uses a umask of 022, turning off only the others-write and
+group-write bits in the permissions of files it creates.  (The correspondence
+between bits and number is:  rwx = 421, so turning off group-write bits and
+all others-access bits would be a mask of 027, for example.)  Usually
+a umask of 002 or 022 is appropriate.
+!
+newsumask=`$ask 'What umask should C News use' ${newsumask-022}`
+case "$newsumask" in
+0*)	;;
+*)	newsumask="0$newsumask"	;;
+esac
+
+echo
+echo 'The shell files that are everywhere in C News want to pick up their'
+echo 'configuration parameters (mostly, the last few questions you have'
+echo 'answered) from a file at a known location; this is very hard to avoid'
+echo 'unless you play tricks with environment variables (see documentation).'
+echo 'Where should the shell configuration file be'
+newsconfig=`$ask 'located' ${newsconfig-$newsctl/bin/config}`
+
+cat <<!
+
+C News wants to mail some kinds of trouble and status reports.  These are
+divided into urgent reports (something went badly wrong) and non-urgent
+reports (routine status info).  The mailing addresses for these should
+probably be system mailboxes, rather than those of specific people, so you
+won't have to change the software when you get a new administrator.
+!
+newscrisis=`$ask 'Where should C News mail urgent reports' ${newscrisis-newscrisis}`
+newsmaster=`$ask 'Where should C News mail non-urgent reports' ${newsmaster-newsmaster}`
+
+cat <<!
+
+C News has libraries for "small" address spaces (16 bits) and "big"
+ones (preferably 32 bits, but anything rather bigger than 16).
+!
+while :
+do
+	addrsize=`$ask 'Which best describes your system' ${addrsize-big}`
+	case "$addrsize" in
+	big|small)	break	;;
+	esac
+	echo 'Sorry, no such library is supplied.'
+done
+
+cat <<!
+
+Systems vary in whether certain library functions and system calls
+are present.  C News contains reasonably-portable versions of the
+possibly-missing library functions, and fake versions of the
+possibly-missing system calls, but it needs to know which are missing.
+!
+newfake=
+mightfake='fcntl fgetline getopt gettimeofday memcpy mkdir putenv
+	remove rename strchr strerror strspn symlink'
+for fn in $mightfake
+do
+	has=`$notinlist "$fake" $fn.o`
+	tmp=`$yesno "Does your system have  $fn()" $has`
+	case "$tmp" in
+	no)	newfake="$newfake $fn.o"	;;
+	esac
+done
+if test " `$notinlist "$newfake" memcpy.o`" != " yes"
+then
+	newfake="$newfake memchr.o memcmp.o memset.o"
+fi
+if test " `$notinlist "$newfake" strchr.o`" != " yes"
+then
+	newfake="$newfake strrchr.o"
+fi
+if test " `$notinlist "$newfake" strspn.o`" != " yes"
+then
+	newfake="$newfake strcspn.o strpbrk.o strtok.o"
+fi
+
+cat <<!
+
+We strongly, repeat STRONGLY, recommend that all news processing
+(as opposed to reading) be done on the machine that has the disks.
+NFS's imitation of the Unix filesystem semantics is too sloppy for
+reliable processing.  Keeping processing local also speeds it up,
+and permits C News to take some shortcuts.
+!
+tmp=`$notinlist "$fake" fsync.o`
+tmp=`$yesno 'Will processing be done over NFS' $tmp`
+case "$tmp" in
+no)	newfake="$newfake fsync.o"	;;
+esac
+
+cat <<!
+
+The news software uses an indexing package to maintain an index into
+its history file.  Originally this was the old Version Seven "dbm".
+Nowadays the "dbz" package, which is specialized for news (and runs
+much faster, with much smaller files) is normally used.  Everything
+using the news database has to be compiled with the same package, as
+they are generally not file-compatible.
+!
+has=`$notinlist "$fake" dbz.o`
+tmp=`$yesno 'Do you want to use the "dbz" package' $has`
+case "$tmp" in
+no)	echo 'Presumably you want to use the dbm library or some local'
+	echo 'equivalent, then.  You will need to include appropriate'
+	echo 'filenames or compiler options when asked about libraries'
+	echo 'a bit later.  Be warned that support for non-dbz indexes'
+	echo 'is increasingly poor, and you may have to work around'
+	echo 'dbz-specific assumptions in the installation procedure.'
+	newfake="$newfake dbz.o"	# make dbm look like dbz
+	has=`$notinlist "$fake" dbmclose.o`
+	tmp=`$yesno 'Does your dbm/dbz have a dbmclose() function' $has`
+	case "$tmp" in
+	no)	newfake="$newfake dbmclose.o"	;;
+	esac
+	echo 'Does the store() function in your dbm/dbz return a'
+	storeval=`$yesno 'value (some old dbms did not)' ${storeval-yes}`
+	case "$storeval" in
+	no)	echo 'You will need to modify libfake/dbz.c/dbzstore() not'
+		echo 'to return the nonexistent value of store().'
+		;;
+	esac
+	;;
+esac
+
+fake="$newfake"
+
+cat <<!
+
+Some old systems have implementations of the Standard I/O library ("stdio")
+in which fgets, fputs, fread, and fwrite are quite slow.  We supply versions
+of these functions which are faster; they are compatible with most old
+AT&T-derived stdios.  (They tend not to work on modern systems, but modern
+stdio implementations are usually respectably fast.)  They can be a major
+performance win for C News.  There is a fairly thorough compatibility check
+run before a commitment is made to use our speedups; as far as we know, if
+the test works, the functions do.
+!
+faststdio=`$yesno 'Do you want to use our stdio speedups' ${faststdio-no}`
+
+has=`$notinlist "$fake" strchr.o`
+case "$has" in
+yes)	echo
+	echo 'The strchr() function is usually slower than in-line C code'
+	echo 'when small strings are involved, unless your compiler is very'
+	echo 'clever and can generate in-line code for strchr().  Is your'
+	faststrchr=`$yesno 'compiler that good (okay to guess)' ${faststrchr-no}`
+	;;
+esac
+
+newfakehdrs=
+#if test " `$notinlist "$newfake" ftime.o`" != " yes"
+#then
+#	newfakehdrs="$newfakehdrs sys/timeb.h"
+#fi
+newfakehdrs="$newfakehdrs sys/timeb.h"
+if test " `$notinlist "$newfake" gettimeofday.o`" != " yes"
+then
+	newfakehdrs="$newfakehdrs sys/time.h"
+fi
+if test " `$notinlist "$newfake" fcntl.o`" != " yes"
+then
+	newfakehdrs="$newfakehdrs fcntl.h"
+fi
+echo
+echo 'Some systems have header files that others lack, and C News'
+echo 'is prepared to fake missing ones.'
+mightfakehdrs='string.h stdlib.h stddef.h'
+for h in $mightfakehdrs
+do
+	has=`$notinlist "$fakehdrs" $h`
+	tmp=`$yesno "Does your system have an ANSI-C-conforming <$h>" $has`
+	case "$tmp" in
+	no)	newfakehdrs="$newfakehdrs $h"	;;
+	esac
+done
+fakehdrs="$newfakehdrs"
+
+cat <<!
+
+Very old Unix systems needed the order of object modules in a library
+chosen very carefully.  V7 introduced "ranlib" which removes the need
+for this.  Many modern systems have the same facility built into "ar"
+(look for the "symdef" or "symbol table" feature in the "ar" manual page)
+so ranlib is not needed.  (Caution:  some SCO systems reportedly have
+a ranlib, but use it only for cross-compiling, not for native programs.)
+C News can cope with either (if you have neither, you're in trouble).
+!
+ranlib=`$yesno 'Does your system use ranlib' ${ranlib-no}`
+
+cat <<!
+
+Usually "make" is named just "make", but sometimes there is more than
+one version on a system.
+!
+make=`$ask 'What is the name of the make to be used' ${make-make}`
+case "$make" in
+make)	;;
+*)	echo "You might also have to change the 'MAKE=make' line in the"
+	echo "top-level makefile."
+	;;
+esac
+
+cat <<!
+
+C News relies heavily on being able to put an "include" command in
+a makefile, so that the contents of another file is automatically
+inserted there when make runs.  The syntax for this varies.  The
+possibilities for including a file named "../include/config.make" are:
+
+	svr4	include ../include/config.make
+	bsd	.include "../include/config.make"
+	other	something else
+	noway	make has no such feature
+
+Sun systems use the svr4 syntax, as does GNU make.
+!
+while :
+do
+	include=`$ask 'Which one is appropriate' ${include-bsd}`
+	case "$include" in
+	svr4|bsd)	break	;;
+	other)	echo "You will have to modify conf/makeinc appropriately"
+		echo "before running make."
+		include=svr4
+		break
+		;;
+	noway)	echo "conf/maker is an imitation make that fudges this on"
+		echo "the fly; it may suffice.  It's not well tested yet."
+		break
+		;;
+	esac
+	echo "*** no such choice available"
+done
+
+echo
+echo 'Historically the C compiler is named "cc", but this is not true on'
+echo 'some systems, and on others there are several different C compilers.'
+echo '"Make" usually has a default C compiler, but you may want another.'
+case "$cc" in
+'')	tmp=no	;;
+*)	tmp=yes	;;
+esac
+tmp=`$yesno "Do you want to use a compiler other than make's default" $tmp`
+case "$tmp" in
+yes)	cc=`$ask 'What is the name of the C compiler to be used' ${cc-cc}`
+	;;
+*)	cc=
+	;;
+esac
+
+echo
+echo 'Historically the only normal compilation option needed for most'
+echo 'programs is -O, but again compilers, especially newer ones, differ.'
+echo '(NOTE:  many 386/486 compilers miscompile dbz if -O is used!)'
+copts="`$ask 'What options should be given to the compiler' \"${copts--O}\"`"
+
+echo
+echo 'The final linking ("ld") step of compiling might need an option,'
+echo 'such as -n or -i, to produce the preferred form of executable file.'
+echo 'On most modern systems the default is right.  What options, if any,'
+ldopts="`$ask 'should be given for linking' \"${ldopts-}\"`"
+
+echo
+echo 'On unusual systems it may be necessary to link C News programs with'
+echo 'libraries other than the usual C library.  These can be specified as'
+echo 'either full pathnames or -l... options.  What libraries, in addition'
+echo 'to the one(s) picked up automatically by the compiler, should be used'
+postlibs="`$ask 'when linking C News' \"${postlibs-}\"`"
+
+echo
+echo 'C News tries to limit the backlog of news batches spooled up for'
+echo 'transmission to a site, to control use of disk space.  To do this,'
+echo 'it needs to be able to determine the length of the queue of news'
+echo 'batches for a particular site.  This is UUCP-version-dependent.'
+echo 'There is a good chance that you will have to customize the "queuelen"'
+echo 'program.  C News knows about several versions:'
+echo '	svr4	System V Release 4 uucp'
+echo '	hdb	pre-SVR4 Honey DanBer, aka Basic Networking Utilities'
+echo '	tay	Taylor UUCP, native mode'
+echo '	sub	old uucp with subdirectories (e.g. /usr/spool/uucp/C.)'
+echo '	vo	very old uucp, no subdirectories'
+echo '	pre	prehistoric uucp, no subdirectories, no -g option on uux'
+echo "	null	don't run uucp or don't care about queue lengths"
+while :
+do
+	uucptype=`$ask 'Which one is most appropriate' ${uucptype-hdb}`
+	case "$uucptype" in
+	svr4|hdb|tay|sub|vo|pre|null)	break	;;
+	esac
+	echo 'Sorry, no such choice is available.'
+done
+
+echo
+echo 'C News often wants to ask how much disk space is available.  The'
+echo 'format of output from the "df" command unfortunately varies a lot,'
+echo 'as does the availability of a system call to get the same information.'
+echo 'C News knows about several different versions (the first four are'
+echo 'preferred):'
+echo '	statfs	system with standard statfs() (4.4BSD, some System Vs)'
+echo "	ultrix	DEC Ultrix with DEC's own bizarre statfs()"
+echo '	statvfs	system with statvfs() (many modern System Vs)'
+echo '	ustat	system with ustat() (most System Vs)'
+echo '	bsd	4.2/4.3BSD'
+echo '	sysv	old System Vs'
+echo '	xenix	some (all?) Xenixes; some System Vs, e.g. Microport, HP?'
+echo '	sgi	Silicon Graphics Iris systems'
+echo '	v7	plain old style:  no headers or fluff, just name and number'
+echo "	null	don't know or don't care how much space is available"
+while :
+do
+	dftype=`$ask 'Which one is most appropriate' ${dftype-statfs}`
+	case "$dftype" in
+	sysv|xenix)
+		echo 'Beware -- test "spacefor" to make sure it works.'
+		echo 'System V "df" formats vary widely, indeed wildly.'
+		echo '"Consider it standard".  Sure.'
+		;;
+	ustat)	echo 'The block size defined in util/doustat.c (512) may be'
+		echo 'too conservative, as many modern System V filesystems'
+		echo 'use a 1024-byte block.  There is no way to determine'
+		echo 'this automatically and portably.'
+		;;
+	esac
+	case "$dftype" in
+	ustat|statfs|statvfs|ultrix|null)	askdf=no	;;
+	bsd|sysv|sgi|xenix|v7)	askdf=yes			;;
+	esac
+	case "$dftype" in
+	ustat|statfs|statvfs|ultrix)	sftype=c ; break	;;
+	bsd|sysv|sgi|xenix|v7|null)	sftype=sh ; break	;;
+	esac
+	echo 'Sorry, no such choice is available.'
+done
+
+case "$askdf" in
+yes)	echo
+	echo 'Some "df" commands, especially on old systems, must be given'
+	echo 'the name of a device.  Modern ones can be given any directory'
+	echo 'name and the system handles the details of figuring out what'
+	echo 'device is meant.  A few will take a directory only if it is'
+	echo 'the "top" of a filesystem.  Will "df" accept any directory'
+	dfdirs=`$yesno 'name as an argument' ${dfdirs-yes}`
+	case "$dfdirs" in
+	no)	echo 'You are going to have to customize "spacefor" for your'
+		echo 'system.  It will be generated assuming that directory'
+		echo 'names do work.'
+		;;
+	esac
+	;;
+esac
+
+echo
+archive=`$yesno 'Are you planning to use expire to archive news on disk' ${archive-no}`
+case "$archive" in
+yes)	echo 'You probably want to customize the "archive" entry in'
+	echo '"spacefor" so it knows where your archiving is done and how'
+	echo 'much space you want free there.'
+	;;
+esac
+
+echo
+spacelow=`$yesno 'Are you particularly short of disk space' ${spacelow-no}`
+case "$spacelow" in
+yes)	echo 'You may want to reconsider whether you really want to get'
+	echo 'news, unless you are getting only a very small set of groups.'
+	echo 'In any case, you definitely want to inspect "spacefor" and'
+	echo 'change some of its thresholds for free space.  BE WARNED'
+	echo 'that C News is not built to run on a brim-full file system;'
+	echo 'it relies on simple, rough space checks on the assumption that'
+	echo 'there is a substantial cushion of free space.'
+	;;
+no)	echo 'You may want to inspect "spacefor" to make sure its defaults'
+	echo 'for things like desired free space are appropriate for your'
+	echo 'system, although the defaults are fairly conservative.'
+	;;
+esac
+
+echo
+echo 'Are you running C News on a group of machines hooked together with NFS,'
+echo 'run essentially as a single system with a single administration,'
+nfsgroup=`$yesno 'with articles filed on one "server" machine' ${nfsgroup-no}`
+case "$nfsgroup" in
+yes)
+	echo
+	hostname=`$yesno 'Does your system have a "hostname" command' ${hostname-yes}`
+	case "$hostname" in
+	no)	echo 'With a server but no "hostname" command, you will have'
+		echo 'problems and will probably have to tinker by hand to'
+		echo 'get a fake "hostname" that does the right thing.  The'
+		echo 'generated files will assume you have "hostname".'
+		hostname=yes
+		;;
+	esac
+	server=`$ask "What is the \"hostname\" name of the server" ${server-newsie}`
+	;;
+*)	server=newsie	;;
+esac
+
+echo
+echo 'The "rnews" and "cunbatch" commands (which are identical, the latter'
+echo 'being purely for backward compatibility with seriously-old systems)'
+echo 'have to be installed somewhere where uucp can find them to execute'
+echo 'them.  It is not normally necessary for users to be able to run'
+echo 'them, so they need not go in the directories searched for normal'
+echo 'commands... although uucp often searches only those directories.'
+rbin=`$ask 'Where should "rnews" and "cunbatch" be put' ${rbin-$newsbin/input}`
+
+echo
+echo "The inews command, and also readnews+postnews+checknews if you're"
+echo 'going to use them, should go in one of the directories searched for'
+echo 'normal commands, so users can run them without special arrangements.'
+bin=`$ask 'What directory should these commands go in' ${bin-/usr/bin}`
+
+echo
+echo 'saving defaults...'
+rm -f $memory
+>$memory
+warn='# These answers are interdependent; do not edit this file!'
+if test ! -w $memory
+then
+	echo 'It appears that I cannot save the defaults.'
+else
+	(
+		for v in $vars
+		do
+			echo "$warn"
+			# even this horror botches metachars in var
+			eval "echo $v=\\\"\"\$$v\"\\\""
+		done
+	) >>$memory
+fi
+chmod -w $memory
+
+echo
+conf/useanswers -v $memory conf/makeinc conf/substitutions include/config.make
+
+echo done

@@ -1,0 +1,273 @@
+.\" Copyright (c) 1983, 1991 The Regents of the University of California.
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. All advertising materials mentioning features or use of this software
+.\"    must display the following acknowledgement:
+.\"	This product includes software developed by the University of
+.\"	California, Berkeley and its contributors.
+.\" 4. Neither the name of the University nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"     @(#)socket.2	6.8 (Berkeley) 3/10/91
+.\"
+.\" Modified Sat Jul 24 10:36:46 1993 by Rik Faith (faith@cs.unc.edu)
+.\"
+.\" Traduction 13/10/1996 par Christophe Blaess (ccb@club-internet.fr)
+.\"
+.TH SOCKET 2 "13 Octobre 1996" BSD "Manuel du programmeur Linux"
+.SH NOM
+socket \- Creer un point de communication.
+.SH SYNOPSIS
+.B #include <sys/types.h>
+.br
+.B #include <sys/socket.h>
+.sp
+.BI "int socket(int " domain ", int " type ", int " protocol );
+.SH DESCRIPTION
+.B Socket
+cree un point de communication, et renvoie un descripteur.
+
+Le parametre 
+.I domain
+indique un domaine de communication, a l'interieur duquel s'etablira 
+le dialogue. 
+Ceci permet de selectionner la famille de protocole a employer.
+Ces familles sont definies dans le fichier
+.IR linux/socket.h .
+Les formats actuellement proposes sont :
+
+.RS
+.TP 0.9i
+AF_UNSPEC
+Famille non specifiee, laisser le systeme la determiner.
+.TP
+AF_UNIX
+Protocoles local interne UNIX (pipe,...)
+.TP
+AF_INET
+Protocoles Internet (UDP, TCP, etc...)
+.TP
+AF_AX25
+Radio amateurs AX.25
+.TP
+AF_IPX
+Protocoles Novell.
+.TP
+AF_APPLETALK
+Protocoles Apple.
+.TP
+AF_NETROM
+Radio amateurs NetRom.
+.TP
+AF_BRIDGE
+Passerelle multi-protocoles.
+.TP
+AF_AAL5
+Reserve pour l'ATM Werner
+.TP
+AF_X25
+Reserve pour le projet CCITT X.25
+.TP
+AF_INET6
+Reserve pour le projet IP version 6
+.RE
+
+Les sockets ont le
+.IR type ,
+indique, ce qui fixe la semantique des communications. Les types
+definis actuellement sont :
+
+.RS
+.TP 0.9i
+SOCK_STREAM
+Support de dialogue garantissant l'integrite, fournissant un flux
+de donnees binaires, et integrant un mecanisme pour les transmissions 
+de donnees hors-bande.
+
+Les sockets de ce type sont des flux full\-duplex, similaires a des 
+tubes (pipes). 
+
+
+.TP
+SOCK_DGRAM
+Transmissions sans connexion, non garantie, de datagrammes de
+longueur fixe, generalement courte.
+.TP
+SOCK_RAW
+Transmissions interne au systeme, le type
+.BR SOCK_RAW ,
+ne peut etre utilise que par le Super\-User.
+.TP
+SOCK_RDM
+Transmission garantie de datagrammes
+.TP
+SOCK_SEQPACKET
+Dialogue garantissant l'integrite, pour le transport de datagrammes
+de longueur fixe. Le lecteur peut avoir a lire le paquet de
+donnees complet a chaque appel systeme
+.BR read
+.fi
+.RE
+
+
+Le protocole a utiliser sur la socket est indique par l'argument
+.IR protocol .
+Normalement il n'y a qu'un seul protocole par type de socket pour
+une famille donnee. Neanmoins rien ne s'oppose a ce que plusieurs
+protocoles existent, auquel cas il est necessaire de le specifier.
+
+Le numero de protocole depend du domaine de communication de la
+socket. Voir
+.BR protocols (5).
+
+
+
+Une socket de type 
+.BR stream
+doit etre
+.I connectee
+avant que des donnees puisse y etre lues ou ecrites. Une connexion
+sur une autre socket est etablie par l'appel systeme
+.BR connect (2).
+Une fois connectee les donnees y sont transmises par
+.BR read (2)
+et
+.BR write (2)
+ou par des variantes de
+.BR send (2)
+et
+.BR recv (2).
+
+Quand une session se termine, on referme la socket avec
+.BR close (2).
+
+Les donnees hors\-bande sont envoyees ou recues en utilisant
+.BR send (2)
+et
+.BR recv (2).
+
+Le protocole de communication utilise pour implementer les
+sockets
+.B stream
+garantit qu'aucune donnee n'est perdue ou dupliquee.
+Si un bloc de donnees, pour lequel le correspondant a suffisament de
+place dans son buffer, n'est pas transmis correctement dans un delai
+raisonnable, la connexion est consideree comme inutilisable, et les
+appels systemes renverront une valeur \-1 en indiquant une erreur
+.B ETIMEDOUT
+dans la variable globale
+.IR errno .
+
+Eventuellement les protocoles peuvent maintenir les sockets en service 
+en forcant des transmissions directes toutes les minutes en l'absence
+de toute autre activite. Une erreur est indique si aucune reponse
+n'est recue sur une socket inactive pendant une periode prolongee
+(par exemple 5 minutes).
+
+Un signal 
+.B SIGPIPE
+est envoye au processus tentant d'ecrire sur une socket inutilisable,
+forcant les programmes ne gerant pas ce signal a se terminer.
+
+Les sockets de type
+.B SOCK_SEQPACKET
+emploient les memes appels systemes que celles de types
+.B SOCK_STREAM,
+a la difference que la fonction
+.BR read (2)
+ne renverra que le nombre d'octets requis, et toute autre donnee
+restante sera eliminee.
+
+Les sockets de type
+.B SOCK_DGRAM
+ou
+.B SOCK_RAW
+permettent l'emission de datagrammes a des correspondants
+indiques au moment de l'appel systeme
+.BR send (2).
+Les datagrammes sont generalement lus par la fonction
+.BR recvfrom (2),
+qui fournit egalement l'adresse du correspondant.
+
+Un appel a 
+.BR fcntl (2)
+permet de preciser un groupe de processus qui recevront un
+signal
+.B SIGURG
+lors de l'arrivee de donnees hors\-bande.
+Cette fonction permet egalement de valider des entrees/sorties
+non bloquantes, et une notification asynchrone des evenements par
+le signal
+.BR SIGIO .
+
+Les operations sur les sockets sont representees par des
+.IR options
+du niveau socket.
+Ces options sont definies dans
+.IR sys/socket.h .
+Les fonctions
+.BR setsockopt (2)
+et
+.BR getsockopt (2)
+sont utilisees respectivement pour fixer ou lire les options.
+.SH "VALEUR RENVOYEE"
+.BR socket
+retourne un descripteur referencant la socket cree en cas de reussite.
+En cas d'echec \-1 est renvoye, et
+.I errno
+contient le code d'erreur.
+.SH ERREURS
+.TP 0.8i
+.B EPROTONOSUPPORT
+Le type de protocole, ou le protocole lui-meme n'est pas disponible
+dans ce domaine de communication.
+.TP
+.B EMFILE
+La table des descripteurs par processus est pleine.
+.TP
+.B ENFILE
+La table des fichiers est pleine.
+.TP
+.B EACCESS
+La creation d'une telle socket n'est pas autorisee.
+.TP
+.B ENOBUFS
+Pas suffisament d'espace pour allouer les buffers necessaires.
+.SH HISTORIQUE
+La fonction
+.B socket
+est apparue dans BSD 4.2.
+.SH "VOIR AUSSI"
+.BR accept "(2), " bind "(2), " connect "(2), " getprotoent "(3), "
+.BR getsockname "(2), " getsockopt "(2), " ioctl "(2), " listen "(2), "
+.BR read "(2), " recv "(2), " select "(2), " send "(2), " shutdown "(2), "
+.BR socketpair "(2), " write (2)
+.\" .sp
+.\" "An Introductory 4.3 BSD Interprocess Communication Tutorial"
+.\" is reprinted in
+.\" .I UNIX Programmer's Supplementary Documents Volume 1
+.\" .sp
+.\" "BSD Interprocess Communication Tutorial"
+.\" is reprinted in
+.\" .I UNIX Programmer's Supplementary Documents Volume 1

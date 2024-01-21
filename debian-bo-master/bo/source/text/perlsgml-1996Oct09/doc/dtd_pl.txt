@@ -1,0 +1,966 @@
+
+     _________________________________________________________________
+                                      
+                                    dtd.pl
+                                       
+   dtd.pl is a Perl 4 library that parses an SGML document type defintion
+   (DTD) and creates Perl data structures containing the content of the
+   DTD.
+   
+   Note
+          The library is useable under Perl 5 systems. However, only Perl
+          4 constructs are used.
+          
+     _________________________________________________________________
+                                      
+Audience
+
+   I assume the reader knows about the scope of packages and how to
+   access variables/subroutines defined in packages. If not, refer to
+   perl(1) or any book on Perl. The reader should also have a working
+   knowledge of SGML.
+   
+   Unless stated, or implied, otherwise, all variables mentioned are
+   within the scope of package dtd.
+   
+     _________________________________________________________________
+                                      
+Usage
+
+   Once installed, the following statement can be used to access the dtd
+   routines:
+   
+    require "dtd.pl";
+
+   All the public routines available are defined within the scope of
+   package main. Hence, if you require dtd.pl in a package other than
+   main, you must use package qualification when calling a routine.
+   
+   Example:
+   
+    &main'DTDread_dtd(DTD);
+
+   or,
+   
+    &'DTDread_dtd(DTD);
+
+   The following routines are available in dtd.pl:
+   
+   Parsing Routines
+   
+     * DTDread_dtd -- Parse an SGML DTD
+     * DTDread_catalog_files -- Parse a set of entity map files
+     * DTDread_mapfile -- Parse entity map file
+     * DTDreset -- Reset all data structures
+     * DTDset_comment_callback -- Set SGML comment callback
+     * DTDset_debug_callback -- Set routine to capture debugging messages
+     * DTDset_debug_handle -- Set output filehandle for debugging
+       messages
+     * DTDset_err_callback -- Set routine to capture error messages
+     * DTDset_err_handle -- Set output filehandle for error messages
+     * DTDset_pi_callback -- Set processing instruction callback
+     * DTDset_verbosity -- Set verbosity flag
+       
+   The following routines are only applicable after DTDread_dtd has been
+   called.
+   
+   Data Access Routines
+   
+     * DTDget_base_children -- Get base elements of an element
+     * DTDget_elem_attr -- Get attributes for an element
+     * DTDget_elements -- Get array of all elements
+     * DTDget_elements_of_attr -- Get array of all elements that have a
+       given attribute
+     * DTDget_exc_children -- Get exclusion elements of an element
+     * DTDget_gen_ents -- Get general entities defined in DTD
+     * DTDget_gen_data_ents -- Get general entities: {PC,C,S}DATA, PI
+     * DTDget_inc_children -- Get inclusion elements of an element
+     * DTDget_parents -- Get parent elements of an element
+     * DTDget_top_elements -- Get top-most elements
+     * DTDis_child -- Check if element is a child of another element
+     * DTDis_element -- Check if element defined in DTD
+       
+   Utility Routines
+   
+     * DTDis_attr_keyword -- Check for reserved attribute value
+     * DTDis_elem_keyword -- Check for reserved element value
+     * DTDis_group_connector -- Check for group connector
+     * DTDis_occur_indicator -- Check for occurrence indicator
+     * DTDis_tag_name -- Check for legal tag name
+     * DTDprint_tree -- Output content tree for an element
+     * DTDset_tree_callback -- Set callback for when a line is to be
+       printed in DTDprint_tree
+       
+     _________________________________________________________________
+                                      
+Parsing Routines
+
+   The following routines deal with the parsing of an SGML DTD.
+   
+  DTDread_dtd
+  
+    Usage
+    
+    $status = &'DTDread_dtd(FILEHANDLE);
+
+    Description
+    
+   DTDread_dtd parses the SGML DTD specified by FILEHANDLE.
+   
+   Note
+          Make sure to package qualify FILEHANDLE when calling
+          DTDread_dtd. Otherwise, FILEHANDLE will be interpreted under
+          the scope of package dtd.
+          
+   A 1 is returned if the DTD was successfully parsed. A 0 is returned if
+   an error occured.
+   
+   Parsing of the DTD stops once the end of the file is reached, or at
+   the end of the doctype declaration (if a doctype declaration exists).
+   Any external entity references will be parsed if an entity to filename
+   mapping exists (see DTDread_mapfile).
+   
+   DTDread_dtd makes the following assumptions when parsing a DTD:
+   
+     * The reference concrete syntax is assumed. However, various
+       variables in dtd.pl can be redefined to try to accomodate an
+       alternate syntax. There are some dependencies in the parser on how
+       certain delimiters are defined. See the Perl source for more
+       information.
+     * The SGML DTD is syntactically correct. This libary is not intended
+       as a validator. Use nsgmls, or other SGML validator, for such
+       purposes.
+     * The SGML declaration statement is ignored if it exists.
+     * Generic identifiers and entity names can only contain the
+       characters "A-Za-z_.-". However, this can be changed by setting
+       the variable $namechars. There is no size limit on name length.
+     * Element names are treated with case-insensitivity, but entity
+       names are case-sensitive. Tag names are converted and stored in
+       lowercase.
+     * Multiple contiguous whitespaces are ignored in entity identifiers.
+       I.e. Multiple contiguous whitespaces are treated as one whitespace
+       character.
+       
+   After DTDread_dtd is finished, the following variables are filled
+   (Note: all the variables are within the scope of package dtd):
+   
+   @ParEntities
+          Parameter entities in order processed
+          
+   @GenEntities
+          General entities in order processed
+          
+   @Elements
+          Elements in order processed
+          
+   %ParEntity
+          Keys: Non-external parameter entities.
+          Values: Replacement value.
+          
+   %PubParEntity
+          Keys: External public parameter entities (PUBLIC).
+          Values: Entity identifier, if defined.
+          
+   %SysParEntity
+          Keys: External public parameter entities (SYSTEM).
+          Values: Entity identifier, if defined.
+          
+   %GenEntity
+          Keys: Regular general entities.
+          Values: Entity value.
+          
+   %StartTagEntity
+          Keys: STARTTAG general entities.
+          Values: Entity value.
+          
+   %EndTagEntity
+          Keys: ENDTAG general entities.
+          Values: Entity value.
+          
+   %MSEntity
+          Keys: MS general entities.
+          Values: Entity value.
+          
+   %MDEntity
+          Keys: MD general entities.
+          Values: Entity value.
+          
+   %PIEntity
+          Keys: PI general entities.
+          Values: Entity value.
+          
+   %CDataEntity
+          Keys: CDATA general entities.
+          Values: Entity value.
+          
+   %SDataEntity
+          Keys: SDATA general entities.
+          Values: Entity value.
+          
+   %ElemCont
+          Keys: Element names.
+          Values: Base content of declaration of elements.
+          
+   %ElemInc
+          Keys: Element names.
+          Values: Inclusion set declarations.
+          
+   %ElemExc
+          Keys: Element names.
+          Values: Exclusion set declarations.
+          
+   %ElemTag
+          Keys: Element names.
+          Values: Omitted tag minimization.
+          
+   %Attribute
+          Keys: Element names.
+          Values: Attributes for elements. To access the data stored in
+          %Attribute, it is best to use DTDget_elem_attr.
+          
+   %PubNotation
+          Keys: PUBLIC Notation names.
+          Values: Notation identifier.
+          
+   %SysNotation
+          Keys: SYSTEM Notation names.
+          Values: Notation identifier.
+          
+   %ElemsOfAttr
+          Keys: Attribute names.
+          Values: A $; list of elements that have the key as an
+          attribute.
+          
+   All entities are expanded when data is stored in %ElemCont, %ElemInc,
+   %ElemInc, %ElemExc, %ElemTag, %Attribute arrays.
+   
+   To avoid maintenance problems with programs directly accessing the
+   variables set by DTDread_dtd, dtd.pl defines routines to access the
+   data contained in the variables. If you use dtd.pl, try to use the
+   data access routines when at all possible.
+   
+    Notes
+    
+     * External PUBLIC and SYSTEM general and data entities are ignored.
+     * Concurrent DTDs are not distinguished.
+     * LINKTYPE, SHORTREF, USEMAP declarations are ignored.
+     * Data attribute declarations (ie. "<!ATTLIST #NOTATION ...) are
+       ignored.
+     * DTDread_dtd's performance is not the best. DTDread_dtd makes
+       frequent use of Perl's getc function.
+       
+  DTDread_catalog_files
+  
+    Usage
+    
+    &'DTDread_catalog_files(@files);
+
+    Description
+    
+   DTDread_catalog_files reads all catalog files specified by @files and
+   by the SGML_CATALOG_FILES envariable.
+   
+   Catalog Syntax
+   
+   The syntax of a catalog is a subset of SGML catalogs (as defined in
+   SGML Open Draft Technical Resolution 9401:1994).
+   
+   A catalog contains a sequence of the following types of entries:
+   
+   PUBLIC public_id system_id
+          This maps public_id to system_id.
+          
+   ENTITY name system_id
+          This maps a general entity whose name is name to system_id.
+          
+   ENTITY %name system_id
+          This maps a parameter entity whose name is name to system_id.
+          
+   Syntax Notes
+   
+     * A system_id string cannot contain any spaces. The system_id is
+       treated as pathname of file.
+     * Any line in a catalog file that does not follow the previously
+       mentioned entries is ignored.
+     * In case of duplicate entries, the first entry defined is used.
+       
+   Example catalog file:
+   
+        -- ISO public identifiers --
+PUBLIC "ISO 8879-1986//ENTITIES General Technical//EN"            iso-tech.ent
+PUBLIC "ISO 8879-1986//ENTITIES Publishing//EN"                   iso-pub.ent
+PUBLIC "ISO 8879-1986//ENTITIES Numeric and Special Graphic//EN"  iso-num.ent
+PUBLIC "ISO 8879-1986//ENTITIES Greek Letters//EN"                iso-grk1.ent
+PUBLIC "ISO 8879-1986//ENTITIES Diacritical Marks//EN"            iso-dia.ent
+PUBLIC "ISO 8879-1986//ENTITIES Added Latin 1//EN"                iso-lat1.ent
+PUBLIC "ISO 8879-1986//ENTITIES Greek Symbols//EN"                iso-grk3.ent
+PUBLIC "ISO 8879-1986//ENTITIES Added Latin 2//EN"                ISOlat2
+PUBLIC "ISO 8879-1986//ENTITIES Added Math Symbols: Ordinary//EN" ISOamso
+
+        -- HTML public identifiers and entities --
+PUBLIC "-//IETF//DTD HTML//EN"                                    html.dtd
+PUBLIC "ISO 8879-1986//ENTITIES Added Latin 1//EN//HTML"          ISOlat1.ent
+ENTITY "%html-0"                                                  html-0.dtd
+ENTITY "%html-1"                                                  html-1.dtd
+
+   Environment Variables
+   
+   The following envariables (ie. environment variables) are supported:
+   
+   P_SGML_PATH
+          This is a colon (semi-colon for MSDOS users) separated list of
+          paths for finding catalog files or system identifiers. For
+          example, if a system identifier is not an absolute pathname,
+          then the paths listed in P_SGML_PATH are used to find the file.
+          
+   SGML_CATALOG_FILES
+          This envariable is a colon (semi-colon for MSDOS users)
+          separated list of catalog files to read. If a file in the list
+          is not an absolute path, then file is searched in the paths
+          listed in the P_SGML_PATH and SGML_SEARCH_PATH.
+          
+   SGML_SEARCH_PATH
+          This is a colon (semi-colon for MSDOS users) separated list of
+          paths for finding catalog files or system identifiers. This
+          envariable serves the same function as P_SGML_PATH. If both are
+          defined, paths listed in P_SGML_PATH are searched first before
+          any paths in SGML_SEARCH_PATH.
+          
+   The use of P_SGML_PATH is for compatibility with earlier versions.
+   SGML_CATALOG_FILES and SGML_SEARCH_PATH are supported for
+   compatibility with James Clark's nsgmls(1).
+   
+   Note
+          When searching for a file via the P_SGML_PATH and/or
+          SGML_SEARCH_PATH, if the file is not found in any of the paths,
+          then the current working directory is searched.
+          
+  DTDread_mapfile
+  
+    Usage
+    
+    &'DTDread_mapfile($filename);
+
+    Description
+    
+   DTDread_mapfile parses a catalog specified $filename.
+   
+   This function is similiar to DTDread_catalog_files with the exception
+   only $filename is read.
+   
+  DTDreset
+  
+    Usage
+    
+    &'DTDreset();
+
+    Description
+    
+   DTDreset clears all data associated with the DTD read via DTDread_dtd.
+   This routine is useful if multiple DTDs need to be processed.
+   
+  DTDset_comment_callback
+  
+    Usage
+    
+    &'DTDset_comment_callback($callback);
+
+    Description
+    
+   DTDset_comment_callback sets the function, $callback, to be called
+   when a comment declaration is read during DTDread_dtd. $callback is
+   called as follows:
+   
+    &$callback(*comment_text);
+
+   *comment_text is a pointer to the string containing all the text
+   within the SGML comment declaration (excluding the open and close
+   delimiters).
+   
+   Note
+          Make sure to package qualify the callback; otherwise, the
+          callback will be invoked within the scope of package dtd.
+          
+  DTDset_debug_callback
+  
+    Usage
+    
+    &'DTDset_debug_callback($callback);
+
+    Description
+    
+   DTDset_debug_callback sets the function, $callback, to be called when
+   a debugging message is generated during DTDread_dtd. $callback is
+   called as follows:
+   
+    &$callback($message);
+
+   $message is a string containing the debugging message. The callback
+   will only be invoked if verbosity is set via DTDset_verbosity. If a
+   debugging callback is registered, then debugging messages will be
+   supressed from standard error or the filehandle registered via the
+   DTDset_debug_handle.
+   
+   Note
+          Make sure to package qualify the callback; otherwise, the
+          callback will be invoked within the scope of package dtd.
+          
+  DTDset_debug_handle
+  
+    Usage
+    
+    &'DTDset_debug_handle(FILEHANDLE);
+
+    Description
+    
+   DTDset_debug_handle sets the filehandle to send all debugging messages
+   generated during DTDread_dtd. The default filehandle is "STDERR".
+   
+   Messages will be generated only if verbosity is set via
+   DTDset_verbosity. If a debugging callback is registered via
+   DTDset_debug_callback. then debugging messages will be supressed from
+   the filehandle.
+   
+   Note
+          Make sure to package qualify the filehandle; otherwise, the
+          filehandle will be interpreted within the scope of package dtd.
+          
+  DTDset_err_callback
+  
+    Usage
+    
+    &'DTDset_err_callback($callback);
+
+    Description
+    
+   DTDset_err_callback sets the function, $callback, to be called when an
+   error message is generated during DTDread_dtd. $callback is called as
+   follows:
+   
+    &$callback($message);
+
+   $message is a string containing the error message. The callback will
+   only be invoked if verbosity is set via DTDset_verbosity. If a error
+   callback is registered, then error messages will be supressed from
+   standard error or the filehandle registered via the DTDset_err_handle.
+   
+   Note
+          Make sure to package qualify the callback; otherwise, the
+          callback will be invoked within the scope of package dtd.
+          
+  DTDset_err_handle
+  
+    Usage
+    
+    &'DTDset_err_handle(FILEHANDLE);
+
+    Description
+    
+   DTDset_err_handle sets the filehandle to send all error messages
+   generated DTDread_dtd. The default filehandle is "STDERR".
+   
+   Messages will be generated only if verbosity is set via
+   DTDset_verbosity. If a error callback is registered via
+   DTDset_err_callback. then error messages will be supressed from the
+   filehandle.
+   
+   Note
+          Make sure to package qualify the filehandle; otherwise, the
+          filehandle will be interpreted within the scope of package dtd.
+          
+  DTDset_pi_callback
+  
+    Usage
+    
+    &'DTDset_pi_callback($callback);
+
+    Description
+    
+   DTDset_pi_callback sets the function, $callback, to be called when a
+   processing instruction is read during DTDread_dtd. $callback is called
+   as follows:
+   
+    &$callback(*pi_text);
+
+   *pi_text is a pointer to the string containing all the text within the
+   processing instruction (excluding the open and close delimiters).
+   
+   Note
+          Make sure to package qualify the callback; otherwise, the
+          callback will be invoked within the scope of package dtd.
+          
+  DTDset_verbosity
+  
+    Usage
+    
+    &'DTDset_verbosity($value);
+
+    Description
+    
+   DTDset_verbosity sets the verbosity flag for DTDread_dtd. If $value is
+   non-zero, then DTDread_dtd outputs status messages as it parses a DTD.
+   This function is used for debugging purposes.
+   
+     _________________________________________________________________
+                                      
+Data Access Routines
+
+   The following routines access the data extracted from an SGML DTD via
+   DTDread_dtd
+   
+  DTDget_elements
+  
+    Usage
+    
+    @elements = &'DTDget_elements();
+    @elements = &'DTDget_elements($nosortflag);
+
+    Description
+    
+   DTDget_elements retrieves an array of all elements defined in the DTD.
+   An optional flag argument can be passed to the routine to determine is
+   elements returned are sorted or not: 0 => sorted, 1 => not sorted.
+   
+  DTDget_elements_of_attr
+  
+    Usage
+    
+    @elements = &'DTDget_elements_of_attr($attribute_name);
+
+    Description
+    
+   DTDget_elements_of_attr retrieves an array of all elements that
+   contain the specified attribute.
+   
+  DTDget_top_elements
+  
+    Usage
+    
+    @top_elements = &'DTDget_elements();
+
+    Description
+    
+   DTDget_top_elements retrieves a sorted array of all top-most elements
+   defined in the DTD. Top-most elements are those elements that cannot
+   be contained within another element or can only be contained within
+   itself.
+   
+  DTDget_elem_attr
+  
+    Usage
+    
+    %attribute = &'DTDget_elem_attr($elem);
+
+    Description
+    
+   DTDget_elem_attr returns an associative array containing the
+   attributes of $elem. The keys of the array are the attribute names,
+   and the array values are $; separated strings of the possible values
+   for the attributes. Example of extracting an attribute's values:
+   
+    @values = split(/$;/, $attribute{`alignment'});
+
+   The first array value of the $; splitted array is the default value
+   for the attribute (which may be an SGML reserved word). If the default
+   value equals "#FIXED", then the next array value is the #FIXED value.
+   The other array values are all possible values for the attribute.
+   
+   Note
+          $; is assumed to be the default value assigned by Perl: "\034".
+          If $; is changed, unpredictable results may occur.
+          
+  DTDget_parents
+  
+    Usage
+    
+    @parent_elements = &'DTDget_parents($elem);
+
+    Description
+    
+   DTDget_parents returns an array of all elements that may be a parent
+   of $elem.
+   
+  DTDget_base_children
+  
+    Usage
+    
+    @base_children = &'DTDget_base_children($elem, $andcon);
+
+    Description
+    
+   DTDget_base_children returns an array of the elements in the base
+   model group of $elem. The $andcon is flag if the connector characters
+   are included in the returned array: 0 => no connectors, 1 (non-zero)
+   => connectors.
+   
+   Example:
+   
+    <!ELEMENT foo (x | y | z) +(a | b) -(m | n)>
+
+   The call
+   
+    &'DTDget_base_children(`foo')
+
+   will return
+   
+    (`x', `y', `z')
+
+   The call
+   
+    &'DTDget_base_children(`foo', 1)
+
+   will return
+   
+    (`(`,`x', `|', `y', `|', `z', `)')
+
+   One may use DTDis_tag_name to distinguish elements from the
+   connectors.
+   
+  DTDget_exc_children
+  
+    Usage
+    
+    @exc_children = &'DTDget_exc_children($elem, $andcon);
+
+    Description
+    
+   DTDget_exc_children returns an array of the elements in the exclusion
+   model group of $elem. The $andcon is flag if the connector characters
+   are included in the returned array: 0 => no connectors, 1 (non-zero)
+   => connectors.
+   
+   Example:
+   
+    <!ELEMENT foo (x | y | z) +(a | b) -(m | n)>
+
+   The call
+   
+    &'DTDget_exc_children(`foo')
+
+   will return
+   
+    (`m', `n')
+
+  DTDget_gen_ents
+  
+    Usage
+    
+    @generalents = &'DTDget_gen_ents();
+    @generalents = &'DTDget_gen_ents($nosort);
+
+    Description
+    
+   DTDget_gen_ents returns an array of general entities. An optional flag
+   argument can be passed to the routine to determine is elements
+   returned are sorted or not: 0 => sorted, 1 => not sorted.
+   
+  DTDget_gen_data_ents
+  
+    Usage
+    
+    @gendataents = &'DTDget_gen_data_ents();
+
+    Description
+    
+   DTDget_gen_data_ents returns an array of general data entities defined
+   in the DTD. Data entities cover the following: PCDATA, CDATA, SDATA,
+   PI.
+   
+  DTDget_inc_children
+  
+    Usage
+    
+    @inc_children = &'DTDget_inc_children($elem, $andcon);
+
+    Description
+    
+   DTDget_inc_children returns an array of the elements in the inclusion
+   model group of $elem. The $andcon is flag if the connector characters
+   are included in the returned array: 0 => no connectors, 1 (non-zero)
+   => connectors.
+   
+   Example:
+   
+    <!ELEMENT foo (x | y | z) +(a | b) -(m | n)>
+
+   The call
+   
+    &'DTDget_inc_children(`foo')
+
+   will return
+   
+    (`a', `b')
+
+  DTDis_element
+  
+    Usage
+    
+    &'DTDis_element($element);
+
+    Description
+    
+   DTDis_element returns 1 if $element is defined in the DTD. Otherwise,
+   0 is returned.
+   
+  DTDis_child
+  
+    Usage
+    
+    &'DTDis_child($element, $child);
+
+    Description
+    
+   DTDis_child returns 1 if $child can be a legal child of $element
+   Otherwise, 0 is returned.
+   
+     _________________________________________________________________
+                                      
+Utility Routines
+
+   The following are general utility routines.
+   
+  DTDis_attr_keyword
+  
+    Usage
+    
+    &'DTDis_attr_keyword($word);
+
+    Description
+    
+   DTDis_attr_keyword returns 1 if $word is an attribute content reserved
+   value, otherwise, it returns 0. In the reference concrete syntax, the
+   following values of $word will return 1:
+   
+     * CDATA
+     * ENTITY
+     * ENTITIES
+     * ID
+     * IDREF
+     * IDREFS
+     * NAME
+     * NAMES
+     * NMTOKEN
+     * NMTOKENS
+     * NOTATION
+     * NUMBER
+     * NUMBERS
+     * NUTOKEN
+     * NUTOKENS
+       
+   Character case is ignored.
+   
+  DTDis_elem_keyword
+  
+    Usage
+    
+    &'DTDis_elem_keyword($word);
+
+    Description
+    
+   DTDis_elem_keyword returns 1 if $word is an element content reserved
+   value, otherwise, it returns 0. In the reference concrete syntax, the
+   following values of $word will return 1:
+   
+     * #PCDATA
+     * CDATA
+     * EMPTY
+     * RCDATA
+       
+   Character case is ignored.
+   
+  DTDis_group_connector
+  
+    Usage
+    
+    &'DTDis_group_connector($char);
+
+    Description
+    
+   DTDis_group_connector returns 1 if $char is an group connector,
+   otherwise, it returns 0. The following values of $char will return 1:
+   
+     * ,
+     * &
+     * |
+       
+  DTDis_occur_indicator
+  
+    Usage
+    
+    &'DTDis_occur_indicator($char);
+
+    Description
+    
+   DTDis_occur_indicator returns 1 if $char is an occurence indicator,
+   otherwise, it returns 0. The following values of $char will return 1:
+   
+     * +
+     * ?
+     * *
+       
+  DTDis_tag_name
+  
+    Usage
+    
+    &'DTDis_tag_name($string);
+
+    Description
+    
+   DTDis_tag_name returns 1 if $string is a legal tag name, otherwise, it
+   returns 0. Legal characters in a tag name are defined by the
+   $namechars variable. By default, a tag name may only contain the
+   characters "A-Za-z_.-".
+   
+  DTDprint_tree
+  
+    Usage
+    
+    &'DTDprint_tree($elem, $depth, FILEHANDLE);
+
+    Description
+    
+   DTDprint_tree prints the content hierarchy of a single element, $elem,
+   to a maximum depth of $depth to the file specified by FILEHANDLE. If
+   FILEHANDLE is not specified then output goes to standard out. A depth
+   of 5 is used if $depth is not specified. The root of the tree has a
+   depth of 1.
+   
+   The tree shows the overall content hierarchy for an element. Content
+   hierarchies of descendents will also be shown. Elements that exist at
+   a higher (or equal) level, or if the maximum depth has been reached,
+   are pruned. The string "..." is appended to an element if it has been
+   pruned due to pre-existance at a higher (or equal) level. The content
+   of the pruned element can be determined by searching for the complete
+   tree of the element (ie. elements w/o "..."). Elements pruned because
+   maximum depth has been reached will not have "..." appended.
+   
+   Example:
+   
+     |__section+)
+         |_(effect?, ...
+         |__title, ...
+         |__toc?, ...
+         |__epc-fig*,
+         |   |_(effect?, ...
+         |   |__figure,
+         |   |   |_(effect?, ...
+         |   |   |__title, ...
+         |   |   |__graphic+, ...
+         |   |   |__assoc-text?)
+
+   Note
+          Pruning must be done to avoid a combinatorical explosion. It is
+          common for DTD's to define content hierarchies of infinite
+          depth. Even with a predefined maximum depth, the generated tree
+          can become very large.
+          
+   Since the tree outputed is static, the inclusion and exclusion sets of
+   elements are treated specially. Inclusion and exclusion elements
+   inherited from ancestors are not propagated down to determine what
+   elements are printed, but special markup is presented at a given
+   element if there exists inclusion and exclusion elements from
+   ancestors. The reason inclusions and exclusions are not propagated
+   down is because of the pruning done. Since an element may occur in
+   multiple contexts -- and have different ancestoral inclusions and
+   exclusions in effect -- an element without "..." may be the only place
+   of reference to see the content hierarchy of the element.
+   
+   Example:
+   
+    D1
+     |  {+} idx needbegin needend newline
+     |
+     |_(head,
+     |   | {A+} idx needbegin needend newline
+     |   |  {-} needbegin needend
+     |   |
+     |   |_(((#PCDATA |
+     |   |____((acro |
+     |   |       | {A+} idx needbegin needend newline
+     |   |       | {A-} needbegin needend
+     |   |       |
+     |   |       |_(((#PCDATA |
+     |   |       |____((super | ...
+     |   |       |______sub)))*)) ...
+
+   Ignoring the lines starting with {}'s, one gets the content hierachy
+   of an element as defined by the DTD without concern of where it may
+   occur in the overall structure. The {} lines give additional
+   information regarding the element with respect to its existance within
+   a specific context. For example, when an ACRO element occurs within
+   D1,HEAD -- along with its normal content -- it can contain IDX and
+   NEWLINE elements due to inclusions from ancestors. However, it cannot
+   contain NEEDBEGIN and NEEDEND regardless of its defined content since
+   an ancestor(s) excludes them.
+   
+   Note
+          Exclusions override inclusions. If an element occurs in an
+          inclusion set and an exclusion set, the exclusion takes
+          precedence. Therefore, in the above example, NEEDBEGIN, NEEDEND
+          are excluded from ACRO.
+          
+   Explanation of {}'s keys:
+   
+   {+}
+          The list of inclusion elements defined by the current element.
+          Since this is part of the content model of the element, the
+          inclusion subelements are printed as part of the content
+          hierarchy of the current element after the base content model.
+          Subelements that are inclusions will have {+} appended to the
+          subelement entry.
+          
+   {A+}
+          The list of inclusion elements due to ancestors. This is listed
+          as reference to determine the content of an element within a
+          given context. None of the ancestoral inclusion elements are
+          printed as part of the content hierarchy of the element.
+          
+   {-}
+          The list of exclusion elements defined by the current element.
+          Since this is part of the content model of the element, any
+          subelement in the content model that would be excluded will
+          have {-} appended to the subelement listing.
+          
+   {A-}
+          The list of exclusion elements due to ancestors. This is listed
+          as reference to determine the content of an element within a
+          given context. None of the ancestoral exclusion elements have
+          any effect on the printing of the content hierarchy of the
+          current element.
+          
+  DTDset_tree_callback
+  
+    Usage
+    
+    &'DTDset_tree_callback($callback);
+
+    Description
+    
+   DTDset_tree_callback sets the function, $callback, to be called when a
+   line of output is generated via DTDprint_tree. $callback is called as
+   follows:
+   
+    $cb_return = &$callback($line);
+
+   The return value of the callback will be the actual text that gets
+   outputed by DTDprint_tree.
+   
+   Note
+          Make sure to package qualify the callback; otherwise, the
+          callback will be invoked within the scope of package dtd.
+          
+     _________________________________________________________________
+                                      
+Availability
+
+   This program is part of the perlSGML package; see
+   <URL:http://www.oac.uci.edu/indiv/ehood/perlSGML.html>
+   
+     _________________________________________________________________
+                                      
+Author
+
+   
+    Earl Hood <ehood@medusa.acs.uci.edu>
+    
+     _________________________________________________________________

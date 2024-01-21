@@ -1,0 +1,677 @@
+#!/bin/sh
+
+############################################################################
+# Global settings, most of which can be overruled in the resource file:
+# VERBOSE: initial verbosity level, either 'yes' or 'no', may be overruled
+# in a resource file. Initially 'no', which means you won't get messages
+# until the .rc file is sourced. After that, messages may start appearing
+# if you have VERBOSE='yes' in the .rc file.
+VERBOSE='no'
+# SINGLEDEVICE: should "find" stay on the same device? Either 'yes' or 'no',
+# can be overruled in resource files. Suggested is 'yes', otherwise "find"
+# will descend /proc, /mnt (when you have mounted stuff), /dos (say a mounted
+# msdos disk) etcetera.
+SINGLEDEVICE='yes'
+# NEEDROOT: set to 'yes' if this script should check that only "root" may run
+# backups. Usually that's what you want, because "find" should be able to
+# scan the whole disk.
+NEEDROOT='yes'
+# I think that "find" is a too heavy load, so I prefer to nice it to -19.
+# Besides, I always run backups when I am about to leave, so I don't care
+# how long it takes. Set NICEFIND to 'no' if you don't care about the load
+# or if you want to make the list building slightly faster.
+NICEFIND='yes'
+# BACKUPDEV: the device where the backup goes to, a filename. Default is
+# '/tmp/backup.out', I suggest you overrule it to say '/dev/ftape' or whatever
+# in the resource file. The default '/tmp/tob.out' is merely for testing.
+BACKUPDEV='/tmp/tob.out'
+
+# Here's a couple of tempfiles, usually there's no need to change this
+# unless your /tmp isn't accessible..
+# TMPLIST: filename of temporary list of files to backup, should be somewhere
+# in /tmp. Other temp files will be named $TMPLIST.1, $TMPLIST.2 etcetera.
+# *** Don't quote these variables or the $$ won't get expanded! ***
+TMPLIST=/tmp/tob.$$
+# FILELIST: temporary file to store names of files to backup
+FILELIST=/tmp/tob.list.$$
+
+# Next follow the backup / restore program commands:
+# BACKUPCMD: the command that writes a backup to BACKUPDEV, accepting a list
+# of files from a file $FILELIST. Used to actually write a backup.
+BACKUPCMD='afio -Zvo $BACKUPDEV < $FILELIST'
+# BACKUPCMDTOSTDOUT: the command that writes a backup to stdout, accepting
+# a list of files in $FILELIST. Used to count the size of a backup.
+BACKUPCMDTOSTDOUT='afio -Zo - < $FILELIST'
+# LISTCMD: the command that lists BACKUPDEV's contents, list goes to stdout
+LISTCMD='afio -Zt $BACKUPDEV'
+# RESTORECMD: the command that reads BACKUPDEV, accepting a list of files on
+# the rest of the command line, the files are then restored into the
+# _current_ working directory. Note: some afio's seem to require _no_ space
+# between the -y and the filespec.. sigh.
+RESTORECMD='afio -Zviny"$FILESPEC" $BACKUPDEV'
+
+# Where do relevant programs live?
+RM="/bin/rm"
+LS="/bin/ls"
+
+##########################################################################
+# Pre- and postcommands. E.g., if you use the loadable module ftape.o, you
+# might want the PRECMD 'insmod ftape.o' and the POSTCMD 'rmmod ftape.o'
+# I am leaving this blank, since the default backup device is a file in /tmp.
+# In addition to PRECMD, you have PRECMD1 and PRECMD2 (if you need more
+# preloading), the commands are executed in a series (PRECMD, then PRECMD1,
+# then PRECMD2).
+PRECMD='echo This is the tob script.'
+POSTCMD='echo Bye.'
+
+###########################################################################
+# Not configurable settings, used internally:
+# VER: the version of this script, my job to update it (no quotes here)
+VER=0.14
+# RCLIST: list of resource files which tob will search for
+RCLIST='/etc/tob.rc /usr/etc/tob.rc /usr/local/etc/tob.rc'
+# FINDPRINTCMD: -print format string for find
+FINDPRINTCMD='%p [ctime:] %c [owner/group:] %u:%g [inode:] %i [linkto:] %l [perm:] %m [hardlinks:] %n\n'
+
+############################################################################
+# show a message to the screen
+message ()
+{
+    if [ "$VERBOSE" = "yes" ] ; then
+	echo "$*"
+    fi
+}
+
+############################################################################
+# print error message and die
+error ()
+{
+    echo 'Fatal tob error:'
+    echo "$*"
+    postcommand
+    exit 1
+}    
+
+############################################################################
+# determine name of resource file
+getrcname ()
+{
+    found='no'
+    for f in $RCLIST ; do
+	if [ -f $f -a "$found" = "no" ] ; then
+	    message "Resource file: $f"
+	    RCFILE=$f
+	    found='yes'
+	fi
+    done
+
+    if [ "$found" = "no" ] ; then
+	error "No resource file \"tob.rc\" found."
+    fi
+}    
+
+###########################################################################
+# check environment settings
+checkenv ()
+{
+    if [ "$TOBHOME" = "" ] ; then
+	error "TOBHOME undefined"
+    fi
+    
+    if [ "$BACKUPDEV" = "" ] ; then
+	error "BACKUPDEV undefined"
+    fi
+    
+    if [ "$NEEDROOT" = "yes" ] ; then
+	if [ `whoami` != root ] ; then
+	    error "You need to be root to run tobs!"
+	fi
+    fi
+}
+
+############################################################################
+# read resource files
+readrc ()
+{
+    . "$RCFILE" || error "Syntax error in $RCFILE?"
+    message "Ok, got resource $RCFILE."
+
+    # check that relevant environment vars are set
+    checkenv
+}
+
+###########################################################################
+# clean up all stale files
+cleanup ()
+{
+    message 'Cleaning up.'
+    $RM -f $TMPLIST* $FILELIST*
+    postcommand
+}
+
+###########################################################################
+# pre-tob command
+precommand ()
+{
+    if [ "$PRECMD" != "" ] ; then
+	eval "$PRECMD" || error "Pre-tob command failed."
+    fi
+    
+    if [ "$PRECMD1" != "" ] ; then
+	eval "$PRECMD1" || error "Pre-tob command 1 failed."
+    fi
+    
+    if [ "$PRECMD2" != "" ] ; then
+	eval "$PRECMD2" || error "Pre-tob command 2 failed."
+    fi
+}    
+
+###########################################################################
+# post-tob command
+postcommand ()
+{
+    if [ "$POSTCMD" != "" ] ; then
+	localpostcmd=$POSTCMD
+	POSTCMD=""
+	eval "$localpostcmd"
+    fi
+}    
+
+###########################################################################
+# check that no argument follows a flag on the commandline
+noarg ()
+{
+    if [ "$2" != "" ] ; then
+	error "Flag $1 needs no arguments."
+    fi
+}    
+
+###########################################################################
+# check that exactly one argument follows a flag
+onearg ()
+{
+    if [ "$2" = "" -o "$3" != "" ] ; then
+	error "Flag $1 needs one argument."
+    fi
+}
+
+###########################################################################
+# check that one or two args follow the flag
+oneortwoarg ()
+{
+    if [ "$2" = "" -o "$4" != "" ] ; then
+	error "Flag $1 needs one or two arguments."
+    fi
+}    
+
+############################################################################
+# make a list of files to $TMPLIST, given $1 = volume name
+makefulllist ()
+{
+    if [ "$SINGLEDEVICE" = "yes" ] ; then
+	xdevflag="-xdev"
+    else
+	xdevflag=""
+    fi
+
+    if [ "$NICEFIND" = "yes" ] ; then
+	nicefindcmd="nice -19"
+    else
+	nicefindcmd=""
+    fi
+    
+    # check that a startdir file is present
+    if [ ! -f $TOBHOME/volumes/$1.startdir ] ; then
+	error "$TOBHOME/volumes/$1.startdir not found, no such volume."
+    fi
+
+    message "Building list of all files of volume $1.. patience."
+
+    # Let's see if `find' should scan for directories too. Under afio, it
+    # should since the dirs (with their permissions) will get included in the
+    # backup. Under tar, directories should NOT be backed up, since tar will
+    # then auto-descend the directory. I'm still wishing for a tar that won't
+    # recursively archive..
+    # For the FINDSWITCH, thanks go to Jeff Coy Jr.
+
+    echo "$BACKUPCMD" | grep tar > /dev/null
+    if [ $? -eq 0 ] ; then		# backup command is TAR:
+	findswitch="-not -type d"	# avoid directories
+    else
+	findswitch=			# otherwise, include them
+    fi
+
+    excludecontents=""
+    if [ -f $TOBHOME/volumes/$1.exclude ] ; then
+	excludecontents=`cat $TOBHOME/volumes/$1.exclude`
+    fi
+
+    if [ "$excludecontents" != "" ] ; then
+	$nicefindcmd find `cat $TOBHOME/volumes/$1.startdir` $xdevflag \
+		$findswitch \
+		-printf "$FINDPRINTCMD" | \
+	    sed -e 's.\\.\\\\.g' | \
+	    sort | \
+	    grep -v -f$TOBHOME/volumes/$1.exclude > $TMPLIST || \
+		error "List creation failed."
+    else
+	$nicefindcmd find `cat $TOBHOME/volumes/$1.startdir` $xdevflag \
+		$findswitch \
+		-printf "$FINDPRINTCMD" | \
+	    sed -e 's.\\.\\\\.g' | \
+	    sort > $TMPLIST || \
+		error "List creation failed."
+    fi
+}
+
+############################################################################
+# make a list of a diff backup
+makedifflist ()
+{
+    message "Making list of different files of volume $1.. patience."
+    if [ ! -f "$TOBHOME/lists/$1.Full.z" ] ; then
+	error "Cannot make list of different files: no full backup exists."
+    fi
+    makefulllist "$1"
+    gunzip -c $TOBHOME/lists/$1.Full.z |
+	diff $TMPLIST - |
+	grep '^<' |
+	sed 's/^< //g' > $TMPLIST.1 || \
+	    error "Different files listing failed."
+}
+
+############################################################################
+# make listing of an incremental backup
+makeinclist ()
+{
+    message "Making list for incremental backup of volume $1.. patience."
+
+    # start off with a full listing of this moment
+    if [ ! -f "$TOBHOME/lists/$1.Full.z" ] ; then
+	error "Cannot create incremental list: no full backup exists."
+    fi
+    makefulllist "$1"
+    # current state listing in $TMPLIST
+
+    # merge all previous listings of this volume
+    $RM -f "$TMPLIST.1"
+    for f in $TOBHOME/lists/$1* ; do
+	gunzip -c < "$f" >> "$TMPLIST.1" || \
+	    error "Failure to merge listings of previous backups."
+    done
+    sort "$TMPLIST.1" > "$TMPLIST.2"
+    # all that's been backed up now listed and sorted in $TMPLIST.2
+
+    diff "$TMPLIST" "$TMPLIST.2" |
+	grep '^<' |
+	sed 's/^< //g' > "$TMPLIST.1" || \
+	    error "Incremental files listing failed."
+}
+
+############################################################################
+# find file in listings of backups, or list all backups
+searchlistings ()
+{
+    cd $TOBHOME/lists || error "$TOBHOME/lists directory is missing."
+    files=`$LS -1`
+
+    if [ "$files" = "" ] ; then
+	message "No backups were made."
+    else
+	for f in $files ; do
+	    vol=`echo $f | sed 's/\..*//g'`
+	    type=`echo $f | sed 's/\.z//g' | sed 's/[^\.]*\.//g'`
+	    if [ ! -f $TOBHOME/volumes/$vol.startdir ] ; then
+		message "List file $f: there is no corresponding volume." \
+			"Stale list file?"
+	    else
+		echo "$vol $type" | \
+		    awk '{printf ("VOLUME: %-10s TYPE: %-30s ", $1, $2);}'
+		$LS -l $f | awk '{printf ("DATE: %s %s %s\n", $6, $7, $8);}'
+		if [ "$2" != "" ] ; then
+		    gunzip -c $f |
+		      awk '{printf ("%-50s %s %s %s %s %s \n",\
+				    $1,$3,$4,$5,$6,$7);}' |
+		      grep "$2"
+		fi
+	    fi
+	done
+    fi
+}
+
+############################################################################
+# count the size of any backup, given a list file
+countbackup ()
+{
+
+    if [ ! -s "$1" ] ; then
+	echo "0 bytes is estimated size, backup not needed."
+    else
+	sed 's/\(.*\) \[ctime:\].*/\1/' < "$1" > $FILELIST
+	eval "$BACKUPCMDTOSTDOUT" |
+	    wc |
+	    awk '{ if ($3 < 1000)
+		        printf ("Estimated: %d bytes\n",$3); 
+	           else if ($3 < 1000000)
+			printf ("Estimated: %.1f KB\n",$3/1000.0); 
+	           else
+			printf ("Estimated: %.1f MB\n",$3/1000000.0); }' \
+	    || error "Backup size estimate failed."
+    fi
+}
+
+############################################################################
+# run the any form of backup, given a list file as 1st arg and volumename
+# as second arg
+runbackup ()
+{
+    VOLUMENAME=$2	# store name for usage in .rc file
+    
+    message "Now starting backup program to write to $BACKUPDEV."
+    sed 's/\(.*\) \[ctime:\].*/\1/' < "$1" > $FILELIST
+    eval "$BACKUPCMD" || error "Backup command failed."
+}
+
+############################################################################
+# check dirs etcetera
+check ()
+{
+    # check that directories are there
+    message "Checking existence of directories."
+    cd $TOBHOME || error "No TOBHOME directory $TOBHOME found."
+    if [ ! -d volumes ] ; then
+	error "$TOBHOME/volumes directory is missing."
+    fi
+    if [ ! -d lists ] ; then
+	error "$TOBHOME/lists directory is missing."
+    fi
+    
+    message "Checking volumes in $TOBHOME/volumes"
+    cd $TOBHOME/volumes || error "No volumes directory."
+
+    # check that startdirs are here
+    startlist=`$LS -1 *.startdir` || error "No startdir files found."
+}
+
+############################################################################
+# List defined volumes
+listvolumes ()
+{
+    message "Listing volumes in $TOBHOME/volumes"
+    cd $TOBHOME/volumes || error "No volumes directory."
+
+    # check that startdirs are here
+    startlist=`$LS -1 *.startdir` || error "No startdir files found."
+    for f in $startlist ; do
+	base=`echo $f | sed 's/\.startdir//g'`
+	exclude=$base.exclude
+
+	echo "Volume \"$base\""
+	message "    starts:   " `cat $f`
+	if [ -f $exclude ] ; then
+	    message "    excludes: " `cat $exclude`
+	fi
+    done
+}
+
+############################################################################
+# show which backups were made and when
+backups ()
+{
+    searchlistings
+}
+
+############################################################################
+# search listings for a given file
+findfile ()
+{
+    searchlistings "$@"
+}    
+
+############################################################################
+# make a full backup
+full ()
+{
+    message "About to make a full backup of volume $2."
+    makefulllist "$2"
+    runbackup $TMPLIST "$2"
+    message "Saving listing file and removing all older listings."
+    $RM -f $TOBHOME/lists/$2*
+    gzip -c $TMPLIST > $TOBHOME/lists/$2.Full.z
+}
+
+############################################################################
+# count size of a full backup
+fullcount ()
+{
+    message "About to determine the size of a full backup of volume $2."
+    makefulllist "$2"
+    message "Now starting backup program to pipe output to counter."
+    countbackup $TMPLIST
+}
+
+############################################################################
+# make a diferential backup
+differential ()
+{
+    message "About to make a differential backup of volume $2."
+
+    makedifflist "$2"
+    # listing now in TMPLIST.1
+    
+    runbackup "$TMPLIST.1" "$2"
+    message "Saving listing file and removing older incremental listings."
+    $RM -f $TOBHOME/lists/$2.incremental*
+    gzip -c "$TMPLIST.1" > "$TOBHOME/lists/$2.differential.z"
+}
+
+############################################################################
+# determine size of a diferential backup
+diffcount ()
+{
+    message "About to determine the size of a differential backup of volume $2."
+
+    makedifflist "$2"
+    countbackup "$TMPLIST.1"
+}
+
+############################################################################
+# make incremental backup
+incremental ()
+{
+    message "About to make incremental backup of volume $2."
+    
+    makeinclist "$2"
+    # listing now in TMPLIST.1
+    
+    runbackup "$TMPLIST.1" "$2"
+    message "Saving listing file."
+    gzip -c "$TMPLIST.1" > \
+	"$TOBHOME/lists/$2.incremental-`date +%Y-%m-%d-%H:%M`.z"
+}    
+
+############################################################################
+# count size of incremental backup
+inccount ()
+{
+    message "About to determine the size of an incremental backup of" \
+	    "volume $2."
+
+    makeinclist "$2"
+    countbackup "$TMPLIST.1"
+}
+
+############################################################################
+# generate listing of stuff on backup device
+verbose ()
+{
+    message "Generating report of $BACKUPDEV."
+    eval "$LISTCMD" || error "Listing of $BACKUPDEV cannot be generated."
+}
+
+############################################################################
+# restore file(s) from backup medium
+restore ()
+{
+    if [ "$3" = "" ] ; then
+	startdir=$PWD
+    else
+	startdir=$3
+    fi
+
+    cd $startdir || error "Bad starting directory $startdir."
+    
+    message "Restoring $2 from $BACKUPDEV relative to $startdir."
+    FILESPEC=$2
+
+    eval "$RESTORECMD" || error "Restore command failed."
+}
+
+############################################################################
+# print usage and die
+usage ()
+{
+    cat << ENDUSAGE
+
+ICCE Tape Oriented Backup Utility $VER
+Copyright (c) Karel Kubat / ICCE 1994,1995. All rights reserved.
+Another MegaHard production!
+
+tob by Karel Kubat (karel@icce.rug.nl).
+
+Usage: tob [-rc rcfile] -action [arguments]
+Where: (names in <> must be supplied, names in [] are optional):
+    -rc <rcfile>         : use alternate resource file <rcfile>
+                           (must be FIRST argument)
+    -backups             : show which backups were made and when
+    -check               : check environment, directories, etc.
+    -volumes             : list defined volumes
+    -full <vol>          : make full backup of volume <vol> (all files)
+    -fullcount <vol>     : determine number of bytes that would be backed up
+    -diff <vol>          : make differential backup of <volume> (all files
+                           since last full backup)
+    -diffcount <vol>     : determine number of bytes that would be backed up
+    -inc <vol>		 : make incremental backup of volume <vol> (all 
+			   files since all previous backups of vol)
+    -inccount <vol>	 : determine number of bytes that would be backed up
+    -restore <spec> [dir]: restore all matching filespecification <spec>
+                           (restores relative to current directory, or to "dir")
+    -find <file>         : search listings of backups for <file> (<file> is a
+                           grep-expression, "tob -find ." shows all)
+    -verbose             : list contents of backup device (use
+                           "tob -verbose | grep file" to list only some
+			   files)
+
+ENDUSAGE
+}
+
+###########################################################################
+# main prog
+
+message "This is tob V$VER."
+
+# trap some sigs
+trap cleanup 1 2 3 15
+
+# try to find resource file
+getrcname
+
+# default type argument to RC file is "none"
+TYPE="none"
+
+ready=no
+while [ "$ready" = "no" ] ; do
+    ready=yes
+    case $1 in
+	-rc)
+	    shift
+	    RCFILE=$1
+	    message "will use alternate resource file $RCFILE."
+	    shift
+	    ready=no
+	    ;;
+	-check)
+	    noarg "$@"
+	    readrc
+	    precommand
+	    check
+	    ;;
+	-volumes)
+	    noarg "$@"
+	    readrc
+	    precommand
+	    listvolumes
+	    ;;
+	-backups)	    
+	    noarg "$@"
+	    readrc
+	    precommand
+	    backups
+	    ;;
+	-full)
+	    onearg "$@"
+	    TYPE="full"
+	    readrc
+	    precommand
+	    full "$@"
+	    ;;
+	-fullcount)
+	    onearg "$@"
+	    readrc
+	    precommand
+	    fullcount "$@"
+	    ;;
+	-diff)
+	    onearg "$@"
+	    TYPE="diff"
+	    readrc
+	    precommand
+	    differential "$@"
+	    ;;
+	-diffcount)
+	    onearg "$@"
+	    readrc
+	    precommand
+	    diffcount "$@"
+	    ;;
+	-inc)
+	    onearg "$@"
+	    TYPE="inc"
+	    readrc
+	    precommand
+	    incremental "$@"
+	    ;;
+	-inccount)
+	    onearg "$@"
+	    readrc
+	    precommand
+	    inccount "$@"
+	    ;;
+	-verbose)
+	    noarg "$@"
+	    readrc
+	    precommand
+	    verbose
+	    ;;
+	-find)
+	    onearg "$@"
+	    readrc
+	    precommand
+	    findfile "$@"
+	    ;;
+	-restore)
+	    oneortwoarg "$@"
+	    readrc
+	    precommand
+	    restore "$@"
+	    ;;
+	*)
+	    readrc
+	    precommand
+	    usage
+	    ;;
+esac
+done
+
+cleanup
+exit 0

@@ -1,0 +1,227 @@
+#define SWITCH '@'.
+
+there are 4 kinds of commands defined.
+
+
+SWITCH, SWITCH   This just sends the SWITCH character through. Used to escape
+		the switch character.
+
+SWITCH, SWITCH+n Switch to the stream n. Streams are numbered from 1.
+
+SWITCH, SWITCH-1, "%s" , 0
+	Do the control sequence "%s" on the local end.
+SWITCH, SWITCH-2, "%s" , 0
+	Do the control sequence on the remote end.
+SWITCH, SWITCH-3, "%s", 0
+	Pass the control sequence through to the remote client. This is
+	how the results of commands are passed back to the client. A 
+	switch, switch-3 sequence is generated in the term server, and passed
+	to the client.
+
+"%s" is simply a string of non-zero bytes.  Brackets indicate optional items.
+Legal control sequences are.
+
+Option					Returns status?
+
+C_NAME "%s"				No
+       "<client name>"
+        Sets the name of this client to be '%s'.  Returned by C_STATS
+        Does not return success of failure.
+
+C_PUTENV "%s=%s"			No
+	 "<variable>=<value>"
+        Puts a variable into the environment.  This will be inherited by 
+        any C_EXEC commands.
+
+C_CLOSE "[%d]"				No
+	"[<client number>]"
+	Close the current client's file, or the client number specified file.
+
+C_CLCLOSE "[%d]"			No
+          "[<client number>]"
+	Close the current client, or the client number specified.
+
+C_DUMB  				No
+	Downgrade clients status to dumb. All control message are now
+	ignored, and all switch characters become escaped. Only makes
+	sense as a local command.
+
+C_DUMP "%d"				No
+       "<count>"
+	Effectively makes term go dump for the next %d bytes. All command
+	bytes are ignored in the data stream until %d bytes have passed.
+	Measured from the first byte to be send after the C_DUMP command.
+	Sending 0 means to go dumb permanently.
+
+
+C_CHMOD "%s\n%o [%ld [%ld]]"		No
+        "<filename>\n<mode> [<access time> [<modify time>]]"
+	Changes the mode of a file, and optionally the access time and 
+        modification time.  Times are specified relative to the current
+        time.
+ 
+C_SETPEERNAME "%d,%d,%d,%d,%d,%d"	No
+              ** cf. RFC 959
+	Changes the socket address that will be returned by C_GETPEERNAME.
+	This is usefull, if the connection has been redirected.
+
+C_OPEN "%s [%ld [%o]]"			Yes
+       "<filename> [<seek value> [<file mode>]]>"
+	To attach a O_RDWR|O_CREAT file to the file descriptor.
+	(only makes sense as a remote command).
+
+C_UPLOAD "%s [%ld [%o]]"		Yes
+       "<filename> [<seek value> [<file mode>]]>"
+	To attach a O_TRUNC|O_CREAT|O_TRUNC file to the file descriptor.
+	(only makes sense as a remote command).
+
+C_DOWNLOAD "%s [%ld [%o]]"		Yes
+       "<filename> [<seek value> [<file mode>]]>"
+	To attach a O_RDONLY file to the file descriptor.
+	(only makes sense as a remote command).
+
+C_STAT "%s"				"%ld %d %d %ld %ld %o"
+       "<filename>"			"<size> <type> <effective permissions>
+                                         <access time> <modification time>
+					 <file mode>"
+        Returns the given stats for the specified file.  <type> is 0 for
+        a file, 1 for a directory, and 2 for anything else.  <effective
+        permissions> are 4+2+1 for (rwx).  <access time> and <modification
+        time> is relative to the current time.
+
+C_UNLINK "%s"				Yes
+         "<filename>"
+	Unlinks the specified file.
+
+C_EXEC "%s\254%s\%s\254%s\254 ...\254\254" 	Yes
+       "<argv 0>\254<argv 1>\254<argv 2>\254...\254\254"
+	Forks and exec's the above command.
+
+C_PTYEXEC "%s\254%s...\254\254"		Yes
+          "<argv 0>\254<argv 1>\254<argv 2>\254...\254\254"
+	Same as C_EXEC, but opens a pty to execute it in first. This is how
+	remote shells are spawned.
+
+C_BIND "%u [%d]"			"%u"
+       "<port> [<backlog>]"		"<port>"
+        Binds the remote port %d.  If <backlog> is greater than 0, will
+        listen for <backlog> connections.  Otherwise you will need to use
+        C_LISTEN.  <backlog> defaults to 5.   See C_LISTEN.
+
+C_ACCEPT "%d"				"%d,%d,%d,%d,%d,%d"
+	 "<client>"			** cf. RFC 959
+	Tries to do an accept() on the socket indicated by the client
+	number. The number is the result of a C_BIND command.
+
+C_X_SERVER 				Yes
+	Tries to connect the display.
+
+C_SOCKET "%s"				Yes
+	Tries to open the unix domain socket with name "%s".
+
+C_PORT "[%s:]%d [%d]" 			Yes
+       "[<hostname>:]<port> [<old>]"
+	Tries to open a connection to <port> on the host specified.
+	<hostname> defaults to "remotehost".  If <old> is 0, the socket
+        will be closed and recreated, otherwise the existing socket will
+        be used.  <old> defaults to 0.
+
+C_LISTEN "%d %d"			No
+	"<client> <backlog>"
+	Listens to for connections on a bound socket. When a socket is ready
+	accept()'ing, a client number is written to the stream. This number
+	should be passed as a parameter to C_ACCEPT. It is acceptable to 
+	select() on the server socket until it is ready for reading. If it
+	is ready for reading, then the socket must be ready for accepting.
+
+C_PRIORITY "%d"				No
+           "<priority>"
+	Changes the client to the specified value.  Normally priorities range
+	from 20 to -20, with 20 allowed the most outgoing term traffic and -20
+	allowed the least.  The local priority is separate from the remote
+	priority.
+
+C_COMPRESS "%c" 			No
+           "<yes or no>"
+	Turns on and off compression respectively.  The any of 'y','c','Y','C',
+        '1' or '\01' means compress, and 'n', 'u', 'r', 'N', 'U', 'R', '0',
+        or '\0' means don't compress.
+
+C_STATS "%d"				Yes --> Varies
+	"<option>"
+	>= 0 to stat that client number.
+	-1 for a space separated list of active client numbers.
+	-2 , "%d %d", being the number of bytes fed to the compressor,
+		followed by the number of bytes output by the compressor.
+	-3 "%d %d", being the number of bytes read from the modem port,
+		followed by the number of bytes written to the modem port.
+	-4 "%d %d", being the number of packets in the input queue, followed
+		by the number of the packets in the output queue.
+	-5 "%d" being the baudrate term is operating at.
+	-6 being the client number of the client that asked for the C_STATS.
+
+C_SEEK "%d"				Yes
+       "<offset>"
+	lseek()s to that offset on the file descriptor.
+
+C_RESIZE "%d %d %d"			No
+         "<client> <columns> <rows>"
+	Sets the window size of <client> to be <columns>
+	wide by <rows> high.
+
+C_BINDN "%d"				"%d,%d,%d,%d,%d,%d"
+	"<port>"			** cf. RFC 959
+	binds a remote port selected by the system. It immediately writes
+	back to the stream the remote getsockname() information in the format
+	a,b,c,d,e,f (cf. RFC 959). Then it proceeds like C_BIND. 
+	(I've added this to support a non-passive termftp client for 
+	the benefit of firewalled people. -ot)
+
+C_GETSOCKNAME "[%d]"			"%d,%d,%d,%d,%d,%d"
+              "[<client>]"		** cf. RFC 959
+	Returns the socket name.
+
+C_GETPEERNAME "[%d]"			"%d,%d,%d,%d,%d,%d"
+              "[<%d>]"			** cf. RFC 959
+	Returns the peername.
+
+C_GETHOSTNAME "[%s]"			"%lx %s"
+              "[<hostname>]"		"<ip address> <proper hostname>"
+	Finds the <ip address> and <proper hostname> of the given host.
+	If no hostname is specified, it finds the <ip address> and 
+	<proper name> of the <hostname> returned with gethostname().
+
+C_BINDS					"%u"
+					"<port>"
+	Causes term to listen for a single connection from <port> instead
+	of the normal unix domain socket.  This only makes sense as a
+	local command, when the connecting socket must be tcpip instead
+	of unix domain.
+
+C_USOCK "%d %d"				Yes
+	"<client> <udp-type>"
+	Changes the udp-type of a socket.
+
+C_UBIND "%d %u"				Yes
+	"<client> <port>"
+	Binds the udp socket of <client> to the specified port.
+
+C_UDPSET "%d:%d,%d,%d,%d,%d,%d"		Yes
+         "<client>:<** cf. RFC 959>"
+	Sets the default address where the udp socket transmits its data.
+
+C_QUIT "%d"				Yes
+       "<option>"
+	Shutdown term.  If <option> is 1, it doesn't hangup the modem,
+	if 2, it will hangup, if -1 or not specified, performs the default
+	shutdown action.
+
+** cf. RFC 959		Is the socket address in the following format:
+   "<ip number with ","'s instead of "."'s>,<port/256>,<port%256>"
+
+
+The very first data packet received may be of the form:
+
+  "VERSION %lu %lx %s"  == "VERSION <term version> <local address> <hostname>"
+
+

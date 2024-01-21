@@ -1,0 +1,492 @@
+<!--
+	linux97.html
+	Last modification: Sun, 3 Nov 1996 10:03:35 +0200
+	linux97.	Verso Linux 97	PJ 4: Verso Linux 97	Lettere
+  -->
+<p align=center>
+<h2>Verso Linux 97</h2>
+<b>di Matteo Frigo</b><br>
+<a href="mailto:athena@theory.lcs.mit.edu">athena@theory.lcs.mit.edu</a>
+</p>
+<P>
+<EM><HR>
+Non esiste più alcuna differenza apprezzabile tra lo hardware di un
+PC e quello di una workstation. Grazie a Linux, non esiste nemmeno
+alcuna differenza tra il <i>software</i> delle due classi di
+macchine. Ciò implica che la tendenza verso workstation
+multiprocessore coinvolgerà in breve i personal computer e Linux -
+cioè, sarà facile trovare PC con 2 o 4 processori. Questo articolo
+propone alcune idee su come Linux possa evolvere per utilizzare
+appieno piccole macchine parallele.
+</EM><HR>
+
+<P>
+
+<H3>Introduzione</H3>
+
+È relativamente facile costruire personal computer paralleli, e
+ciò si può ottenere in molti modi diversi. La soluzione più
+semplice è di collegare insieme computer esistenti, usando un
+network con poca banda, come ad esempio Ethernet, e già questa
+configurazione è sufficiente per risolvere molti problemi pratici.
+<P>
+
+Una variazione interessate su questo approccio è quella che Arvind
+con il suo gruppo a MIT sta sviluppando: inserire sul bus di un
+normale PC una scheda che simula una memoria RAM condivisa tra varie
+CPU. La scheda in realtà è connessa ad un network, e contiene un
+processore dedicato (che nel caso di Arvind è più sofisticato del
+processore principale!). In risposta alla lettura o scrittura di una
+locazione di memoria, questo hardware decide se essa sia locale o
+remota. Se è remota, inoltra una richiesta (usando il network) ad un
+altro PC, e una volta ottenuti i dati li presenta alla CPU locale.  Il
+nocciolo dell'idea sta nel fatto che il coprocessore maschera tutti i
+protocolli che servono a mantenere coerente la memoria condivisa. Dal
+punto di vista della CPU locale, gli accessi alla memoria condivisa
+avvengono con normali istruzioni di load e store - si possono
+perciò utilizzare processori tradizionali senza modifica alcuna. Da
+un punto di vista filosofico, questa soluzione è uno hack, e sarebbe
+molto più pulito (ed efficiente) modificare la CPU stessa per
+trattare in modo speciale questo tipo di operazioni: ad esempio, c'è
+un ritardo intrinseco nell'accesso al bus, che non può essere
+eliminato dalla soluzione di Arvind; un altro problema è che gli
+accessi remoti sono per loro natura più lenti, e quindi dovrebbero
+essere iniziati prima possibile.  Tuttavia, dati i tempi ed i costi
+dello sviluppo di un processore, la modifica di una CPU esistente è
+una soluzione economicamente poco praticabile.
+<P>
+
+Una terza soluzione è di costruire una macchina con <code>P</code>
+processori connessi ad un bus, e con una memoria comune. Workstation
+di questo tipo sono ormai disponibili commercialmente da alcuni anni. Il
+numero <code>P</code> di processori è tipicamente dell'ordine di 2-8,
+giacché la tecnologia del bus è poco scalabile per
+<code>P</code> più grande.
+Questo è il tipo di macchina che sarà facile vedere su
+molti tavoli prima della fine dell'anno in corso. Per fissare le idee,
+chiamiamo <i>SMP</i> (symmetric multi-processor) una macchina del
+genere.
+<P>
+
+Il resto dell'articolo è volto all'esplorazione delle possibilità
+e delle difficoltà connesse all'uso di uno SMP. L'argomento è
+troppo vasto per poter essere trattato a fondo in così poco
+spazio - mi limiterò dunque ad esporre alcune idee.
+<P>
+
+Il punto di vista di questo articolo è quello dello hacker che è
+interessato ad ottenere il massimo dalla sua macchina. Questo punto di
+vista non è irragionevole: infatti, se un utente paga per avere due
+processori, vuole ottenere il doppio di performance. Punto. Un
+miglioramento di un fattore 1.5 è inaccettabile e non
+giustificabile economicamente. Ciò significa che, almeno per un po'
+di tempo, non sentiremo parlare di Microsoft nell'arena degli SMP.
+<P>
+
+Siamo inoltre interessati ad usare lo SMP come macchina parallela,
+ossia ad usare <i>tutta</i> la macchina per la soluzione di 
+<i>un</i> problema. Si noti che gli attuali SMP commerciali sono costruiti
+come <i>throughput server</i>: ossia, sono concepiti per servire
+molti utenti e svolgere molti compiti sequenziali
+contemporaneamente. In sostanza, su queste macchine, un singolo
+programma non trae vantaggio alcuno dal fatto di girare su uno SMP. Il
+nostro interesse è volto invece all'utilizzo di più processori per
+l'esecuzione di un solo programma.
+<P>
+
+La nostra unità di tempo è il ciclo macchina. Per fissare le idee,
+uno SMP odierno ha un processore RISC superscalare, che esegue da 2 a
+6 o 8 istruzioni per ciclo di clock. Un accesso alla cache di primo
+livello (sul chip) costa uno o due cicli. Un accesso alla L2 cache
+(off chip) costa sui 10 cicli, e un accesso alla memoria costa tra i
+50 e i 100 cicli (processori appena annunciati hanno tre
+livelli di cache. Sempre più interessante). Un interrupt su una
+macchina del genere costa almeno 100 cicli - le ragioni
+architetturali per cui questo è vero sono troppo complesse da
+spiegare qui (pare che UltraSPARC abbia interrupt veloci, ma
+non ne so di più). La descrizione che ho dato è una buona
+approssimazione dei processori high-end attuali. Si noti che anche il
+P6/Pentium Pro, sotto una apparente compatibilità 80x86, è in
+realtà un processore RISC con hardware apposito per compilare al
+volo codice 8086 in codice RISC.
+<P>
+
+Il resto dell'articolo è così organizzato: la
+sezione 
+<b>Programmazione di uno SMP</b> introduce due approcci alla
+programmazione parallela - il <i>data parallelism</i> e il
+<I>multithreading</i>.  La sezione <b>Cilk</b> descrive Cilk, un
+linguaggio multithreaded.  La sezione <b>Implementazione</b>
+si addentra in
+dettaglio in alcune questioni tecniche legate all'implementazione di
+Cilk, e più in generale ad ogni linguaggio parallelo che voglia
+essere efficiente.
+
+<H3>Programmazione di uno SMP</h3>
+
+Il problema principale del parallelismo è il software. Allo stato
+attuale, la scrittura un programma parallelo richiede risorse e
+competenze di gran lunga superiori alla scrittura del corrispondente
+programma sequenziale. Questa considerazione, unita all'osservazione
+che il programma deve essere ben scritto ed efficiente per avere un
+qualunque senso, rende effettivamente la programmazione parallela
+un'arte arcana.
+<P>
+
+Il problema del software si riduce a questo: per avere efficienza,
+ogni processore dovrebbe essere programmato indipendentemente, ogni
+risorsa dovrebbe essere pianificata in modo da evitare intasamento del
+network/bus/dischi/ecc., ed ogni comunicazione dovrebbe essere
+esplicita. È chiaro, tuttavia, che una pianificazione così
+dettagliata fa presto a diventare ingovernabile. Quello che si
+vorrebbe avere è una astrazione della macchina sufficientemente
+generale da essere applicabile a buona parte dei problemi di
+interesse, e sufficientemente semplice da essere implementabile in
+modo efficiente. Per gli scopi del presente articolo, descriverò due
+tra i possibili approcci.
+<P>
+
+Nei linguaggi <i>data-parallel</i> i tipi di dati fondamentali sono i
+vettori ad una o più dimensioni.
+L'idea è che se <code>A</code> e <code>B</code> sono
+vettori di <code>n</code> elementi,
+<code>A=B</code> copia tutto il vettore <code>B</code> in <code>A</code>, in
+parallelo. Il programmatore non si deve preoccupare
+di come <code>A</code> e <code>B</code>
+siano allocati in memoria, né di quale processore sia responsabile
+di un particolare elemento.  Per un esempio comune di linguaggio
+data-parallel, si pensi a <tt><b>matlab</tt></b>.  Da questa descrizione
+sommaria può apparire che il data-parallelism sia applicabile solo a
+problemi numerici sufficientemente regolari.  In realtà ci sono modi
+intelligenti per programmare, ad esempio, quicksort in un linguaggio
+data-parallel, e similmente molti altri algoritmi classici. Tuttavia,
+la formulazione di questi problemi in un programma data-parallel è
+innaturale, e nemmeno molto efficiente.  Voglio dire che, parlando
+grossomodo, l'intuizione che il data-parallelism si applichi solo a
+problemi `sufficientemente' regolari è esatta.  Ciò non toglie che
+per una vasta classe di problemi il data-parallelism sia una soluzione
+pulita ed efficiente (una versione parallela di <tt><b>matlab</tt></b>
+è qualcosa di cui molti sentono la mancanza).
+<P>
+
+Un approccio diverso è il <em>multithreading</em>, in cui sono stato
+coinvolto in prima persona. L'idea di base è che un programma si
+può vedere come un grafo orientato aciclico (DAG). Ad esempio
+l'espressione <code>(a+b)c</code> può
+essere vista come un flusso di dati (<em>
+dataflow</em>). I valori si muovono
+sul grafo e subiscono le elaborazioni specificate dai nodi, in modo
+naturale.
+<P>
+
+Detta in questo modo, l'idea del multithreading non sembra molto furba:
+infatti ci sono almeno tre problemi: (I) come specifichiamo il grafo?
+(II) che succede in caso il grafo non sia fisso, ma dipenda dall'input?
+(Si pensi ad un <tt>if</tt>, o ad un ciclo su <code>n</code>
+elementi, con <code>n</code>
+parte dell'input.) (III) come eseguiamo il grafo in modo efficiente?
+(Bisogna decidere quale processore esegua una certa operazione,
+e quando.) Ci sono molte soluzioni a questi problemi. La prossima sezione
+tratta di un possibile approccio.
+<P>
+
+<H3>Cilk</H3>
+
+Cilk è insieme un linguaggio multithreaded e un runtime system.
+Il linguaggio specifica un grafo dataflow, ed il runtime system esegue
+il grafo in parallelo.
+<P>
+
+Il linguaggio Cilk è C con un paio di nuove keyword, <tt>spawn</tt> e
+<tt>sync</tt> (in realtà ci sono altre estensioni per la
+scrittura di programmi nondeterministici e per l'esecuzione
+speculativa. Mi guardo bene dal trattare l'argomento in questa sede).
+Aggiungere <tt>spawn</tt> ad una chiamata di funzione specifica che la
+funzione chiamata può essere eseguita in parallelo alla funzione
+chiamante. L'istruzione <tt>sync</tt> specifica che tutte le funzioni
+(<em>procedure</em>, nella terminologia di Cilk) che sono state invocate
+con <tt>spawn</tt> devono essere completate prima che l'esecuzione possa
+continuare. Il programma di esempio calcola
+ricorsivamente <tt> fib(n-1)</tt> e <tt>fib(n-2)</tt>, in parallelo.
+Prima di poter ritornare la somma di <tt>fib(n-1)</tt>  e 
+<tt> fib(n-2)</tt>, tuttavia, occorre che entrambe le procedure siano
+completate. Questo è lo scopo dell'istruzione <tt>sync</tt> prima
+del <tt>return</tt>.
+
+<P>
+<PRE>
+int fib(int n) 
+{
+     if (n < 2)
+          return n;
+     else {
+          int x, y;
+          x = fib(n-1);
+          y = fib(n-2);
+          return x + y;
+     }
+}
+
+
+cilk int fib(int n) 
+{
+     if (n < 2)
+          return n;
+     else {
+          int x, y;
+          x = spawn fib(n-1);
+          y = spawn fib(n-2);
+          sync;
+          return x + y;
+     }
+}
+
+</PRE>
+
+Chiamiamo <em>thread</em> le parti di procedure che sono comprese tra
+un sync e l'altro. I thread sono rappresentati da cerchi,
+mentre le procedure sono rappresentate da ovali che racchiudono
+tutti i thread che formano la procedure.
+Ci sono archi impliciti tra thread nella stessa procedure, derivanti
+dal fatto che <tt>sync</tt> impone un ordine sequenziale tra quanto c'è
+lessicalmente prima del <tt>sync</tt> e quanto compare dopo. Tali archi
+sono linee orizzontali. L'istruzione <tt>spawn</tt>
+crea una nuova procedure, e specifica un arco tra la procedure
+madre e la procedure figlia.
+Allo stesso modo, la combinazione <tt>return / sync</tt>
+specifica altri archi, che indicano che <tt>sync</tt> aspetta il
+valore calcolato da <tt>return</tt>.
+<P>
+
+Abbiamo appena visto che con un paio di primitive si possono
+specificare facilmente i grafi dataflow. Due osservazioni sono
+importanti a questo punto: (I) non tutti i grafi dataflow possono
+essere specificati in questo modo; (II) il grafo viene generato
+dinamicamente durante l'esecuzione, e può dipendere dall'input.
+Un'altra osservazione è che gli archi ora non portano necessariamente
+informazione, e possono semplicemente indicare dipendenza temporale
+(se il lettore non capisce di che sto parlando, può tranquillamente
+ignorare l'affermazione precedente).
+<P>
+
+Una volta specificato il DAG, come eseguirlo? Consideriamo il
+programma in C senza <tt>spawn</tt> e <tt>sync</tt>. La normale esecuzione
+di una chiamata di funzione salva sullo stack il contesto attuale,
+sospende la funzione corrente e comincia ad eseguire la funzione
+chiamata.  Lo scheduler di Cilk funziona allo stesso modo, ed in più
+aggiunge <em>work-stealing</em>. L'idea è che lo <tt>spawn</tt> salva
+sullo stack il contesto attuale e comincia ad eseguire la nuova
+procedure. Quando un processore non ha nulla da fare, sceglie un altro
+processore a caso, e gli <em>ruba</em> il contesto salvato sullo stack,
+continuando l'esecuzione fino al prossimo <tt>sync</tt>. Facendo le cose
+per bene, con più dettagli di quanti io possa fornire in questa
+sede, si dimostra che questo semplice approccio è ottimale dal punto
+di vista del tempo di esecuzione, ed efficiente nell'utilizzo dello
+spazio.
+
+<H3>Implementazione</H3>
+
+Tutta la discussione precedente è servita ad introdurre il modello
+di calcolo di cui voglio parlare, e per descrivere alcuni dettagli
+implementativi che sono di interesse alla comunità degli hacker
+di Linux.
+<P>
+
+L'implementazione dello scheduler work-stealing di Cilk (scheduler che
+si può descrivere in due righe) è
+tutt'altro che banale. Parte dei
+problemi deriva dall'architettura degli odierni SMP, e parte dal
+sistema operativo. Questo è il punto in cui io vedo potenzialità
+per Linux di fare le cose per bene (contrariamente a come sono fatte,
+per esempio, in Solaris).
+<P>
+
+
+<b>Primo problema: lo stack.</b> Per una serie di ragioni
+si vuole che ogni thread del programma Cilk abbia la stessa visione
+dello stack del corrispondente programma C. Ogni funzione del
+programma C vede lo stack di tutti i suoi antenati; allo stesso 
+modo ogni Cilk procedure deve vedere lo stack di tutti i suoi 
+antenati (tutti gli <tt>spawn</tt> che hanno portato alla procedure
+in oggetto). Ora, due procedure in esecuzione in parallelo hanno
+due sequenze diverse di antenati, e potenzialmente alcuni antenati
+comuni. Quindi la memoria deve essere mappata in modo che parte
+dello stack di una procedure sia privata, e parte condivisa con
+altre procedure. L'idea di fondo è che ogni volta che il
+lavoro viene trasferito da un processore all'altro, lo stack
+<em>si biforca</em>, diventando quello che viene chiamato
+<em>cactus stack</em> in letteratura.
+<P>
+
+Mappare la memoria in Unix non è semplice. Il modo migliore è la
+system call <tt>mmap()</tt>, che consente di associare un indirizzo
+di memoria virturale ad una posizione in un file. Per esempio,
+si può dire al kernel: associa 4k a partire dall'indirizzo
+<tt>0x10000</tt> ai 4k nel file <tt>/tmp/foo</tt> a partire dalla posizione
+512. Ogni altro processo che mappa la stessa posizione dello
+stesso file condividerà la stessa memoria. Con un uso intelligente
+di <tt>mmap()</tt> si può mappare lo stack come si vuole.
+<P>
+
+Il problema è che <tt>mmap()</tt> passa attraverso il file system.
+L'autore ha lavorato su una macchina con più memoria RAM che disco (!),
+il che vuol dire che non può utilizzare tutta la memoria!
+Quello che manca a Unix è la possibilità di mappare dalla
+swap area. La soluzione di Solaris è di avere un filesystem
+costruito in memoria RAM/swap area, in cui si può allocare
+un file da cui mappare la memoria. La soluzione è chiaramente
+demenziale, ed è un problema aperto per gli hacker di linux
+trovare una soluzione migliore.
+<P>
+
+
+<b>Secondo problema: page faults.</b> Lo stack è qualcosa
+che evolve dinamicamente, e non è bello assegnargli dimensioni
+fisse (come fanno i Posix/Solaris thread, altra cosa fatta male).
+Lo stack di Cilk è gestito a mano come descritto in precedenza:
+come fare per estenderlo solo quando serve? Una soluzione è
+di intercettare il page fault che avviene quando un programma accede
+ad una locazione di memoria non mappata. In Cilk succede questo:
+lo stack è inizialmente non mappato. Quando il programma accede
+allo stack, il sistema genera un page fault; il corrispondente
+signal viene intercettato, e la pagina corretta viene mappata
+nella locazione appropriata (può essere una pagina nuova o
+una pagina condivisa, a seconda della posizione nel cactus
+stack). La soluzione è ragionevolmente semplice ed elegante.
+<P>
+
+Il problema è che il S.O. impiega tempi dell'ordine del
+millisecondo per trasferire controllo al signal handler - e
+non ho la minima idea di perché servano 100000 cicli per una
+operazione apparentemente semplice. 
+<P>
+
+Proposta: Linux dovrebbe implementare una gestione della memoria
+veloce da spazio utente. Come farlo è un altro problema aperto
+per gli hacker di linux. La gestione di un page fault non dovrebbe
+richiedere più di 100-200 cicli macchina.
+<P>
+
+<b>Terzo problema: locks.</b> Alcune locazioni di memoria
+in Cilk sono condivise tra più processori, ed il loro accesso
+deve essere arbitrato in qualche modo. I processori moderni supportano
+diversi meccanismi per arbitrare la memoria. Ad esempio, SPARC ha
+una istruzione SWAP, che atomicamente scambia il contenuto
+di una cella di memoria con un registro. Si può costruire un
+lock usando SWAP: sia <tt>L=1</tt> una variabile condivisa, che
+rappresenta un lock (ossia, il permesso di accedere a certe
+risorse critiche). <tt>SWAP(L, 0)</tt> restituisce 0 o 1, ma
+è garantito che
+solo un processore avrà 1. Chi riceve 1 ha il lock e può
+continuare, gli altri continuano ad eseguire SWAP finché chi ha il lock
+non decide di restituirlo (con <tt> SWAP(L, 1)</tt>). Tutto ciò è
+molto bello e molto elegante. 
+<P>
+
+Tutto ciò è anche molto lento. SWAP va comunque a lavorare sul
+bus, ed ogni accesso al bus costa <em>decine</em> di cicli, oggigiorno,
+e la situazione è destinata a peggiorare. L'obiettivo di Cilk
+è di fornire thread della granularità di poche istruzioni macchina,
+e l'implementazione è tale che la creazione di un thread richiede
+un lock (dettagli omessi). Come risolvere il problema?
+<P>
+
+Un algoritmo classico per implementare un lock è il seguente
+(algoritmo di Dekker). Supponiamo per semplicità ci siano solo due
+processori. Ci sono sue variabili condivise, <tt>L1</tt> e <tt>L2</tt>,
+inizialmente a <tt>0</tt>. Il processore 1 esegue il seguente codice:
+
+<pre>
+L1 = 1;
+
+if (L2 == 1) {
+     /* c'e' un conflitto, risolvilo */
+}
+
+/* sezione critica qui */
+
+L1 = 0;
+</pre>
+
+Allo stesso modo il processore 2 ha il codice che segue:
+
+<pre>
+L2 = 1;
+
+if (L1 == 1) {
+     /* c'e' un conflitto, risolvilo */
+}
+
+/* sezione critica qui */
+
+L2 = 0;
+</pre>
+
+Il protocollo è tale che i due processori non possono entrare
+contemporaneamente nella sezione critica, come è in un certo
+senso ovvio (supposto che la soluzione del conflitto sia corretta),
+perché ognuno guarda lo stato dell'altro processore prima di
+entrare nella sezione critica. Il protocollo è anche dimostrabilmente
+corretto.
+<P>
+
+Problema: non funziona. La ragione per cui non funziona è che i
+processori odierni possono scambiare <tt>load</tt> e <tt>store</tt> dalla
+memoria. In particolare, il processore 1, con ogni probabilità,
+leggerà <tt>L2</tt> <em>prima</em> di scrivere <tt>L1</tt>,
+vanificando il
+nostro bel protocollo.
+<P>
+
+La soluzione è di inserire una speciale istruzione
+(chiamata <tt>MEMBAR</tt>
+da SPARC V9 e da Alpha) che assicura che tutte le operazioni precedenti
+vengano completate prima di proseguire. In questo modo si sono
+potuti implementare lock in due o tre cicli macchina (se la cache
+funziona correttamente).
+<P>
+
+Il messaggio di questa sezione è: attenti, la memoria non si
+comporta in modo ovvio, e le cose diventano sempre più difficili. Un
+meccanismo di lock veloce (pochi cicli) dovrebbe essere parte standard
+di <tt>libc</tt>, ma per quanto ne so io non è fornito da alcun
+costruttore. Solaris fornisce i suoi bravi lock, naturalmente (pagando
+almeno 10000 cicli).
+<P>
+
+Il secondo messaggio è: come esattamente si comporti la memoria
+dipende da costruttore a costruttore e da modello a modello.
+UltraSPARC supporta diversi modelli di memoria, che garantiscono
+più cose a spese dell'efficienza; ma il S.O. non permette di
+specificare quale modello di memoria usare. Una gerarchia di modelli
+di memoria dovrebbe essere standard, e il S.O. dovrebbe permettere
+al programmatore di scegliere. Allo stato attuale, un programma per
+SMP veloce e portabile è pura utopia (anche se in Cilk siamo
+riusciti a fare un buon lavoro nell'isolare le parti machine-dependent).
+
+<H3>Conclusioni</H3>
+
+Ho presentato Cilk, un possibile approccio alla programmazione parallela
+di un SMP, di cui esiste già una implementazione efficiente.
+L'implementazione di Cilk combatte contro i difetti del S.O. -
+l'occasione è buona per correggere questi difetti. 
+<P>
+
+Ho dato alcune idee (probabilmente novità assolute per chi non
+ha mai usato un SMP) sulle difficoltà della programmazione parallela,
+con cui in breve tempo ogni programmatore serio dovrà confrontarsi.
+Le idee espresse nella Sezione <b>Implementazione</b> rappresentano ricerca in corso,
+e sono per la maggior parte ancora non pubblicate.
+<P>
+
+Per saperne di più su Cilk, si veda 
+<a href="http://theory.lcs.mit.edu/~cilk">http://theory.lcs.mit.edu/~cilk</a>,
+che contiene anche tutte le
+pubblicazioni relative.
+
+<HR>
+Matteo Frigo -
+MIT Laboratory for Computer Science NE43-203, Cambridge, MA 02139<BR>
+athena@theory.lcs.mit.edu
+<P>
+<a href="http://theory.lcs.mit.edu/~athena">http://theory.lcs.mit.edu/~athena</a>

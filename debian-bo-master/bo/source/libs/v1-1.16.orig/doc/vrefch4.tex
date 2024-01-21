@@ -1,0 +1,537 @@
+%***********************************************************************
+%***********************************************************************
+%***********************************************************************
+
+\chapter {The Application}
+
+This chapter covers the top level classes used to build an application.
+
+The classes covered in this chapter include:
+
+\begin{description}
+	\item[vApp] The base class for applications.
+	\item[vAppWinInfo] A utility class to interface views to models.
+\end{description}
+
+%------------------------------------------------------------------------
+\Class{vApp}
+\Indextt{vApp}
+
+The base class for building applications.
+
+\subsection* {Synopsis}
+
+\begin{description}
+	\item [Header:] \code{<v/vapp.h>}
+	\item [Class name:] vApp
+	\item [Contains:] vCmdWindow, vAppWinInfo
+\end{description}
+
+\subsection* {Description}
+
+The \code{vApp} class serves as the base class for building
+applications. There must be exactly one instance of an object
+derived from the \code{vApp} class.  The base class contains and
+hides the code for interacting with the host windowing system,
+and serves to simplify using the windowing system.
+
+You will usually derive a class based on \code{vApp} that will
+serve as the main control center of the application, as well as
+containing the window objects needed for the user interface.
+The single instance of the application class is defined
+in the body of the derived application class code.
+
+The \code{vApp} class has several utility methods of general
+usefulness, as well as several methods that are normally
+overridden to provide the control interface from the application
+to the command windows. The derived class will
+also usually have other methods used to interface with the
+application.
+
+In order to simplify the control interface between the application
+and the windows, the \code{vAppWinInfo} class has been provided.
+The application can extend that class to keep track of
+relevant information for each window. When the \code{NewAppWin}
+method is used to create a window, it will create an
+appropriate instance of a \code{vAppWinInfo} object, and return
+a pointer to the new object. The
+base \code{vApp} then provides the method \code{getAppWinInfo}
+to retrieve the information associated with a given window.
+
+\subsection* {Constructor} %------------------------------------
+
+\Meth{vApp(char* appName)}
+\Meth{vApp(char* appName, simSDI = 0, int fh = 0, int fw = 0)}
+\Indextt{vApp}
+
+\Param {appName} Default name for the application. This name
+will be used by default when names are not provided for windows.
+The name also appears on the ``main window'' for some platforms,
+including Microsoft Windows, but not X.
+The constructor also initializes some internal state information.
+There must be exactly one instance of the \code{vApp} object, and
+will usually represent your derived \code{myApp} object. See the
+code below with \code{AppMain} for an example of creating the
+single app instance.
+
+\Param {simSDI} This \emph{optional} parameter is used to specify
+that \V should start as a Windows SDI application if it is set
+to 1. This parameter has no effect for the X version.
+
+\Param{fw, fh} These are used to specify the size of a
+menuless and canvasless \V application, and are optional.
+
+\subsection* {Methods to Override} %------------------------
+
+%............................................................
+\Meth{void AppCommand(vWindow* win, ItemVal val)}
+\Indextt{AppCommand}
+
+Any window commands not processed by the \code{vWindow} object
+are passed to \code{AppCommand}. You can override this method
+to handle any commands not processed in windows.
+
+%............................................................
+\Meth{int AppMain(int argc, char** argv)}
+\Indextt{AppMain}
+
+This is a global function (not a class member!) that is called
+once by the system at start up time with the standard command
+line arguments \code{argc} and \code{argv}. You provide this
+function in your code.
+
+Your program will not have a C \code{main} function. The main
+reason for this is portability. While you would usually have
+a \code{main} in a Unix based program, MS-Windows does not
+use \code{main}, but rather \code{PASCAL WinMain}. By handling
+how the program gets started and providing the \code{AppMain}
+mechanism, \V\ allows you to ignore the differences. You will
+still have all the capability to access the command line arguments
+and do whatever else you would do in \code{main} without having
+to know about getting the host windowing system up and running.
+
+The windowing system will have been initialized before \code{AppMain}
+is called. You can process the command line arguments, and
+perform other required initializations. The top level command
+window should also created in \code{AppMain} by calling \code{NewAppWin}.
+
+Before \code{AppMain} is called, the single instance of your
+derived \code{vApp} object must also be constructed, usually by
+instantiating a static instance with a statement such as \code{static
+myApp* MyApp = new myApp("ProtoApp")}. As part of the
+construction of the \code{myApp} object, the global pointer
+\code{vApp* theApp} is also pointed to the single instance of the
+\code{vApp} or derived \code{myApp} object. You can then use
+\code{theApp} anywhere in your code to access methods provided by
+the \code{vApp} class.
+
+Your \code{AppMain} should return a 0 if it was successful. A
+nonzero return value will cause the \V\ system to terminate with
+an exit code corresponding to the value you returned.
+
+\subsection* {Example}
+
+\footnotesize
+\begin{verbatim}
+
+// EVERY V application needs the equivalent of the following line
+
+  static myApp* MyApp = new myApp("ProtoApp");  // Construct the app.
+
+//==========================>>> AppMain <<<===========================
+  int AppMain(int argc, char** argv)
+  {
+    // Use AppMain to perform special app initialization, and
+    // to create the main window.  This example assumes that
+    // NewAppWin knows how to create the proper window.
+
+    (void) theApp->NewAppWin(0, "Prototype V Example", 350, 100, 0);
+    return 0;
+  }
+\end{verbatim}
+
+\normalfont\normalsize
+
+%............................................................
+\Meth{void CloseAppWin(vWindow* win)}
+\Indextt{CloseAppWin}
+
+This is the normal way to close a window. Your derived \code{CloseAppWin}
+should first handle all housekeeping details, such as saving the
+contents of a file, and then call the default \code{vApp::CloseAppWin}
+method. The default method calls the window's \code{CloseWin}
+method and removes the window.
+
+The \code{CloseAppWin} method is also called when the user clicks
+the close button of the window.  This close button will
+correspond to the standard close window button depending on the
+native windowing system. On the X Window System, each window will
+have a close button in the menu bar. On Windows, this corresponds
+to a double click on the upper left box of the title bar, or
+the ``X'' box in Windows 95.
+
+%............................................................
+\Meth{void Exit(void)}
+\Indextt{Exit}
+
+This is the normal way to exit from a standard \V\ application. The
+overridden method can perform any special processing (e.g.,
+asking ``Are you sure?'') required. The default \code{Exit} will
+call \code{CloseAppWin} for each window created with \code{NewAppWin},
+and then exit from the windowing system.
+
+%............................................................
+\Meth{void KeyIn(vWindow* win, vKey key, unsigned int shift)}
+\Indextt{KeyIn}
+
+Any input key events not handled by the \code{vWindow} object are
+passed to \code{VApp::KeyIn}. See \code{KeyIn} in the \code{vWindow}
+section for details of using keys.
+
+%............................................................
+\Meth{vWindow* NewAppWin(vWindow* win, char* name, int w, int h,
+  vAppWinInfo* winInfo)}
+\Indextt{NewAppWin}
+
+The purpose of the \code{NewAppWin} method is to create a
+new instance of a window. Most likely, you will override
+\code{NewAppWin} with your own version, but you still \emph{must}
+call the base \code{vApp::NewAppWin} method \emph{after} your
+derived method has completed its initializations.
+
+The default behavior of the base \code{NewAppWin} class is to set
+the window title to \code{name}, and the width \code{w} and
+height \code{h}. Note that the height and width are of the
+\emph{canvas}, and not necessarily the whole app window. If you
+don't add a canvas to the command window, the results are not
+specified. Usually, your derived \code{NewAppWin} will create an
+instance of your derived \code{vCmdWindow} class, and you will
+pass its pointer in the \code{win} parameter. If the the \code{win}
+parameter is null, then a standard \code{vCmdWindow} will be
+created automatically, although that window won't be particularly
+useful to anyone.
+
+Your \code{NewAppWin} class may also create an instance of your
+derived \code{vAppWinInfo} class. You would pass its pointer to the
+\code{winInfo} parameter. If you pass a null, then the base \code{NewAppWin}
+method also  creates an instance of the standard \code{vAppWinInfo}
+class.
+
+The real work done by the base \code{NewAppWin} is to register
+the instance of the window with the internal \V\ run time system.
+This is why you must call the base \code{NewAppWin} method.
+
+\code{NewAppWin} returns a pointer to the object just created. Your
+derived code can return the value returned by the base
+\code{vApp::NewAppWin}, or the pointer it created itself.
+
+\subsection* {Example}
+
+The following shows a minimal example of deriving a \code{NewAppWin}
+method.
+
+\footnotesize
+
+\begin{verbatim}
+vWindow* myApp::NewAppWin(vWindow* win, char* name, int w, int h,
+  vAppWinInfo* winInfo)
+  {
+    // Create and register a window. Usually this derived method
+    // knows about the windows that need to be created, but
+    // it is also possible to create the window instance outside.
+
+    vWindow* thisWin = win;
+    vAppWinInfo* theWinInfo = winInfo;
+
+    if (!thisWin)   // Normal case: we will create the new window
+        thisWin = new myCmdWindow(myname, w, h);  // create window
+
+    // Now the application would do whatever it needed to create
+    // a new view -- opening a file, tracking information, etc.
+    // This information can be kept in the vAppWinInfo object.
+
+    if (!theWinInfo)               // Create if not supplied
+        vAppWinInfo* theWinInfo = new myAppWinInfo(name);
+
+    // Now carry out the default actions
+    return vApp::NewAppWin(thisWin, name, w, h, theWinInfo);
+  }
+\end{verbatim}
+\normalfont\normalsize
+
+\subsection* {Utility Methods} %--------------------------------------
+
+%............................................................
+\Meth{int DefaultHeight()}
+\Indextt{DefaultHeight}
+
+Returns a default window canvas height value in pixels corresponding to 24 lines
+of text in the default font.
+
+%............................................................
+\Meth{int DefaultWidth()}
+\Indextt{DefaultWidth}
+
+Returns a default window canvas width value in pixels corresponding to 80 columns
+of text in the default font.
+
+%............................................................
+\Meth{vFont GetDefaultFont(void)}
+\Indextt{GetDefaultFont}
+
+This method returns a \code{vFont} object representing the default
+system font. It is a convenience method, and probably not overly useful
+to application programs.
+
+%............................................................
+\Meth{vFont GetVVersion(int\& major, int\& minor)}
+\Indextt{GetVVersion}
+
+Returns the current major and minor version of \V.
+
+%............................................................
+\Meth{int IsRunning()}
+\Indextt{IsRunning}
+
+This method returns true if the windowing system is active and
+running. A false return means the program was started from
+a nonwindowing environment.
+
+%............................................................
+\Meth{int ScreenHeight()}
+\Indextt{ScreenHeight}
+
+Returns the overall height of the physical display screen in pixels.
+Note that this value may or may not be overly useful. On X,
+the \code{vCommandWindows} are drawn on the full display. On
+the Windows MDI version, the command windows all fall inside the
+MDI frame, and thus knowing the size of the whole screen is less
+useful.
+
+%............................................................
+\Meth{int ScreenWidth()}
+\Indextt{ScreenWidth}
+
+Returns the overall width of the physical display screen in pixels.
+See \code{ScreenHeight}.
+
+%............................................................
+\Meth{void SendWindowCommandAll(ItemVal id, int val, CmdType ctype)}
+\Indextt{SendWindowCommandAll}
+
+This method can be used to send a message to the \code{WindowCommand} method
+of \emph{ALL} currently active windows. This method is most useful for
+sending messages to windows from modeless dialogs. While messages to
+the \code{WindowCommand} method usually originate with the system
+in response to menu picks or command object selection, it can be
+useful to send the messages directly under program control. The
+\code{vDraw} sample program contains a good example of using
+\code{SendWindowCommandAll} (and \code{SetValueAll}) in \code{vdrwdlg.cpp}.
+There is no way to send a message to a specific window. The message
+is sent to all active windows.
+
+%............................................................
+\Meth{void SetAppTitle(char* title)}
+\Indextt{SetAppTitle}
+
+This method is used to set the title of the main application
+window. This currently only applies to the Microsoft Windows
+MDI version of \V. It is a no-op for the X version. It is still
+important that you choose a good title for your main window,
+and set it either with this method, or by providing a good
+name to the \code{vApp} initializer.
+
+%............................................................
+\Meth{void SetValueAll(ItemVal itemId, int Val,
+ItemSetType what)}
+\Indextt{SetValueAll}
+
+This method is similar to \code{vWindow::SetValue}, except that
+the control with the given \code{itemId} in \emph{ALL} currently
+active windows is set. This is useful to keep control values
+in different windows in sync. The only difference between
+\code{vApp :: SetValueAll} and \code{vWindow :: SetValueAll} is
+that the \code{vApp} version can be easily called from dialogs
+as well as windows.
+
+%............................................................
+\Meth{void SetStringAll(ItemVal itemId, char* title)}
+\Indextt{SetStringAll}
+
+This method is similar to \code{vWindow::SetString}, except that
+the string with the given \code{itemId} in \emph{ALL} currently
+active windows is set. This is useful to keep control strings
+in different windows in sync. The only difference between the
+\code{vApp::SetStringAll} version and the \code{vWindow::SetStringAll}
+version is that the \code{vApp} version can be easily called from
+dialogs as well as windows.
+
+%............................................................
+\Meth{int ShowList()}
+\Indextt{ShowList}
+
+This method is intended mostly for debugging, and will print
+on \code{stderr} the list of currently registered windows.
+
+%............................................................
+\Meth{vAppWinInfo *getAppWinInfo(vWindow* win)}
+\Indextt{getAppWinInfo}
+
+This method provides an easy way to retrieve the \code{vAppWinInfo}
+(or more typically, a derived class) object that is associated
+with a window.  By convention, when a window is first created,
+it and its associated \code{vAppWinInfo} object are tracked by
+\code{NewAppWin}. When a user action in a window causes a method
+in \code{vApp} to be invoked, the \code{this} of that window is
+usually sent to the \code{vApp} method.  You then use that
+\code{vWindow} pointer to call \code{getAppWinInfo} to get a
+pointer to the associated \code{vAppWinInfo} object. It will be
+up to you to determine what information that object has, and how
+to use it.
+
+\subsection* {Tasking} %--------------------------------------
+\index{multitasking}\index{tasking}\index{background processing}
+\index{compute bound applications}
+
+Some applications may have extensive computation requirements. In
+traditional programming environments, this is usually no problem.
+However, for GUI based applications, the code cannot simply
+perform extensive computation in response to some command event
+(such as a "Begin Computation" menu command). GUIs make a basic
+assumption that the application will process events relatively
+quickly. While computation is in process, the application will
+not receive additional events, and may appear to hang if the
+computation is too long.
+
+\V\ provides two different approaches to handling compute bound
+applications. The most straight forward approach is to have
+the computation periodically call the \V\ method \code{vApp::CheckEvents}.
+\code{CheckEvents} will process events, and pass the messages to the
+appropriate \V\ method. This method may be the most appropriate
+for applications such as simulations.
+\index{simulations}
+
+The second technique is to have the \V\ system call a work procedure
+periodically to allow some computation to be performed. This technique
+may be most appropriate for applications that have short computations
+that should be performed even if the user is not entering commands
+or interacting with the application. The technique is supported by
+the \code{WorkSlice} method.
+
+\Meth{CheckEvents()}
+\Indextt{CheckEvents}
+
+Most \V\ applications will \emph{not} need this utility. However, it is possible
+for some compute bound applications to lock out system response to the
+events needed to update the screen. If you notice that your application
+stops responding to input, or fails to consistently update items
+in your window, then place calls to \code{vApp::CheckEvents()} in
+your code somewhere. You may have to experiment how often you need
+to call it. It does have some overhead, so you don't want it to
+slow down your app. But it does need to get called enough so the
+system can keep up with the screen updates. This function needs
+no parameters, and returns no value.
+
+\Meth{EnableWorkSlice(long slice)}
+\Indextt{EnableWorkSlice}
+
+For applications that need computations to be performed continuously
+or periodically, even while the user is not interacting with the program,
+\V\ provides \code{EnableWorkSlice} and \code{WorkSlice}. After
+\code{EnableWorkSlice} has been called, \V\ will call the app's
+\code{WorkSlice} method every \code{slice} milliseconds.
+The \code{WorkSlice} method of every open \code{vCommandWindow}
+will also be called. Calling \code{EnableWorkSlice} with a zero
+value will stop the calls to the \code{WorkSlice} methods.
+
+\V\ uses a standard \V\ \code{vTimer} object to implement this
+behavior. Thus, all of the information about actual time intervals
+and limits on the number of timers discussed in the \code{vTimer}
+description apply to \code{EnableWorkSlice} and \code{WorkSlice}.
+
+\Meth{WorkSlice()}
+\Indextt{WorkSlice}
+
+When a \code{EnableWorkSlice} has been called with a positive value,
+\V\ calls \code{vApp::WorkSlice} at approximately the specified
+interval (or more
+likely, the overridden method in your app), as well as the
+\code{vWindow::WorkSlice} method of each open \code{vCommandWindow}.
+Your application can override the appropriate \code{WorkSlice}
+method to perform short, periodic computations. Theses
+computations should be shorter than the time interval specified for
+\code{EnableWorkSlice}. This may be difficult to ensure since
+different processors will work at different speeds. One simple
+way to be sure you don't get multiple calls to the \code{WorkSlice}
+method is to set a static variable on entry to the code. Note
+that \code{vCommandWindow} also has a \code{WorkSlice} method.
+The \code{WorkSlice} for the \code{vApp} is called first,
+followed by a call to each open \code{vCommandWindow}
+sequentially in no specific order.
+
+%............................................................
+
+\subsection* {See Also}
+
+vWindow, vAppWinInfo
+
+%-------------------------------------------------------------------------
+
+\Class{vAppWinInfo}
+\Indextt{vAppWinInfo}
+
+A utility class to interface views to models.
+\subsection* {Synopsis}
+
+\begin{description}
+	\item [Header:] \code{<v/vawinfo.h>}
+	\item [Class name:] vAppWinInfo
+\end{description}
+
+\subsection* {Description}
+
+This class is intended to be used as a base class for deriving
+your own \code{myAppWinInfo} class. The purpose of such a class is
+to serve as a controller data base for the MVC architecture. Typically,
+you would keep an \code{AppWinInfo} record for each view (open window)
+of the file or whatever represented by the model. For example, if
+your application were a text file viewer, the \code{AppWinInfo} record
+could track the file name, current line number, and viewing mode
+for each view of a file.
+
+\V\ makes using a \code{AppWinInfo} object easier by
+automatically tracking it when you create each new window with
+\code{NewAppWin}. You can then easily retrieve the \code{AppWinInfo}
+object associated with each window by using the \code{vApp::getAppWinInfo}
+method.
+
+\subsection* {Constructor} %------------------------------------
+
+\Meth{vAppWinInfo(char* infoName = "", void* ptr = 0)}
+\Indextt{vAppWinInfo}
+
+You can provide two values for the \code{vAppWinInfo} constructor.
+The first is a pointer to a character string which you can use
+to store some name meaningful to you application. The second is a
+\code{void *} pointer, and can be used to point to anything you
+want. The constructor makes a copy of the name string, but just
+copies the void pointer and does not copy the object pointed to.
+
+\subsection* {Utility Methods}
+
+%............................................................
+\Meth{virtual char* infoName()}
+\Indextt{infoName}
+
+Returns a pointer to the name supplied to the constructor.
+
+%............................................................
+\Meth{virtual void* getPtr()}
+\Indextt{getPtr}
+
+Returns the value of the pointer name supplied to the constructor.
+
+
+\subsection* {See Also}
+
+vApp

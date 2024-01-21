@@ -1,0 +1,1174 @@
+This is Info file octave.info, produced by Makeinfo version 1.67 from
+the input file ./octave.texi.
+
+START-INFO-DIR-ENTRY
+* Octave: (octave).	Interactive language for numerical computations.
+END-INFO-DIR-ENTRY
+
+   Copyright (C) 1996, 1997 John W. Eaton.
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+   Permission is granted to copy and distribute modified versions of
+this manual under the conditions for verbatim copying, provided that
+the entire resulting derived work is distributed under the terms of a
+permission notice identical to this one.
+
+   Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions.
+
+
+File: octave.info,  Node: Orthogonal Collocation,  Prev: Functions of One Variable,  Up: Quadrature
+
+Orthogonal Collocation
+======================
+
+ - Loadable Function: [R, A, B, Q] = colloc (N, "left", "right")
+     Compute derivative and integral weight matrices for orthogonal
+     collocation using the subroutines given in J. Villadsen and M. L.
+     Michelsen, `Solution of Differential Equation Models by Polynomial
+     Approximation'.
+
+   Here is an example of using `colloc' to generate weight matrices for
+solving the second order differential equation U' - ALPHA * U" = 0 with
+the boundary conditions U(0) = 0 and U(1) = 1.
+
+   First, we can generate the weight matrices for N points (including
+the endpoints of the interval), and incorporate the boundary conditions
+in the right hand side (for a specific value of ALPHA).
+
+     n = 7;
+     alpha = 0.1;
+     [r, a, b] = colloc (n-2, "left", "right");
+     at = a(2:n-1,2:n-1);
+     bt = b(2:n-1,2:n-1);
+     rhs = alpha * b(2:n-1,n) - a(2:n-1,n);
+
+   Then the solution at the roots R is
+
+     u = [ 0; (at - alpha * bt) \ rhs; 1]
+          => [ 0.00; 0.004; 0.01 0.00; 0.12; 0.62; 1.00 ]
+
+
+File: octave.info,  Node: Differential Equations,  Next: Optimization,  Prev: Quadrature,  Up: Top
+
+Differential Equations
+**********************
+
+   Octave has two built-in functions for solving differential equations.
+Both are based on reliable ODE solvers written in Fortran.
+
+* Menu:
+
+* Ordinary Differential Equations::
+* Differential-Algebraic Equations::
+
+
+File: octave.info,  Node: Ordinary Differential Equations,  Next: Differential-Algebraic Equations,  Prev: Differential Equations,  Up: Differential Equations
+
+Ordinary Differential Equations
+===============================
+
+   The function `lsode' can be used Solve ODEs of the form
+
+     dx
+     -- = f (x, t)
+     dt
+
+using Hindmarsh's ODE solver LSODE.
+
+ - Loadable Function:  lsode (FCN, X0, T, T_CRIT)
+     Return a matrix of X as a function of T, given the initial state
+     of the system X0.  Each row in the result matrix corresponds to
+     one of the elements in the vector T.  The first element of T
+     corresponds to the initial state X0, so that the first row of the
+     output is X0.
+
+     The first argument, FCN, is a string that names the function to
+     call to compute the vector of right hand sides for the set of
+     equations.  It must have the form
+
+          XDOT = f (X, T)
+
+     where XDOT and X are vectors and T is a scalar.
+
+     The fourth argument is optional, and may be used to specify a set
+     of times that the ODE solver should not integrate past.  It is
+     useful for avoiding difficulties with singularities and points
+     where there is a discontinuity in the derivative.
+
+   Here is an example of solving a set of three differential equations
+using `lsode'.  Given the function
+
+     function xdot = f (x, t)
+     
+       xdot = zeros (3,1);
+     
+       xdot(1) = 77.27 * (x(2) - x(1)*x(2) + x(1) \
+                 - 8.375e-06*x(1)^2);
+       xdot(2) = (x(3) - x(1)*x(2) - x(2)) / 77.27;
+       xdot(3) = 0.161*(x(1) - x(3));
+     
+     endfunction
+
+and the initial condition `x0 = [ 4; 1.1; 4 ]', the set of equations
+can be integrated using the command
+
+     t = linspace (0, 500, 1000);
+     
+     y = lsode ("f", x0, t);
+
+   If you try this, you will see that the value of the result changes
+dramatically between T = 0 and 5, and again around T = 305.  A more
+efficient set of output points might be
+
+     t = [0, logspace (-1, log10(303), 150), \
+             logspace (log10(304), log10(500), 150)];
+
+ - Loadable Function:  lsode_options (OPT, VAL)
+     When called with two arguments, this function allows you set
+     options parameters for the function `lsode'.  Given one argument,
+     `lsode_options' returns the value of the corresponding option.  If
+     no arguments are supplied, the names of all the available options
+     and their current values are displayed.
+
+   See Alan C. Hindmarsh, `ODEPACK, A Systematized Collection of ODE
+Solvers', in Scientific Computing, R. S. Stepleman, editor, (1983) for
+more information about the inner workings of `lsode'.
+
+
+File: octave.info,  Node: Differential-Algebraic Equations,  Prev: Ordinary Differential Equations,  Up: Differential Equations
+
+Differential-Algebraic Equations
+================================
+
+   The function `dassl' can be used Solve DAEs of the form
+
+     0 = f (x-dot, x, t),    x(t=0) = x_0, x-dot(t=0) = x-dot_0
+
+using Petzold's DAE solver DASSL.
+
+ - Loadable Function: [X, XDOT] = dassl (FCN, X0, XDOT0, T, T_CRIT)
+     Return a matrix of states and their first derivatives with respect
+     to T.  Each row in the result matrices correspond to one of the
+     elements in the vector T.  The first element of T corresponds to
+     the initial state X0 and derivative XDOT0, so that the first row
+     of the output X is X0 and the first row of the output XDOT is
+     XDOT0.
+
+     The first argument, FCN, is a string that names the function to
+     call to compute the vector of residuals for the set of equations.
+     It must have the form
+
+          RES = f (X, XDOT, T)
+
+     where X, XDOT, and RES are vectors, and T is a scalar.
+
+     The second and third arguments to `dassl' specify the initial
+     condition of the states and their derivatives, and the fourth
+     argument specifies a vector of output times at which the solution
+     is desired, including the time corresponding to the initial
+     condition.
+
+     The set of initial states and derivatives are not strictly
+     required to be consistent.  In practice, however, DASSL is not
+     very good at determining a consistent set for you, so it is best
+     if you ensure that the initial values result in the function
+     evaluating to zero.
+
+     The fifth argument is optional, and may be used to specify a set of
+     times that the DAE solver should not integrate past.  It is useful
+     for avoiding difficulties with singularities and points where
+     there is a discontinuity in the derivative.
+
+ - Loadable Function:  dassl_options (OPT, VAL)
+     When called with two arguments, this function allows you set
+     options parameters for the function `lsode'.  Given one argument,
+     `dassl_options' returns the value of the corresponding option.  If
+     no arguments are supplied, the names of all the available options
+     and their current values are displayed.
+
+   See K. E. Brenan, et al., `Numerical Solution of Initial-Value
+Problems in Differential-Algebraic Equations', North-Holland (1989) for
+more information about the implementation of DASSL.
+
+
+File: octave.info,  Node: Optimization,  Next: Statistics,  Prev: Differential Equations,  Up: Top
+
+Optimization
+************
+
+* Menu:
+
+* Quadratic Programming::
+* Nonlinear Programming::
+* Linear Least Squares::
+
+
+File: octave.info,  Node: Quadratic Programming,  Next: Nonlinear Programming,  Prev: Optimization,  Up: Optimization
+
+Quadratic Programming
+=====================
+
+ - Loadable Function: [X, OBJ, INFO, LAMBDA] = qpsol (X, H, C, LB, UB,
+          LB, A, UB)
+     Solve quadratic programs using Gill and Murray's QPSOL.  Because
+     QPSOL is not freely redistributable, this function is only
+     available if you have obtained your own copy of QPSOL.  *Note
+     Installation::.
+
+ - Loadable Function:  qpsol_options (OPT, VAL)
+     When called with two arguments, this function allows you set
+     options parameters for the function `qpsol'.  Given one argument,
+     `qpsol_options' returns the value of the corresponding option.  If
+     no arguments are supplied, the names of all the available options
+     and their current values are displayed.
+
+
+File: octave.info,  Node: Nonlinear Programming,  Next: Linear Least Squares,  Prev: Quadratic Programming,  Up: Optimization
+
+Nonlinear Programming
+=====================
+
+ - Loadable Function: [X, OBJ, INFO, LAMBDA] = npsol (X, PHI, LB, UB,
+          LB, A, UB, LB, G, UB)
+     Solve nonlinear programs using Gill and Murray's NPSOL.  Because
+     NPSOL is not freely redistributable, this function is only
+     available if you have obtained your own copy of NPSOL.  *Note
+     Installation::.
+
+     The second argument is a string containing the name of the
+     objective function to call.  The objective function must be of the
+     form
+
+          y = phi (x)
+
+     where x is a vector and y is a scalar.
+
+ - Loadable Function:  npsol_options (OPT, VAL)
+     When called with two arguments, this function allows you set
+     options parameters for the function `npsol'.  Given one argument,
+     `npsol_options' returns the value of the corresponding option.  If
+     no arguments are supplied, the names of all the available options
+     and their current values are displayed.
+
+
+File: octave.info,  Node: Linear Least Squares,  Prev: Nonlinear Programming,  Up: Optimization
+
+Linear Least Squares
+====================
+
+ - Function File: [BETA, V, R] = gls (Y, X, O)
+     Generalized least squares estimation for the multivariate model `Y
+     = X * B + E' with `mean (E) = 0' and `cov (vec (E)) = (S^2)*O',
+     where Y is a T by P matrix, X is a T by K matrix, B is a K by P
+     matrix, E is a T by P matrix, and O is a TP by TP matrix.
+
+     Each row of Y and X is an observation and each column a variable.
+
+     The return values BETA, V, and R are defined as follows.
+
+    BETA
+          The GLS estimator for B.
+
+    V
+          The GLS estimator for `S^2'.
+
+    R
+          The matrix of GLS residuals, `R = Y - X * BETA'.
+
+ - Function File: [BETA, SIGMA, R] = ols (Y, X)
+     Ordinary least squares estimation for the multivariate model `Y =
+     X*B + E' with `mean (E) = 0' and `cov (vec (E)) = kron (S, I)'.
+     where Y is a T by P matrix, X is a T by K matrix, B is a K by P
+     matrix, and E is a T by P matrix.
+
+     Each row of Y and X is an observation and each column a variable.
+
+     The return values BETA, SIGMA, and R are defined as follows.
+
+    BETA
+          The OLS estimator for B, `BETA = pinv (X) * Y', where `pinv
+          (X)' denotes the pseudoinverse of X.
+
+    SIGMA
+          The OLS estimator for the matrix S,
+
+               SIGMA = (Y-X*BETA)' * (Y-X*BETA) / (T-rank(X))
+
+    R
+          The matrix of OLS residuals, `R = Y - X * BETA'.
+
+
+File: octave.info,  Node: Statistics,  Next: Sets,  Prev: Optimization,  Up: Top
+
+Statistics
+**********
+
+   I hope that someday Octave will include more statistics functions.
+If you would like to help improve Octave in this area, please contact
+<bug-octave@bevo.che.wisc.edu>.
+
+ - Function File:  mean (X)
+     If X is a vector, compute the mean of the elements of X
+
+          mean (x) = SUM_i x(i) / N
+     If X is a matrix, compute the mean for each column and return them
+     in a row vector.
+
+ - Function File:  median (X)
+     If X is a vector, compute the median value of the elements of X.
+
+                      x(ceil(N/2)),             N odd
+          median(x) =
+                      (x(N/2) + x((N/2)+1))/2,  N even
+     If X is a matrix, compute the median value for each column
+     and return them in a row vector.
+
+ - Function File:  std (X)
+     If X is a vector, compute the standard deviation of the elements
+     of X.
+
+          std (x) = sqrt (sumsq (x - mean (x)) / (n - 1))
+     If X is a matrix, compute the standard deviation for each
+     column and return them in a row vector.
+
+ - Function File:  cov (X, Y)
+     If each row of X and Y is an observation and each column is a
+     variable, the (I,J)-th entry of `cov (X, Y)' is the covariance
+     between the I-th variable in X and the J-th variable in Y.  If
+     called with one argument, compute `cov (X, X)'.
+
+ - Function File:  corrcoef (X, Y)
+     If each row of X and Y is an observation and each column is a
+     variable, the (I,J)-th entry of `corrcoef (X, Y)' is the
+     correlation between the I-th variable in X and the J-th variable
+     in Y.  If called with one argument, compute `corrcoef (X, X)'.
+
+ - Function File:  kurtosis (X)
+     If X is a vector of length N, return the kurtosis
+
+          kurtosis (x) = N^(-1) std(x)^(-4) sum ((x - mean(x)).^4) - 3
+
+     of X.  If X is a matrix, return the row vector containing the
+     kurtosis of each column.
+
+ - Function File:  mahalanobis (X, Y)
+     Return the Mahalanobis' D-square distance between the multivariate
+     samples X and Y, which must have the same number of components
+     (columns), but may have a different number of observations (rows).
+
+ - Function File:  skewness (X)
+     If X is a vector of length N, return the skewness
+
+          skewness (x) = N^(-1) std(x)^(-3) sum ((x - mean(x)).^3)
+
+     of X.  If X is a matrix, return the row vector containing the
+     skewness of each column.
+
+
+File: octave.info,  Node: Sets,  Next: Polynomial Manipulations,  Prev: Statistics,  Up: Top
+
+Sets
+****
+
+   Octave has a limited set of functions for managing sets of data,
+where a set is defined as a collection unique elements.
+
+ - Function File:  create_set (X)
+     Return a row vector containing the unique values in X, sorted in
+     ascending order.  For example,
+
+          create_set ([ 1, 2; 3, 4; 4, 2 ])
+               => [ 1, 2, 3, 4 ]
+
+ - Function File:  union (X, Y)
+     Return the set of elements that are in either of the sets X and Y.
+     For example,
+
+          union ([ 1, 2, 4 ], [ 2, 3, 5 ])
+               => [ 1, 2, 3, 4, 5 ]
+
+ - Function File:  intersection (X, Y)
+     Return the set of elements that are in both sets X and Y.  For
+     example,
+
+          intersection ([ 1, 2, 3 ], [ 2, 3, 5 ])
+               => [ 2, 3 ]
+
+ - Function File:  complement (X, Y)
+     Return the elements of set Y that are not in set X.  For example,
+
+          complement ([ 1, 2, 3 ], [ 2, 3, 5 ])
+               => 5
+
+
+File: octave.info,  Node: Polynomial Manipulations,  Next: Control Theory,  Prev: Sets,  Up: Top
+
+Polynomial Manipulations
+************************
+
+   In Octave, a polynomial is represented by its coefficients (arranged
+in descending order).  For example, a vector  $c$ of length  N
+
+     p(x) = C(1) x^N + ... + C(N) x + C(N+1).
+
+ - Function File:  compan (C)
+     Compute the companion matrix corresponding to polynomial
+     coefficient vector C.
+
+     The companion matrix is
+
+               _                                                        _
+              |  -c(2)/c(1)   -c(3)/c(1)  ...  -c(N)/c(1)  -c(N+1)/c(1)  |
+              |       1            0      ...       0             0      |
+              |       0            1      ...       0             0      |
+          A = |       .            .   .            .             .      |
+              |       .            .       .        .             .      |
+              |       .            .           .    .             .      |
+              |_      0            0      ...       1             0     _|
+
+     The eigenvalues of the companion matrix are equal to the roots of
+     the polynomial.
+
+ - Function File:  conv (A, B)
+     Convolve two vectors.
+
+     `y = conv (a, b)' returns a vector of length equal to `length (a)
+     + length (b) - 1'.  If A and B are polynomial coefficient vectors,
+     `conv' returns the coefficients of the product polynomial.
+
+ - Function File:  deconv (Y, A)
+     Deconvolve two vectors.
+
+     `[b, r] = deconv (y, a)' solves for B and R such that `y = conv
+     (a, b) + r'.
+
+     If Y and A are polynomial coefficient vectors, B will contain the
+     coefficients of the polynomial quotient and R will be a remander
+     polynomial of lowest order.
+
+ - Function File:  poly (A)
+     If A is a square N-by-N matrix, `poly (A)' is the row vector of
+     the coefficients of `det (z * eye (N) - a)', the characteristic
+     polynomial of A.  If X is a vector, `poly (X)' is a vector of
+     coefficients of the polynomial whose roots are the elements of X.
+
+ - Function File:  polyderiv (C)
+     Return the coefficients of the derivative of the polynomial whose
+     coefficients are given by vector C.
+
+ - Function File:  polyfit (N, Y, N)
+     Return the coefficients of a polynomial P(X) of degree N that
+     minimizes `sumsq (p(x(i)) - y(i))',  to best fit the data in the
+     least squares sense.
+
+ - Function File:  polyinteg (C)
+     Return the coefficients of the integral the polynomial whose
+     coefficients are represented by the vector C.
+
+     The constant of integration is set to zero.
+
+ - Function File:  polyreduce (C)
+     Reduces a polynomial coefficient vector to a minimum number of
+     terms by stripping off any leading zeros.
+
+ - Function File:  polyval (C, X)
+     Evaluate a polynomial.
+
+     `polyval (C, X)' will evaluate the polynomial at the specified
+     value of X.
+
+     If X is a vector or matrix, the polynomial is evaluated at each of
+     the elements of X.
+
+ - Function File:  polyvalm (C, X)
+     Evaluate a polynomial in the matrix sense.
+
+     `polyvalm (C, X)' will evaluate the polynomial in the matrix
+     sense, i.e. matrix multiplication is used instead of element by
+     element multiplication as is used in polyval.
+
+     The argument X must be a square matrix.
+
+ - Function File:  residue (B, A, TOL)
+     If B and A are vectors of polynomial coefficients, then residue
+     calculates the partial fraction expansion corresponding to the
+     ratio of the two polynomials.
+
+     The function `residue' returns R, P, K, and E, where the vector R
+     contains the residue terms, P contains the pole values, K contains
+     the coefficients of a direct polynomial term (if it exists) and E
+     is a vector containing the powers of the denominators in the
+     partial fraction terms.
+
+     Assuming B and A represent polynomials  P (s) and Q(s)  we have:
+
+           P(s)    M       r(m)         N
+           ---- = SUM -------------  + SUM k(i)*s^(N-i)
+           Q(s)   m=1 (s-p(m))^e(m)    i=1
+
+     where M is the number of poles (the length of the R, P, and E
+     vectors) and N is the length of the K vector.
+
+     The argument TOL is optional, and if not specified, a default
+     value of 0.001 is assumed.  The tolerance value is used to
+     determine whether poles with small imaginary components are
+     declared real.  It is also used to determine if two poles are
+     distinct.  If the ratio of the imaginary part of a pole to the
+     real part is less than TOL, the imaginary part is discarded.  If
+     two poles are farther apart than TOL they are distinct.  For
+     example,
+
+           b = [1, 1, 1];
+          
+           a = [1, -5, 8, -4];
+          
+           [r, p, k, e] = residue (b, a);
+          
+               => r = [-2, 7, 3]
+          
+               => p = [2, 2, 1]
+          
+               => k = [](0x0)
+          
+               => e = [1, 2, 1]
+
+     which implies the following partial fraction expansion
+
+                  s^2 + s + 1       -2        7        3
+             ------------------- = ----- + ------- + -----
+             s^3 - 5s^2 + 8s - 4   (s-2)   (s-2)^2   (s-1)
+
+ - Function File:  roots (V)
+     For a vector V with N components, return the roots of the
+     polynomial
+
+          v(1) * z^(N-1) + ... + v(N-1) * z + v(N).
+
+
+File: octave.info,  Node: Control Theory,  Next: Signal Processing,  Prev: Polynomial Manipulations,  Up: Top
+
+Control Theory
+**************
+
+   Most of the functions described in this chapter were contributed by
+A. Scottedward Hodel <A.S.Hodel@eng.auburn.edu> and R. Bruce Tenison
+<Bruce.Tenison@eng.auburn.edu>.  They have also written a larger
+collection of functions for solving linear control problems.  It is
+currently being updated for Octave version 2, with snapshots of the
+sources available from `ftp://ftp.eng.auburn.edu/pub/hodel'.
+
+ - Function File: [N, M, P] = abcddim (A, B, C, D)
+     Check for compatibility of the dimensions of the matrices defining
+     the linear system [A, B, C, D] corresponding to
+
+          dx/dt = a x + b u
+          y = c x + d u
+
+     or a similar discrete-time system.
+
+     If the matrices are compatibly dimensioned, then `abcddim' returns
+
+    N
+          The number of system states.
+
+    M
+          The number of system inputs.
+
+    P
+          The number of system outputs.
+
+     Otherwise `abcddim' returns N = M = P = -1.
+
+ - Function File:  are (A, B, C, OPT)
+     Return the solution, X, of the algebraic Riccati equation
+
+          a' * x + x * a - x * b * x + c = 0
+
+     for identically dimensioned square matrices A, B, and C.  If B is
+     not square, `are' attempts to use `B*B'' instead.  If C is not
+     square, `are' attempts to use `C'*C') instead.
+
+     To form the solution, Laub's Schur method (IEEE Transactions on
+     Automatic Control, 1979) is applied to the appropriate Hamiltonian
+     matrix.
+
+     The optional argument OPT is passed to the eigenvalue balancing
+     routine.  If it is omitted, a value of `"B"' is assumed.
+
+ - Function File:  c2d (A, B, T)
+     Convert the continuous time system described by:
+
+          dx/dt = a x + b u
+
+     into a discrete time equivalent model
+
+          x[k+1] = Ad x[k] + Bd u[k]
+
+     via the matrix exponential assuming a zero-order hold on the input
+     and sample time T.
+
+ - Function File:  dare (A, B, C, R, OPT)
+     Return the solution, X of the discrete-time algebraic Riccati
+     equation
+
+          a' x a - x + a' x b (r + b' x b)^(-1) b' x a + c = 0
+
+     for matrices with dimensions:
+
+    A
+          N by N.
+
+    B
+          N by M.
+
+    C
+          N by N, symmetric positive semidefinite.
+
+    R
+          M by M, symmetric positive definite (invertible).
+
+     If C is not square, then the function attempts to use `C'*C'
+     instead.
+
+     To form the solution, Laub's Schur method (IEEE Transactions on
+     Automatic Control, 1979) is applied to the appropriate symplectic
+     matrix.
+
+     See also Ran and Rodman, `Stable Hermitian Solutions of Discrete
+     Algebraic Riccati Equations', Mathematics of Control, Signals and
+     Systems, Volume 5, Number 2 (1992).
+
+     The optional argument OPT is passed to the eigenvalue balancing
+     routine.  If it is omitted, a value of `"B"' is assumed.
+
+ - Function File:  dgram (A, B)
+     Return the discrete controllability or observability gramian for
+     the discrete time system described by
+
+          x[k+1] = A x[k] + B u[k]
+            y[k] = C x[k] + D u[k]
+
+     For example, `dgram (A, B)' returns the discrete controllability
+     gramian and `dgram (A', C')' returns the observability gramian.
+
+ - Function File: [L, M, P, E] = dlqe (A, G, C, SIGW, SIGV, Z)
+     Construct the linear quadratic estimator (Kalman filter) for the
+     discrete time system
+
+          x[k+1] = A x[k] + B u[k] + G w[k]
+            y[k] = C x[k] + D u[k] + w[k]
+
+     where W, V are zero-mean gaussian noise processes with respective
+     intensities `SIGW = cov (W, W)' and `SIGV = cov (V, V)'.
+
+     If specified, Z is `cov (W, V)'.  Otherwise `cov (W, V) = 0'.
+
+     The observer structure is
+
+          z[k+1] = A z[k] + B u[k] + k(y[k] - C z[k] - D u[k])
+
+     The following values are returned:
+
+    L
+          The observer gain, (A - ALC).  is stable.
+
+    M
+          The Riccati equation solution.
+
+    P
+          The estimate error covariance after the measurement update.
+
+    E
+          The closed loop poles of (A - ALC).
+
+ - Function File: [K, P, E] = dlqr (A, B, Q, R, Z)
+     Construct the linear quadratic regulator for the discrete time
+     system
+
+          x[k+1] = A x[k] + B u[k]
+
+     to minimize the cost functional
+
+          J = Sum (x' Q x + u' R u)
+
+     Z omitted or
+
+          J = Sum (x' Q x + u' R u + 2 x' Z u)
+
+     Z included.
+
+     The following values are returned:
+
+    K
+          The state feedback gain, (A - BK) is stable.
+
+    P
+          The solution of algebraic Riccati equation.
+
+    E
+          The closed loop poles of (A - BK).
+
+ - Function File:  dlyap (A, B)
+     Solve the discrete-time Lyapunov equation `a x a' - x + b = 0' for
+     square matrices A, B.  If B is not square, then the function
+     attempts to solve either
+
+          dx
+          -- = a x + b u
+          dt
+          
+          y = c x + d u
+
+     where W and V are zero-mean gaussian noise processes with
+     respective intensities
+
+          sigw = cov (w, w)
+          sigv = cov (v, v)
+
+     The optional argument Z is the cross-covariance `cov (W, V)'.  If
+     it is omitted, `cov (W, V) = 0' is assumed.
+
+     Observer structure is `dz/dt = A z + B u + k (y - C z - D u)'
+
+     The following values are returned:
+
+    K
+          The observer gain, (A - KC) is stable.
+
+    P
+          The solution of algebraic Riccati equation.
+
+    E
+          The vector of closed loop poles of (A - KC).
+
+ - Function File: [K, P, E] = lqr (A, B, Q, R, Z)
+     construct the linear quadratic regulator for the continuous time
+     system
+
+          dx
+          -- = A x + B u
+          dt
+
+     to minimize the cost functional
+
+                infinity
+                /
+            J = |  x' Q x + u' R u
+               /
+              t=0
+
+     Z omitted or
+
+                infinity
+                /
+            J = |  x' Q x + u' R u + 2 x' Z u
+               /
+              t=0
+
+     Z included.
+
+     The following values are returned:
+
+    K
+          The state feedback gain, (A - BK) is stable.
+
+    P
+          The stabilizing solution of appropriate algebraic Riccati
+          equation.
+
+    E
+          The vector of the closed loop poles of (A - BK).
+
+ - Function File:  lyap (A, B, C)
+     Solve the Lyapunov (or Sylvester) equation via the Bartels-Stewart
+     algorithm (Communications of the ACM, 1972).
+
+     If A, B, and C are specified, then `lyap' returns the solution of
+     the  Sylvester equation
+
+          a x + x b + c = 0
+
+     If only `(a, b)' are specified, then `lyap' returns the solution
+     of the Lyapunov equation
+
+          a' x + x a + b = 0
+
+     If B is not square, then `lyap' returns the solution of either
+
+          a' x + x a + b' b = 0
+
+     or
+
+          a x + x a' + b b' = 0
+
+     whichever is appropriate.
+
+ - Function File:  tzero (A, B, C, D, OPT)
+     Compute the transmission zeros of [A, B, C, D].
+
+     The optional argument OPT is passed to the eigenvalue balancing
+     routine.  If it is omitted, a value of `"B"' is assumed.
+
+
+File: octave.info,  Node: Signal Processing,  Next: Image Processing,  Prev: Control Theory,  Up: Top
+
+Signal Processing
+*****************
+
+   I hope that someday Octave will include more signal processing
+functions.  If you would like to help improve Octave in this area,
+please contact <bug-octave@bevo.che.wisc.edu>.
+
+ - Function File:  detrend (X, P)
+     If X is a vector, `detrend (X, P)' removes the best fit of a
+     polynomial of order P from the data X.
+
+     If X is a matrix, `detrend (X, P)' does the same for each column
+     in X.
+
+     The second argument is optional.  If it is not specified, a value
+     of 1 is assumed.  This corresponds to removing a linear trend.
+
+ - Function:  fft (A, N)
+     Compute the FFT of A using subroutines from FFTPACK.  If A is a
+     matrix, `fft' computes the FFT for each column of A.
+
+     If called with two arguments, N is expected to be an integer
+     specifying the number of elements of A to use.  If A is a matrix,
+     N specifies the number of rows of A to use.  If N is larger than
+     the size of A, A is resized and padded with zeros.
+
+ - Loadable Function:  ifft (A, N)
+     Compute the inverse FFT of A using subroutines from FFTPACK.  If A
+     is a matrix, `fft' computes the inverse FFT for each column of A.
+
+     If called with two arguments, N is expected to be an integer
+     specifying the number of elements of A to use.  If A is a matrix,
+     N specifies the number of rows of A to use.  If N is larger than
+     the size of A, A is resized and padded with zeros.
+
+ - Loadable Function:  fft2 (A, N, M)
+     Compute the two dimensional FFT of A.
+
+     The optional arguments N and M may be used specify the number of
+     rows and columns of A to use.  If either of these is larger than
+     the size of A, A is resized and padded with zeros.
+
+ - Loadable Function:  ifft2 (A, N, M)
+     Compute the two dimensional inverse FFT of A.
+
+     The optional arguments N and M may be used specify the number of
+     rows and columns of A to use.  If either of these is larger than
+     the size of A, A is resized and padded with zeros.
+
+ - Built-in Function:  fftconv (A, B, N)
+     Return the convolution of the vectors A and B, as a vector with
+     length equal to the `length (a) + length (b) - 1'.  If A and B are
+     the coefficient vectors of two polynomials, the returned value is
+     the coefficient vector of the product polynomial.
+
+     The computation uses the FFT by calling the function `fftfilt'.  If
+     the optional argument N is specified, an N-point FFT is used.
+
+ - Function File:  fftfilt (B, X, N)
+     With two arguments, `fftfilt' filters X with the FIR filter B
+     using the FFT.
+
+     Given the optional third argument, N, `fftfilt' uses the
+     overlap-add method to filter X with B using an N-point FFT.
+
+ - Loadable Function: y = filter (B, A, X)
+     Return the solution to the following linear, time-invariant
+     difference equation:
+
+             N                   M
+            SUM a(k+1) y(n-k) = SUM b(k+1) x(n-k)      for 1<=n<=length(x)
+            k=0                 k=0
+
+     where  N=length(a)-1 and M=length(b)-1.  An equivalent form of
+     this equation is:
+
+                      N                   M
+            y(n) = - SUM c(k+1) y(n-k) + SUM d(k+1) x(n-k)  for 1<=n<=length(x)
+                     k=1                 k=0
+
+     where  c = a/a(1) and d = b/a(1).
+
+     In terms of the z-transform, y is the result of passing the
+     discrete- time signal x through a system characterized by the
+     following rational system function:
+
+                       M
+                      SUM d(k+1) z^(-k)
+                      k=0
+            H(z) = ----------------------
+                         N
+                    1 + SUM c(k+1) z(-k)
+                        k=1
+
+ - Loadable Function: [Y, SF] = filter (B, A, X, SI)
+     This is the same as the `filter' function described above, except
+     that SI is taken as the initial state of the system and the final
+     state is returned as SF.  The state vector is a column vector
+     whose length is equal to the length of the longest coefficient
+     vector minus one.  If SI is not set, the initial state vector is
+     set to all zeros.
+
+ - Function File: [H, W] = freqz (B, A, N, "whole")
+     Return the complex frequency response H of the rational IIR filter
+     whose numerator and denominator coefficients are B and A,
+     respectively.  The response is evaluated at N angular frequencies
+     between 0 and  2*pi.
+
+     The output value W is a vector of the frequencies.
+
+     If the fourth argument is omitted, the response is evaluated at
+     frequencies between 0 and  pi.
+
+     If N is omitted, a value of 512 is assumed.
+
+     If A is omitted, the denominator is assumed to be 1 (this
+     corresponds to a simple FIR filter).
+
+     For fastest computation, N should factor into a small number of
+     small primes.
+
+ - Function File:  sinc (X)
+     Return  sin(pi*x)/(pi*x).
+
+
+File: octave.info,  Node: Image Processing,  Next: Audio Processing,  Prev: Signal Processing,  Up: Top
+
+Image Processing
+****************
+
+   To display images using these functions, you must be using Octave
+with the X Window System, and you must have either `xloadimage' or `xv'
+installed.  You do not need to be running X in order to manipulate
+images, however, so some of these functions may be useful even if you
+are not able to view the results.
+
+   Loading images only works with Octave's image format (a file with a
+matrix containing the image data, and a matrix containing the
+colormap).  Contributions of robust, well-written functions to read
+other image formats are welcome.  If you can provide them, or would like
+to improve Octave's image processing capabilities in other ways, please
+contact <bug-octave@bevo.che.wisc.edu>.
+
+ - Function File:  colormap (MAP)
+ - Function File:  colormap ("default")
+     Set the current colormap.
+
+     `colormap (MAP)' sets the current colormap to MAP.  The color map
+     should be an N row by 3 column matrix.  The columns contain red,
+     green, and blue intensities respectively.  All entries should be
+     between 0 and 1 inclusive.  The new colormap is returned.
+
+     `colormap ("default")' restores the default colormap (a gray scale
+     colormap with 64 entries).  The default colormap is returned.
+
+     With no arguments, `colormap' returns the current color map.
+
+ - Function File:  gray (N)
+     Return a gray colormap with N entries corresponding to values from
+     0 to N.  The argument N should be a scalar.  If it is omitted, 64
+     is assumed.
+
+ - Function File: [IMG, MAP] = gray2ind ()
+     Convert a gray scale intensity image to an Octave indexed image.
+
+ - Function File:  image (X, ZOOM)
+     Display a matrix as a color image.  The elements of X are indices
+     into the current colormap and should have values between 1 and the
+     length of the colormap.  If ZOOM is omitted, a value of 4 is
+     assumed.
+
+ - Function File:  imagesc (X, ZOOM)
+     Display a scaled version of the matrix X as a color image.  The
+     matrix is scaled so that its entries are indices into the current
+     colormap.  The scaled matrix is returned.  If ZOOM is omitted, a
+     value of 4 is assumed.
+
+ - Function File:  imshow (X, MAP)
+ - Function File:  imshow (X, N)
+ - Function File:  imshow (I, N)
+ - Function File:  imshow (R, G, B)
+     Display images.
+
+     `imshow (X)' displays an indexed image using the current colormap.
+
+     `imshow (X, MAP)' displays an indexed image using the specified
+     colormap.
+
+     `imshow (I, N)' displays a gray scale intensity image.
+
+     `imshow (R, G, B)' displays an RGB image.
+
+ - Function File:  ind2gray (X, MAP)
+     Convert an Octave indexed image to a gray scale intensity image.
+     If MAP is omitted, the current colormap is used to determine the
+     intensities.
+
+ - Function File: [R, G, B] = ind2rgb (X, MAP)
+     Convert an indexed image to red, green, and blue color components.
+     If MAP is omitted, the current colormap is used for the conversion.
+
+ - Function File: [X, MAP] = loadimage (FILE)
+     Load an image file and it's associated color map from the specified
+     FILE.  The image must be stored in Octave's image format.
+
+ - Function File:  rgb2ntsc (RGB)
+     Image format conversion.
+
+ - Function File:  ntsc2rgb (YIQ)
+     Image format conversion.
+
+ - Function File:  ocean (N)
+     Create color colormap.  The argument N should be a scalar.  If it
+     is omitted, 64 is assumed.
+
+ - Function File: [X, MAP] = rgb2ind (R, G, B)
+     Convert and RGB image to an Octave indexed image.
+
+ - Function File:  saveimage (FILE, X, FMT, MAP)
+     Save the matrix X to FILE in image format FMT.  Valid values for
+     FMT are
+
+    `"img"'
+          Octave's image format.  The current colormap is also saved in
+          the file.
+
+    `"ppm"'
+          Portable pixmap format.
+
+    `"ps"'
+          PostScript format.  Note that images saved in PostScript
+          format can not be read back into Octave with loadimage.
+
+     If the fourth argument is supplied, the specified colormap will
+     also be saved along with the image.
+
+     Note: if the colormap contains only two entries and these entries
+     are black and white, the bitmap ppm and PostScript formats are
+     used.  If the image is a gray scale image (the entries within each
+     row of the colormap are equal) the gray scale ppm and PostScript
+     image formats are used, otherwise the full color formats are used.
+
+ - Built-in Variable: IMAGEPATH
+     A colon separated list of directories in which to search for image
+     files.
+
+
+File: octave.info,  Node: Audio Processing,  Next: System Utilities,  Prev: Image Processing,  Up: Top
+
+Audio Processing
+****************
+
+   Octave provides a few functions for dealing with audio data.  An
+audio `sample' is a single output value from an A/D converter, i.e., a
+small integer number (usually 8 or 16 bits), and audio data is just a
+series of such samples.  It can be characterized by three parameters:
+the sampling rate (measured in samples per second or Hz, e.g. 8000 or
+44100), the number of bits per sample (e.g. 8 or 16), and the number of
+channels (1 for mono, 2 for stereo, etc.).
+
+   There are many different formats for representing such data.
+Currently, only the two most popular, *linear encoding* and *mu-law
+encoding*, are supported by Octave.  There is an excellent FAQ on audio
+formats by Guido van Rossum <guido@cwi.nl> which can be found at any
+FAQ ftp site, in particular in the directory
+`/pub/usenet/news.answers/audio-fmts' of the archive site
+`rtfm.mit.edu'.
+
+   Octave simply treats audio data as vectors of samples (non-mono data
+are not supported yet).  It is assumed that audio files using linear
+encoding have one of the extensions `lin' or `raw', and that files
+holding data in mu-law encoding end in `au', `mu', or `snd'.
+
+ - Function File:  lin2mu (X)
+     If the vector X represents mono audio data in 8- or 16-bit linear
+     encoding, `lin2mu (X)' is the corresponding mu-law encoding.
+
+ - Function File:  mu2lin (X, BPS)
+     If the vector X represents mono audio data in mu-law encoding,
+     `mu2lin' converts it to linear encoding.  The optional argument
+     BPS specifies whether the input data uses 8 bit per sample
+     (default) or 16 bit.
+
+ - Function File:  loadaudio (NAME, EXT, BPS)
+     Loads audio data from the file `NAME.EXT' into the vector X.
+
+     The extension EXT determines how the data in the audio file is
+     interpreted;  the extensions `lin' (default) and `raw' correspond
+     to linear, the extensions `au', `mu', or `snd' to mu-law encoding.
+
+     The argument BPS can be either 8 (default) or 16, and specifies
+     the number of bits per sample used in the audio file.
+
+ - Function File:  saveaudio (NAME, X, EXT, BPS)
+     Saves a vector X of audio data to the file `NAME.EXT'.  The
+     optional parameters EXT and BPS determine the encoding and the
+     number of bits per sample used in the audio file (see
+     `loadaudio');  defaults are `lin' and 8, respectively.
+
+   The following functions for audio I/O require special A/D hardware
+and operating system support.  It is assumed that audio data in linear
+encoding can be played and recorded by reading from and writing to
+`/dev/dsp', and that similarly `/dev/audio' is used for mu-law
+encoding.  These file names are system-dependent.  Improvements so that
+these functions will work without modification on a wide variety of
+hardware are welcome.
+
+ - Function File:  playaudio (NAME, EXT)
+ - Function File:  playaudio (X)
+     Plays the audio file `NAME.EXT' or the audio data stored in the
+     vector X.
+
+ - Function File:  record (SEC, SAMPLING_RATE)
+     Records SEC seconds of audio input into the vector X.  The default
+     value for SAMPLING_RATE is 8000 samples per second, or 8kHz.  The
+     program waits until the user types <RET> and then immediately
+     starts to record.
+
+ - Function File:  setaudio (TYPE)
+ - Function File:  setaudio (TYPE, VALUE)
+     Set or display various properties of your mixer hardware.
+
+     For example, if `vol' corresponds to the volume property, you can
+     set it to 50 (percent) by `setaudio ("vol", 50)'.
+
+     This is an simple experimental program to control the audio
+     hardware settings.  It assumes that there is a `mixer' program
+     which can be used as `mixer TYPE VALUE', and simply executes
+     `system ("mixer TYPE VALUE")'.  Future releases might get rid of
+     this assumption by using the `fcntl' interface.
+
+
+File: octave.info,  Node: System Utilities,  Next: Tips,  Prev: Audio Processing,  Up: Top
+
+System Utilities
+****************
+
+   This chapter describes the functions that are available to allow you
+to get information about what is happening outside of Octave, while it
+is still running, and use this information in your program.  For
+example, you can get information about environment variables, the
+current time, and even start other programs from the Octave prompt.
+
+* Menu:
+
+* Timing Utilities::
+* Filesystem Utilities::
+* Controlling Subprocesses::
+* Process ID Information::
+* Environment Variables::
+* Current Working Directory::
+* Password Database Functions::
+* Group Database Functions::
+* System Information::
+

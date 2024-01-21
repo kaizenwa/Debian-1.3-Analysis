@@ -1,0 +1,165 @@
+.\" Hey Emacs! This file is -*- nroff -*- source.
+.\"
+.\" Copyright (C) 1993 Rickard E. Faith (faith@cs.unc.edu)
+.\" Copyright (C) 1994 Andries E. Brouwer (aeb@cwi.nl)
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\"
+.\" Modified Tue Jan 16 19:48:00 MET 1996 by Patrick Rother (krd@burn.rhein-ruhr.de)
+.\"
+.TH MOUNT 2 "16. Januar 1996" "Linux 1.1.67" "Systemaufrufe"
+.SH BEZEICHNUNG
+mount, umount \- Aufsetzen und Entfernen von Dateisystemen.
+.SH SYNTAX
+.B #include <sys/mount.h>
+.br
+.B #include <linux/fs.h>
+.sp
+.BI "int mount(const char *" specialfile ", const char * " dir
+.BI ", const char * " filesystemtype ", unsigned long " rwflag
+.BI ", const void * " data );
+.sp
+.BI "int umount(const char *" specialfile );
+.sp
+.BI "int umount(const char *" dir );
+.SH BESCHREIBUNG
+.B mount
+setzt das durch
+.I specialfile
+angegebene Dateisystem (welches oft eine Geräte-Datei ist), auf das Verzeichnis
+.IR dir
+auf.
+
+.B umount
+entfernt die Dateisystemanbindung
+.IR specialfile
+oder
+.IR dir .
+
+Nur der Superuser darf Dateisysteme aufsetzen und entfernen.
+
+Das Argument
+.IR filesystemtype
+darf nur einen der Werte aus /proc/filesystems
+(wie "minix", "ext2", "msdos", "proc", "nfs", "iso9660" etc.) annehmen.
+
+Das Argument
+.IR rwflag
+hat die magic number 0xC0ED in den oberen 16 bit
+und diverse Mountflags (wie definiert in <linux/fs.h>)
+in den unteren 16 bit:
+.nf
+#define MS_RDONLY    1 /* setze read-only auf */
+#define MS_NOSUID    2 /* ignoriere suid- und sgid-bits */
+#define MS_NODEV     4 /* verbiete Zugriff auf Gerätedateien */
+#define MS_NOEXEC    8 /* verbiete Programmausführung */
+#define MS_SYNC     16 /* Schreibzugriffe werden sofort auf das Medium geschrieben */
+#define MS_REMOUNT  32 /* verändere Flags eines aufgesetzen Dateisystems */
+#define MS_MGC_VAL 0xC0ED0000
+.fi
+Wenn die magic number nicht vorhanden ist werden die letzten zwei Argumente nicht benutzt.
+
+Das Argument
+.IR data
+wird von den verschiedenen Dateisystemen interpretiert.
+
+.SH RÜCKGABEWERT
+Bei Erfolg wird Null zurückgegeben. Bei Fehler wird \-1 zurückgegeben und
+.I errno
+entsprechend gesetzt.
+.SH FEHLER
+Die Fehlerwerte unten resultieren aus Dateisystemunabhängigen Fehlern.
+Jeder Dateisystemtyp kann seine eigenen speziellen Fehlerwerter und seine
+eigenes spezielles verhalten aufweisen. Siehe Kernel-Quellcode für Details.
+
+.TP 0.8i
+.B EPERM
+The Anwender ist nicht der Superuser.
+.TP
+.B ENODEV
+.I Filesystemtype
+wird nicht vom Kernel unterstüzt.
+.TP
+.B ENOTBLK
+.I Specialfile
+ist kein block device (wenn ein device erforderlich war).
+.TP
+.B EBUSY
+.I Specialfile
+ist bereits aufgesetzt. Oder es kann kann nicht auf read-only umgesetzt werden,
+weil noch Dateien darauf für Schreibzugriff geöffnet sind.
+Oder es kann nicht nach
+.I dir
+aufgesetzt werden, weil
+.I dir
+es besetzt ist (es ist Arbeitsverzeichnis eines Prozesses,
+Aufsatzpunkt eines anderen Gerätes, hat geöffnete Dateien, etc.).
+.TP
+.B EINVAL
+.I Specialfile
+hat einen ungültigen Superblock.
+Oder es wurde eine Umsetzung versucht, während
+.I specialfile
+noch gar nicht aufgesetzt war auf
+.IR dir .
+Oder es wurde ein Absetzen versucht, wobei
+.I dir
+gar nicht aufgesetzt war.
+.TP
+.B EFAULT
+Einer der pointer arguments zeigt nach ausserhalb des Addressraums des Benutzers.
+.TP
+.B ENOMEM
+Der Kernel konnte keine freie Seite belegen um Dateinamen oder Daten darin abzuspeichern.
+.TP
+.B ENAMETOOLONG
+Ein Pfadname war länger als MAXPATHLEN.
+.TP
+.B ENOENT
+Ein Pfadname war leer oder hatte eine nicht existierende Komponente.
+.TP
+.B ENOTDIR
+Das zweite Argument oder ein prefix des ersten Arguments ist kein Verzeichnis.
+.TP
+.B EACCES
+Eine Komponente eines Pfades war nicht durchsuchbar.
+.br
+Oder es wurde versucht ein read-only-Dateisystem ohne Angabe des
+MS_RDONLY-flag aufzusetzen.
+.br
+Oder das block device
+.I Specialfile
+befindet sich auf einem Dateisystem, welches mit der Option MS_NODEV 
+aufgesetzt ist.
+.TP
+.B ENXIO
+Die major number des block device
+.I specialfile
+ist ausserhalb des gültigen Bereichs.
+.TP
+.B EMFILE
+(Falls kein block device erforderlich ist:)
+Die Tabelle der dummy devices ist voll.
+.SH "KONFORM ZU"
+Diese Funktionen sind ziemlich Linux-spezifisch.
+.SH "SIEHE AUCH"
+.BR mount (8),
+.BR umount (8).

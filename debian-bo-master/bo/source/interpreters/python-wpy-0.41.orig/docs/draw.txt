@@ -1,0 +1,362 @@
+Drawing
+
+All drawing in wpy is done to a "device context", an object representing
+the screen, a printer or a bitmap.  A device context or "DC" is associated
+with each view object you have.  A DC contains a number of drawing tools
+such as pens, brushes and fonts.  All drawing methods use these tools.  For
+example, if you draw a line, the current pen is used.  When you draw to a DC,
+the system prepares the DC for the type of output device (screen, printer, etc.)
+and it uses the drawing tools you have selected for that DC.
+
+Although a wpy device context is based on a Windows DC, drawing in wpy is
+much simpler.  A wpy DC is not shared with any other application or object,
+so it is not necessary to replace drawing tools with the original tools in order
+to return the DC to its original configuration.  When running on Windows,
+the system supplies this logic as required.  Also, any tools selected into
+a device context stay there until replaced, so it is often unnecessary to
+keep replacing tools.  Windows would return a DC with default tools for each
+call.
+
+Almost all drawing in wpy is done in response to an OnDraw(self, DC) message.
+You must always override this view method to display your view of the document.
+To draw to a view, just wait for an OnDraw() message and then call the
+drawing methods of the DC given.  An OnDraw() message is sent when the view is
+first displayed or when an area of the view is declared invalid by a call to
+InvalidateRect().
+
+The same OnDraw() mechanism is used when drawing to a printer.  Although the
+DC is a printer DC, the same code will draw to the printer just as it draws
+to the screen.  If you need to distinguish between the screen and a printer,
+check the wpyIsPrinting attribute.
+
+If you change an attribute of a DC the change will persist, and each time you
+are given a DC it will have the tools last assigned to it.  For example, if you
+change the pen in the DC with a call to SelectObject(), the next OnDraw() message
+will have a DC with the changed pen.  This makes it easy to fix a pen, brush, font
+etc. in a DC once and for all.  But if you want to change a pen to a different pen,
+you must call SelectObject() for each change.  If you never call SelectObject, a
+default drawing tool is used.
+
+When you draw an object with DrawText(), LineTo() etc. the return value is an object
+which has wpyLocX/Y and wpySizeX/Y and other attributes depending on the object
+drawn.  You can add your own attributes to the returned object too.  The CScrollView
+method GetDrawnObject() is available to return these drawn objects given the view
+coordinates (x, y).  This may be used, for example, to respond to a mouse click over
+a piece of text in a web browser.
+
+It is sometimes necessary to draw other than in response to an OnDraw message.
+For example, you must draw to the view directly to draw lines or boxes with the
+mouse.  In this case, call DC = view.GetDC() to return the DC associated with
+the view.  Then call the drawing methods of the DC as before.  The tools will be the
+same as the tools used for OnDraw().  You must call view.ReleaseDC(DC) as soon as
+you are done drawing, and you must not save a copy of DC for later use.  You must
+call ReleaseDC before you exit the current function.  It is a "feature" of Windows
+that this DC is a volatile pointer and you must call GetDC and ReleaseDC very
+frequently.  Since you will probably be drawing with the mouse to need this feature,
+you will have a call to GetDC and ReleaseDC at the top and bottom of OnMouseMove().
+
+
+class CDC
+
+Class CDC represents a device context.  See above.  Device contexts are never
+constructed by the user.  They are made available as method arguments.
+
+Instance Variables
+
+wpyIsPrinting, int
+	0/1 if OnDraw() is called for printing.  Only valid
+	within OnDraw().
+wpySizeX/Y, int
+	The size of the display surface.
+wpyOneMeter, int
+	The number of pixels in one meter.
+wpyPrintPoint, float
+	The number of pixels in a printer's point ( 1/72 inch).
+wpyTextColor, 3-tuple
+	The color to draw text, as the tuple (red, green, blue).  The
+	colors have values from 0 to 255.
+
+Methods
+
+DrawText(self, text, x, y, max_width = 0, justify = "left")
+The return value is a CDrawnText instance.
+
+text, string
+	Text to draw.
+x, y, int
+	The location to draw the text in pixels.  The anchor is "nw", the
+	upper left corner.
+max_width, int
+	If specified, a maximum width in pixels for the text.  If text exceeds
+	this width, it is broken into lines at a blank.  Otherwise, the text can
+	be any length.  A newline always breaks the text.
+justify, one of "left", "right", "center"
+	How to display multiline text.  Has no effect unless max_width is entered too.
+
+	Draw text.  Text will be broken into multiple lines at newline characters.
+
+GetTextExtent(self, text)
+string text
+	Return the size of the text as the tuple (width, height).  Needed to
+	do text layout and drawing.  Within view::OnDraw(), you must call this
+	with the device context given, as "DC.GetTextExtent()".  This method
+	may also be called for a window, and it uses the window's device
+	context.  Do not use "self.GetTextExtent()" within OnDraw().
+
+LineTo(self, x, y)
+The return value is a CDrawnLine instance.
+
+x, y, int
+	The ending location of the line, and the new current location.
+
+	Draw a line using the current pen from the current location (see MoveTo) to
+	the specified location, and update the current location.
+
+MoveTo(self, x, y)
+x, y, int
+	Set the current location to (x, y).
+
+Arc(self, x, y, w, h, start, extent):
+Draw an arc made of the ellipse in the rectangle x, y, w, h, starting
+from the angle "start" counter clockwise through the angle "extent" in degrees.
+The return value is a CDrawnArc instance.
+
+Chord(self, x, y, w, h, start, extent):
+Draw a chord made of the ellipse in the rectangle x, y, w, h, starting
+from the angle "start" counter clockwise through the angle "extent" in degrees.
+The return value is a CDrawnArc instance.
+
+Circle(self, x, y, radius):
+Draw a circle centered at (x, y) with the given radius.
+The return value is a CDrawnEllipse instance.
+
+Ellipse(self, x, y, w, h):
+Draw an ellipse in the rectangle specified.
+The return value is a CDrawnEllipse instance.
+
+Pie(self, x, y, w, h, start, extent):
+Draw a pie slice made of the ellipse in the rectangle x, y, w, h, starting
+from the angle "start" counter clockwise through the angle "extent" in degrees.
+The return value is a CDrawnArc instance.
+
+Polygon(self, points):
+Draw a closed polygon made of the points in the list "points"
+consisting of tuples (x, y).
+The return value is a CDrawnPolygon instance.
+
+Rectangle(self, x, y, w, h):
+The return value is a CDrawnRectangle instance.
+
+x, y, w, h, int
+	Draw a rectangle with "w" width and "h" height at (x, y) using the current
+	pen and brush.
+
+DrawImage(self, image, x, y)
+The return value is a CDrawnImage instance.
+
+image, a CImage instance.
+	The image object to draw.
+x, y, int
+	The location to draw the image in pixels.  The anchor is "nw", the
+	upper left corner.
+
+SelectObject(self, object)
+object, a drawing object such as a pen or font
+	Replace the current drawing object in the device context with the specified
+	new drawing object, and return the old object.
+
+SetTextColor(self, color)
+	Change the color to draw text.  "Color" is the tuple (r, g, b).
+	Return the previous color.
+
+
+class CBrush
+
+Class CBrush represents a brush, a drawing tool.
+
+Instance Variables
+
+wpyRed, wpyGreen, wpyBlue, int 0 to 255, readonly after Create()
+	The color of the brush.
+
+Methods
+
+__init__(self, rgb = (0, 0, 0))
+	Construct a brush with the color given.
+
+Create(self)
+	Create the brush using the underlying GUI.  Return self.
+
+
+class CPen
+
+Class CPen represents a pen, a drawing tool.
+
+Instance Variables
+
+wpyWidth, int, readonly after Create()
+	The width of the pen in pixels.
+wpyRed, wpyGreen, wpyBlue, int 0 to 255, readonly after Create()
+	The color of the pen.
+wpyStyle, int, readonly after Create()
+	The style of the pen.
+
+Methods
+
+__init__(self, width = 1, rgb = (0, 0, 0), style = wpycon.PS_SOLID)
+	Construct a pen with the attributes given.
+
+Create(self)
+	Create the pen using the underlying GUI.  Return self.
+
+Class CFont
+
+Class CFont represents a font, a drawing tool.
+
+Instance Variables
+
+wpyFamily, wpyHeight, wpyWeight		Equal to the __init__ arguments.
+
+Methods
+
+__init__(self, family, height = 0, weight = wpycon.FW_NORMAL)
+family, string
+	The general type of font.  It must be one of the strings:
+		"swiss"		A proportional font without serifs such as Helvetica.
+		"roman"		A proportional font with serifs such as Times Roman.
+		"modern"	A fixed width font such as Courier.
+	The family string can be followed by "italic", as in "roman italic".
+	A feature to specify a more specific font will be added later, but the
+	"family" will still be required in case the more specific font is not
+	available.
+height, int
+	The size of the font in printer's points.  Or use zero to specify a default size.
+weight, int
+	The weight of the font; that is, how dark it is.  For example, FW_NORMAL
+	and FW_BOLD are available on most systems.
+
+Create(self)
+	Create the font using the underlying GUI.  Return self.
+
+Bugs:	The function used to map fonts to X fonts when using Tk is primitive.
+
+
+
+Class CImage represents a color bitmap.  It is not a drawing tool.
+
+Instance Variables
+
+wpySizeX/Y, int, readonly after Create()
+	The size of the bitmap in pixels.
+
+Methods
+
+__init__(self, filename = None)
+	Construct an image object, record the filename.
+
+Create(self)
+	Create the image using the underlying GUI.  Initialize the bitmap
+	from the filename (currently the only bitmap creation method).
+	The size of the bitmap is self.wpySizeX/Y.  If there was an error
+	in creating the bitmap, the size is (0, 0).  You should test the
+	size before using the CImage object.
+
+	The file formats currently available are whatever Tk supports for
+	Unix (currently GIF and PPM), and BMP, DIB, GIF and PPM on Windows.
+	The file name extension is used to decide what read method to use,
+	so the file name must end in one of the above extensions, ".gif" etc.
+
+
+class CDrawnLine
+	Class CDrawnLine represents a line drawn by LineTo().
+
+Instance Variables
+
+wpyLocX, wpyLocY, wpySizeX, wpySizeY
+	The bounding box for the line.
+wpyStartX, wpyStartY, wpyEndX, wpyEndY
+	The starting and ending points.
+wpyPen
+	The pen in effect in the DC when the text was drawn.
+
+The following attributes can be changed and then re-drawn with view::Redraw():
+	wpyPen
+
+
+
+class CDrawnArc
+	Class CDrawnArc represents an arc, pie slice or chord.
+
+class CDrawnEllipse
+	Class CDrawnEllipse represents an ellipse drawn by Ellipse() or
+	a circle drawn by Circle().
+
+class CDrawnPolygon
+	Class CDrawnPolygon represents a polygon drawn by Polygon().
+
+class CDrawnRectangle
+	Class CDrawnRectangle represents a rectangle drawn by Rectangle().
+
+Instance Variables
+
+wpyLocX, wpyLocY, wpySizeX, wpySizeY
+	The dimensions of the rectangle.
+wpyPen
+	The pen in effect in the DC when the text was drawn.
+wpyBrush
+	The brush in effect in the DC when the text was drawn.
+
+The following attributes can be changed and then re-drawn with view::Redraw():
+	wpyPen, wpyBrush
+
+
+class CDrawnText
+	Class CDrawnText represents a piece of text drawn by DrawText().
+
+Instance Variables
+
+wpyLocX, wpyLocY, wpySizeX, wpySizeY
+	The bounding box for the text.
+wpyText
+	The text drawn.
+wpyTextColor
+	The text color in effect in the DC when the text was drawn as (r, g, b).
+wpyFont
+	The font in effect in the DC when the text was drawn.
+
+The following attributes can be changed and then re-drawn with view::Redraw():
+	wpyText, wpyFont, wpyTextColor
+BUG:  The effect of redrawing multi-line text is undefined.
+
+Methods
+
+
+GetIndexXY(self, view, x, y)
+	Return the index in self.wpyText (the text drawn) of the character located
+	closest to the point (x, y) in view coordinates.  Use this to figure out
+	which character is located under the mouse, for example.
+	NOTE:  This only works for a single line of text, as the system is (currently)
+	not aware of where multiline text was broken.
+
+
+
+class CDrawnImage
+	Class CDrawnImage represents an image drawn by DrawImage().
+
+Instance Variables
+
+wpyLocX, wpyLocY, wpySizeX, wpySizeY
+	The bounding box for the image.
+
+The following attributes can be changed and then re-drawn with view::Redraw():
+	None.
+
+
+Class CView
+
+These are the methods of the view classes which are used for drawing.  See the file
+view.txt.
+
+InvalidateRect(self)
+GetDrawnObject(self, x, y)
+Redraw(self, object)

@@ -1,0 +1,263 @@
+#ident "@(#) README,v 1.2 1990/10/24 05:20:13 tron Exp"
+
+-*-
+
+README - info about the /usr/lib/smail/maps directory
+
+The Smail routers use information found in the /usr/lib/smail/maps
+directory to determine routes to other sites.  Such information
+is usually in the format of pathalias output.
+
+-*-
+
+Path resolving:
+
+Smail resolves routes by searching the following files in order from
+top to bottom.  These files are in the same format as pathalias
+output files.  Items higher on the list take priority over lower items.  
+
+	force.path		- force routes for given sitenames
+	domain.path		- formed from domain.map
+	world.path		- major path file
+	uuname.path		- formed from uuname output
+
+Pathalias output files are of the form:
+
+	site	site_a!site_b!...!site!%s
+
+Where site can be a simple sitename (e.g., amdahl) or a domain
+(e.g., .amdahl.com) or a compound name (e.g., hplabs.hp.com).
+Normally a complete match in one file will result in the
+path site_a!site_b!... being used to reach site.  If only a
+partial "right-hand-side" match is found, the longest
+match will be used.
+
+It should be noted that transports like uux only understand
+simple sitenames.  This site_a, the leading site, should be a 
+simple site if possible.  One could use a method file to
+direct such paths to a transport that understands non-simple
+site names.  This is why a pathalias map entry should
+only show links from the local site to simple sitenames.
+One can always do:
+
+	bargw	simple(DAILY), site(HOURLY)
+
+	simple.domain.part = simple
+	site = site.com
+
+and avoid the issue.
+
+See below for details on each file.  See smail(5) & smail(8) for
+more information about routers.
+
+-*-
+
+duplicate site names:
+
+Sometimes two different sites have the same site name.  There
+are several rules on how to deal with this case.
+
+If one publishes in an external map (such as world.map) that
+one talks to  "curds", one must treat "curds" as if it is
+a directly connected.  This is true even if the perfered path to
+"curds" may be thru some other site.
+
+One must NEVER be directly connected to two sites with the same name.
+One can not be connected to two sites samed "foobar".
+
+One must never establish a connection to a site that has the same
+name as an unpublished site internally in our local domain.
+
+One must never name an internal domain site the same as a site
+that we already directly connect to in some form.  One should
+not give an internal site a name of a site that is registered
+elsewhere.
+
+If one does not have a direct connection to "werehwon", paths of the
+form:  werehwon!...!user  are ambiguous.  If "werehwon" is a simple
+site name, then user@werehwon is ambiguous.  Note that the address 
+of user@werehwon.domain is NOT ambiguous if a path to wherehwon.domain 
+in known.
+
+One may dis-ambiguate an ambiguous address in any way one likes.
+However one should try to honor published addresses in order
+from top to bottom:
+
+	* internet addresses registered by SRI-NIC  (if on the internet)
+	* addresses registered in a d.* Usenet map
+	* addresses registered in a u.* Usenet map
+	* addresses registered in your local.map map
+
+If one receives a connection request from a site "foo" (lets call it
+new-foo), and one other site has already registered as "foo" (lets call
+it old-foo), one should resolve the conflict as follows:
+
+	* If one directly talks to old-foo, refuse the connection.
+
+	* Encourage new-foo to change its name.  Warn them of problems
+	  they will face with their Email being mis-directed to old-foo.
+
+    If none of the above can be done, then do the following:
+
+	* Pick some domain based name such as "foo.domain" that
+	  is unique and where "domain" is not "uucp".  This assumes 
+	  that foo really is in the domain named "domain"!
+	
+	* If "foo.domain" is not already registered either as
+	  ".domain" in the case where ".domain" is not a top level 
+	  domain such as ".arpa"  or".edu"; Or if "foo.domain" is not 
+	  registered, require them to first publish a map containing 
+	  at least the following information:
+
+	    #N foo-bar, foo.domain
+	    ... etc ...
+	    foo-bar	yoursite(COST)
+	    foo-bar	.foo.domain
+	    foo.domain = foo-bar
+	
+	  where foo-bar was a unique simple name.  Then add
+	  the following lines to the forces file:
+
+	     foo-bar	foo!%s
+	     foo.domain	foo!%s
+	     .foo.domain	foo!%s
+
+	 If they can not publish a map entry for some reason,
+	 refuse the connection.
+
+-*-
+
+unpublished connections:
+
+It is possible to have a connection to a site where such a connection
+has not been published.  A few notes of care should be taken in
+dealing with such unpublished connections, depending on if the
+site you are connecting to has registered its name somewhere or not.
+
+If the site has a registered map entry, simply use the private.map
+to record the connection.
+
+If the site is not registered, warn them that if someone registeres
+a site with the same name, Email directed to them could be sent
+to that other site.  Don't record the connection in any map (other 
+than maybe as a comment in private.map), but rather allow the
+uuname.path file to record the routing information.
+
+-*-
+
+Internal domain sites:
+
+Most sites internal to the BAR.FOO.COM will remain unpublished.  The
+visible domain on the Smail mailer for these sites should be set to
+FOO.BAR.COM so that route problems do not arise.  Only major
+FOO.BAR.COM sites such as servers or sites with names we wish
+to reserve should be noted in the world.map.
+
+When selecting internal names it is very useful if they do not
+conflict with a published site.  Due to the way domain.path
+is used only the name Site.FOO.BAR.COM will always be correctly
+routed.
+
+NOTE: It is important that we never establish a connection between
+      an outside site with the same name as an internal site.
+      It is also important that we never give an internal site
+      the same name as a site we directly talk to.
+
+-*-
+
+force.path file:
+
+The force file allows one to force explicit paths to specific sites
+regardless of that the maps may say.  The force file should be
+used as a last resort when resolving conflicts.  The use of map
+information is not only more general, but allows finer control.
+
+The force.path file is formed from the force file by removing
+comments and sorting it.
+
+-*-
+
+domain.path file:
+
+The domain.path file contains path information about sites in the
+local domain only.  That is, each site found in the first field
+of the domain.path file is assumed to be in the local domain.
+
+In for case of bargw, this local domain is BAR.FOO.COM.  A site 
+of the form:
+
+	    foo.BAR.FOO.COM 
+
+will match the site named "foo" in the domain.path file.  One does
+not need to have both "foo" and "foo.BAR.FOO.COM" in the file.
+
+-*-
+
+world.path file:
+
+When pathalias forms world.path the following information is used.  
+The mkpath.conf file tells mkpath how to build the world.path file.
+The uuwho command works off of the map files that form world.path.
+
+A site of the form "foo.uucp" will match the site named "foo" in
+the world.path file.  One does not need to have both "foo" and 
+"foo.uucp" in the file.
+
+Information found in maps higher on the list take priority over 
+information found in lower maps.  However the cost of a link is
+the lowest cost known.  Once can alter or force the cost of a link
+by the dead, delete and adjust directives.  (See below)
+
+    tweak.map               - dead, delete, adjust and other Usenet info 
+    private.map             - map of unpublished links from this site
+    world.map		    - the Usenet map we publish 
+    delete <sitename>       - remove Usenet info about our site (amdahl) 
+    newmap/*.map            - Usenet maps that have not yet been posted 
+    Usenet maps             - maps in /usr/spool/uumaps/[du].* 
+
+-*-
+
+uuname.path file:
+
+The uuname.path file consists of a set of pathalias lines of the form:
+
+	site	site!%s
+
+where site is a file listed by uuname.  This serves as a catch all in
+case the site slips thru the other files, or in case the site
+can not be in a map file.
+
+-*-
+
+Regarding the dead {} directive:
+
+Declaring a site or link (sitea!siteb) dead does NOT distroy the 
+site or link!  If no other link can be found, the least costly 
+dead link will be used.  In fact, declaring a link or site to 
+be dead will create that link if it does not already exist!  
+
+The dead directive should never be used in Usenet maps 
+except maybe d.Project.  You should not publish a dead 
+directive in your maps.
+
+
+Regarding the delete {} directive:  
+
+Deleting a link (sitea!siteb) removes knowledge that 
+sitea talks to siteb, however siteb!sitea could still
+exist.  Deleting a site removes all information about 
+that site as well as links to & from that site. A deleted 
+site or link may be recreated by later information.  
+
+The delete directive never be used in Usenet maps.  
+You should not publish a delete directive in your maps.
+
+
+Regarding the adjust {} directive:  
+
+An adjust directive on a site adds cost to all outgoing links 
+from that site.  By default the cost added is 4000.  If
+a site does not already exist, adjust creates it.
+
+The adjust directive never be used in Usenet maps.  
+You should not publish an adjust directive in your maps.

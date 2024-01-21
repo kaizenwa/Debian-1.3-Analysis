@@ -1,0 +1,1193 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT()
+AC_PREREQ(2.4)			dnl Minimum Autoconf version required.
+
+AC_CONFIG_HEADER(include/LTconfig.h)
+
+AC_ARG_WITH(gcc,
+[  --with-gcc              use GCC to compile Lesstif])
+AC_ARG_WITH(gmake,
+[  --with-gmake            use GNU MAKE to build Lesstif])
+AC_ARG_WITH(shared,
+[  --with-shared           create shared libraries for Lesstif])
+AC_ARG_WITH(static,
+[  --with-static           create static libraries for Lesstif])
+AC_ARG_WITH(testXm,
+[  --with-testXm,          compile testXm directories])
+AC_ARG_WITH(testMrm,
+[  --with-testMrm,         compile testMrm directories])
+
+AC_CHECK_PROG(AR, ar, ar, ar)
+AC_PROG_RANLIB
+AC_PROG_MAKE_SET
+
+#### Choose a compiler.
+test -n "$CC" && cc_specified=yes
+
+case ${with_gcc} in
+  yes ) CC=gcc ;; 
+  no  ) CC=cc ;;
+  *   ) AC_PROG_CC;;
+esac
+
+case ${with_shared} in
+  yes ) with_shared=yes;;
+  no  ) with_shared=no;;
+  *   ) with_shared=yes;;
+esac
+
+case ${with_static} in
+  yes ) with_static=yes;;
+  no  ) with_static=no;;
+  *   ) with_static=no;;
+esac
+
+case ${with_gmake} in
+  yes ) with_gmake=yes;;
+  no  ) with_gmake=no;;
+  *   ) with_gmake=no;;
+esac
+
+dnl
+dnl Tests cannot be compiled if they are not there.
+dnl Also don't do them if command line options to configure say not to.
+dnl
+
+subdirs="include libXm libMrm clients scripts"
+cleandirs="include libXm libMrm testXm clients testMrm scripts"
+
+case ${with_testXm} in
+  yes ) with_testXm=yes;
+	test ! -d testXm && with_testXm=no;;
+  no  ) with_testXm=no;;
+  *   ) with_testXm=no;;
+esac
+
+case ${with_testMrm} in
+  yes ) with_testMrm=yes;
+	test ! -d testMrm && with_testMrm=no;;
+  no  ) with_testMrm=no;;
+  *   ) with_testMrm=no;;
+esac
+
+case ${with_testXm} in
+  yes ) with_testXm=yes;
+	echo "Compiling testXm/ subdirectory tree";
+	subdirs="$subdirs testXm";;
+  no  ) with_testXm=no;
+	echo "Not compiling testXm/ subdirectory tree";;
+esac
+
+case ${with_testMrm} in
+  yes ) with_testMrm=yes;
+	echo "Compiling testMrm/ subdirectory tree";
+	subdirs="$subdirs testMrm";;
+  no  ) with_testMrm=no;
+	echo "Not compiling testMrm/ subdirectory tree";;
+esac
+
+dnl
+dnl End of testXm/testMrm madness
+dnl
+
+AC_PROG_INSTALL
+AC_AIX
+AC_PROG_YACC
+AC_PROG_LEX
+AC_HEADER_STDC
+AC_CHECK_HEADERS(memory.h unistd.h string.h getopt.h limits.h)
+AC_CHECK_HEADERS(fcntl.h sys/time.h sys/systeminfo.h sys/stat.h)
+AC_CHECK_HEADERS(sys/select.h pwd.h sys/types.h sys/wait.h)
+AC_HEADER_DIRENT
+AC_C_CONST
+AC_C_INLINE
+AC_HEADER_TIME
+
+AC_TYPE_SIGNAL
+AC_CHECK_FUNCS(uname putenv select strstr strcasecmp strncasecmp sysconf)
+AC_CHECK_FUNCS(waitpid getitimer setitimer strdup)
+
+AC_REPLACE_FUNCS(gethostname)
+
+AC_FUNC_STRCOLL
+
+dnl
+dnl Check integer sizes
+dnl
+
+AC_CHECK_SIZEOF(short, 2)
+AC_CHECK_SIZEOF(int, 4)
+AC_CHECK_SIZEOF(long, 4)
+AC_CHECK_SIZEOF(long long, 8)
+
+dnl
+dnl The constants are only used when cross compiling; if I understand the
+dnl documentation well enough, those get substituted for the target.  The
+dnl values given are the most common values, but may need customization if
+dnl someone is desparate enough to _want_ to cross compile to a 64 bit
+dnl machine from a 32 bit machine, for example.
+dnl
+dnl end integer sizes
+dnl
+
+AC_DEFUN(AC_PATH_MOTIF_DIRECT,
+[test -z "$motif_direct_test_library" && motif_direct_test_library=Xm
+test -z "$motif_direct_test_function" && motif_direct_test_function=XmCreatePushButton
+test -z "$motif_direct_test_include" && motif_direct_test_include=Xm/Xm.h
+  for ac_dir in               \
+    /usr/include/Motif1.2     \
+    /usr/Motif1.2/include     \
+                              \
+    /usr/motif/include        \
+                              \
+    /usr/X11R6/include        \
+    /usr/X11R5/include        \
+                              \
+    /usr/include/X11R6        \
+    /usr/include/X11R5        \
+                              \
+    /usr/local/X11R6/include  \
+    /usr/local/X11R5/include  \
+                              \
+    /usr/local/include/X11R6  \
+    /usr/local/include/X11R5  \
+                              \
+    /usr/X11/include          \
+    /usr/include/X11          \
+    /usr/local/X11/include    \
+    /usr/local/include/X11    \
+                              \
+    /usr/X386/include         \
+    /usr/x386/include         \
+    /usr/XFree86/include/X11  \
+                              \
+    /usr/dt/include           \
+                              \
+    /usr/include              \
+    /usr/local/include        \
+    /usr/unsupported/include  \
+    /usr/athena/include       \
+    /usr/local/x11r5/include  \
+    /usr/lpp/Xamples/include  \
+    ; \
+  do
+    if test -r "$ac_dir/$motif_direct_test_include"; then
+      no_motif= ac_motif_includes=$ac_dir
+      break
+    fi
+  done
+
+# Check for the libraries.
+# See if we find them without any special options.
+# Don't add to $LIBS permanently.
+ac_save_LIBS="$LIBS"
+LIBS="-l$motif_direct_test_library $LIBS"
+# First see if replacing the include by lib works.
+for ac_dir in `echo "$ac_motif_includes" | sed s/include/lib/` \
+    /usr/lib/Motif1.2     \
+    /usr/Motif1.2/lib     \
+                          \
+    /usr/motif/lib        \
+                          \
+    /usr/X11R6/lib        \
+    /usr/X11R5/lib        \
+                          \
+    /usr/lib/X11R6        \
+    /usr/lib/X11R5        \
+                          \
+    /usr/local/X11R6/lib  \
+    /usr/local/X11R5/lib  \
+                          \
+    /usr/local/lib/X11R6  \
+    /usr/local/lib/X11R5  \
+                          \
+    /usr/X11/lib          \
+    /usr/lib/X11          \
+    /usr/local/X11/lib    \
+                          \
+    /usr/X386/lib         \
+    /usr/x386/lib         \
+    /usr/XFree86/lib/X11  \
+                          \
+    /usr/lib              \
+    /usr/local/lib        \
+    /usr/unsupported/lib  \
+    /usr/athena/lib       \
+    /usr/local/x11r5/lib  \
+    /usr/lpp/Xamples/lib  \
+    ; \
+do
+  for ac_extension in a so sl; do
+    if test -r $ac_dir/lib${motif_direct_test_library}.$ac_extension; then
+      no_motif= ac_motif_libraries=$ac_dir
+      break 2
+    fi
+  done
+done])
+
+AC_DEFUN(AC_PATH_MOTIF,
+[AC_REQUIRE_CPP()dnl
+
+motif_includes=NONE
+motif_libraries=NONE
+
+AC_MSG_CHECKING(for Motif)
+AC_ARG_WITH(motif, [  --with-motif            enable Motif tests])
+if test "x$with_motif" = xno; then
+  no_motif=yes
+else
+  if test "x$motif_includes" != xNONE && test "x$motif_libraries" != xNONE; then
+    no_motif=
+  else
+AC_CACHE_VAL(ac_cv_path_motif,
+[# One or both of these vars are not set, and there is no cached value.
+no_motif=yes
+AC_PATH_MOTIF_DIRECT
+
+if test "$no_motif" = yes; then
+  ac_cv_path_motif="no_motif=yes"
+else
+  ac_cv_path_motif="no_motif= ac_motif_includes=$ac_motif_includes ac_motif_libraries=$ac_motif_libraries"
+fi])dnl
+  fi
+  eval "$ac_cv_path_motif"
+fi # with_motif != no
+
+if test "$no_motif" = yes; then
+  AC_MSG_RESULT(no)
+else
+  test "x$motif_includes" = xNONE && motif_includes=$ac_motif_includes
+  test "x$motif_libraries" = xNONE && motif_libraries=$ac_motif_libraries
+  ac_cv_path_motif="no_motif= ac_motif_includes=$motif_includes ac_motif_libraries=$motif_libraries"
+  AC_MSG_RESULT([libraries $motif_libraries, headers $motif_includes])
+fi
+])
+
+AC_DEFUN(AC_XT_VERSION6,
+[AC_MSG_CHECKING([For Xt Revision Number 6])
+  AC_TRY_LINK([#include <X11/Intrinsic.h>],
+[#if XtSpecificationRelease < 6
+fail;
+#endif
+], XTversion="6",
+   [AC_MSG_RESULT(no)])])
+
+AC_DEFUN(AC_XT_VERSION5,
+[AC_MSG_CHECKING([For Xt Revision Number 5])
+  AC_TRY_LINK([#include <X11/Intrinsic.h>],
+[#if XtSpecificationRelease < 5
+fail;
+#endif
+], XTversion="5",
+   [AC_MSG_RESULT(no)])])
+
+AC_PATH_X
+dnl Set the CFLAGS variable to the location of the found X-header files
+if test "x$x_includes" != x ; then
+  CFLAGS="-I$x_includes"
+fi
+x_inc_path="$x_includes"
+x_lib_path="$x_libraries"
+
+XTversion=""
+AC_XT_VERSION6
+
+if test "x$XTversion" = x ; then
+  AC_XT_VERSION5
+  if test "x$XTversion" = x; then
+    AC_MSG_ERROR(You must have X11 Revision 5 or higher to compile Lesstif)
+  else
+    AC_MSG_RESULT(revision 5)
+  fi
+else
+  AC_MSG_RESULT(revision 6)
+  R6libs="-lXext -lSM -lICE"
+fi
+
+AC_PATH_MOTIF
+
+if test "x$x_libraries" != x ; then
+  x_libraries="-L$x_libraries"
+fi
+if test "x$x_includes" != x ; then
+  x_includes="-I$x_includes"
+fi
+if test "x$motif_libraries" != x ; then
+  motif_libraries="-L$motif_libraries"
+fi
+if test "x$motif_includes" != x ; then
+  motif_includes="-I$motif_includes"
+fi
+
+dnl These are used by platforms that use the form libXm.so.x.y for there
+dnl shared libraries
+dnl
+dnl Please don't use other than numbers though: 0.75a will not
+dnl work on a number of systems (FreeBSD, NetBSD, ...).
+
+major_shared=0
+minor_shared=76
+
+dnl Now we handle the various system dependant problems
+dnl that aren't addressed in the X header files, or things dealing
+dnl with utility quirks on some systems.
+dnl
+dnl 1.  Whether the readdir call returns things in lexicographic order
+dnl
+dnl 2.  CFLAGS for ansi compliance on some platforms (HPUX)
+dnl
+dnl 3.  The makefile to use for building shared libraries
+dnl
+dnl (to be continued)
+
+AC_CANONICAL_HOST
+canonical=$host
+configuration=$host_alias
+
+lexicographic_readdir=1
+
+CFLAGS="-g" # our default
+GPROF_FLAGS="-pg"
+GPROF_CFLAGS=""
+EXTRACFLAGS=""
+
+dnl add copious amounts of debugging with gcc
+if test "${CC}" = "gcc" ; then
+  CFLAGS="${CFLAGS} -Wall -ansi -pedantic"
+  GPROF_CFLAGS="${GPROF_CFLAGS} -Wall -ansi -pedantic"
+fi
+
+case "${canonical}" in
+
+  *-hp-hpux* )
+    lexicographic_readdir=''
+
+    if test "${CC}" = "cc" ; then
+      CFLAGS="${CFLAGS} -Aa -z -D_HPUX_SOURCE"
+      GPROF_CFLAGS="${GPROF_CFLAGS} -Aa -z -D_HPUX_SOURCE"
+    fi
+
+    case ${with_shared} in
+      yes )
+	if test "${CC}" = "cc" ; then
+	  PICFLAGS="+z"
+	  shared_make="\$(srcdir)/../config/hpux-shared-cc.mk"
+        else
+          PICFLAGS="-fPIC"
+	  shared_make="\$(srcdir)/../config/hpux-shared-gcc.mk"
+	fi
+        test_depend_xm="\$(TESTS): ../../libXm/libXm.sl"
+        test_depend_mrm="\$(TESTS): ../../libMrm/libMrm.sl"
+        client_depend_xm="\$(CLIENTS): ../../libXm/libXm.sl"
+	client_depend_mrm="\$(CLIENTS): ../../libMrm/libMrm.sl"
+        depend_xm_shared="../../libXm/libXm.sl"
+        depend_mrm_shared="../../libMrm/libMrm.sl"
+      ;;
+      no )
+        shared_make="\$(srcdir)../config/default-shared.mk"
+      ;;
+    esac
+
+    dnl Only allow GNU make on HPUX
+    with_gmake=yes
+    test_include="include \$(srcdir)/../test.Makefile"
+    client_include="include \$(srcdir)/../client.Makefile"
+    shared_include="include ${shared_make}"
+    objs_pat_subst="\$(SRCS:%.c=%.o)"
+    srcdir_src_pat_subst="\$(SRCS:%.c=\$(srcdir)/%.c)"
+    shobjs_pat_subst="\$(SRCS:%.c=shared/%.o)"
+    gprofobjs_pat_subst="\$(SRCS:%.c=gprof/%.o)"
+    shared_rule1="shared/%.o : \$(srcdir)/%.c"
+    shared_rule2="	\${CC} \${CFLAGS} ${PICFLAGS} -c -o \$@ \$<"
+    shared_rule3=""
+    shared_rule4=""
+    gprof_rule1="gprof/%.o : \$(srcdir)/%.c"
+    gprof_rule2="	\${CC} \${GPROF_CFLAGS} \${GPROF_FLAGS} -c -o \$@ \$<"
+    gprof_rule3=""
+    gprof_rule4=""
+
+    obj_rule1=""
+    obj_rule2="%.o : \$(srcdir)/%.c"
+    obj_rule3="	\${CC} \${CFLAGS} -c -o \$@ \$<"
+    obj_rule4=""
+  ;; 
+
+  *-*-linuxoldld* )
+    with_shared=no
+    with_static=yes
+    shared_make="\$(srcdir)/../config/default-shared.mk"
+    EXTRACFLAGS="-D_SVID_SOURCE -D_GNU_SOURCE -D_POSIX_SOURCE -D_BSD_SOURCE"
+
+dnl With LINUX, we assume they're running gmake
+    test_include="include ../test.Makefile"
+    client_include="include ../client.Makefile"
+    shared_include="include ${shared_make}"
+    objs_pat_subst="\$(SRCS:%.c=%.o)"
+    srcdir_src_pat_subst="\$(SRCS:%.c=\$(srcdir)/%.c)"
+    shobjs_pat_subst="\$(SRCS:%.c=shared/%.o)"
+    gprofobjs_pat_subst="\$(SRCS:%.c=gprof/%.o)"
+    shared_rule1="shared/%.o : \$(srcdir)/%.c"
+    shared_rule2="	\${CC} \${CFLAGS} ${EXTRACFLAGS} ${PICFLAGS} -c -o \$@ \$<"
+    shared_rule3=""
+    shared_rule4=""
+    gprof_rule1="gprof/%.o : \$(srcdir)/%.c"
+    gprof_rule2="	\${CC} \${GPROF_CFLAGS} ${EXTRACFLAGS} \${GPROF_FLAGS} -c -o \$@ \$<"
+    gprof_rule3=""
+    gprof_rule4=""
+
+    obj_rule1=""
+    obj_rule2="%.o : \$(srcdir)/%.c"
+    obj_rule3="	\${CC} \${CFLAGS} ${EXTRACFLAGS} -c -o \$@ \$<"
+    obj_rule4=""
+  ;;
+
+  *-*-linuxaout )
+      EXTRACFLAGS="-D_SVID_SOURCE -D_GNU_SOURCE -D_POSIX_SOURCE -D_BSD_SOURCE"
+      case ${with_shared} in
+	yes )
+          PICFLAGS="-fPIC"
+          shared_make="\$(srcdir)/../config/linuxaout-shared.mk"
+          test_depend_xm="\$(TESTS): ../../libXm/libXm.so.${major_shared}.${minor_shared}"
+          test_depend_mrm="\$(TESTS): ../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+          client_depend_xm="\$(CLIENTS): ../../libXm/libXm.so.${major_shared}.${minor_shared}"
+	  client_depend_mrm="\$(CLIENTS): ../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+          depend_xm_shared="../../libXm/libXm.so.${major_shared}.${minor_shared}"
+          depend_mrm_shared="../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+        ;;
+	no )
+          shared_make="\$(srcdir)/../config/default-shared.mk"
+        ;;
+      esac
+
+    test_include="include ../test.Makefile"
+    client_include="include ../client.Makefile"
+    shared_include="include ${shared_make}"
+    objs_pat_subst="\$(SRCS:%.c=%.o)"
+    srcdir_src_pat_subst="\$(SRCS:%.c=\$(srcdir)/%.c)"
+    shobjs_pat_subst="\$(SRCS:%.c=shared/%.o)"
+    gprofobjs_pat_subst="\$(SRCS:%.c=gprof/%.o)"
+    shared_rule1="shared/%.o : \$(srcdir)/%.c"
+    shared_rule2="	\${CC} \${CFLAGS} ${EXTRACFLAGS} ${PICFLAGS} -c -o \$@ \$<"
+    shared_rule3=""
+    shared_rule4=""
+    gprof_rule1="gprof/%.o : \$(srcdir)/%.c"
+    gprof_rule2="	\${CC} \${GPROF_CFLAGS} ${EXTRACFLAGS} \${GPROF_FLAGS} -c -o \$@ \$<"
+    gprof_rule3=""
+    gprof_rule4=""
+
+    obj_rule1=""
+    obj_rule2="%.o : \$(srcdir)/%.c"
+    obj_rule3="	\${CC} \${CFLAGS} ${EXTRACFLAGS} -c -o \$@ \$<"
+    obj_rule4=""
+  ;;
+ 
+  *-*-linux )
+    EXTRACFLAGS="-D_SVID_SOURCE -D_GNU_SOURCE -D_POSIX_SOURCE -D_BSD_SOURCE"
+    case ${with_shared} in
+      yes )
+        PICFLAGS="-fPIC"
+        shared_make="\$(srcdir)/../config/linux-shared.mk"
+        test_depend_xm="\$(TESTS): ../../libXm/libXm.so.${major_shared}.${minor_shared}"
+        test_depend_mrm="\$(TESTS): ../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+        client_depend_xm="\$(CLIENTS): ../../libXm/libXm.so.${major_shared}.${minor_shared}"
+        client_depend_mrm="\$(CLIENTS): ../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+        depend_xm_shared="../../libXm/libXm.so.${major_shared}.${minor_shared}"
+        depend_mrm_shared="../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+      ;;
+      no )
+        shared_make="\$(srcdir)/../config/default-shared.mk"
+      ;;
+    esac
+
+dnl With LINUX, we assume they're running gmake
+    test_include="include ../test.Makefile"
+    client_include="include ../client.Makefile"
+    shared_include="include ${shared_make}"
+    objs_pat_subst="\$(SRCS:%.c=%.o)"
+    srcdir_src_pat_subst="\$(SRCS:%.c=\$(srcdir)/%.c)"
+    shobjs_pat_subst="\$(SRCS:%.c=shared/%.o)"
+    gprofobjs_pat_subst="\$(SRCS:%.c=gprof/%.o)"
+    shared_rule1="shared/%.o : \$(srcdir)/%.c"
+    shared_rule2="	\${CC} \${CFLAGS} ${EXTRACFLAGS} ${PICFLAGS} -c -o \$@ \$<"
+    shared_rule3=""
+    shared_rule4=""
+    gprof_rule1="gprof/%.o : \$(srcdir)/%.c"
+    gprof_rule2="	\${CC} \${GPROF_CFLAGS} ${EXTRACFLAGS} \${GPROF_FLAGS} -c -o \$@ \$<"
+    gprof_rule3=""
+    gprof_rule4=""
+
+    obj_rule1=""
+    obj_rule2="%.o : \$(srcdir)/%.c"
+    obj_rule3="	\${CC} \${CFLAGS} ${EXTRACFLAGS} -c -o \$@ \$<"
+    obj_rule4=""
+  ;;
+
+  *-*-irix5* | *-*irix6* )
+    dnl handle irix debugging output
+    if test "${CC}" = "cc" ; then
+      CFLAGS="${CFLAGS} -fullwarn"
+    fi
+
+    case ${with_shared} in
+      yes )
+	if test "${CC}" = "cc" ; then
+	  PICFLAGS="-KPIC"
+	else
+	  PICFLAGS="-fPIC"
+	fi
+
+        shared_make="\$(srcdir)/../config/irix5.x-shared.mk"
+        test_depend_xm="\$(TESTS): ../../libXm/libXm.so.${major_shared}.${minor_shared}"
+        test_depend_mrm="\$(TESTS): ../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+        client_depend_xm="\$(CLIENTS): ../../libXm/libXm.so.${major_shared}.${minor_shared}"
+	client_depend_mrm="\$(CLIENTS): ../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+        depend_xm_shared="../../libXm/libXm.so.${major_shared}.${minor_shared}"
+        depend_mrm_shared="../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+      ;;
+      no )
+        shared_make="\$(srcdir)/../config/default-shared.mk"
+      ;;
+    esac
+
+    with_gmake=yes
+    objs_pat_subst="\$(SRCS:%.c=%.o)"
+    srcdir_src_pat_subst="\$(SRCS:%.c=\$(srcdir)/%.c)"
+    shobjs_pat_subst="\$(SRCS:%.c=shared/%.o)"
+    gprofobjs_pat_subst="\$(SRCS:%.c=gprof/%.o)"
+    test_include="include ../test.Makefile"
+    client_include="include ../client.Makefile"
+    shared_include="include ${shared_make}"
+    shared_rule1="shared/%.o : \$(srcdir)/%.c"
+    shared_rule2="	\${CC} \${CFLAGS} ${PICFLAGS} -c -o \$@ \$<"
+    shared_rule3=""
+    shared_rule4=""
+    gprof_rule1="gprof/%.o : \$(srcdir)/%.c"
+    gprof_rule2="	\${CC} \${GPROF_CFLAGS} \${GPROF_FLAGS} -c -o \$@ \$<"
+    gprof_rule3=""
+    gprof_rule4=""
+
+    obj_rule1=""
+    obj_rule2="%.o : \$(srcdir)/%.c"
+    obj_rule3="	\${CC} \${CFLAGS} -c -o \$@ \$<"
+    obj_rule4=""
+  ;;
+
+  *-*-solaris2* ) 
+    EXTRACFLAGS="-D__EXTENSIONS__"
+    case ${with_shared} in
+      yes )
+	if test "${CC}" = "cc" ; then
+	  PICFLAGS="-K pic"
+	else
+	  PICFLAGS="-fPIC"
+	fi
+        shared_make="\$(srcdir)/../config/solaris2-shared.mk"
+        test_depend_xm="\$(TESTS): ../../libXm/libXm.so.${major_shared}.${minor_shared}"
+        test_depend_mrm="\$(TESTS): ../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+        client_depend_xm="\$(CLIENTS): ../../libXm/libXm.so.${major_shared}.${minor_shared}"
+	client_depend_mrm="\$(CLIENTS): ../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+        depend_xm_shared="../../libXm/libXm.so.${major_shared}.${minor_shared}"
+        depend_mrm_shared="../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+      ;;
+      no )
+        shared_make="\$(srcdir)/../config/default-shared.mk"
+      ;;
+    esac
+
+dnl With SOLARIS2, make accepts the same syntax as GNU make, so
+dnl it doesn't matter which we have, we just use the GNU syntax
+
+    test_include="include ../test.Makefile"
+    client_include="include ../client.Makefile"
+    shared_include="include ${shared_make}"
+    objs_pat_subst="\$(SRCS:%.c=%.o)"
+    srcdir_src_pat_subst="\$(SRCS:%.c=\$(srcdir)/%.c)"
+    shobjs_pat_subst="\$(SRCS:%.c=shared/%.o)"
+    gprofobjs_pat_subst="\$(SRCS:%.c=gprof/%.o)"
+    shared_rule1="shared/%.o : \$(srcdir)/%.c"
+    shared_rule2="	\${CC} \${CFLAGS} ${EXTRACFLAGS} ${PICFLAGS} -c -o \$@ \$<"
+    shared_rule3=""
+    shared_rule4=""
+    gprof_rule1="gprof/%.o : \$(srcdir)/%.c"
+    gprof_rule2="	\${CC} \${GPROF_CFLAGS} \${GPROF_FLAGS} ${EXTRACFLAGS} -c -o \$@ \$<"
+    gprof_rule3=""
+    gprof_rule4=""
+
+    obj_rule1=""
+    obj_rule2="%.o : \$(srcdir)/%.c"
+    obj_rule3="	\${CC} \${CFLAGS} ${EXTRACFLAGS} -c -o \$@ \$<"
+    obj_rule4=""
+  ;;
+
+  *-*-sunos4* )
+    case ${with_shared} in
+      yes )
+        if test "${CC}" = "cc" ; then
+          PICFLAGS="-pic"
+        else
+          PICFLAGS="-fPIC"
+        fi
+        shared_make="\$(srcdir)/../config/sunos4-shared.mk"
+        test_depend_xm="\$(TESTS): ../../libXm/libXm.so.${major_shared}.${minor_shared}"
+        test_depend_mrm="\$(TESTS): ../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+        client_depend_xm="\$(CLIENTS): ../../libXm/libXm.so.${major_shared}.${minor_shared}"
+        client_depend_mrm="\$(CLIENTS): ../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+        depend_xm_shared="../../libXm/libXm.so.${major_shared}.${minor_shared}"
+        depend_mrm_shared="../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+      ;;
+      no )
+        shared_make="\$(srcdir)/../config/default-shared.mk"
+      ;;
+    esac
+
+dnl With SUNOS4, make accepts the same syntax as GNU make, so
+dnl it doesn't matter which we have, we just use the GNU syntax
+
+    test_include="include ../test.Makefile"
+    client_include="include ../client.Makefile"
+    shared_include="include ${shared_make}"
+    objs_pat_subst="\$(SRCS:%.c=%.o)"
+    srcdir_src_pat_subst="\$(SRCS:%.c=\$(srcdir)/%.c)"
+    shobjs_pat_subst="\$(SRCS:%.c=shared/%.o)"
+    gprofobjs_pat_subst="\$(SRCS:%.c=gprof/%.o)"
+    shared_rule1="shared/%.o : \$(srcdir)/%.c"
+    shared_rule2="	\${CC} \${CFLAGS} ${PICFLAGS} -c -o \$@ \$<"
+    shared_rule3=""
+    shared_rule4=""
+    gprof_rule1="gprof/%.o : \$(srcdir)/%.c"
+    gprof_rule2="	\${CC} \${GPROF_CFLAGS} \${GPROF_FLAGS} -c -o \$@ \$<"
+    gprof_rule3=""
+    gprof_rule4=""
+
+    obj_rule1=""
+    obj_rule2="%.o : \$(srcdir)/%.c"
+    obj_rule3="	\${CC} \${CFLAGS} -c -o \$@ \$<"
+    obj_rule4=""
+  ;;
+
+
+  *-*-freebsd* | *-*-netbsd* | *-*-openbsd* )
+    case ${with_shared} in
+      yes )
+        case "${canonical}" in
+          *-*-freebsd* | *-*-openbsd* )
+            PICFLAGS="-fPIC -DPIC"
+          ;;
+
+          sparc-*-netbsd* )
+            PICFLAGS="-fPIC -DPIC"
+          ;;
+
+          *-*-netbsd* )
+            PICFLAGS="-fpic -DPIC"
+          ;;
+        esac
+
+        shared_make="\$(srcdir)/../config/free_net-bsd-shared.mk"
+        test_depend_xm="\$(TESTS): ../../libXm/libXm.so.${major_shared}.${minor_shared}"
+        test_depend_mrm="\$(TESTS): ../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+        client_depend_xm="\$(CLIENTS): ../../libXm/libXm.so.${major_shared}.${minor_shared}"
+        client_depend_mrm="\$(CLIENTS): ../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+        depend_xm_shared="../../libXm/libXm.so.${major_shared}.${minor_shared}"
+        depend_mrm_shared="../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+      ;;
+      no )
+        shared_make="\$(srcdir)/../config/default-shared.mk"
+      ;;
+    esac
+
+    case "${canonical}" in
+      *-*-freebsd2.0* )
+      dnl This fixes the problem that Danny has noticed
+
+      AC_MSG_WARN(Including makefile additions to get tests to build on FreeBSD 2.0)
+
+      freebsd20_testhack1=".if \${TESTS} != \".NO_TESTS_YET\""
+      freebsd20_testhack2=".for i in \${TESTS}"
+      freebsd20_testhack3="\$i: \$i.o"
+      freebsd20_testhack4="	\${CC} \${CFLAGS} -o \$i \$i.o \${AUX_OBJS} \${lesstif_libraries} \${x_libraries}"
+      freebsd20_testhack5="\$i.motif: \$i.o"
+      freebsd20_testhack6="	\${CC} \${CFLAGS} -o \$i.motif \$i.o \${AUX_OBJS} \${motif_libraries} \${x_libraries}"
+      freebsd20_testhack7=".endfor"
+      freebsd20_testhack8=".endif"
+      ;;
+    esac
+
+    case ${with_gmake} in
+      yes )
+        test_include="include ../test.Makefile"
+        client_include="include ../client.Makefile"
+        shared_include="include ${shared_make}"
+        objs_pat_subst="\$(SRCS:%.c=%.o)"
+        srcdir_src_pat_subst="\$(SRCS:%.c=\$(srcdir)/%.c)"
+        shobjs_pat_subst="\$(SRCS:%.c=shared/%.o)"
+        gprofobjs_pat_subst="\$(SRCS:%.c=gprof/%.o)"
+        shared_rule1="shared/%.o : \$(srcdir)/%.c"
+        shared_rule2="	\${CC} \${CFLAGS} ${PICFLAGS} -c -o \$@ \$<"
+        shared_rule3=""
+        shared_rule4=""
+        gprof_rule1="gprof/%.o : \$(srcdir)/%.c"
+        gprof_rule2="	\${CC} \${GPROF_CFLAGS} \${GPROF_FLAGS} -c -o \$@ \$<"
+        gprof_rule3=""
+        gprof_rule4=""
+
+        obj_rule1=""
+        obj_rule2="%.o : \$(srcdir)/%.c"
+        obj_rule3="	\${CC} \${CFLAGS} -c -o \$@ \$<"
+        obj_rule4=""
+      ;;
+      no )
+        test_include=".include \"../test.Makefile\""
+        client_include=".include \"../client.Makefile\""
+        shared_include=".include \"${shared_make}\""
+        objs_pat_subst="\${SRCS:%.c=%.o}"
+        srcdir_src_pat_subst="\${SRCS:%.c=\$(srcdir)/%.c}"
+        shobjs_pat_subst="\${SRCS:%.c=shared/%.o}"
+        gprofobjs_pat_subst="\$(SRCS:%.c=gprof/%.o)"
+        shared_rule1=".for SH_OBJ in \${SH_OBJS}"
+        shared_rule2="\${SH_OBJ}: \${SH_OBJ:shared/%.o=\$(srcdir)/%.c}"
+        shared_rule3="	\${CC} \${CFLAGS} ${PICFLAGS} -c \${SH_OBJ:shared/%.o=\$(srcdir)/%.c} -o \$@"
+        shared_rule4=".endfor"
+        gprof_rule1=".for GPROF_OBJ in \${GPROF_OBJS}"
+        gprof_rule2="\${GPROF_OBJ}: \${GPROF_OBJ:gprof/%.o=\$(srcdir)/%.c}"
+        gprof_rule3="	\${CC} \${GPROF_CFLAGS} \${GPROF_FLAGS} -c \${GPROF_OBJ:gprof/%.o=\$(srcdir)/%.c} -o \$@"
+        gprof_rule4=".endfor"
+
+        obj_rule1=".for OBJ in \${OBJS}"
+        obj_rule2="\${OBJ}: \${OBJ:%.o=\$(srcdir)/%.c}"
+        obj_rule3="	\${CC} \${CFLAGS} -c \${OBJ:%.o=\$(srcdir)/%.c}"
+        obj_rule4=".endfor"       
+      ;;
+    esac
+  ;;
+
+  *-*-osf* )
+
+     no_pipe="yes"
+     if test "${CC}" = "cc" ; then
+       CFLAGS="${CFLAGS} -std1 -D_GNU_SOURCE -D_BSD_SOURCE"
+     else
+       CFLAGS="${CFLAGS} -D_GNU_SOURCE -D_BSD_SOURCE"
+     fi
+    
+    case ${with_shared} in
+      yes )
+        PICFLAGS="-fPIC"
+        shared_make=../config/osf-shared.mk        
+        test_depend_xm="\$(TESTS): ../../libXm/libXm.so.${major_shared}.${minor_shared}"
+        test_depend_mrm="\$(TESTS): ../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+        client_depend_xm="\$(CLIENTS): ../../libXm/libXm.so.${major_shared}.${minor_shared}"
+        client_depend_mrm="\$(CLIENTS): ../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+        depend_xm_shared="../../libXm/libXm.so.${major_shared}.${minor_shared}"
+        depend_mrm_shared="../../libMrm/libMrm.so.${major_shared}.${minor_shared}"
+      ;;
+      no )
+        shared_make="\$(srcdir)/../config/default-shared.mk"
+      ;;
+    esac
+
+dnl OSF1's make doesn't allow includes, so we have to use GNU make
+    with_gmake=yes
+    test_include="include ../test.Makefile"
+    client_include="include ../client.Makefile"
+    shared_include="include $(shared_make)"
+    objs_pat_subst="\$(SRCS:%.c=%.o)"
+    srcdir_src_pat_subst="\$(SRCS:%.c=\$(srcdir)/%.c)"
+    shobjs_pat_subst="\$(SRCS:%.c=shared/%.o)"
+    gprofobjs_pat_subst="\$(SRCS:%.c=gprof/%.o)"
+    shared_rule1="shared/%.o : \$(srcdir)/%.c"
+    shared_rule2="	\${CC} \${CFLAGS} ${PICFLAGS} -c -o \$@ \$<"
+    shared_rule3=""
+    shared_rule4=""
+    gprof_rule1="gprof/%.o : \$(srcdir)/%.c"
+    gprof_rule2="	\${CC} \${GPROF_CFLAGS} \${GPROF_FLAGS} -c -o \$@ \$<"
+    gprof_rule3=""
+    gprof_rule4=""
+
+    obj_rule1=""
+    obj_rule2="%.o : \$(srcdir)/%.c"
+    obj_rule3="	\${CC} \${CFLAGS} -c -o \$@ \$<"
+    obj_rule4=""
+  ;;
+
+  *-*-dgux5* )
+    case ${with_shared} in
+      yes )
+        if test "${CC}" = "cc" ; then
+          PICFLAGS="-K PIC"
+        else
+          PICFLAGS="-fPIC"
+        fi
+        shared_make="\$(srcdir)/../config/dgux-shared.mk"
+        test_depend_xm="\$(TESTS): ../../libXm/libXm.so"
+        test_depend_mrm="\$(TESTS): ../../libMrm/libMrm.so"
+        client_depend_xm="\$(CLIENTS): ../../libXm/libXm.so"
+        client_depend_mrm="\$(CLIENTS): ../../libMrm/libMrm.so"
+        depend_xm_shared="../../libXm/libXm.so"
+        depend_mrm_shared="../../libMrm/libMrm.so"
+      ;;
+      no )
+        shared_make="\$(srcdir)/../config/default-shared.mk"
+      ;;
+    esac
+
+dnl don't know whether or not DG/UX's make allows includes.
+
+    test_include="include ../test.Makefile"
+    client_include="include ../client.Makefile"
+    shared_include="include ${shared_make}"
+    objs_pat_subst="\$(SRCS:%.c=%.o)"
+    srcdir_src_pat_subst="\$(SRCS:%.c=\$(srcdir)/%.c)"
+    shobjs_pat_subst="\$(SRCS:%.c=shared/%.o)"
+    gprofobjs_pat_subst="\$(SRCS:%.c=gprof/%.o)"
+    shared_rule1="shared/%.o : \$(srcdir)/%.c"
+    shared_rule2="	\${CC} \${CFLAGS} ${PICFLAGS} -c -o \$@ \$<"
+    shared_rule3=""
+    shared_rule4=""
+    gprof_rule1="gprof/%.o : \$(srcdir)/%.c"
+    gprof_rule2="	\${CC} \${GPROF_CFLAGS} \${GPROF_FLAGS} -c -o \$@ \$<"
+    gprof_rule3=""
+    gprof_rule4=""
+
+    obj_rule1=""
+    obj_rule2="%.o : \$(srcdir)/%.c"
+    obj_rule3="	\${CC} \${CFLAGS} -c -o \$@ \$<"
+    obj_rule4=""
+  ;;
+
+  *-*-sysv5 )
+    case ${with_shared} in
+      yes )
+        if test "${CC}" = "cc" ; then
+          PICFLAGS="-K PIC"
+        else
+          PICFLAGS="-fPIC"
+        fi
+        shared_make="\$(srcdir)/../config/sysvr4-shared.mk"
+        test_depend_xm="\$(TESTS): ../../libXm/libXm.so"
+        test_depend_mrm="\$(TESTS): ../../libMrm/libMrm.so"
+        client_depend_xm="\$(CLIENTS): ../../libXm/libXm.so"
+        client_depend_mrm="\$(CLIENTS): ../../libMrm/libMrm.so"
+        depend_xm_shared="../../libXm/libXm.so"
+        depend_mrm_shared="../../libMrm/libMrm.so"
+      ;;
+      no )
+        shared_make="\$(srcdir)/../config/default-shared.mk"
+      ;;
+    esac
+
+dnl don't know whether or not SYSV's make allows includes.
+
+    test_include="include ../test.Makefile"
+    client_include="include ../client.Makefile"
+    shared_include="include ${shared_make}"
+    objs_pat_subst="\$(SRCS:%.c=%.o)"
+    srcdir_src_pat_subst="\$(SRCS:%.c=\$(srcdir)/%.c)"
+    shobjs_pat_subst="\$(SRCS:%.c=shared/%.o)"
+    gprofobjs_pat_subst="\$(SRCS:%.c=gprof/%.o)"
+    shared_rule1="shared/%.o : \$(srcdir)/%.c"
+    shared_rule2="	\${CC} \${CFLAGS} ${PICFLAGS} -c -o \$@ \$<"
+    shared_rule3=""
+    shared_rule4=""
+    gprof_rule1="gprof/%.o : \$(srcdir)/%.c"
+    gprof_rule2="	\${CC} \${GPROF_CFLAGS} \${GPROF_FLAGS} -c -o \$@ \$<"
+    gprof_rule3=""
+    gprof_rule4=""
+
+    obj_rule1=""
+    obj_rule2="%.o : \$(srcdir)/%.c"
+    obj_rule3="	\${CC} \${CFLAGS} -c -o \$@ \$<"
+    obj_rule4=""
+  ;;
+
+  *-*-aix* )
+    case ${with_shared} in
+      yes )
+        if test "${CC}" = "cc" ; then
+          PICFLAGS="-bM\:SRE"
+        else
+          PICFLAGS="-fPIC"
+        fi
+        shared_make="\$(srcdir)/../config/aix-shared.mk"
+        test_depend_xm="\$(TESTS): ../../libXm/libXm.a"
+        test_depend_mrm="\$(TESTS): ../../libMrm/libMrm.a"
+        client_depend_xm="\$(CLIENTS): ../../libXm/libXm.a"
+        client_depend_mrm="\$(CLIENTS): ../../libMrm/libMrm.a"
+        depend_xm_shared="../../libXm/libXm.a"
+        depend_mrm_shared="../../libMrm/libMrm.a"
+      ;;
+      no )
+        shared_make="\$(srcdir)/../config/default-shared.mk"
+      ;;
+    esac
+
+    test_include="include ../test.Makefile"
+    client_include="include ../client.Makefile"
+
+dnl Determine how to invoke nm depending on AIX version
+    aixversion=`uname -v`
+    case ${aixversion} in
+      4*)
+          aixnm='/usr/bin/nm -B'
+      ;;
+      *)
+          aixnm=/usr/ucb/nm
+      ;;
+    esac
+
+dnl hack with shared_rules
+    case ${with_gmake} in
+      yes )
+        objs_pat_subst="\$(SRCS:%.c=%.o)"
+        srcdir_src_pat_subst="\$(SRCS:%.c=\$(srcdir)/%.c)"
+        shobjs_pat_subst="\$(SRCS:%.c=shared/%.o)"
+        gprofobjs_pat_subst="\$(SRCS:%.c=gprof/%.o)"
+        shared_include="NM=${aixnm}"
+        shared_rule1="include ${shared_make}"
+        shared_rule2=""
+        shared_rule3="shared/%.o : \$(srcdir)/%.c"
+        shared_rule4="	\${CC} \${CFLAGS} ${PICFLAGS} -c -o \$@ \$<"
+        gprof_rule1="include ${shared_make}"
+        gprof_rule2=""
+        gprof_rule3="gprof/%.o : \$(srcdir)/%.c"
+        gprof_rule4="	\${CC} \${GPROF_CFLAGS} \${GPROF_FLAGS} -c -o \$@ \$<"
+
+        obj_rule1=""
+        obj_rule2="%.o : \$(srcdir)/%.c"
+        obj_rule3="	\${CC} \${CFLAGS} -c -o \$@ \$<"
+        obj_rule4=""
+      ;;
+      no )
+        objs_pat_subst="\$(SRCS:.c=.o)"
+# This won't work here..
+#       srcdir_src_pat_subst="\$(SRCS:%.c=\$(srcdir)/%.c)"
+
+        shobjs_pat_subst="\$(SRCS:.c=.o)"
+        gprofobjs_pat_subst="\$(SRCS:%.c=gprof/%.o)"
+        shared_include="NM=${aixnm}"
+        shared_rule1="include ${shared_make}"
+        shared_rule2=""
+        shared_rule3="%.o : \$(srcdir)/%.c"
+        shared_rule4="	\${CC} \${CFLAGS} ${PICFLAGS} -c -o \$@ \$<"
+        gprof_rule1="include ${shared_make}"
+        gprof_rule2=""
+        gprof_rule3="%.o : \$(srcdir)/%.c"
+        gprof_rule4="	\${CC} \${GPROF_CFLAGS} \${GPROF_FLAGS} -c -o \$@ \$<"
+
+        obj_rule1=""
+        obj_rule2="%.o : \$(srcdir)/%.c"
+        obj_rule3="	\${CC} \${CFLAGS} -c -o \$@ \$<"
+        obj_rule4=""
+      ;;
+    esac
+  ;;
+
+  *)
+    if test "${with_shared}" = "yes" ; then
+      AC_MSG_WARN(Shared lesstif libraries are not supported for $canonical)
+    fi
+    with_shared=no
+    with_static=yes
+    shared_make="\$(srcdir)/../config/default-shared.mk"
+
+dnl unsupported system, so they must use GNU make
+    with_gmake=yes
+    test_include="include ../test.Makefile"
+    client_include="include ../client.Makefile"
+    shared_include="include ${shared_make}"
+    objs_pat_subst="\$(SRCS:%.c=%.o)"
+    srcdir_src_pat_subst="\$(SRCS:%.c=\$(srcdir)/%.c)"
+    shobjs_pat_subst="\$(SRCS:%.c=shared/%.o)"
+    gprofobjs_pat_subst="\$(SRCS:%.c=gprof/%.o)"
+    shared_rule1="shared/%.o : \$(srcdir)/%.c"
+    shared_rule2="	\${CC} \${CFLAGS} ${PICFLAGS} -c -o \$@ \$<"
+    shared_rule3=""
+    shared_rule4=""
+    gprof_rule1="gprof/%.o : \$(srcdir)/%.c"
+    gprof_rule2="	\${CC} \${GPROF_CFLAGS} \${GPROF_FLAGS} -c -o \$@ \$<"
+    gprof_rule3=""
+    gprof_rule4=""
+
+    obj_rule1=""
+    obj_rule2="%.o : \$(srcdir)/%.c"
+    obj_rule3="	\${CC} \${CFLAGS} -c -o \$@ \$<"
+    obj_rule4=""
+  ;;
+esac
+
+if test -z "$no_pipe"; then
+if test "$CC" = "gcc"; then
+  AC_MSG_CHECKING([if the compiler understands -pipe])
+  OLDCC="$CC"
+  CC="$CC -pipe"
+  AC_TRY_COMPILE(,,
+    AC_MSG_RESULT(yes),
+    CC="$OLDCC"
+    AC_MSG_RESULT(no))
+fi
+fi
+
+if test "$with_gmake" = yes ; then
+   echo "Configuring for GNU make utility"
+else
+   echo "Configuring for System specific make utility"
+fi
+
+if test "$with_static" = no ; then
+  if test "$with_shared" = no ; then
+    AC_MSG_WARN(You must specify 'yes' to one of the --with-static or --with-shared flags.  Building static libs)
+    with_static=yes
+  fi
+fi
+
+if test "$with_shared" = yes ; then
+   if test "$with_static" = yes ; then
+     echo "Configuring to build both static and shared libraries"
+   else
+     echo "Configuring to build shared libraries only"
+   fi
+else
+   if test "$with_static" = yes ; then
+     echo "Configuring to build static libraries only"
+   fi   
+fi
+
+if test "x$lexicographic_readdir" != x ; then
+   AC_DEFINE(READDIR_LEXICOGRAPHIC_ORDER)
+fi
+
+dnl
+dnl Stuff added to influence test*/test.Makefile
+dnl
+
+case ${with_shared} in
+  yes )
+    build_lesstif_xm="-L../../libXm \$(XM_LIBRARY)"
+    build_lesstif_xmg="-L../../libXm \$(XMG_LIBRARY)"
+    build_lesstif_mrm="-L../../libMrm \$(MRM_LIBRARY)"
+    build_lesstif_libraries="-L../../libXm -L../../libMrm \$(XM_LIBRARY)"
+  ;;
+  no )
+    build_lesstif_xm="../../libXm/libXm.a"
+    build_lesstif_xmg="../../libXm/libXm_g.a"
+    build_lesstif_mrm="../../libMrm/libMrm.a"
+    build_lesstif_libraries="../../libMrm/libMrm.a ../../libXm/libXm.a"
+    test_depend_xm="\$(TESTS): ../../libXm/libXm.a"
+    test_depend_mrm="\$(TESTS): ../../libMrm/libMrm.a"
+    client_depend_xm="\$(CLIENTS): ../../libXm/libXm.a"
+    client_depend_mrm="\$(CLIENTS): ../../libMrm/libMrm.a"
+  ;;
+esac
+
+case ${with_static} in
+  yes) static_prefix=;;
+  no) static_prefix="#";;
+esac
+
+
+AC_SUBST(test_include)
+AC_SUBST(client_include)
+AC_SUBST(static_prefix)
+AC_SUBST(shared_include)
+AC_SUBST(objs_pat_subst)
+AC_SUBST(srcdir_src_pat_subst)
+AC_SUBST(shobjs_pat_subst)
+AC_SUBST(gprofobjs_pat_subst)
+AC_SUBST(shared_rule1)
+AC_SUBST(shared_rule2)
+AC_SUBST(shared_rule3)
+AC_SUBST(shared_rule4)
+AC_SUBST(gprof_rule1)
+AC_SUBST(gprof_rule2)
+AC_SUBST(gprof_rule3)
+AC_SUBST(gprof_rule4)
+AC_SUBST(obj_rule1)
+AC_SUBST(obj_rule2)
+AC_SUBST(obj_rule3)
+AC_SUBST(obj_rule4)
+AC_SUBST(build_lesstif_xm)
+AC_SUBST(build_lesstif_xmg)
+AC_SUBST(build_lesstif_mrm)
+AC_SUBST(build_lesstif_libraries)
+AC_SUBST(test_depend_xm)
+AC_SUBST(test_depend_mrm)
+AC_SUBST(client_depend_xm)
+AC_SUBST(client_depend_mrm)
+AC_SUBST(depend_xm_shared)
+AC_SUBST(depend_mrm_shared)
+
+AC_SUBST(shared_make)
+AC_SUBST(x_lib_path)
+AC_SUBST(x_libraries)
+AC_SUBST(x_inc_path)
+AC_SUBST(x_includes)
+AC_SUBST(motif_libraries)
+AC_SUBST(motif_includes)
+AC_SUBST(major_shared)
+AC_SUBST(minor_shared)
+AC_SUBST(PICFLAGS)
+AC_SUBST(R6libs)
+
+AC_SUBST(freebsd20_testhack1)
+AC_SUBST(freebsd20_testhack2)
+AC_SUBST(freebsd20_testhack3)
+AC_SUBST(freebsd20_testhack4)
+AC_SUBST(freebsd20_testhack5)
+AC_SUBST(freebsd20_testhack6)
+AC_SUBST(freebsd20_testhack7)
+AC_SUBST(freebsd20_testhack8)
+
+AC_SUBST(subdirs)
+AC_SUBST(cleandirs)
+
+AC_OUTPUT(Makefile \
+          include/Makefile include/Mrm/Makefile include/Xm/Makefile \
+          libXm/Makefile libMrm/Makefile \
+	  clients/Makefile clients/client.Makefile \
+          clients/xmbind/Makefile \
+          clients/uil/Makefile \
+          clients/mwm/Makefile \
+          clients/lib/Makefile \
+          scripts/Makefile \
+          testXm/Makefile \
+          testXm/test.Makefile testXm/arrowbg/Makefile \
+          testXm/arrowbutton/Makefile testXm/baseclass/Makefile \
+          testXm/bulletinboard/Makefile testXm/cascadebutton/Makefile \
+          testXm/cascadebuttong/Makefile testXm/cmap/Makefile \
+	  testXm/command/Makefile testXm/combobox/Makefile \
+	  testXm/cutpaste/Makefile testXm/dialogs/Makefile \
+	  testXm/drag_drop/Makefile testXm/drag_help/Makefile \
+	  testXm/drag_icon/Makefile testXm/drag_move/Makefile \
+	  testXm/drag_pixmaps/Makefile testXm/drag_simple/Makefile \
+	  testXm/dynamic_drag/Makefile testXm/drawingarea/Makefile \
+	  testXm/drawnbutton/Makefile testXm/dsscale/Makefile \
+	  testXm/extobj/Makefile testXm/filesb/Makefile testXm/fonts/Makefile \
+          testXm/form/Makefile testXm/frame/Makefile testXm/geometry/Makefile \
+          testXm/imagecache/Makefile testXm/international/Makefile \
+	  testXm/label/Makefile testXm/labelg/Makefile \
+	  testXm/list/Makefile testXm/mainw/Makefile \
+          testXm/megabutton/Makefile testXm/menushell/Makefile \
+          testXm/messagebox/Makefile \
+          testXm/misc/Makefile testXm/mwm/Makefile testXm/newtoggleb/Makefile \
+          testXm/panedw/Makefile testXm/protocols/Makefile \
+          testXm/pushbg/Makefile testXm/pushbutton/Makefile \
+          testXm/region/Makefile \
+          testXm/reptype/Makefile testXm/resind/Makefile \
+	  testXm/resconvert/Makefile testXm/rowcolumn/Makefile \
+	  testXm/scale/Makefile testXm/screen/Makefile \
+          testXm/scrollbar/Makefile testXm/scrolledwindow/Makefile \
+          testXm/selections/Makefile testXm/selectionbox/Makefile \
+	  testXm/separator/Makefile testXm/sepg/Makefile \
+	  testXm/smartmb/Makefile \
+          testXm/spinbutton/Makefile testXm/tearoff/Makefile \
+          testXm/text/Makefile testXm/textf/Makefile \
+          testXm/togglebg/Makefile testXm/togglebutton/Makefile \
+          testXm/togglebplus/Makefile testXm/tracking/Makefile \
+          testXm/traversal/Makefile testXm/vasimple/Makefile \
+          testXm/vendor/Makefile testXm/virtualkeys/Makefile \
+          testXm/xmos/Makefile testXm/xmstring/Makefile \
+          testMrm/Makefile testMrm/test.Makefile testMrm/mrm/Makefile)
+
+dnl
+dnl The End.
+dnl

@@ -1,0 +1,61 @@
+#!/usr/bin/make -f
+# debian.rules file for cdwrite-2.0
+# Based on the sample debian.rules file by Ian Jackson
+
+package=cdwrite
+version=2.0
+debian=1
+
+# The next section may have to be extensively modified
+
+build:
+	$(checkdir)
+	$(MAKE)
+	touch build
+
+clean:
+	$(checkdir)
+	-rm -f build
+	-$(MAKE) clean
+	-rm -rf debian-tmp *~
+
+binary:		checkroot build
+	-rm -rf debian-tmp
+	mkdir debian-tmp debian-tmp/DEBIAN
+	install -d debian-tmp/usr/doc/copyright
+	install -d debian-tmp/usr/bin
+	install -d debian-tmp/usr/man/man1
+	sed -e '2s/=/$(version)-$(debian)/' \
+		debian.control > debian-tmp/DEBIAN/control
+	install -s -m 755 cdwrite debian-tmp/usr/bin/cdwrite
+	install -s -m 755 isosize debian-tmp/usr/bin/isosize
+	install -m 644 cdwrite.1 debian-tmp/usr/man/man1/cdwrite.1
+	cp debian.README debian-tmp/usr/doc/copyright/$(package)
+	chown -R root.root debian-tmp
+	chmod -R g-ws debian-tmp
+	dpkg --build debian-tmp
+	mv debian-tmp.deb ../$(package)-$(version)-$(debian).deb
+
+define checkdir
+	test -f $(package).c
+endef
+
+# Below here is fairly generic really
+
+source:		clean
+	chmod +x debian.rules
+	cd .. && \
+	tar cf $(package)-$(version)-$(debian).tar $(package)-$(version) && \
+	gzip -9vf $(package)-$(version)-$(debian).tar
+ 
+diff:		clean
+	cd .. && \
+	(diff -ruN $(package)-$(version).orig $(package)-$(version) \
+	 >$(package)-$(version)-$(debian).diff; [ $$? = 1 ]) && \
+	gzip -9vf $(package)-$(version)-$(debian).diff
+
+checkroot:
+	$(checkdir)
+	test root = "`whoami`"
+
+.PHONY: binary source diff clean checkroot

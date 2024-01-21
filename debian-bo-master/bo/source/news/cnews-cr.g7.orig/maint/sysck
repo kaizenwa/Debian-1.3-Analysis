@@ -1,0 +1,44 @@
+#! /bin/sh
+# sysck file... - check sys file for B-Newsisms and other errors
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+PATH=$NEWSCTL/bin:$NEWSBIN:$NEWSPATH:/usr/local/bin ; export PATH
+awk=gawk	# gawk is preferred as it can handle arbitrarily-long lines
+
+# first, a pass over the raw input
+$awk '
+/^[	 ][	 ]*$/ { print FILENAME ", line " NR ": non-empty blank line" }
+
+# start of possibly-continued comment
+/^#.*\\$/	{ commcont = 1; start = NR; next }
+# uncommented continuation line - fix/complain
+/^[^#]/ && commcont > 0 && start > 0 {
+	print FILENAME ", line " start ": uncommented continuations follow"
+	start = 0		# no more complaints
+}
+/^#/ || commcont == 0	{  }	# commented or non-continuation line - ok
+/^[\t ]/ && contin == 0 {
+	print FILENAME " line " NR " begins with whitespace;"
+	print "probably previous line lacks trailing backslash"
+}
+/.*\\$/		{ contin = 1; next }		# continued line
+{
+	contin = 0; commcont = 0	# uncontinued line
+}
+' $*
+
+# then a pass over the canonicalised input
+$awk -f $NEWSBIN/canonsys.awk $* | $awk -F: '
+$3 ~ /A/ { print "unsupported A flag in " $1 " entry; see relay/anews" }
+$3 ~ /H/ { print "unsupported H flag in " $1 " entry; incredible!" }
+$3 ~ /I/ && $2 !~ /ihave/ {
+	if ($3 ~ /F/)
+		print "FI flags in " $1 " entry; rewrite as n flag"
+	else if ($1 !~ /\.wehave(\/.*)?$/)
+		print "ihave/sendme specified in " $1 " entry; see doc/ihave"
+}
+$3 ~ /N/ { print "unsupported N flag in " $1 " entry; see I flag" }
+$3 ~ /M/ { print "unsupported M flag in " $1 " entry; see newsbatch(8)" }
+$3 ~ /O/ { print "unsupported O flag in " $1 " entry; see newsbatch(8)" }
+$3 ~ /S/ { print "unsupported S flag in " $1 " entry for command " $4 "; omit?" }
+'

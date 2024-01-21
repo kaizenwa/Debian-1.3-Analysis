@@ -1,0 +1,200 @@
+/* strchr (str, ch) -- Return pointer to first occurrence of CH in STR.
+   For Intel 80x86, x>=3.
+   Copyright (C) 1994 Free Software Foundation, Inc.
+   Contributed by Ulrich Drepper <drepper@ira.uka.de>
+
+The GNU C Library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Library General Public License as
+published by the Free Software Foundation; either version 2 of the
+License, or (at your option) any later version.
+
+The GNU C Library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Library General Public License for more details.
+
+You should have received a copy of the GNU Library General Public
+License along with the GNU C Library; see the file COPYING.LIB.  If
+not, write to the Free Software Foundation, Inc., 675 Mass Ave,
+Cambridge, MA 02139, USA.  */
+
+#include <string.h>
+
+#include "asm-ops.h"
+
+char *
+strchr(const char * s,int c)
+{
+register char * __res;
+__asm__( 
+	/* Some optimizations:
+	 * 0. use as less jumps as possible (this is what has to be done
+	 *    ALWAYS)
+	 * 1. four times unfolded loop
+	 * 2. loop pointer increment only at the end of the loop
+	 * 3. don't use register used for register variables (i.e. which
+	 *    which must be saved)
+	 */
+	"movb %%dl,%%dh\n\t"	/* now %dx is c|c */
+	"movw %%dx,%%cx\n\t"
+	"shll $16,%%edx\n\t"	/*     %edx is c|c|0|0 */
+	"movw %%cx,%%dx\n\t"	/*     %edx is c|c|c|c */
+
+        "testb $3,%0\n\t"       /* correct aligned ? */
+        "je " LF(11) "\n\t"      /* yes => begin loop */
+	"movb (%0),%%cl\n\t"
+        "cmpb %%cl,%%dl\n\t"    /* compare byte */
+        "je " LF(6) "\n\t"      /* target found => return */
+	"orb %%cl,%%cl\n\t"
+	"jz " LF(2) "\n\t"
+        "incl %0\n\t"           /* increment source ptr */
+
+	"testb $3,%0\n\t"	/* dito */
+	"je " LF(11) "\n\t"
+	"movb (%0),%%cl\n\t"
+	"cmpb %%cl,%%dl\n\t"
+	"je " LF(6) "\n\t"
+	"orb %%cl,%%cl\n\t"
+	"jz " LF(2) "\n\t"
+	"incl %0\n\t"
+
+	"testb $3,%0\n\t"	/* dito */
+	"je " LF(11) "\n\t"
+	"movb (%0),%%cl\n\t"
+	"cmpb %%cl,%%dl\n\t"
+	"je " LF(6) "\n\t"
+	"orb %%cl,%%cl\n\t"
+	"jz " LF(2) "\n\t"
+	"incl %0\n"
+
+	/* If you cannot guess what this is for look through the resulting
+	 * code.  The dumb version has an .align at the beginning of the
+	 * following asm statement.  This is quite long.  If we could
+	 * make the jump to the label '11' behind the NOPs we could save
+	 * the time in 75% of the cases.  Exactly this is done here.
+	 * If anything in the prepending code changes the number of NOPs
+	 * may have to change, too.  */
+
+#if (!defined(__i486__) && !defined(__i586__)) || \
+    defined(I_DONT_KNOW_WHAT_THIS_MEANS)
+LL(11)	"\tsubl $16,%0\n\t"
+
+	ALIGN "\n"
+#else
+	"\tnop; nop; nop; nop\n"
+LL(11)	"\tsubl $16,%0\n"
+#endif
+		
+LL(1)	"\taddl $16,%0\n\t"	/* increment loop counter */
+	
+	"movl (%0),%%ecx\n\t"
+	"xorl %%edx,%%ecx\n\t"
+	"movl %%ecx,%%edi\n\t"
+	"addl $0xfefefeff,%%edi\n\t"
+	"jnc " LF(7) "\n\t"
+	"xorl %%ecx,%%edi\n\t"
+	"notl %%edi\n\t"
+	"andl $0x01010100,%%edi\n\t"
+	"jnz " LF(7) "\n\t"
+	"xorl %%edx,%%ecx\n\t"
+	"movl %%ecx,%%edi\n\t"
+	"addl $0xfefefeff,%%ecx\n\t"
+	"jnc " LF(2) "\n\t"
+	"xorl %%edi,%%ecx\n\t"
+	"notl %%ecx\n\t"
+	"andl $0x01010100,%%ecx\n\t"
+	"jnz " LF(2) "\n\t"
+
+	"movl 4(%0),%%ecx\n\t"
+	"xorl %%edx,%%ecx\n\t"
+	"movl %%ecx,%%edi\n\t"
+	"addl $0xfefefeff,%%edi\n\t"
+	"jnc " LF(71) "\n\t"
+	"xorl %%ecx,%%edi\n\t"
+	"notl %%edi\n\t"
+	"andl $0x01010100,%%edi\n\t"
+	"jnz " LF(71) "\n\t"
+	"xorl %%edx,%%ecx\n\t"
+	"movl %%ecx,%%edi\n\t"
+	"addl $0xfefefeff,%%ecx\n\t"
+	"jnc " LF(2) "\n\t"
+	"xorl %%edi,%%ecx\n\t"
+	"notl %%ecx\n\t"
+	"andl $0x01010100,%%ecx\n\t"
+	"jnz " LF(2) "\n\t"
+
+	"movl 8(%0),%%ecx\n\t"
+	"xorl %%edx,%%ecx\n\t"
+	"movl %%ecx,%%edi\n\t"
+	"addl $0xfefefeff,%%edi\n\t"
+	"jnc " LF(72) "\n\t"
+	"xorl %%ecx,%%edi\n\t"
+	"notl %%edi\n\t"
+	"andl $0x01010100,%%edi\n\t"
+	"jnz " LF(72) "\n\t"
+	"xorl %%edx,%%ecx\n\t"
+	"movl %%ecx,%%edi\n\t"
+	"addl $0xfefefeff,%%ecx\n\t"
+	"jnc " LF(2) "\n\t"
+	"xorl %%edi,%%ecx\n\t"
+	"notl %%ecx\n\t"
+	"andl $0x01010100,%%ecx\n\t"
+	"jnz " LF(2) "\n\t"
+
+	"movl 12(%0),%%ecx\n\t"
+	"xorl %%edx,%%ecx\n\t"
+	"movl %%ecx,%%edi\n\t"
+	"addl $0xfefefeff,%%edi\n\t"
+	"jnc " LF(73) "\n\t"
+	"xorl %%ecx,%%edi\n\t"
+	"notl %%edi\n\t"
+	"andl $0x01010100,%%edi\n\t"
+	"jnz " LF(73) "\n\t"
+	"xorl %%edx,%%ecx\n\t"
+	"movl %%ecx,%%edi\n\t"
+	"addl $0xfefefeff,%%ecx\n\t"
+	"jnc " LF(2) "\n\t"
+	"xorl %%edi,%%ecx\n\t"
+	"notl %%ecx\n\t"
+	"andl $0x01010100,%%ecx\n\t"
+	"jz " LB(1) "\n"	/* next round */
+
+LL(2)	"\txorl %0,%0\n\t"	/* return NULL pointer for NOT FOUND */
+	"jmp " LF(6) "\n"
+
+LL(73)	"\taddl $4,%0\n"	/* correct counter */
+LL(72)	"\taddl $4,%0\n"
+LL(71)	"\taddl $4,%0\n"
+LL(7)	"\txorl %%edx,%%ecx\n\t"/* reconstruct the original dword */
+
+	/* We now scan for the byte in which the character was matched.
+	 * But we have to take care of the case that a NULL char is
+	 * found before this in the dword.  */
+	"cmpb %%dl,%%cl\n\t"	/* compare first byte with CH */
+	"jz " LF(6) "\n\t"	/* equal, branch */
+	"orb %%cl,%%cl\n\t"	/* is NULL char ? */
+	"jz " LB(2) "\n\t"	/* yes, return NULL */
+	"cmpb %%dl,%%ch\n\t"	/* compare second byte with CH */
+	"jz " LF(5) "\n\t"	/* equal, branch */
+	"orb %%ch,%%ch\n\t"	/* is NULL char ? */
+	"jz " LB(2) "\n\t"	/* yes, return NULL */
+	"shrl $8,%%ecx\n\t"	/* we cannot access the upper 16 bit easy */
+	"cmpb %%dl,%%ch\n\t"	/* compare third byte with CH */
+	"jz " LF(4) "\n\t"	/* equal, branch */
+	"orb %%ch,%%ch\n\t"	/* is NULL char ? */
+	"jz " LB(2) "\n\t"	/* yes, return NULL */
+	
+	/* it must be in the fourth byte and it cannot be NULL */
+
+	"incl %0\n"		
+LL(4)	"\tincl %0\n"		/* correct missing loop increment */
+LL(5)	"\tincl %0\n"
+LL(6)
+	:"=a" (__res):"0" (s),"d" (c):"dx","di");
+return __res;
+}
+
+#include <gnu-stabs.h>
+#ifdef elf_alias
+elf_alias (strchr, index);
+#endif

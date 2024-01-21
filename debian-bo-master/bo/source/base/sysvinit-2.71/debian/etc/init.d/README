@@ -1,0 +1,175 @@
+Configuration of Init under Debian GNU/Linux
+********************************************
+
+Copyright (C) 1995 Debian Association, Inc.
+
+   The /etc/init.d directory contains the scripts executed by init(8)
+when init state (or "runlevel") is changed.  This includes the boot
+process, when the multi-user state begins.  Several of these scripts
+are included with init and are intended to be executed ONCE, usually
+at boot time.  An example is /etc/init.d/boot, which is executed at
+boot time to check and mount file systems, activate swap, load kernel
+modules, etc.--everything that needs to be done before the multi-user
+state begins.  /etc/init.d also contains the scripts that are executed
+when entering runlevel 0 (halt), runlevel 1 (single-user) and runlevel
+6 (reboot).
+
+   Packages can (and should) place scripts in /etc/init.d to start
+or stop services at boot time or during a change of runlevel.  These
+scripts should be named /etc/init.d/<package>, and they should accept
+one of two arguments: "start", which starts the services, or "stop",
+which stops the services.  This script should not fail obscurely when
+the configuration files remain but the package has been removed, as
+the default in dpkg is to leave configuration files on the system
+after the package has been removed.  Only when it is executed with the
+`--purge' option will dpkg remove configuration files.  Therefore, you
+should include a `test' statement at the top of the script, like this:
+
+   test -f <program-executed-later-in-script> || exit 0
+
+These scripts should be referenced, when appropriate, by symbolic
+links in the /etc/rc?.d directories, as below.
+
+   When changing runlevels, init looks in the directory /etc/rc<n>.d
+for the scripts it should execute, where <n> is the runlevel that is
+being changed to.  Please note that the "scripts" in /etc/rc?.d are
+not actually scripts; they are symbolic links, referencing actual
+scripts in /etc/init.d.  For simplicity, we refer to them as "scripts".
+
+   First, the scripts prefixed with a "K" are executed, followed by
+the scripts prefixed with an "S".  The "K" scripts are responsible
+for killing certain services and the "S" scripts for starting certain
+services upon ENTERING the runlevel.  For example, if we are changing
+from runlevel 2 to runlevel 3, init will first execute all of the "K"
+prefixed scripts it finds in /etc/rc3.d (to kill services), and then
+all of the "S" prefixed scripts it finds in /etc/rc3.d (to start
+services).  The "K" scripts will execute the file it references with
+an argument of "stop", and the "S" scripts will execute this file with
+an argument of "start".
+
+   After the "K" or "S" prefix, there should be a number specified,
+and this number should be between 00 and 99.  The number determines
+the order in which the scripts are run.  For example, the "K20" scripts
+will be executed before the "K30" scripts.  You can use this number
+to make sure that a certain service is started before another.  For
+example, on some machines, the program `setserial' may need to
+properly set an IRQ before the `ppp' program uses a modem to connect
+to a network.  In this case, the script that runs `setserial' should
+have a lower number than the script that starts `ppp' so that it runs
+first:
+
+   /etc/rc2.d/S10setserial
+   /etc/rc2.d/S20ppp
+
+   If it does not matter when or in which order the script is run,
+use the number "20".  If it does, then you should talk to Ian Murdock
+<imurdock@debian.org> first, and he will help you choose a number.
+
+   In Debian GNU/Linux, we try to ship our software in as much of a
+"default" state as possible.  Therefore, unless there is a good reason
+for doing differently, we ask that you start and stop the services in
+each of the multi-user state runlevels (2, 3, 4, and 5).  If a service
+needs to be stopped before a file system can be unmounted (an example
+is process accounting or quota services), then be sure to stop them
+in the halt runlevel (0), the single-user runlevel (1) and the reboot
+runlevel (6).
+
+   The system administrator will have the opportunity to customize
+runlevels by simply adding, moving, or removing the symbolic links
+in /etc/rc?.d.  This is why we default to running everything in the
+multi-user state--a reasonable default--and the administrator can
+easily customize init to be as complex and sophisticated as he or
+she wants it to be beyond this.
+
+   We provide a script to make it easier for package maintainers to
+arrange for the proper creation and removal of /etc/rc?.d symbolic
+links from their postinst and postrm scripts.  You should use this
+script to make changes to /etc/rc?.d and NEVER include any /etc/rc.?.d
+symbolic links in the actual archive.
+
+   * In the postinst script, you need only do the following to setup
+   /etc/rc?.d.  You should redirect standard output to /dev/null, as
+   update-rc.d produces insignificant output:
+
+      update-rc.d <package> defaults >/dev/null
+
+   where <package> is the name of the file as it appears in /etc/init.d.
+   It will use the default number of "20", as mentioned above.  If you
+   need to use a different number, you can specify it after "defaults":
+
+      update-rc.d <package> defaults 30 >/dev/null
+
+   * In the postrm script, you need to call update-rc.d IF AND ONLY IF
+   it is called with the `purge' argument:
+
+      if [ $1 = "purge" ]
+      then
+        update-rc.d <package> remove >/dev/null
+      fi
+
+
+*** IMPORTANT ***
+
+   DO NOT include the /etc/rc?.d/* symbolic links in the archive!
+THIS WILL CAUSE PROBLEMS!  You should create them with update-rc.d,
+as above.
+
+   DO NOT include the /etc/rc?.d/* symbolic links in conffiles!  THIS
+WILL CAUSE PROBLEMS!  DO, however, include the /etc/init.d scripts in
+conffiles.
+
+
+*** EXAMPLE ***
+
+   The process accounting package wants to make sure that process
+accounting is started at boot time and that it is stopped before the
+system is halted, enters the single-user state, or is rebooted (all
+so the /var file system can be properly unmounted).  It puts a script
+that does this in /etc/init.d, naming the script appropriately "acct".
+This script accepts one of two arguments: either "start", which starts
+process accounting, or "stop", which stops it.  To ensure that it does
+not fail obscurely when the configuration files remain but the package
+has been removed, we include a `test' statement at the top of the
+script:
+
+   #! /bin/sh
+   #
+   # Start process accounting.
+
+   test -f /usr/sbin/accton || exit 0
+
+   case "$1" in
+     start)
+       echo "Starting process accounting"
+       /usr/sbin/accton /var/account/pacct
+       ;;
+     stop)
+       echo "Stopping process accounting"
+       /usr/sbin/accton
+       ;;
+     *)
+       echo "Usage: /etc/init.d/acct {start|stop}"
+       exit 1
+   esac
+
+   exit 0
+
+(You may find a skeletal script from which to base your /etc/init.d
+scripts in /etc/init.d/skeleton.)
+
+   We want to stop then (re)start process accounting when entering
+a multi-user state--runlevels 2, 3, 4, and 5--and we want to stop
+it when leaving such a state--runlevels 0 (halt), 1 (single) and 6
+(reboot).  These are good defaults, and we accomplish this by
+including the following in the postinst:
+
+   update-rc.d acct defaults >/dev/null
+
+   When the user removes the acct packages with the `--purge' option,
+we want to make sure the /etc/rc?.d symbolic links are properly removed,
+so we include the following in the postrm:
+
+   update-rc.d acct remove >/dev/null
+
+Otherwise, the /etc/rc?.d symbolic links will remain on the system
+along with /etc/init.d/acct script.

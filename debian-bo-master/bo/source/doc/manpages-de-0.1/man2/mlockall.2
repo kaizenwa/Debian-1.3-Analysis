@@ -1,0 +1,161 @@
+.\" Hey Emacs! This file is -*- nroff -*- source.
+.\"
+.\" Copyright (C) Markus Kuhn, 1996
+.\" German Version (C) Michaela Hohenner und Hanno Wagner, 1996
+.\"
+.\" This is free documentation; you can redistribute it and/or
+.\" modify it under the terms of the GNU General Public License as
+.\" published by the Free Software Foundation; either version 2 of
+.\" the License, or (at your option) any later version.
+.\"
+.\" The GNU General Public License's references to "object code"
+.\" and "executables" are to be interpreted as the output of any
+.\" document formatting or typesetting system, including
+.\" intermediate and printed output.
+.\"
+.\" This manual is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public
+.\" License along with this manual; if not, write to the Free
+.\" Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139,
+.\" USA.
+.\"
+.\" 1995-11-26  Markus Kuhn <mskuhn@cip.informatik.uni-erlangen.de>
+.\"      First version written
+.\" Translated into german (c) Michaela Hohenner und Hanno Wagner, 1996
+.\" Modified 6 June 1996 by Martin Schulze (joey@linux.de)
+.\"
+.TH MLOCKALL 2 "6. Juni 1996" "Linux 1.3.43" "Systemaufrufe"
+.SH BEZEICHNUNG
+mlockall \- Schaltet Paging für den aktuellen Prozeß aus.
+.SH "ÜBERSICHT"
+.nf
+.B #include <sys/mman.h>
+.sp
+\fBint mlockall(int \fIflags\fB);
+.fi
+.SH BESCHREIBUNG
+.B mlockall
+sperrt das Paging für alle Seiten, die in den Adreßraum des aufrufenden
+Prozesses eingebunden sind.  Dieses bezieht sich auf die Seiten des Code-,
+Daten- und Stacksegments genauso wie auf gemeinsame Bibliotheken,
+Kernel-Daten im Userspace, Shared Memory und Shared Dateien.  Es ist
+garantiert, daß alle eingebundenen Speicherseiten im RAM bleiben,
+wenn der
+.BR mlockall \-Aufruf
+erfolgreich zurückkehrt. Und es wird ebenfalls garantiert, daß sie
+solange im RAM bleiben, bis die Seiten mit
+.B munlock
+oder
+.B munlockall
+entsperrt werden, das Programm terminiert wird oder mit
+.B exec
+ein anderes Programm aufruft.  Diese Sperrungen werden nicht an
+Tochterprozesse über ein
+.B fork
+hinaus vererbt.
+
+Das Sperren von Speicher hat zwei Hauptanwendungen:
+Echtzeitalgorithmen und Hochsicherheits-Datenverarbeitung.
+Echtzeitalgorithmen erfordern deterministisches Timing, und, wie auch
+Scheduling, ist Paging einer der Hauptgründe für unerwartete
+Verzögerungen in der Programmausführung.
+Echtzeitapplikationen werden außerdem für gewöhnlich mit
+.B sched_setscheduler
+auf einen Echtzeit-Scheduler umschalten.
+Kryptographische Sicherheitssoftware arbeitet oft mit
+sicherheitskritischen Bytes wie Paßwörtern oder geheimen Schlüsseln
+als Datenstrukturen.  Durch Paging könnten diese geheimen Daten auf
+eine permanente Swappartition übertragen werden, von wo aus sie auch
+dann noch Dritten zugänglich sein können, lange nachdem das Programm
+die geheimen Daten aus dem RAM gelöscht und sich beendet hat.
+Für Sicherheitsapplikationen müssen nur kleine Teile des Speichers 
+gesperrt werden.  Dafür steht  
+.B mlock
+zur Verfügung.
+
+Die 
+.I flags
+Parameter können mit logischem ODER aus folgenden Konstanten konstruiert
+werden:
+.TP
+.B MCL_CURRENT
+Sperrt alle Seiten, die momentan in den Adreßraum des Prozesses umgerechnet
+sind.
+.TP
+.B MCL_FUTURE
+Sperrt alle Seiten, die in Zukunft in den Adreßraum des Prozesses
+gelegt werden.  Das könnten zum Beispiel neue Adreßseiten sein, die
+bei einem sich vergrößernden Heap und Stack benötigt werden,
+Dateien, die in den Speicher gebunden werden, oder gemeinsam benutzte
+Speicherregionen.
+.PP
+Wenn
+.B MCL_FUTURE
+angegeben ist und die Anzahl der gesperrten Seiten das obere Limit der
+zulässigen gesperrten Seiten überschreitet, wird der Systemaufruf,
+der das neue umrechnen veranlaßte mit 
+.BR ENOMEM 
+fehlschlagen.
+Wenn diese Seiten durch wachsenden Stack eingebunden wurden, wird der
+Kernel die Ausdehnung des Stacks nicht zulassen und ein
+.BR SIGSEGV 
+an den Prozeß senden.
+
+Echtzeitprozesse sollten genug gesperrte Stackseiten reservieren,
+bevor sie in die zeitkritische Phase treten, so daß kein Fehler durch
+einen Funktionsaufruf entstehen kann.  Dies kann durch den Aufruf
+einer Funktion erreicht werden, die eine ausreichend große
+automatische Variable erzeugt und in den Speicher schreibt, in dem
+diese liegt, um diese Stackseiten zu belegen.  Auf diesem Wege werden
+genug Seiten für den Stack bereitgestellt und können im RAM gesperrt
+werden.  Der Schreibvorgang stellt sicher, daß nicht einmal ein
+Schreib-Kopier-Seitenfehler in der kritischen Phase entstehen können.
+
+Speichersperren werden nicht gestapelt, das heißt, Seiten die mehrmals durch
+den Aufruf von
+.B mlockall
+oder
+.B mlock
+gesperrt wurden werden sofort wieder freigegeben durch einen einzigen Aufruf
+von
+.BR munlockall .
+Seiten die an verschiedene Orte oder für verschiedene Prozesse
+bereitgestellt wurden bleiben solange im RAM gesperrt wie sie mindestens
+an einen Ort oder durch einen Prozeß benötigt werden.
+
+In POSIX Systemen, wo 
+.B mlockall
+und
+.B munlockall
+verfügbar sind, ist
+.B _POSIX_MEMLOCK
+definiert in <unistd.h>.
+.SH "RÜCKGABEWERT"
+Bei Erfolg gibt 
+.B mlockall
+eine Null aus.  Falls ein Fehler auftritt wird ein \-1 zurückgegeben und
+.I errno
+sofort gesetzt.
+.SH FEHLER
+.TP
+.B ENOMEM
+Der Prozeß versuchte die maximal zulässige Anzahl gesperrter Seiten zu
+überschreiten.
+.TP
+.B EPERM
+Der Aufrufende Prozeß hat nicht die erforderlichen Rechte.  Nur Rootprozesse
+dürfen Seiten sperren.
+.TP
+.B EINVAL
+Unbekannte Flags wurden angegeben.
+.SH STANDARDS
+POSIX.1b, SVR4
+.SH SIEHE AUCH
+ munlockall (2),
+.BR mlock (2), 
+und
+.BR munlock (2).

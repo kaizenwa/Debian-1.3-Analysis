@@ -1,0 +1,394 @@
+   
+                                     XAOS
+                                  ALGORITHMS
+                                       
+   
+Main Concept
+
+   
+   
+   The main idea behind XaoS is that it is not required to calculate the
+   whole image every frame. Most pixels are already calculated in the
+   previous frames. You usually don't have exactly the pixels you want,
+   but all within a range lower than a step between pixels are
+   acceptable. That is why the image flickers a bit and why points do not
+   blink randomly as in precalculated animations.
+   
+   This document describes some of the most important algorithms in XaoS
+     * Saving Previous Pixels
+     * Approximation Algorithm
+     * Moving Pixels to New Positions
+     * Calculating New Pixels
+     * Symmetry
+     * Calculation of Mandelbrot Set
+     * Dynamic Resolution
+     * Autopilot
+       
+   
+     _________________________________________________________________
+   
+Saving Previous Pixels
+
+   
+   
+   Ideally, all precalculated points should be saved and used for
+   building successive frames. I could not figure out a practical way to
+   implement this. To save all frames for half an hour would require 24
+   Mb of memory, and searching the saved frames would be more
+   computationally expensive than recalculating an entirely new frame.
+   For this reason only the last generated frame is used as reference.
+   This way the memory requirements are proportional to xsize * ysize. It
+   can be shown that this method is only about 2-5% slower during
+   zooming. -Of course unzooming is much slower.
+   
+   Because only the previous frame is used, another optimization can be
+   performed. Imaginary and real parts of the calculated image are not
+   precise since they are the result of successive iterations of same
+   algorithm. In order to prevent errors from being distributed to the
+   following frames their exact coordinates need to be known.
+   Fortunately, it isn't neccassary to save their values since it is
+   known that all real components in a row and all imaginary components
+   in a column are equal. Thus, the only things that must be saved are
+   the real components for every row and the imaginary components for
+   every column.
+   
+   This allows for a substantial speed-up in approximation because the
+   calculation requires less data. Of course, some rows and columns fall
+   out of the threshold and new ones need to be calculate to fill in the
+   gaps in the frame.
+   
+   Obviously, much less work is done. There are only xsize + ysize
+   calculations instead of xsize * ysize. So the main loop in XaoS looks
+   like this:
+     * Make approximations for rows
+     * Make approximations for columns
+     * Move old pixels to their new positions
+     * Calculate pixels for which there is no good approximation for
+       their row
+     * Calculate pixels for which ther is not good approcimation for
+       their column but there is one for their row
+       
+   
+     _________________________________________________________________
+   
+Approximation Algorithm
+
+  INTRODUCTION TO PROBLEM
+  
+   
+   
+   You can see that the approximation algorithm is central to the
+   implementation of XaoS. If the guess is incorrect the image will look
+   strange, boundaries will not be smooth and the zoom will flicker. On
+   the other hand, if it adds more new rows or columns than required,
+   zooming will become much slower. Also, in the instance of doubling
+   (i.e., using an old row or column more than once) the resolution will
+   lower. It is important to keep the increasing imaginary and real
+   components in the correct order. If a row and column of complex
+   coordinates follows one with higher coordinate values an improved
+   approximation can be attained by swapping their values.
+   
+   The algorithm needs to be relatively fast. It is only used for xsize +
+   ysize values but if its speed is proportional to O(n ^ 2), it can be
+   slower than a whole recalculation of the image. Speeds of O(n) or O(n
+   * log(n)) are acceptable.
+   
+  SOME SIMPLE ALGORITHMS TO SOLVE IT
+  
+   
+   
+   Initially, a very simple algorithm was used:
+   
+     Find the old row/column nearest the row/column that needs to be
+     regenerated. If the difference between them is less than one step
+     (step = (end - beginning) / resolution) then use it. Otherwise,
+     recalculate a new one.
+     
+   Finding the nearest row/column pair is very simple since it is always
+   greater or equal to the pair needing to be generated.
+   
+   Surprisingly, this simple algorithm has almost all the problems
+   described above. Doubling was fixed by lowering the limit to step / 2.
+   This cause a considerable slowdown so the limit was returned to step.
+   Instead, the algorithm was changed to search for only row/column pairs
+   that are greater than the previous frame's row/column pairs. This is
+   the algorithm that was used in version 1.0
+   
+   This algorithm still added to many new rows and columns and did not
+   generate smooth boundaries. For version 1.1 a heuristic was added that
+   preferred approximating rows/columns with lower values. This way it
+   did not occupy possible rows/columns for the next approximation. The
+   result was a speedup by a magnitude of four. In versions 1.1 to 2.0
+   many improvements were made to the heuristic to give it added
+   performance. The following example tries to explain how complicated
+   the problem is (O is the old coordinates and X is the values to be
+   approximated):
+
+        X1        X2        X3        X4        X5        X6        X7
+O1 O2                    O3 O4 O5                   O6 O7 O8
+
+   The normal algorithm will aproximate X1 by O2, X3 by O4 but nothing
+   more. For the algorithm with threshold step instead of step / 2:
+
+  O2 to X1
+  O3 to X2
+  O4 to X3
+  O5 to X4
+  O6 to X5
+  O8 to X6
+
+   But this will fail with X7. The second algorithm which relies on lower
+   values will do the following:
+
+  O1 to X1
+  O3 to X2
+  O4 to X3
+  O5 to X4
+  O6 to X5
+  O7 to X6
+  O8 to X7
+
+   O1 to X1 is wrong. And there is many and many other situations that
+   may occur. But you may see that the normal algorithm will calculate 4
+   new rows/columns but the heuristic saves all of these calculations.
+   
+  CURRENT ALGORITHMS USED
+  
+   
+   
+   In version 2.1 work on this heuristic was disabled after I discovered
+   a suprisingly simple algorithm that solves all these problems. First I
+   decided to define exactly what is best aproximation. This should be
+   done by defining a price for every aproximation and choose the
+   aproximation with the lowest price. Prices are defined as such:
+   
+     Aproximating row/column x by y costs diff(x, y) ^ 2.
+     
+   This prefers two smaller approximation errors before a single larger
+   error and describes my goal quite well.
+   
+   The cost for adding a new row/column specifies when it is better to do
+   a bad approximation and when to add a new row/column. I use (4 * step)
+   * (4 * step). This means that the approximation is acceptable when
+   diff(x, y) < 4 * step. Otherwise, adding a new row/column costs less.
+   Now the best approximation is known. All that is required is a fast
+   algorithm to do this. Surprisingly, this is possible in linear time
+   using a relatively simple dynamic algorithm. It uses approximations of
+   length < n to make a guess at the length of n. It can start by
+   approximating one row/column and then again for two, three up to
+   xsize/ysize rows/columns.
+   
+   The algorithm starts by calculating prices for all possible new
+   positions for old row/column 1. Because of the pricing there are
+   maximally 8 new positions. (Other ones must cost more than adding new
+   row/column). Of course it is possible that there are no new positions.
+   
+   
+   For calculating the price of aproximations for row/column 2 I may use
+   previous one: Try new position n. Calculate the price and add the best
+   aproximation for the previous (row/column 1) one that uses a new
+   position lower than n(prohibits doubling or swapping). This shoud be
+   one of 8 positions or eventually adding of new one and not using
+   row/column 1 at all.
+   
+   The same method can be used for the rest of the rows/columns. At the
+   end the best price may be found for the last row/column and return by
+   the way it was calculated. (For this I need the saved "calculated
+   using" values.) At this step the best approximation has been
+   determined.
+   
+   To fill the table, 9 * n steps are required and n steps to backtrack
+   best aproximation. The only problem is that this algorithm is still a
+   little slow (chiefly because of slow memory access on Intel
+   architectures). -But with some optimizing it works well.
+   
+   This algorithm is almost perfect except that it occaisonally adds new
+   rows/columns to the wrong locations. It does not prefer to add new
+   rows/columns into holes. But it does not seem that this is the real
+   problem. The last optimization made was based upon the face that added
+   rows/columns do not have the exact real and imaginary components
+   calculated by (beginning + x * step) but lies at the average of left
+   and right neighbours. This makes the boundaries smooth and distributes
+   coordinates better. It also has the added benefit of making the input
+   better for future approximations.
+     _________________________________________________________________
+   
+Moving Pixels to New Positions
+
+   
+   
+   Since XaoS is using the approximation algorithm the following table is
+   filled for every row/column:
+     * calculate
+     * oldpoint
+     * position
+       
+   calculate is 1 if the current row/column is new and needs to be
+   calculated or 0 if no old pixels need to be moved. oldpoint is a
+   pointer to the old row/column that corresponds to the new one. This
+   pixel needs to be copied to the new location. position is the real and
+   imaginary components of the coordinates used for future
+   approximations. Because almost all points will be moved, the solution
+   seems to be simple: for every new point look at the row and column
+   table; copy it if required.
+   
+   There is the problem that this minimally needs three memory reads for
+   every pixel (read calculate, oldpoint and index of old point). This is
+   too slow, so a small optimization is performed. Instead rewriting the
+   piece of code in assembly, normal memcpy is used to move blocks of
+   pixels to their new locations. This minimizes the internal loop and
+   access can be done more quickly since memcpy is usually optimized for
+   each architecture.
+   
+   Using the row table, a list of blocks to move for every row is
+   created. With this new table all the pixels can be moved quickly. This
+   increased the speed of XaoS about four times and made this function so
+   fast that it is no longer a problem. (In fact, it takes much less
+   processing than all other parts of XaoS.)
+     _________________________________________________________________
+   
+Calculating New Pixels
+
+   
+   
+   The above optimizations make XaoS very fast, but another 30% increase
+   in speed is aquired by using a clever method for calculating the new
+   pixels. Many methods are known for saving calculations during the
+   generation of fractal images. The most powerful is boundary detection.
+   It relies on the fact that the Mandelbrot Set is connected with lakes.
+   You need only one pixel at the boundary, then traverse the whole set
+   and then fill the solid area inside. This method saves many
+   calculations but is too complex for adding just one line. Many claim
+   that it does not introduce any errors, but this is not true. It is
+   possible for a connected part of the lake to be so small that it is
+   not visible in smaller resolutions. In this case, boundary detection
+   misses the whole area.
+   
+   XaoS uses modification of method known as solid guessing. The pixels
+   at the boundaries of a rectangle are calculated. If they are all the
+   same you may assume that this rectangle does not does not contain
+   anything and fill it.
+   
+   This algorithm is further modified to operate on added lines. For this
+   it is at least as good as boundary detection and produces more
+   tangible errors. When adding a single line, the upper and lower line
+   may be examined for the nearest three pixels. If they are all the same
+   then it is assumed that 9x9 pixels are the same. This disables all
+   calculations inside solid areas and calculates as many points as
+   boundary detection. The only possibility of creating a larger error
+   with this method as opposed to boundary detection is in the instance
+   that the shape of the set is so sharp that it does not set any of the
+   tested points but comes from the right (i.e., uncalculated) location.
+   This situation is not very common.
+   
+   Later, rules were added for new rows and columns that crossed each
+   other. In this instance you can test only four pixels. This situation
+   is very rare. It is hoped that it does not introduce many errors.
+   
+   If multiple blocks of new lines need to be calculated there are not
+   reference pixels to use for solid guessing. Interlacing does the
+   trick. By calculating the odd lines without any guessing, the guessing
+   algorithm is now possible for the remaining uncalculated lines. This
+   simple trick saves about 30% of the calculation of the main Mandelbrot
+   image.
+   
+   A similar approximation can also be done for the X coordinate. This
+   makes it possible to improve solid guessing at even pixels because all
+   surrounding pixels are available, further reducing errors.
+     _________________________________________________________________
+   
+Symmetry
+
+   
+   
+   Many fractals are horizontally or vertically symmetrical. This is
+   implemented in the approximation code. When there is no good
+   approximation available, try to mirror the opposite side if the line
+   is available.
+   
+   Other symmetries have been implemented. They do not help much, but
+   once it has been coded there is no reason to remove it.
+   
+   This method primarily speeds up the initial image.
+     _________________________________________________________________
+   
+Calculation of the Mandelbrot Set
+
+   
+   
+   After researching possible optimizations for the main calculation
+   loop, I discovered that most of them did not really help. The only
+   special optimization used on the Mandelbrot set is to avoid
+   calculating in a few circles that are definitely inside the set. This
+   only increases the speed of the calculation of the first image and has
+   no visible effect on the average speed of zooming.
+     _________________________________________________________________
+   
+Dynamic Resolution
+
+   
+   
+   The above optimizations often do not help enough and image calculation
+   is still too slow. One option was to reduce the framerate, but a
+   framerate lower than 5 frames per second is unbearable. Another option
+   is simply to calculate only the details that can be determined within
+   a time interval.
+   
+   Rows/columns not calculated are simple approximated by referencing the
+   nearest other row/column. The result is an image with larger pixels.
+   One problem is the fact that the order of calculating the rows/columns
+   is significant. Previous versions of XaoS simply calculated all rows
+   from top to bottom and then columns from left to right. Using the
+   dynamic resolution code with this algorithm would result in distorted
+   images. This was solved by adding priority to every row/column and
+   calculating the high priority row/column first. The algorithm for
+   adding these priorities is as follows:
+     * Find middle row/column of uncalculated block. Priority is the size
+       of the block (in floating point coordinates)
+     * Start function for left block and right block
+       
+   This function produces quite good results. It tends to make same size
+   rectangles on the whole image and does not depend on resolution.
+   
+   Another interesting optimization is that during the zoom it is more
+   advantageous to calculate rows/columns in the center of the zoom
+   instead of the borders since these will be in the viewport longer and
+   the user is usually focusing on center of the zoom anyhow.
+   
+   This is done by simply adding to the calculated priority
+   normal_priority / (abs(newposition - oldposition) / step + 1). This
+   prefers rows/columns that do not move a great deal. Of course,
+   unzooming uses the formula reversed.
+   
+   The last variable to consider is the time interval for one frame.
+   Setting it too low makes the calculation slow. Setting it too high
+   makes the framerate too low. -So the amount of time spent in other
+   parts of the program is calculated and multiplied by 5 to determine
+   the interval. It is probable that the other parts of XaoS slow down
+   about 20%.
+     _________________________________________________________________
+   
+Autopilot
+
+   
+   
+   Another interesting algorithm controls the autopilot. It is actually
+   quite simple. Interesting parts are found at the boundaries of the
+   set. It randomly looks around and zooms to the first area containing
+   both outside and inside set points. Some fractals (such as the Newton)
+   do not have points inside the set at all. In this case it selects a
+   point where many (more than 2) different colors are around. (i.e., It
+   zooms into noisy areas.)
+   
+   In the instance that there are no such areas, the autopilot will
+   unzoom. Also detects oscilating. 
+     _________________________________________________________________
+   
+    Send all comments, questions, and
+    suggestions to xaos@tedium.com
+    
+   
+   
+   Copyright &copy; 1996, 1997 by Thomas Marsh and Jan Hubicka. All
+   rights reserved.
+   Last Modified: Sun Jan 26 11:37:23 CST 1997

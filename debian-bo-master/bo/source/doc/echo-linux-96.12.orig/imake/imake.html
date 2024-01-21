@@ -1,0 +1,383 @@
+<HEAD>
+<TITLE>
+Utilisation des Imakefiles</TITLE>
+</HEAD>
+
+<BODY>
+
+<IMG SRC="imake2.gif" ALIGN=left HSPACE=10> 
+<H1> 
+<P>Utilisation des Imakefiles
+</H1>
+<P>
+Article pour l'Echo de Linux (<em><b>Octobre 1996</b></em>) 
+<address><a href="mailto:pierre@rd.lectra.fr">Pierre Ficheux 
+(pierre@rd.lectra.fr)</a></address> 
+<BR CLEAR=left>
+<HR>
+
+
+<H1>Introduction</H1>
+<P>
+Le système des Imakefiles permet de générer le fichier
+Makefile d'une application en tenant compte des particularités des diverses
+plate-formes de génération de cette application.
+<P>
+Le concept des Imakefiles a été introduit dans les distributions
+de X11. En effet, X étant 
+supporté par un grand nombre d'implémentations d'UNIX, la gestion des 
+particularités des systèmes
+deviendrait vite inextricable si l'on se limitait à l'utilisation des 
+simples Makefiles. Les Imakefiles permettent de résoudre élégamment
+(et simplement !) le problème en fournissant en plus une procédure
+<EM>standard</EM> de génération d'une application X.
+
+<H1>Description</H1>
+<H2>Principe de base</H2>
+<P>
+Le système des Imakefiles utilise 2 entités principales :
+<UL>
+<LI> Un utilitaire de génération de Makefile: 
+<A HREF="man_imake.html">imake</A>
+<LI> Des fichiers de configuration (généraux et particuliers à l'application)
+</UL>
+
+<H2>L'utilitaire imake</H2>
+<P>
+Le programme 
+<A HREF="man_imake.html">imake</A> utilise les fichiers de configuration 
+pour générer
+un fichier Makefile à partir du fichier Imakefile de l'application.
+Ce programme est basé sur le préprocesseur C (cpp). Les fichiers
+de configuration (ainsi que le fichier Imakefile) utiliseront la syntaxe du
+<EM>cpp</EM> (#define ,#include, commentaires = /* */, ...).
+
+<H2>Fichiers de configuration</H2>
+<P>
+Les fichiers de configuration sont de 2 types :
+<UL>
+<LI> Les fichiers généraux auxquel l'utilisateur n'a normalement pas accès
+<LI> Les fichiers de l'application (Imakefile en particulier)
+</UL>
+<P>
+Les fichiers généraux sont situés sur le répertoire de configuration qui
+pour 
+<A HREF="http://www.xfree86.org">XFree86</A> est 
+<EM>/usr/X11R6/lib/X11/config</EM>. Les principaux fichiers sont :
+<UL>
+<LI> Les fichiers <EM>.tmpl</EM> (Imake.tmpl, Project.tmpl, ...)  qui définissent
+les valeurs par défaut des paramètres, par exemple:
+<PRE>
+	#define HasGcc	NO		pas de gcc par défaut
+	#define SystemV	NO		pas UNIX System V
+</PRE>
+<LI> Les fichiers <EM>.rules</EM> dont <EM>Imake.rules</EM> qui définissent 
+les macro-instructions utilisées dans l'Imakefile pour générer les buts dans 
+le Makefile, par exemple :
+<PRE>
+	AllTarget(xtest)	dans l'Imakefile
+</PRE>
+génère le but :
+<PRE>
+	all:: xtest		dans le Makefile
+</PRE>
+<LI> Les fichiers .cf qui définissent les spécificités des
+plate-formes supportées, par exemple :
+<PRE>
+	sun.cf     	pour les Sun
+	sgi.cf     	pour Silicon Graphics
+	ibm.cf     	pour stations IBM
+	lectra.cf  	devinez !
+	x386.cf		pour Xfree86
+</PRE>
+<LI> Les fichiers <EM>.def</EM> (site.def, host.def) qui permettent une 
+configuration spécifique (après application des règles et définitions des
+<EM>.tmpl</EM> et <EM>.cf</EM>) par des définitions du genre :
+<PRE>
+	#define DontBuildMotifDemos
+	#define MTop                    /home2/devel/X11/Motif-2.0
+	#define UseLocalXpm             YES
+	#define XpmTop                  /usr/X11R6
+</PRE>
+</UL>
+<P>
+Le fichier correspondant à la plate-forme est sélectionné
+lors de l'appel à <A HREF="man_imake.html">imake</A> car celui-ci définit un symbole 
+caractéristique de l'architecture de la plate-forme (sun, lectra, sgi, ...). Le
+nom du fichier est associé au nom du symbole défini.
+<P>
+Ces fichiers permettent de <EM>surcharger</EM> les valeurs par défaut
+des fichiers Imake.tmpl et Imake.rules. Par exemple, dans le fichier
+lectra.cf, on pourra lire :
+<PRE>
+	#define HasGcc   	YES
+	#define SystemV  	YES
+	#define StandardDefines	-DSYSV -DUSG ...
+</PRE>
+<P>
+Grace au fichier .cf, les spécificités du système seront
+prises en compte AUTOMATIQUEMENT lors de la génération du 
+Makefile et ce sans AUCUNE intervention de l'utilisateur.
+<P>
+Le fichier Imakefile est une suite de macro-instructions dont la
+plupart sont définies dans le fichier Imake.rules. Il peut aussi contenir
+des affectations de variables ou bien des définitions #define .
+<P>
+Par exemple, pour  générer le Makefile d'une application simple constituée 
+d'un source C unique utilisant seulement la Xlib, on aura un Imakefile du type :
+<PRE>
+	LDLIBS = $(XLIB)
+	SimpleProgramTarget(xsimple)
+</PRE>
+<P>
+Imake se charge d'ajouter les particularités de la plate-forme
+utilisée .
+<H2>Génération du Makefile, cas simple</H2>
+<P>
+Pour générer le Makefile, on doit effectuer les opérations
+suivantes :
+<UL>
+<LI> Ecrire un Imakefile
+<LI> Utiliser l'utilitaire <A HREF="man_imake.html">imake</A>
+</UL>
+<P>
+L'écriture d'un Imakefile peut s'avérer être une opération
+complexe si l'on ne prends pas de précautions élémentaires :
+<UL>
+<LI> Toujours partir d'un exemple
+<LI> Utiliser les macros les plus simples
+</UL>
+<P>
+Le fichier doit être organisé de manière ordonnée, par 
+exemple, définition des variables en tête de fichier, appel des macros
+ensuite.
+<P>
+Le Makefile généré contient un certain nombres de buts <EM>standards</EM>
+que l'on invoquera par un classique <EM>make nom_d_un_but</EM> :
+<P>
+<UL>
+<LI> Un but <EM>Makefile</EM> qui permettra de créer un nouveau Makefile à
+partir de l'Imakefile.
+<LI> Un but <EM>Makefiles</EM> . Dans le cas d'une application avec sous-répertoires,
+ce but permettra la création des Makefiles dans les répertoires.
+<LI> Un but <EM>depend</EM> qui permet d'appeler l'utilitaire <EM>makedepend</EM>
+(fourni avec X11). Cet utilitaire crée les dépendances entre
+les fichiers objets et les fichiers sources (.c, .h).
+<LI> Un but <EM>clean</EM> qui permet d'effacer les .o, .a, binaires, etc...
+<LI> Un but <EM>all</EM> qui lance la compilation proprement dite. En général,
+le but par défaut lance la compilation.
+<LI> Un but <EM>install</EM> .
+</UL>
+<P>
+Pour la création d'un Imakefile <EM>type</EM>, nous allons partir d'une
+hypothèse d'application simple :
+<UL>
+<LI> Constituée de plusieurs fichiers sources
+<LI> Utilisant le toolkit Athena (Xaw)
+<LI> N'utilisant pas de sous-répertoires
+</UL>
+<P>
+En premier lieu, on peut définir les librairies utilisées soit:
+<PRE>
+	LDLIBS = XawClientLibs
+</PRE>
+ou bien :
+<PRE>
+	LDLIBS = $(XAWLIB) $(XMULIB) $(XTOOLLIB) $(XLIB) $(EXTRA_LIBRARIES)
+</PRE>
+<P>
+Ensuite, la liste des fichier sources puis des objets soit:
+<PRE>
+       	SRCS = xtest1.c s1.c s2.c s3.c
+	OBJS = xtest1.o s1.o s2.o s3.o 
+</PRE>
+<P>
+Les noms <EM>SRCS</EM> et <EM>OBJS</EM> sont imposés par la macro-instruction
+qui suit.
+<P>
+Ensuite, on utilise les macros suivantes pour créer les buts décrits
+ci-dessus soit:
+<PRE>
+	ComplexProgramTarget (xtest1)
+	InstallAppDefaults (XTest1)
+</PRE>
+<P>
+Cette denière macro génère le but d'installation du fichier de ressources.
+<P>
+Pour créer le Makefile, il suffit de lancer :
+<PRE>
+	xmkmf
+</PRE>
+qui correspond en fait à l'appel :
+<PRE>
+	imake -DUseInstalled -Irépertoire_de_config_X11
+</PRE>
+
+
+<P>
+Le flag <EM>UseInstalled</EM> indique à 
+<A HREF="man_imake.html">imake</A> que l'on travaille sur une
+arborescence X installée et non sur l'arborescence des sources. Le répertoire
+de config X11 contient les fichiers <EM>.cf</EM> et <EM>.rules</EM>.
+<P>
+L'option -I indique le chemin de recherche des fichiers de 
+configuration.
+<P>
+L'appel au shell-script xmkmf (fourni dans la distribution MIT) 
+évite à l'utilisateur de lancer 
+<A HREF="man_imake.html">imake</A> directement.
+<P>
+Lorsque le Makefile est créé, vous pouvez lancer la séquence 
+suivante :
+<PRE>
+	make depend        	pour les dépendances
+	make               	pour compiler
+	make install       	pour installer
+</PRE>
+<P>
+Si vous vouler générer un nouveau Makefile :
+<PRE>
+	make Makefile
+</PRE>
+<H2>Cas plus complexes...</H2>
+<H3>Traitement de sous-répertoires</H3>
+<P>
+Si votre application utilise un sous-répertoire 
+, vous devez ajouter en tête du fichier Imakefile :
+<PRE>
+	#define IHaveSubdirs
+	#define PassCDebugFlags 'CDEBUGFLAGS=$(CDEBUGFLAGS)'
+</PRE>
+Puis au niveau des appels de macros :
+<PRE>
+	MakeSubdirs(nom_répertoire)
+	DependSubdirs(nom_répertoire)
+</PRE>
+<P>
+La première macro crée le but <EM>Makefiles</EM> permettant la génération
+successive des Makefiles par:
+<PRE>
+	make Makefiles
+</PRE>
+La deuxième fait de même pour le but <EM>depend</EM>.
+<P>
+
+<H3>Règle spéciale de compilation</H3>
+<P>
+Vous pouvez également avoir besoin de définir une règle de
+compilation particulière pour un fichier .c donné. Vous utiliserez alors
+la règle :
+<PRE>
+	SpecialObjectRule(f.o, f.c, -DSPECIAL)
+</PRE>
+<P>
+Le fichier f.o sera créé à partir du fichier f.c avec le flag
+<EM>SPECIAL</EM> défini à la compilation.
+<H3>Application à plusieurs exécutables ou complexe</H3>
+<P>
+Pour le cas d'application constituée de plusieurs exécutables
+gérés par le même Imakefile, le fichier Imake.rules contient trois
+macros équivalentes à la macro <EM>ComplexProgramTarget</EM>. Il s'agit de:
+<PRE>
+	ComplexProgramTarget_1
+	ComplexProgramTarget_2
+	ComplexProgramTarget_3
+</PRE>
+<P>
+Ces macros créent les mêmes buts dans le fichier Makefile que
+<EM>ComplexProgramTarget</EM> sauf que les noms des listes des fichiers sources et
+objets seront respectivement: SRCS1, OBJS1, SRCS2, OBJS2, SRCS3, OBJS3.
+<P>
+Enfin, si votre application est trop complexe pour utiliser la 
+règle simple :
+<PRE>
+	ComplexProgramTarget (xtest1)
+</PRE>
+Vous pouvez utiliser la macro <EM>générale</EM> :
+<PRE>
+	NormalProgramTarget(program,objects,deplibs,locallibs,syslibs)
+</PRE>
+Dans ce cas la, vous devez utiliser également les macros :
+<PRE>
+	DependTarget()
+	InstallProgram(program, bindir)
+</PRE>
+<P>
+Respectivement pour générer les buts <EM>depend</EM> et d'<EM>installation</EM>
+de l'exécutable (but <EM>install</EM>) .
+<H3>Macros d'installation</H3>
+<P>
+Comme nous l'avons vu précédemment, vous pouvez utiliser
+<EM>InstallProgram</EM> pour installer un exécutable sur le répertoire des
+binaires. Une version plus générale est :
+<PRE>
+	InstallProgramWithFlags(program,bindir,instflags)
+</PRE>
+<P>
+qui permet de passer des options  à l'utilitaire
+d'installation (en général <EM>/etc/install</EM>).
+<P>
+La macro:
+<PRE>
+	InstallManPage(manfile, mandir)
+</PRE>
+<P>
+installe un fichier <EM>man</EM> sur le répertoire adéquat.
+<P>
+Enfin, vous pouvez installer un fichier quelconque (non exécutable) par la
+macro:
+<PRE>
+	InstallNonExec (file,instdir)
+</PRE>
+<H3>Buts directs</H3>
+<P>
+Vous pouvez inclure dans un Imakefile un but Makefile <EM>directement</EM>
+sans passer par une macro. Par exemple, si votre application utilise un 
+programme qui n'a rien à voir avec X, vous pouvez toujours écrire dans
+l'Imakefile:
+<PRE>
+	prog: $(PROGOBJS)
+		$(CC) -o prog $(PROGOBJS)
+</PRE>
+<P>
+Les lignes seront incluses <EM>DIRECTEMENT</EM> dans le fichier Makefile. Notez
+bien que dans ce cas là, il convient de respecter la syntaxe du Makefile
+(les tabulations en particuliers).
+
+<H1>Conclusion</H1>
+<P>
+L'utilisation des Imakefiles :
+<UL>
+<LI> Facilite le travail du développeur lorsque celui-ci manipule bien les 
+macros... (j'ai toujours mal supporté les caprices de la syntaxe du Makefile !)
+<LI> Assure une meilleure portablité des applications (les spécificités 
+des différents systèmes sont toujours prises en compte).
+<LI> Facilite le travail de celui qui génère l'application car la procédure 
+est <EM>standard</EM> et le Makefile créé est utilisable sur toutes les 
+version de l'utilitaire <EM>make</EM> (ce qui n'est pas toujours le cas des 
+Makefiles écrits <EM>à la main</EM> !).
+</UL>
+<P>
+On peut donc regretter que ce système soit encore trop peu utilisé et que 
+certaines distributions commerciales binaires ne le fournissent pas (ou 
+fournissent une version érronée)...
+
+<H1>Bibliographie</H1>
+
+<UL>
+<LI> Les pages <EM>manuel</EM> UNIX de 
+<A HREF="man_imake.html">imake</A> et  <A HREF="man_xmkmf.html">xmkmf</A>
+<LI> L'éditeur 
+<A HREF="http://www.ora.com">O'Reilly</A> sort une nouvelle version de son
+livre consacré à <EM>imake</EM> intitulé
+<A HREF="http://www.ora.com/catalog/imake2">Software Portability with imake</A>
+(auteur: <A HREF="http://www.ora.com/catalog/imake2/author.html">Paul DuBois</A>)
+</UL>
+
+Vous pouvez également vous inspirer d'exemples comme ceux ci-dessous :
+<UL>
+<LI> Fichier Imakefile pour l'utilitaire <A HREF="Imakefile.vppp">vppp</A>
+<LI> Fichier Imakefile pour <A HREF="Imakefile.xtel">xtel-3.1</A>
+</UL>
+
+</BODY>

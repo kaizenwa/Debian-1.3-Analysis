@@ -1,0 +1,169 @@
+.\" Hey Emacs! This file is -*- nroff -*- source.
+.\"
+.\" (c) 1993 by Thomas Koenig (ig25@rz.uni-karlsruhe.de)
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\" License.
+.\"
+.\" Modified Sat Jul 24 13:30:06 1993 by Rik Faith (faith@cs.unc.edu)
+.\" Modified Sun Aug 21 17:42:42 1994 by Rik Faith (faith@cs.unc.edu)
+.\"          (Thanks to koen@win.tue.nl (Koen Holtman))
+.\" Modified Wed May 17 15:54:12 1995 by Rik Faith (faith@cs.unc.edu)
+."           To remove *'s from status in macros (Thanks to Michael Shields).
+.\"
+.\" Traduction 15/10/1996 par Christophe Blaess (ccb@club-internet.fr)
+.\"
+.TH WAIT 2 "15 Octobre 1996" Linux "Manuel du programmeur Linux"
+.SH NOM
+wait, waitpid \- Attendre la fin d'un processus.
+.SH SYNOPSIS
+.B #include <sys/types.h>
+.br
+.B #include <sys/wait.h>
+.sp
+.BI "pid_t wait(int *" "status" ")"
+.br
+.BI "pid_t waitpid(pid_t " pid ", int *" status ", int " options );
+.SH DESCRIPTION
+La fonction
+.B wait
+suspend l'execution du processus courant jusqu'a ce qu'un enfant
+se termine, ou jusqu'a ce qu'un signal a intercepter arrive.
+Si un processus fils s'est deja termine au moment de l'appel
+(il est devenu "zombie"), la fonction retourne immediatement.
+Toutes les ressources utilisees par le fils sont liberees.
+
+La fonction
+.B waitpid
+suspend l'execution du processus courant jusqu'a ce que le 
+processus fils numero
+.I pid
+se termine, ou jusqu'a ce qu'un signal a intercepter arrive.
+Si le fils mentionne par
+.I pid
+s'est deja termine au moment de l'appel
+(il est devenu "zombie"), la fonction retourne immediatement.
+Toutes les ressources utilisees par le fils sont liberees.
+
+La valeur de
+.I pid
+peut egalement etre l'une des suivantes :
+.IP "< \-1"
+attendre la fin de n'importe quel processus fils
+appartenant a un groupe de processus d'ID 
+.IR pid .
+.IP \-1
+attendre la fin de n'importe quel fils. C'est le meme
+comportement que
+.B wait.
+.IP 0
+attendre la fin de n'importe quel processus fils du meme groupe
+que l'appelant.
+.IP "> 0"
+attendre la fin du processus numero
+.IR pid .
+.PP
+La valeur de l'argument option
+.I options
+est un 
+.I OU
+binaire entre les constantes suivantes :
+.TP 0.8i
+.B WNOHANG
+ne pas bloquer si aucun fils ne s'est termine.
+.TP
+.B WUNTRACED
+recevoir l'information concernant egalement les fils bloque
+si on ne l'a pas encore recue.
+.PP
+Si
+.I status
+est non
+.BR NULL ,
+.B wait
+et
+.B waitpid
+y stocke l'information sur la terminaison du fils.
+
+Cette information peut etre analysee avec les macros suivantes,
+qui prennent le buffer
+.I status
+en argument (et non pas un pointeur sur ce buffer).
+.TP 0.8i
+.BI WIFEXITED( status )
+non nul si le fils s'est termine normalement
+.TP
+.BI WEXITSTATUS( status )
+donne le code de retour tel qu'il a ete mentionne dans l'appel
+.B exit()
+ou dans le
+.B return
+de la routine
+.B main.
+Cette macro ne peut etre evaluee que si 
+.B WIFEXITED
+est non nul.
+.TP
+.BI WIFSIGNALED( status )
+indique que le fils s'est termine a cause d'un signal non
+intercepte.
+.TP
+.BI WTERMSIG( status )
+donne le nombre de signaux qui ont cause la fin du fils. Cette
+macro ne peut etre evaluee que si
+.B WIFSIGNALED
+est non nul.
+.TP
+.BI WIFSTOPPED( status )
+indique que le fils est actuellement arrete. Cette macro n'a de
+sens que si l'on a effectue l'appel avec l'option
+.BR WUNTRACED .
+.TP
+.BI WSTOPSIG( status )
+donne le nombre de signaux qui ont cause l'arret du fils. Cette macro
+ne peut etre evaluee que si
+.B WIFSTOPPED
+est non nul.
+.SH "VALEUR RENVOYEE"
+En cas de reussite, le PID du fils qui s'est termine est renvoye,
+en cas d'echec \-1 est renvoye et
+.I errno
+contient le code d'erreur.
+.SH "ERREURS"
+.TP 0.8i
+.B ECHILD
+Le processus fils indique par
+.I pid
+n'existe pas
+.TP
+.B EPERM
+L'UID effectif du processus appelant ne correspond pas
+a celui du processus attendu, et n'est pas celui du Super\-User.
+.TP
+.B ERESTARTSYS
+.B WNOHANG
+n'est pas indique, et un signal a intercepter ou
+.B SIGCHLD
+a ete recu. Ceci est une extension au standard POSIX.1
+.SH "CONFORME A"
+POSIX.1
+.SH "VOIR AUSSI"
+.BR signal "(2), " wait4 "(2), " signal (7)

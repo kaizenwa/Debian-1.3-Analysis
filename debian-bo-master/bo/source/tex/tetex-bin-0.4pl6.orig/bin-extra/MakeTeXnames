@@ -1,0 +1,108 @@
+#!/bin/sh
+
+help()
+{
+  progname=`basename $0`
+  echo 'Usage: $progname name [dpi mode] [destdir].'
+  echo "Examples: $progname cmr10"
+  echo "          $progname cmr10 720 ljfour"
+  exit 1
+}
+
+warning()
+{
+  progname=`basename $0`
+  echo "$progname: $@" >&2
+}
+
+: ${TEXMF=`kpsetool -v '$TEXMF'`}
+: ${MAKETEXDIR=$TEXMF/maketex}
+: ${FONTNAME=$TEXMF/fontname}
+export TEXMF MAKETEXDIR FONTNAME
+
+# Possible local customizations? (We need to read the file later again!)
+test -r $MAKETEXDIR/maketex.site && . $MAKETEXDIR/maketex.site
+
+NAME=$1
+case $# in
+1|2) DPI=${MT_DEF_BDPI-600}; MODE=${MT_DEF_MODE-ljfour}; DEST=$2;;
+3|4) DPI=$2;  MODE=$3;    DEST=$4;;
+*)   help;;
+esac
+
+: ${MT_PKDESTDIR='$MT_DESTROOT/$MT_PKPART/$MT_MODE/$MT_NAMEPART'}
+: ${MT_TFMDESTDIR='$MT_DESTROOT/$MT_TFMPART/$MT_NAMEPART'}
+: ${MT_MFDESTDIR='$MT_DESTROOT/$MT_MFPART/$MT_NAMEPART'}
+: ${MT_DESTROOT='$TEXMF/fonts'}
+: ${MT_DEFAULT_NAMEPART=tmp}
+: ${MT_PKPART='pk'}
+: ${MT_TFMPART='tfm'}
+: ${MT_NAMEPART='$MT_SUPPLIER/$MT_TYPEFACE'}
+: ${MT_DEFAULT_SUPPLIER=unknown}
+: ${MT_DEFAULT_TYPEFACE=unknown}
+: ${MT_MFPART='source'}
+: ${MT_MFNAME='$NAME.mf'}
+: ${MT_TFMNAME='$NAME.tfm'}
+: ${MT_PKNAME='$NAME.${DPI}pk'}
+
+# Nothing specified, so try to intuit the directory from the
+# fontname. First the special cases: either $NAME matches an entire
+# name in special.map, or it matches the abbreviation in
+# special.map and ends with a numeral (for the pointsize).
+# We (painfully) use only the minimal features in original awk.
+if test -r $FONTNAME/special.map; then
+  set x `awk \
+'{if ($1 == NAME || (substr (NAME, 1, length ($1)) == $1 \
+                 && substr (NAME, length (NAME), 1) ~ /[0-9]/ \
+                  && substr ($1, length ($1), 1) ~ /[^0-9]/)) \
+ { print $2 " " $3; exit; }}' NAME=$NAME $FONTNAME/special.map`
+  shift
+  SUPPLIER=$1; TYPEFACE=$2
+
+  if test -z "$SUPPLIER"; then
+    # Try the normal case. Source first.
+    s_abbrev=`echo $NAME | sed 's/^\(.\).*$/\1/'`
+    SUPPLIER=`awk '{ if ($1 == s_abbrev) { print $2; exit; }}' \
+               s_abbrev=$s_abbrev $FONTNAME/supplier.map`
+    if test -n "$SUPPLIER"; then
+      # We found the source. Try for the typeface.
+      t_abbrev=`echo $NAME | sed 's/^.//;s/\(..\).*$/\1/'`
+      TYPEFACE=`awk '{ if ($1 == t_abbrev) { print $2; exit; }}' \
+                   t_abbrev=$t_abbrev $FONTNAME/typeface.map`
+    fi
+  fi
+fi
+
+if test -z "$SUPPLIER"; then
+  warning "Could not map source abbreviation $s_abbrev for $NAME."
+  warning "Need to update $FONTNAME/special.map?"
+  MT_SUPPLIER=$MT_DEFAULT_SUPPLIER
+  MT_TYPEFACE=$MT_DEFAULT_TYPEFACE
+else
+  MT_SUPPLIER=$SUPPLIER
+  if test -z "$TYPEFACE"; then
+    warning "Could not map typeface abbreviation $t_abbrev for $NAME."
+    warning "Need to update $FONTNAME/special.map?"
+    MT_TYPEFACE=$MT_DEFAULT_TYPEFACE
+  else
+    MT_TYPEFACE=$TYPEFACE
+  fi
+fi
+
+case "$DEST" in
+  "") ;;
+  /*) MT_PKDESTDIR=$DEST;; # Absolute, explicit destdir => use it.
+   *) MT_NAMEPART=$DEST;; # Relative destdir => append to the default.
+esac
+
+test -r $MAKETEXDIR/maketex.site && . $MAKETEXDIR/maketex.site
+
+eval MT_MODE=$MODE
+eval MT_PKPART=$MT_PKPART
+eval MT_NAMEPART=$MT_NAMEPART
+eval MT_DESTROOT=$MT_DESTROOT
+eval MFNAME=$MT_MFDESTDIR/$MT_MFNAME
+eval PKNAME=$MT_PKDESTDIR/$MT_PKNAME
+eval TFMNAME=$MT_TFMDESTDIR/$MT_TFMNAME
+
+echo $PKNAME $TFMNAME $MFNAME | sed 's@//*@/@g'

@@ -1,0 +1,93 @@
+#! /usr/bin/make -f
+
+.PHONY: build clean binary binary-indep binary-arch checkdir checkroot
+
+package = python-doc
+d=./debian/tmp
+doc=$(d)/usr/doc/python
+info=$(d)/usr/info
+
+build: checkdir
+
+clean: checkdir
+	$(RM) -r debian/{tmp,files,substvars}
+	find . -name \*~ -print0 | xargs -0 rm -f
+
+binary:	binary-indep binary-arch
+
+binary-arch:
+
+binary-indep: checkdir build checkroot
+
+	$(RM) -r debian/{tmp,files,substvars}
+
+	install -d $(doc)
+
+	cp src/{FAQ,INDEX,QuickRef.ps,README} $(doc)
+	gzip -9vf $(doc)/{FAQ,INDEX,QuickRef.ps,README}
+
+	install -d $(doc)/X-extension.html
+	tar -C $(doc)/X-extension.html -xzf src/X-extension.html.tar.gz
+	install -d $(info)
+	tar -C $(info)/ -xzf src/X-extension.info.tar.gz
+	#gzip -9vf $(info)/*
+	cp -p src/X-extension.ps.gz $(doc)/
+
+	cp -p src/delegation.ps $(doc)/
+	gzip -9vf $(doc)/delegation.ps
+
+	cp -p src/ext.pdf $(doc)/
+
+	-tar -C $(doc)/ -xzf src/html-1.4.tar.gz
+	mv $(doc)/ext $(doc)/ext.html
+	mv $(doc)/lib $(doc)/lib.html
+	mv $(doc)/ref $(doc)/ref.html
+	mv $(doc)/tut $(doc)/tut.html
+
+	tar -C $(doc)/ -xzf src/icons.tar.gz
+
+	install -d $(info)
+	tar -C $(info)/ -xzf src/lib-info-1.4.tar.gz
+	gzip -9vf $(info)/*
+
+	cp -p src/lib.pdf $(doc)/
+
+	install -d $(doc)/life-preserver-examples
+	tar -C $(doc)/life-preserver-examples -xzf src/life-preserver-examples.tar.gz
+	install -d $(doc)/life-preserver.html
+	tar -C $(doc)/life-preserver.html -xzf src/life-preserver-html.tar.gz
+	tar -C $(doc)/ -xzf src/life-preserver.ps.tar.gz
+	gzip -9vf $(doc)/life-preserver.ps
+
+	cp src/nluug-*.ps $(doc)/
+	gzip -9vf $(doc)/nluug-*.ps
+
+	tar -C $(doc)/ -xzf src/postscript-1.4.tar.gz {ext,lib,ref,tut}.ps
+	gzip -9vf $(doc)/{ext,lib,ref,tut}.ps
+
+	cp src/quick-ref.1.3.html $(doc)/
+	cp src/ref.pdf $(doc)/
+	cp src/ref.ps.gz $(doc)/
+	cp src/thesis-miale.ps $(doc)/
+	cp src/tut.pdf $(doc)/
+	cp src/vhll-*.ps $(doc)/
+	gzip -9vf $(doc)/vhll*.ps
+	cp src/winhelp-1.4.zip $(doc)/
+
+	install -d $(d)/DEBIAN
+	cp debian/{prerm,postinst} $(d)/DEBIAN/
+
+	chown -R root.root $(d)
+	find $(d) -type f -print0 | xargs -0 chmod 644
+	find $(d) -type d -print0 | xargs -0 chmod 755
+
+	chmod 755 $(d)/DEBIAN/{prerm,postinst}
+
+	dpkg-gencontrol -ppython-doc -P$(d)
+	dpkg --build $(d) ..
+
+checkdir:
+	test -f src/X-extension.README
+
+checkroot:
+	test "`whoami`" = "root"

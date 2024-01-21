@@ -1,0 +1,164 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(super.h)
+
+AC_CONFIG_HEADER(config.h)
+ 
+AC_PROG_CC
+
+AC_PROG_INSTALL
+
+AC_HAVE_HEADERS(errno.h stdlib.h limits.h string.h standards.h \
+	netdb.h locale.h auth.h prot.h shadow.h fcntl.h sgtty.h unistd.h \
+	memory.h malloc.h pwdadj.h sys/time.h stdarg.h syslog.h \
+	arpa/inet.h net/route.h net/if.h netinet/in.h \
+	sys/types.h sys/bsdtypes.h sys/label.h sys/audit.h \
+	sys/wait.h sys/param.h sys/security.h \
+	sys/socket.h sys/systeminfo.h )
+
+AC_AIX
+AC_MINIX
+# Check for HP-UX
+test -f /bin/uname && test `/bin/uname` = HP-UX && AC_DEFINE(_HPUX_SOURCE)
+# Check for Digital Unix
+test -f /bin/uname && test `/bin/uname` = OSF1 && AC_DEFINE(_OSF_SOURCE)
+test -f /bin/uname && test `/bin/uname` = OSF1 && AC_DEFINE(Digital_UNIX)
+# Check for Solaris
+test -f /bin/uname && test -f /bin/expr && rev=`/bin/uname -r` &&
+	test `/bin/expr $rev : '\(.\).*'` = 5 && AC_DEFINE(SUNOS5)
+
+AC_CHECKING(for directories to include in the safe path)
+SafePath=/bin:/usr/bin
+test -d /usr/ucb && SafePath=${SafePath}:/usr/ucb
+test -d /usr/bsd && SafePath=${SafePath}:/usr/bsd
+AC_DEFINE_UNQUOTED(SAFE_PATH, "${SafePath}")
+
+AC_CHECK_FUNCS(syslog)
+AC_CHECK_FUNCS(strdup)
+
+# syslog may be in one of the following.  They may also be needed for
+# other reasons, so we just blindly check for them all.
+AC_CHECK_LIB(bsd, main)
+AC_CHECK_LIB(socket, main)
+AC_CHECK_LIB(inet, main)
+
+AC_CHECK_LIB(crypt, main)
+
+AC_CHECK_FUNCS(initgroups)
+for lib in os ; do
+    test "$ac_cv_func_initgroups" = yes && break
+    AC_CHECK_LIB($lib, initgroups)
+done
+
+# On IRIX, -lmalloc avoids a problem with default malloc
+# that causes a core dump.
+AC_CHECK_LIB(malloc, main)
+
+# May be needed on IRIX
+AC_CHECK_LIB(sun, getpwnam)
+
+# Needed on SysV for shadow passwords.
+AC_CHECK_LIB(sec, main)
+ 
+# Needed on Linux for shadow passwords.
+AC_CHECK_LIB(shadow, main)
+ 
+# Needed on Solaris
+AC_CHECK_LIB(nsl, main)
+ 
+# Needed on SCO-ODT-3.0 for crypt.  
+AC_CHECK_LIB(ufc, main)
+ 
+SUPERFILE='"/usr/local/lib/super.tab"'
+SUPERFILE_BACKSLASHED=`echo "$SUPERFILE" | sed -e 's/"/\\\\"/g'`
+
+# We want these before the checks, so the checks can modify their values.
+test -z "$CFLAGS" && CFLAGS=-g auto_cflags=1
+
+# If we're using gcc and the user hasn't specified CFLAGS, add -O to CFLAGS.
+test -n "$GCC" && test -n "$auto_cflags" && CFLAGS="$CFLAGS -O"
+
+AC_C_CONST
+AC_SYS_LONG_FILE_NAMES
+AC_SYS_INTERPRETER
+test "$ac_cv_sys_interpreter" != yes && AC_DEFINE(INTERPRETER_HACK)
+AC_STDC_HEADERS
+
+AC_TYPE_PID_T
+AC_TYPE_UID_T
+AC_TYPE_GETGROUPS
+AC_TYPE_SIZE_T
+
+AC_STRUCT_TM
+AC_TIME_WITH_SYS_TIME
+
+void_ok=no
+AC_MSG_CHECKING(if func signal is compatible with declaring type void)
+AC_TRY_COMPILE([
+#include <stdio.h>
+#include <signal.h>
+],
+changequote(<<,>>)dnl
+<<void (*signal())();
+signal(1, 0);>>,
+changequote([,])dnl
+	AC_DEFINE(HAVE_VOID_SIGNAL) void_ok=yes AC_MSG_RESULT(yes))
+if test $void_ok = no ; then
+AC_TRY_COMPILE([
+#include <stdio.h>
+#include <sys/signal.h>
+],
+changequote(<<,>>)dnl
+<<void (*signal())();
+signal(1, 0);>>,
+changequote([,])dnl
+	AC_DEFINE(HAVE_VOID_SIGNAL) void_ok=yes AC_MSG_RESULT(yes))
+fi
+if test $void_ok = no ; then echo "no" ; fi
+
+AC_MSG_CHECKING(if sys_errlist is defined)
+AC_TRY_COMPILE([
+#include <errno.h>
+#include <stdio.h>
+],
+changequote(<<,>>)dnl
+<<extern char *sys_errlist[];
+fputs(sys_errlist[0], stdout);>>,
+changequote([,])dnl
+	AC_DEFINE(HAVE_SYS_ERRLIST) AC_MSG_RESULT(yes), AC_MSG_RESULT(no))
+
+AC_MSG_CHECKING(if errno must be explicitly declared extern)
+AC_TRY_COMPILE([
+#include <errno.h>
+#include <stdio.h>
+],
+changequote(<<,>>)dnl
+<<printf("%d", errno);>>,
+changequote([,])dnl
+	AC_DEFINE(DONT_DECL_ERRNO) AC_MSG_RESULT(no), AC_MSG_RESULT(yes))
+
+AC_MSG_CHECKING(if compiler supports enum)
+AC_TRY_COMPILE(, [enum { red, green, blue } color;],
+		AC_DEFINE(HAVE_ENUM) AC_MSG_RESULT(yes), AC_MSG_RESULT(no))
+
+AC_MSG_CHECKING(if close-on-exec can be done via ioctl())
+AC_TRY_COMPILE([
+#include <sgtty.h>
+#include <stdio.h>
+],
+changequote(<<,>>)dnl
+<<ioctl(0, FIOCLEX, NULL);>>,
+changequote([,])dnl
+	AC_DEFINE(HAVE_IOCTL_FIOCLEX) AC_MSG_RESULT(yes), AC_MSG_RESULT(no))
+
+AC_FUNC_VPRINTF
+
+AC_CHECK_FUNCS(strerror strtol memcpy memset strerror \
+	getgroups innetgr localtime sysconf getdtablesize )
+
+AC_SUBST(libdir)dnl
+AC_SUBST(bindir)dnl
+AC_SUBST(SUPERFILE)dnl
+AC_SUBST(SUPERFILE_BACKSLASHED)dnl
+AC_SUBST(SafePath)dnl
+
+AC_OUTPUT(Makefile super.1 super.5)

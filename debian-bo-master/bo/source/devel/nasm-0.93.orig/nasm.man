@@ -1,0 +1,264 @@
+
+
+
+NASM(1)                                                   NASM(1)
+
+
+[1mNAME[m
+       nasm - the Netwide Assembler - portable 80x86 assembler
+
+[1mSYNOPSIS[m
+       [1mnasm[m [ [1m-f[m format ] [ [1m-o[m outfile ] infile
+       [1mnasm[m [1m-h[m
+       [1mnasm[m [1m-r[m
+
+[1mDESCRIPTION[m
+       The  [1mnasm[m  command  assembles  the file [4minfile[m and directs
+       output to the file [4moutfile[m if specified. If [4moutfile[m is not
+       specified,  [1mnasm[m  will  derive  a default output file name
+       from the name of its input file, usually by appending `.o'
+       or  `.obj', or by removing all extensions for a raw binary
+       file.  Failing  that,  the  output  file  name   will   be
+       `nasm.out'.
+
+   [1mOPTIONS[m
+       [1m-h[m     Causes  [1mnasm[m  to  exit  immediately, after giving a
+              summary of its invocation options, and listing  all
+              its supported output file formats.
+
+       [1m-r[m     Causes  [1mnasm[m  to exit immediately, after displaying
+              its version number.
+
+       [1m-f[m [4mformat[m
+              Specifies the output file format.  Formats  include
+              [4mbin[m,  to  produce  flat-form binary files, and [4maout[m
+              and [4melf[m to  produce  Linux  a.out  and  ELF  object
+              files, respectively.
+
+       [1m-o[m [4moutfile[m
+              Specifies a precise name for the output file, over-
+              riding [1mnasm[m's default means of determining it.
+
+
+   [1mSYNTAX[m
+       This man page does not fully describe the syntax of [1mnasm[m's
+       assembly  language, but does give a summary of the differ-
+       ences from other assemblers.
+
+       [4mRegisters[m have no leading `%' sign, unlike [1mgas[m, and float-
+       ing-point stack registers are referred to as [4mst0[m, [4mst1[m, and
+       so on.
+
+       [4mFloating-point[m [4minstructions[m may  use  either  the  single-
+       operand  form  or  the  double.  A [4mTO[m keyword is provided;
+       thus, one could either write
+
+                      fadd st0,st1
+                      fadd st1,st0
+
+       or one could use the alternative single-operand forms
+
+
+
+
+                  The Netwide Assembler Project                 1
+
+
+
+
+
+NASM(1)                                                   NASM(1)
+
+
+                      fadd st1
+                      fadd to st1
+
+       [4mUninitialised[m [4mstorage[m is reserved using the [4mRESB[m, [4mRESW[m and
+       [4mRESD[m pseudo-opcodes, each taking one parameter which gives
+       the number of bytes, words or doublewords to reserve.
+
+       [4mRepetition[m of data items is not done by the [4mDUP[m keyword as
+       seen  in  DOS assemblers, but by the use of the [4mTIMES[m pre-
+       fix, like this:
+
+             message: times 3 db 'abc'
+                      times 64-$+message db 0
+
+       which defines the  string  `abcabcabc',  followed  by  the
+       right  number of zero bytes to make the total length up to
+       64 bytes.
+
+       [4mSymbol[m [4mreferences[m are always understood  to  be  immediate
+       (i.e.  the  address of the symbol), unless square brackets
+       are used, in which case the contents of the  memory  loca-
+       tion are used. Thus:
+
+                      mov ax,wordvar
+
+       loads  AX  with  the  address  of  the variable `wordvar',
+       whereas
+
+                      mov ax,[wordvar]
+                      mov ax,[wordvar+1]
+                      mov ax,[es:wordvar+bx]
+
+       all refer to the [4mcontents[m of memory  locations.  The  syn-
+       taxes
+
+                      mov ax,es:wordvar[bx]
+                      es mov ax,wordvar[1]
+
+       are not legal at all, although the use of a segment regis-
+       ter name as an instruction prefix is  valid,  and  can  be
+       used  with instructions such as [4mLODSB[m which can't be over-
+       ridden any other way (yet).
+
+       [4mConstants[m may be expressed numerically in most formats:  a
+       trailing  H,  Q  or B denotes hex, octal or binary respec-
+       tively, and a leading `0x' or `$'  denotes  hex  as  well.
+       Leading zeros are not treated specially at all.  Character
+       constants may be enclosed  in  single  or  double  quotes;
+       there  is  no  escape  character.  The ordering is little-
+       endian (reversed), so that the character  constant  [4m'abcd'[m
+       denotes 0x64636261 and not 0x61626364.
+
+       [4mLocal[m  [4mlabels[m begin with a period, and their `locality' is
+       granted by  the  assembler  prepending  the  name  of  the
+
+
+
+                  The Netwide Assembler Project                 2
+
+
+
+
+
+NASM(1)                                                   NASM(1)
+
+
+       previous  non-local symbol. Thus declaring a label `.loop'
+       after a label `label' has actually defined a symbol called
+       `label.loop'.
+
+   [1mDIRECTIVES[m
+       [4m[SECTION[m [4mname][m or [4m[SEGMENT[m [4mname][m causes [1mnasm[m to direct all
+       following code to the named section.  Section  names  vary
+       with output file format, although most formats support the
+       names [4m.text[m, [4m.data[m and [4m.bss[m.  (The exception  is  the  [4mobj[m
+       format, in which all segments are user-definable.)
+
+       [4m[ABSOLUTE[m  [4maddress][m  causes  [1mnasm[m to position its notional
+       assembly point at an absolute address: so no code or  data
+       may  be  generated, but you can use [4mRESB[m, [4mRESW[m and [4mRESD[m to
+       move the assembly point further on,  and  you  can  define
+       labels.  So  this  directive  may  be  used to define data
+       structures. When you have finished doing  absolute  assem-
+       bly,  you must issue another [4m[SECTION][m directive to return
+       to normal assembly.
+
+       [4m[BITS[m [4m16][m or [4m[BITS[m [4m32][m switches the default processor mode
+       for  which  [1mnasm[m  is  generating code: it is equivalent to
+       [4mUSE16[m or [4mUSE32[m in DOS assemblers.
+
+       [4m[INCLUDE[m [4mfilename][m  or  [4m[INC[m  [4mfilename][m  includes  another
+       source file in the middle of the current one. So far, only
+       one level of inclusion is allowed.
+
+       [4m[EXTERN[m [4msymbol][m and [4m[GLOBAL[m [4msymbol][m import and export sym-
+       bol  definitions, respectively, from and to other modules.
+       Note that the [4mGLOBAL[m directive must appear before the def-
+       inition of the symbol it refers to.
+
+   [1mFORMAT-SPECIFIC[m [1mDIRECTIVES[m
+       [4m[ORG[m  [4maddress][m  is used by the [4mbin[m flat-form binary output
+       format, and specifies the address at which the output code
+       will eventually be loaded.
+
+       [4m[GROUP[m   [4mgrpname[m   [4mseg1[m  [4mseg2...][m   is  used  by  the  [4mobj[m
+       (Microsoft 16-bit)  output  format,  and  defines  segment
+       groups.  This  format also uses [4m[UPPERCASE][m, which directs
+       that all segment, group and symbol  names  output  to  the
+       object  file  should be in uppercase. Note that the actual
+       assembly is still case sensitive.
+
+[1mBUGS[m
+       There is a reported seg-fault on some (Linux) systems with
+       some large source files.
+
+[1mRESTRICTIONS[m
+       Numerous.  There is no listing file or symbol map support,
+       no macro processor, and much, much more.
+
+
+
+
+
+                  The Netwide Assembler Project                 3
+
+
+
+
+
+NASM(1)                                                   NASM(1)
+
+
+[1mSEE[m [1mALSO[m
+       [1mas[m([1m1[m), [1mld[m([1m1[m).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                  The Netwide Assembler Project                 4
+
+

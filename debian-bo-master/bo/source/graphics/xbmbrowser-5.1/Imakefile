@@ -1,0 +1,92 @@
+#
+# Imakefile for XbmBrowser (Version 5.1)
+#
+# Pick One place to install library files
+#    BROWSERDIR = $(LIBDIR)
+     PROJECTROOT = $(DESTDIR)
+     BROWSERDIR = $(LIBDIR)$(PATHSEP)xbmbrowser
+
+# Now we decide on the actual file names to use
+     LIBRARY_RC = $(BROWSERDIR)$(PATHSEP)xbmbrowser.menu
+     USERS_RC   = .xbmbrowserrc
+
+# Specific directory entries for the main menu in LIBRARY_RC
+      X_BITMAPS = $(INCDIR)$(PATHSEP)bitmaps
+
+# X Pixmap Library (change for your system / comment out to disable)
+#    -DDO_XPMS           Turn on the use of pixmaps
+#    -DNO_TRANS_COLOR    Turn off setting the `none' color in xpixmaps
+
+        DO_XPMS = -DDO_XPMS
+        XPM_INC = -I/usr/include/X11
+        XPM_LIB = -L$(LIBDIR)/xpm -lXpm
+
+
+# If you need this uncomment (particularly on decstations)
+#            CC = gcc
+
+
+# -------------------------------------------------------------------
+#           You should NOT need to edit below this line
+# -------------------------------------------------------------------
+
+        DEFINES = -DLIBRARY_RC=\"$(LIBRARY_RC)\" \
+                  -DUSERS_RC=\"$(USERS_RC)\" \
+                  $(DO_XPMS) $(XPM_INC)
+        DEPLIBS = XawClientDepLibs
+LOCAL_LIBRARIES = $(XPM_LIB) XawClientLibs
+           SRCS = xbmbrowser.c images.c callbacks.c misc.c \
+                  user_menu.c user_functs.c IconLabel.c
+           OBJS = xbmbrowser.o images.o callbacks.o misc.o \
+                  user_menu.o user_functs.o IconLabel.o
+           DATA = XbmBrowser.ad.sed XbmBrowser.ad XbmBrowser-color.ad \
+                  xbmbrowser.menu xbmbrowser.menu.tut
+
+    CDEBUGFLAGS = DefaultCDebugFlags -DNDEBUG
+#   CDEBUGFLAGS = -g
+#   CDEBUGFLAGS = -g -DPARSE
+#ifdef HPArchitecture
+    CCOPTIONS = -Aa -D_HPUX_SOURCE
+#endif
+
+# Sed substitions rule
+.sed: 
+	@echo 'SED SUBSTITUTIONS "$@.sed" ==> "$@"'
+	@sed -e 's|==BROWSERDIR==|$(BROWSERDIR)|' \
+	     -e 's|==LIBRARY_RC==|$(LIBRARY_RC)|' \
+	     -e 's|==USERS_RC==|$(USERS_RC)|'     \
+	     -e 's|==X_BITMAPS==|$(X_BITMAPS)|'   \
+	     -e '/==COLOR_SETTINGS_DIVIDER==/d'   \
+	     < $@.sed  >$@
+.SUFFIXES: .sed
+
+# ---------------------------------------
+# Rules for the actual build
+
+ComplexProgramTarget(xbmbrowser)
+
+$(OBJS): xbmbrowser.h
+xbmbrowser.o: patchlevel.h
+IconLabel.o images.o: IconLabel.h IconLabelP.h 
+
+all:: $(DATA)
+
+XbmBrowser.ad.sed: XbmBrowser-color.ad.sed
+	@echo 'DIVIDING COLOR AD "XbmBrowser-color.ad.sed" ==> "$@"'
+	@sed -n '1,/==COLOR_SETTINGS_DIVIDER==/p' \
+	    <XbmBrowser-color.ad.sed >$@
+
+InstallAppDefaults(XbmBrowser)
+InstallAppDefaults(XbmBrowser-color)
+MakeDirectories(install,$(BROWSERDIR))
+InstallNonExecFile(xbmbrowser.menu,$(BROWSERDIR))
+InstallNonExecFile(xbmbrowser.menu.tut,$(BROWSERDIR))
+
+dataclean:
+	rm -f $(DATA)
+
+clean:: dataclean
+
+realclean: clean
+	rm -f Makefile
+

@@ -1,0 +1,87 @@
+# Unix Makefile for most                               -*- sh -*-
+#---------------------------------------------------------------------------
+# 1. Choose a C compiler.  It must understand prototypes.
+#-----------------------------------------------------------------------------
+CC = @CC@
+CFLAGS = @CFLAGS@ @X_CFLAGS@
+LDFLAGS = @LDFLAGS@
+#  Note: gcc -O2 is buggy under Linux.  If you use it, include the
+#        -fno-strength-reduce flag!!
+#-----------------------------------------------------------------------------
+# 2. On a few systems, additional libraries are required.
+#-----------------------------------------------------------------------------
+MISCLIBS = @X_EXTRA_LIBS@ @TERMCAP@
+#MISCLIBS = -lnsl -lsocket                             # Solaris
+#MISCLIBS = -ltermcap                                  # NeXT
+
+#-----------------------------------------------------------------------------
+# 3. Directory where the slang library, slanglib.a, is located.
+#    BUILD SLANG FIRST!!!!  If you do not have it, get it from the same place
+#    you picked up most.  The current home is space.mit.edu:/pub/davis/slang.
+#-----------------------------------------------------------------------------
+#Location of slang.h
+SLANGINC = @SLANG_INCLUDE@#
+#Location of libslang.a
+SLANGLIB = @SLANG_LIB_DIR@#
+#SLANGLIB = ../../slang/$(ARCH)elfobjs#    Location of shared elf library
+#SLANGINC = ../../slang/src#               Location of slang.h
+#SLANGLIB = $(SLANGINC)/$(ARCH)objs#       Location of libslang.a
+
+
+#-----------------------------------------------------------------------------
+# 4. Location where object files are placed (Absolute pathnames!!)
+#-----------------------------------------------------------------------------
+OBJDIR = @OBJDIR@
+SRCDIR = @SRCDIR@
+
+#----------------------------------------------------------------------------
+# 5. Install location
+#----------------------------------------------------------------------------
+INSTALL		= @INSTALL@
+INSTALL_DATA	= @INSTALL_DATA@
+BIN_DIR		= @prefix@/bin
+MAN_DIR		= @prefix@/man/man1
+
+#----------------------------------------------------------------------------
+# Nothing below here should require changing.
+#----------------------------------------------------------------------------
+SHELL = /bin/sh
+OBJS = @PROGRAM_OBJECTS@
+OFILES = @PROGRAM_OFILES@
+
+EXEC = most
+CONFIG_H = config.h
+ALL_CFLAGS = $(CFLAGS) -Dunix -I$(SLANGINC) $(MISCINCLUDES)
+EXECLIBS = -L$(SLANGLIB) -lslang $(MISCLIBS) -lm
+#
+COMPILE_CMD = $(CC) -c $(ALL_CFLAGS)
+#
+all: $(EXEC)
+$(EXEC): $(OBJDIR) $(CONFIG_H) slangversion $(OBJDIR)/$(EXEC)
+	@echo $(EXEC) created in $(OBJDIR)
+$(OBJDIR)/$(EXEC): $(OBJS)
+	cd $(OBJDIR); $(CC) $(OFILES) -o $(EXEC) $(LDFLAGS) $(EXECLIBS)
+#
+$(OBJDIR):
+	-mkdir $(OBJDIR)
+#
+$(CONFIG_H) : $(SRCDIR)/sysconf.h
+	/bin/cp $(SRCDIR)/sysconf.h $(CONFIG_H)
+#
+slangversion: $(OBJDIR)/chkslang
+	$(OBJDIR)/chkslang $(EXEC) 9934
+#
+$(OBJDIR)/chkslang: $(OBJDIR)/chkslang.o
+	$(CC) $(OBJDIR)/chkslang.o -o $(OBJDIR)/chkslang
+clean:
+	/bin/rm -f $(OBJDIR)/* *~
+distclean: clean
+	/bin/rm -rf $(OBJDIR) Makefile sysconf.h
+install: all $(BIN_DIR)
+	$(INSTALL) -s $(OBJDIR)/most $(BIN_DIR)
+	$(INSTALL_DATA) ../most.1 $(MAN_DIR)
+$(BIN_DIR):
+	- ../mkinsdir.sh $(BIN_DIR)
+#---------------------------------------------------------------------------
+# Rules (automatically generated)
+#---------------------------------------------------------------------------

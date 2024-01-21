@@ -1,0 +1,185 @@
+:- module llds.
+:- interface.
+:- import_module tree, shapes.
+:- import_module bool, list, set, term, std_util.
+:- type (llds:code_model)
+	--->	model_det
+	;	model_semi
+	;	model_non.
+:- type (llds:c_file)
+	--->	c_file(string, (llds:c_header_info), (mercury_builtin:list((llds:c_module)))).
+:- type (llds:c_header_info) == (mercury_builtin:list((llds:c_header_code))).
+:- type (llds:c_body_info) == (mercury_builtin:list((llds:c_body_code))).
+:- type (llds:c_header_code) == (std_util:pair(string, (mercury_builtin:term__context))).
+:- type (llds:c_body_code) == (std_util:pair(string, (mercury_builtin:term__context))).
+:- type (llds:c_module)
+	--->	c_module(string, (mercury_builtin:list((llds:c_procedure))))
+	;	c_data(string, (llds:data_name), (bool:bool), (bool:bool), (mercury_builtin:list((std_util:maybe((llds:rval))))), (mercury_builtin:list((hlds_pred:pred_proc_id))))
+	;	c_code(string, (mercury_builtin:term__context))
+	;	c_export((mercury_builtin:list((llds:c_export)))).
+:- type (llds:c_procedure)
+	--->	c_procedure(string, int, (llds:llds__proc_id), (mercury_builtin:list((llds:instruction)))).
+:- type (llds:llds__proc_id) == int.
+:- type (llds:c_export) == string.
+:- type (llds:code_tree) == (tree:tree((mercury_builtin:list((llds:instruction))))).
+:- type (llds:instruction) == (std_util:pair((llds:instr), string)).
+:- type (llds:call_model)
+	--->	det
+	;	semidet
+	;	nondet((bool:bool)).
+:- type (llds:instr)
+	--->	comment(string)
+	;	livevals((set:set((llds:lval))))
+	;	block(int, int, (mercury_builtin:list((llds:instruction))))
+	;	assign((llds:lval), (llds:rval))
+	;	call((llds:code_addr), (llds:code_addr), (mercury_builtin:list((llds:liveinfo))), (llds:call_model))
+	;	mkframe(string, int, (llds:code_addr))
+	;	modframe((llds:code_addr))
+	;	label((llds:label))
+	;	goto((llds:code_addr))
+	;	computed_goto((llds:rval), (mercury_builtin:list((llds:label))))
+	;	c_code(string)
+	;	if_val((llds:rval), (llds:code_addr))
+	;	incr_hp((llds:lval), (std_util:maybe((llds:tag))), (llds:rval))
+	;	mark_hp((llds:lval))
+	;	restore_hp((llds:rval))
+	;	store_ticket((llds:lval))
+	;	restore_ticket((llds:rval))
+	;	discard_ticket
+	;	incr_sp(int, string)
+	;	decr_sp(int)
+	;	pragma_c((mercury_builtin:list((llds:pragma_c_decl))), (mercury_builtin:list((llds:pragma_c_input))), string, (mercury_builtin:list((llds:pragma_c_output)))).
+:- type (llds:pragma_c_decl)
+	--->	pragma_c_decl((prog_data:(type)), string).
+:- type (llds:pragma_c_input)
+	--->	pragma_c_input(string, (prog_data:(type)), (llds:rval)).
+:- type (llds:pragma_c_output)
+	--->	pragma_c_output((llds:lval), (prog_data:(type)), string).
+:- type (llds:liveinfo)
+	--->	live_lvalue((llds:lval), (shapes:shape_num), (std_util:maybe((mercury_builtin:list((llds:lval)))))).
+:- type (llds:lval)
+	--->	reg((llds:reg))
+	;	succip
+	;	maxfr
+	;	curfr
+	;	hp
+	;	sp
+	;	temp((llds:temp_reg))
+	;	stackvar(int)
+	;	framevar(int)
+	;	succip((llds:rval))
+	;	redoip((llds:rval))
+	;	succfr((llds:rval))
+	;	prevfr((llds:rval))
+	;	field((llds:tag), (llds:rval), (llds:rval))
+	;	lvar((mercury_builtin:var)).
+:- type (llds:rval)
+	--->	lval((llds:lval))
+	;	var((mercury_builtin:var))
+	;	create((llds:tag), (mercury_builtin:list((std_util:maybe((llds:rval))))), (bool:bool), int)
+	;	mkword((llds:tag), (llds:rval))
+	;	const((llds:rval_const))
+	;	unop((llds:unary_op), (llds:rval))
+	;	binop((llds:binary_op), (llds:rval), (llds:rval)).
+:- type (llds:rval_const)
+	--->	true
+	;	false
+	;	int_const(int)
+	;	float_const(float)
+	;	string_const(string)
+	;	code_addr_const((llds:code_addr))
+	;	data_addr_const((llds:data_addr)).
+:- type (llds:data_addr)
+	--->	data_addr(string, (llds:data_name), (bool:bool)).
+:- type (llds:data_name)
+	--->	common(int)
+	;	base_type_info(string, (prog_data:arity))
+	;	base_type_layout(string, (prog_data:arity)).
+:- type (llds:unary_op)
+	--->	mktag
+	;	tag
+	;	unmktag
+	;	mkbody
+	;	body
+	;	unmkbody
+	;	cast_to_unsigned
+	;	hash_string
+	;	bitwise_complement
+	;	(not).
+:- type (llds:binary_op)
+	--->	('+')
+	;	('-')
+	;	('*')
+	;	('/')
+	;	(mod)
+	;	('<<')
+	;	('>>')
+	;	'&'
+	;	'|'
+	;	('^')
+	;	(and)
+	;	(or)
+	;	eq
+	;	ne
+	;	array_index
+	;	str_eq
+	;	str_ne
+	;	str_lt
+	;	str_gt
+	;	str_le
+	;	str_ge
+	;	('<')
+	;	('>')
+	;	('<=')
+	;	('>=')
+	;	float_plus
+	;	float_minus
+	;	float_times
+	;	float_divide
+	;	float_eq
+	;	float_ne
+	;	float_lt
+	;	float_gt
+	;	float_le
+	;	float_ge.
+:- type (llds:reg)
+	--->	r(int)
+	;	f(int).
+:- type (llds:temp_reg) == (llds:reg).
+:- type (llds:label)
+	--->	local((llds:proc_label), int)
+	;	c_local((llds:proc_label))
+	;	local((llds:proc_label))
+	;	exported((llds:proc_label)).
+:- type (llds:code_addr)
+	--->	label((llds:label))
+	;	imported((llds:proc_label))
+	;	succip
+	;	do_succeed((bool:bool))
+	;	do_redo
+	;	do_fail
+	;	do_det_closure
+	;	do_semidet_closure
+	;	do_nondet_closure.
+:- type (llds:proc_label)
+	--->	proc(string, (hlds_pred:pred_or_func), string, int, int)
+	;	special_proc(string, string, (prog_data:sym_name), int, int).
+:- type (llds:tag) == int.
+:- type (llds:llds_type)
+	--->	bool
+	;	integer
+	;	unsigned
+	;	float
+	;	word.
+:- pred llds:llds__rval_type((llds:rval), (llds:llds_type)).
+:- mode llds:llds__rval_type(mercury_builtin:in, mercury_builtin:out) is det.
+:- pred llds:llds__lval_type((llds:lval), (llds:llds_type)).
+:- mode llds:llds__lval_type(mercury_builtin:in, mercury_builtin:out) is det.
+:- pred llds:llds__const_type((llds:rval_const), (llds:llds_type)).
+:- mode llds:llds__const_type(mercury_builtin:in, mercury_builtin:out) is det.
+:- pred llds:llds__unop_return_type((llds:unary_op), (llds:llds_type)).
+:- mode llds:llds__unop_return_type(mercury_builtin:in, mercury_builtin:out) is det.
+:- pred llds:llds__binop_return_type((llds:binary_op), (llds:llds_type)).
+:- mode llds:llds__binop_return_type(mercury_builtin:in, mercury_builtin:out) is det.
+:- pred llds:llds__register_type((llds:reg), (llds:llds_type)).
+:- mode llds:llds__register_type(mercury_builtin:in, mercury_builtin:out) is det.

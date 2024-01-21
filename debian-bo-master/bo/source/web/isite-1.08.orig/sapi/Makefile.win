@@ -1,0 +1,136 @@
+#
+# CNIDR Search API
+#
+# This makefile results in:
+#
+#	libsapi.a	- Common API to various search/database systems
+#
+#  To use this library in an application, you must link with libcnidr.a
+#  as well as any libraries specific to the database systems you've chosen
+#  to compile in.
+#
+#  Compile only those search engines you wish (are able) to support
+#
+
+#
+# Compiler and Compiler flags
+#
+
+!IFDEF WIN32
+!include <ntwin32.mak>
+CFLAGS=$(cflags) $(cvarsmt) $(cdebug) -Dstrcasecmp=stricmp -Dstrncasecmp=strnicmp -DNO_MMAP -DUNISOCK_WINSOCK
+!ELSE
+CFLAGS=-Alfw -F 4000 -G3 -Oceglot -W3 -Zi -Dstrcasecmp=stricmp -Dstrncasecmp=strnicmp -DNO_MMAP -DUNISOCK_WINSOCK -DFAR=_far
+!ENDIF
+
+#
+# Library Directory
+#
+# Where should I store the library?
+#
+LIB_DIR=..\bin
+
+#
+# Resulting Library
+#
+LIBRARY=$(LIB_DIR)\sapi.lib
+
+#
+# Librarian
+#
+# Select your platform and comment/uncomment the appropriate ARFLAGS
+#
+AR=lib
+!IFDEF WIN32
+ARFLAGS=-out:$(LIBRARY)
+!ELSE
+ARFLAGS=$(LIBRARY) +
+!ENDIF
+
+#
+# libz3950
+#
+# Where are the libz3950 include files?
+#
+ZDIST_DIR=../zdist
+
+#
+# Search Engines
+#
+#DBASE_CHOICE - Definitions from list of supported engines.
+#
+# 	Current choices: -DSAPI_ISEARCH
+#
+#DBASE_OBJ - Any object files that need to be linked into libsapi
+#DBASE_INC - Location of include files for all database engines
+#DBASE_CFLAGS - Any compiler flags required by particular database engines
+#
+DBASE_CHOICE=
+DBASE_OBJ=
+DBASE_INC=
+DBASE_CFLAGS=
+
+#
+# Isearch
+#
+# Where is the Isearch distribution?
+#
+ISEARCH_DIR=../Isearch
+ISEARCH_INC=-I$(ISEARCH_DIR)/src
+ISEARCH_CFLAGS=
+
+#
+# Script Search Engine
+#
+SCRIPT_OBJ=script.obj
+SCRIPT_INC=
+
+#
+# PGIF (Postgres interface)
+#
+# Where are the PGIF files?
+#
+PGIF_DIR=../pgif
+PGIF_OBJ=$(PGIF_DIR)/pgif.obj
+PGIF_INC=-I$(PGIF_DIR)
+#
+# Where is the Postgres distribution? (not PGIF)
+#
+POSTGRES_DIR=/usr/users/postgres
+#
+
+#
+# That should be all you need to configure
+#
+H=sapi.h ini.h list.h strbox.h script.h
+RM=del
+
+all:$(LIBRARY)
+
+imem.obj:$(H) imem.c
+	$(CC) $(CFLAGS) $(ISEARCH_INC) -c imem.c
+
+script.obj:$(H) script.c
+	$(CC) $(CFLAGS) $(ISEARCH_INC) -c script.c
+
+list.obj:$(H) list.c
+	$(CC) $(CFLAGS) -c list.c
+ 
+ini.obj:$(H) ini.c
+	$(CC) $(CFLAGS) $(ISEARCH_INC) -c ini.c
+ 
+strbox.obj:$(H) strbox.c
+	$(CC) $(CFLAGS) $(ISEARCH_INC) -c strbox.c
+ 
+sapi.obj:$(H) sapi.cxx
+	$(CC) $(CFLAGS) $(DBASE_CHOICE) $(DBASE_CFLAGS) $(DBASE_INC) \
+	$(ISEARCH_INC) -I$(ZDIST_DIR) -c sapi.cxx
+
+$(LIBRARY):$(DBASE_OBJ) sapi.obj list.obj script.obj ini.obj strbox.obj imem.obj
+	$(RM) $(LIBRARY)
+	$(AR) $(ARFLAGS) imem.obj strbox.obj list.obj ini.obj script.obj sapi.obj $(DBASE_OBJ)
+
+clean:
+	$(RM) *.obj
+	$(RM) $(LIBRARY)
+

@@ -1,0 +1,706 @@
+#!/bin/sh
+#
+# Script to be called from debian/rules to setup all the debian specifc
+# required files
+# Christoph Lameter, <clameter@debian.org> October 10, 1996
+#
+# All the parameters are documentation files to be installed.
+# (but doc files can also be listed in debian/docs)
+
+# Global Variables
+
+DATE="`822-date`"
+
+PDIR="`pwd`"
+
+# Figure out package info we need
+LINE=`head -1 debian/changelog`
+PACKAGE=`expr "$LINE" : '\(.*\) (.*)'`
+VERSION=`expr "$LINE" : '.* (\(.*\))'`
+
+if [ "$LINE" = "" ]; then
+	echo "Sorry debstd must be invoked from a debian source archive."
+fi
+
+set -- `getopt pmcus $*`
+if test $? != 0; then
+	echo "Syntax error"
+	exit 1
+fi
+
+for i;do
+	case "$i" in
+	-p)	PERMS=1;shift
+		;;
+	-u)	UNDOC=1;shift
+		;;
+	-s)	SUMS=1;shift
+		;;
+	-m)	NOAUTOMAN=1;shift
+		;;
+	-c)	NOCOMPRESS=1;shift
+		;;
+	--)	shift;break
+		;;
+	esac
+done
+
+# Tolerate old style debstd invocations
+if [ "$PACKAGE" = "$1" ]; then
+	echo "Warning: First parameter of debstd is no longer the packagename!"
+	shift
+fi
+
+# Is this a native Debian package?
+if ! expr "$VERSION" : '.*-' >/dev/null; then
+	NATIVE=1
+fi
+
+# Subroutines
+
+function checksums()
+{
+	pushd $1 >/dev/null
+	md5sum `find * -type f ! -regex "DEBIAN/.*"` >DEBIAN/md5sums </dev/null
+	popd >/dev/null
+}
+
+# addscript customizes a given script and adds it to one of the regular
+# installation scripts. If the script does not exist then it is generated.
+# Parameters:
+# $1=scriptname to be appended to in debian/tmp/DEBIAN
+function addscript()
+{
+	# If there is no script yet then put in the proper header
+	if [ ! -f $CTEMP/DEBIAN/$1 ]; then
+		install /usr/lib/deb-make/emptyscript $CTEMP/DEBIAN/$1
+	else 
+		if ! expr "`head -1 $CTEMP/DEBIAN/$1`" : "#!/bin/sh.*" >/dev/null ; then
+			head -1 $CTEMP/DEBIAN/$1
+			echo "Warning: Script $1 does not use /bin/sh as its interpreter"
+		fi
+	fi
+	# Make sure the files given are separated by blanks!
+	FILES=`echo $FILES | tr "\n" " "`
+	# Customize the script and add to the script indicated
+	sed >>$CTEMP/DEBIAN/$1  -e "s/#PACKAGE#/$PACKAGE/g" \
+                -e "s/#DATE#/$DATE/g" \
+		-e "s/#INITPARAMS#/$INITPARAMS/g" \
+		-e "s/#SCRIPT#/$SCRIPT/g" \
+		-e "s/#DESCR#/\"$DESCR\"/g" \
+		-e "s/#SECTION_NAME#/\"$SECTION_NAME\"/g" \
+		-e "s/#SECTION_MATCH#/\"$SECTION_MATCH\"/g" \
+		-e "s&#FILE#&$FILEX&g" \
+		-e "s&#PACKAGE#&$CPACKAGE&g" \
+		-e "s&#OWNER#&$OWNER&g" \
+		-e "s&#GROUP#&$GROUP&g" \
+		-e "s&#PERMS#&$PERMS&g" \
+		-e "s&#FILES#&$FILES&g"
+}
+
+
+# debinit handles the installation of an init.d script
+# Parameters:
+# $1= name in /etc/init.d
+# $2 = scriptname
+function debinit()
+{
+	SCRIPT=$1
+	install -d $CTEMP/etc/init.d
+	install $2 $CTEMP/etc/init.d/$SCRIPT
+	INITPARAMS=`grep "^FLAGS=" $2`
+	if [ "$INITPARAMS" != "" ]; then
+		INITPARAMS=`expr "$INITPARAMS" : 'FLAGS="\(.*\)"'`
+	fi
+	if [ "$INITPARAMS" = "" ]; then
+		INITPARAMS="defaults"
+	fi
+	echo "-- Adding /etc/init.d maintenance commands for $SCRIPT $INITPARAMS"
+	if grep -q NO_RESTART_ON_UPGRADE $2; then
+		addscript postrm </usr/lib/deb-make/init.postrm
+		addscript postinst </usr/lib/deb-make/init.postinst.norestart
+	else
+		# Add the scripts necessary to manage the init.d script
+		addscript postrm </usr/lib/deb-make/init.postrm
+		addscript postinst </usr/lib/deb-make/init.postinst
+		addscript prerm </usr/lib/deb-make/init.prerm
+	fi
+}
+
+function dive()
+{
+	addscript preinst <<EOF
+dpkg-divert --package $CPACKAGE --add --rename \\
+                --divert $2 $1
+EOF
+	addscript postrm <<EOF
+dpkg-divert --package $CPACKAGE --remove --rename \\
+                --divert $2 $1
+EOF
+}
+
+function diversion()
+{
+   addscript postrm <<EOF
+# diversion added by debstd $DATE
+if [ "\$1" = "remove" ]; then
+EOF
+   while [ 1 ]; do
+	read X
+   	if [ "$X" = "" ]; then
+		echo "fi"|addscript postrm
+		return
+	   else
+		dive $X
+   	fi
+   done
+}
+
+inetd_processing()
+{
+	echo "-- inetd.conf processing"
+	SECT=""
+	read X
+	while [ "$X" != "" ]; do
+		SERVICE="`expr "$X" : "\(\w*\)"`"
+		if expr "$X" : "#:.*:" >/dev/null; then
+			SECT="`expr "$X" : "#:\(.*\):"`"
+		else
+			echo "update-inetd --comment-chars \"#disabled#\" --disable $SERVICE" | addscript postinst
+ 			if [ "$SECT" ]; then
+				echo "update-inetd --group $SECT --add \"$X\"" | addscript postinst
+			else
+				echo "update-inetd --add \"$X\"" | addscript postinst
+			fi
+			echo "update-inetd --remove \"^$SERVICE\"" | addscript postrm
+			echo "update-inetd --comment-chars \"#disabled#\" --enable $SERVICE" | addscript postrm
+		fi
+		read X
+	done
+}
+
+#
+# Move a list of files given in a file $1 into the tmp archive
+# at directory $2. Only do it if $1 exists
+#
+function copyfiles()
+{
+	if [ -f $1 ]; then
+		install -d $CTEMP/$2
+		X=`cat $1`
+		for i in $X; do
+			cp -a $PDIR/$i $CTEMP/$2
+		done
+	fi
+}
+
+function setperms()
+{
+	OWNER=$2
+	GROUP=$3
+	PERMS=$4
+}
+
+
+#
+# Register a suid or gid binary using scripts
+#
+# One parameter which is the file to be processed
+function sreg()
+{
+# Figure out current permissions
+	setperms `find $CTEMP/$1 -printf "%p %u %g %m\n"`
+	FILEX=$1
+	addscript postinst </usr/lib/deb-make/suid.postinst
+	addscript postrm </usr/lib/deb-make/suid.postrm
+	chmod ug-s $CTEMP/$1
+}
+
+# 
+# Package specific things
+#
+# The first parameter is the package name
+# The second parameter is the directory name of the temp directory
+# The third parameter is the prefix for all configuration files to be processed
+function package()
+{
+	local i
+	local X Y
+	CPACKAGE=$1
+	CTEMP=$2
+	install -d $2/DEBIAN
+
+	# Installation scripts
+	for i in postinst preinst prerm postrm configure; do
+		if [ -f $3$i ]; then
+			install $3$i $2/DEBIAN/$i
+		fi
+	done
+
+	if [ -f $3shlibs ]; then
+		install -m644 $3shlibs $2/DEBIAN/shlibs
+	fi
+
+	# Check for SUIDs and GID bits
+	if [ -f $3suid ]; then
+		X=`cat $3suid`
+		if [ "$X" -a "$X" != "off" ]; then
+			echo "-- Manual Suid/gid bit processing"
+			for i in $X; do
+				(cd $2;ls -l $i)
+				sreg $i
+			done
+		fi
+	else
+		X=`find $2 -type f -perm +6000`
+		if [ "$X" ]; then
+			echo "-- Automatic Suid/gid bit processing"
+			for i in $X; do
+				Y=`expr "$i" : "$2/\(.*\)"`
+				(cd $2;ls -l $Y)
+				sreg $Y
+			done
+		fi
+	fi
+
+	# Check up on stuff in etc directory
+	if [ -d $2/etc ]; then
+		if [ -f $3conffiles ]; then
+			for i in `cd $2;find etc -type f`; do
+				if ! grep -q $i $3conffiles; then
+					echo "Warning: File $i provided in binary but is not listed as a conffile!"
+				fi
+			done
+		else
+			echo "Warning: Files installed in etc and no conffile!"
+		fi
+	fi
+
+	# Deal with scripts in etc directories
+	for i in cron.daily cron.weekly cron.monthly rc.boot; do
+		if [ -f $3$i ]; then
+			install -d $2/etc/$i
+			install $3$i $2/etc/$i/$1
+		fi
+	done
+
+	# etc files that could need some tweaking
+	for i in services inittab crontab protocols profile shells rpc shells \
+		syslog.conf conf.modules modules aliases \
+		X11/Xresources X11/config X11/window-managers X11/xinit ; do
+		if [ -f $3$i ]; then
+			FILEX="$i"
+			cat /usr/lib/deb-make/etc.first.postinst $3$i \
+				/usr/lib/deb-make/etc.last.postinst | addscript postinst
+			addscript postrm </usr/lib/deb-make/etc.postrm
+			if [ "$i" = "aliases" ]; then
+				echo 'newaliases || echo "newaliases command not available"' | addscript postinst
+				echo 'newaliases || echo "newaliases command not available"' | addscript postrm
+			fi
+			if [ "$i" = "services" ]; then
+				echo -e "Warning: Please submit modifications to /etc/services to the maintainer\n	of the netbase package"
+			fi
+		fi
+	done
+
+	if [ -f $3diversions ]; then
+		diversion <$3diversions
+	fi
+
+	if [ -f $3inetd.conf ]; then
+		inetd_processing <$3inetd.conf
+	fi
+
+	if [ -f $3init.d ]; then
+		debinit $1 $3init.d
+	fi
+
+	# The case of a daemon without the final d
+	if [ -f $3init ]; then
+		debinit `expr $1 : '\(.*\)d$'` $3init
+	fi
+
+	# Purging files/directories on "purge" ?
+
+	if [ -f $3purge ]; then
+		echo "-- Adding purge actions to postrm"
+		FILES="`cat $3purge`"
+		addscript postrm </usr/lib/deb-make/purge.postrm
+	fi
+
+	if [ -f $3conffiles ]; then
+		install -m644 $3conffiles $2/DEBIAN/conffiles
+		for i in `cat $3conffiles`; do
+			if [ ! -e $2/$i ]; then
+				echo "Warning: Configuration file $i not provided in binary package!"
+			fi
+		done
+	fi
+
+	copyfiles $3docs usr/doc/$PACKAGE
+
+	copyfiles $3examples usr/doc/$PACKAGE/examples
+
+	if [ -d $2/usr/doc ]; then
+		chown -R root.root $2/usr/doc
+
+		chmod 644 `find $2/usr/doc -type f`
+		chmod 755 `find $2/usr/doc -type d`
+	fi
+	
+	if [ -f $3menu ]; then
+		install -d $2/usr/lib/menu
+		install -m644 $3menu $2/usr/lib/menu/$CPACKAGE
+		addscript postinst </usr/lib/deb-make/menu.postinstrm
+		addscript postrm </usr/lib/deb-make/menu.postinstrm
+	fi
+
+	# Info files?
+	if [ -f $3info ]; then
+		echo "-- Installing info files"
+		FILES=""
+		. ./$3info
+		FILEX="$FILE"
+		if [ "$FILES" ]; then
+			install -d $2/usr/info
+			mkdir /tmp/info$$
+			(cd $PDIR;cp $FILES /tmp/info$$)
+			(cd $2/usr/info;find /tmp/info$$ -type f -exec cp '{}' . \;)
+			rm -rf /tmp/info$$
+		fi
+		if [ "$SECTION_MATCH" = "" ]; then
+			addscript postinst </usr/lib/deb-make/info.postinst
+		else
+			addscript postinst </usr/lib/deb-make/info.regexp.postinst
+		fi
+		addscript postrm </usr/lib/deb-make/info.postrm
+	fi
+   	# Check for libraries provided by the package
+	SHLIBS="`find $2/lib $2/usr/lib $2/usr/X11R6/lib -type f -name "lib*.so.*" 2>/dev/null`"
+	X=`cd $2;find lib usr/lib usr/X11R6/lib -type f -name "lib*.so.*" 2>/dev/null`
+	if [ "$X" != "" -a ! -e $3shlibs ]; then
+		echo "-- Processing provided ELF libraries"
+#		>debian/shlibs.local
+		for i in $X; do
+			echo "Sharable Library $i"
+			LIBRARY=`expr $i : ".*/\(.*\)\.so\..*"`
+			VERSION=`expr $i : ".*/.*\.so\.\(.*\)"`
+			MAJOR=`expr $VERSION : "\([0-9]*\)\."`
+			LIBSTUB=`expr $i : "\(.*\/.*\.so\)\..*"`
+			echo "$LIBRARY $MAJOR $1" >>$2/DEBIAN/shlibs
+#			echo "$LIBRARY $MAJOR" >>debian/shlibs.local
+			strip --strip-unneeded $2/$i
+			if [ ! -L $2$LIBSTUB.$MAJOR ]; then
+				ln -s $LIBRARY\.so.$VERSION $2/$LIBSTUB.$MAJOR
+				echo "Added ELF Library link $LIBRARY.so.$MAJOR"
+			fi
+			if [ ! -L $PDIR/debian/tmp/$LIBSTUB ]; then
+				ln -s $LIBRARY\.so.$VERSION $PDIR/debian/tmp/$LIBSTUB
+				echo "Added ELF Library link $LIBRARY.so (in base package)"
+			fi
+				
+		done
+		echo "ldconfig" | addscript postinst
+	fi
+   	# Check for static libraries provided by the package
+	X=`find $2/lib $2/usr/lib $2/usr/X11R6/lib -type f -name "lib*.a" 2>/dev/null`
+	if [ "$X" != "" ]; then
+		echo "-- Processing provided static libraries"
+		for i in $X; do
+			echo "Static Library $i"
+			if ! expr "$i" : ".*_g\.a" >/dev/null; then
+				strip --strip-debug $i
+			fi
+		done
+	fi
+
+
+	# Check for executables to run dpkg-shlibdeps
+	echo "-- Checking for executable binaries in package"
+	X=`find $2 -type f -perm +111| tr "\n" " "`
+	if [ "$X" = "" ]; then
+		if [ "$SHLIBS" = "" ]; then
+			echo "No executables or libraries in the package!"
+		else
+			echo "-- Figuring out dependencies on ELF Libraries"
+			dpkg-shlibdeps -T$3substvars $SHLIBS
+		fi
+	else
+		>/tmp/$$
+		for i in $X; do
+			BINPATH="`expr "$i" : "$2/\(.*\)/.*"`"
+			BINNAME="`expr "$i" : "$2/.*/\(.*\)"`"
+#			echo  "I=$i 2=$2 PATH=$BINPATH NAME=$BINNAME"
+			case "`file $i`" in
+				*ELF*)
+					if [ ! -f $3nodeps ]; then
+						echo $i >>/tmp/$$
+					else
+						if grep -q $3$i nodeps; then
+							echo -n "No Dependencies for "
+						else
+							echo $i >>/tmp/$$
+						fi
+					fi
+					echo "$BINPATH/$BINNAME ELF Binary"
+					strip --remove-section=comment --remove-section=note $i
+					;;
+				*script*)
+					echo "$BINPATH/$BINNAME Script"
+					;;
+				*perl*)	
+					echo "$BINPATH/$BINNAME PERL"
+					;;
+				*)	echo "$BINPATH/$BINNAME WARNING: Type unusual: `file $i`"
+			esac
+			# Check if manpages exist
+			case "$BINPATH" in
+				DEBIAN|etc/rc.boot|usr/lib/cgi-bin|etc/init.d|etc/cron.*|usr/lib/lib*|usr/lib/*)	SECTION=""
+					;;
+				sbin|usr/sbin)	SECTION="8"
+					;;
+				usr/X11R6/bin)	SECTION="1"
+					;;
+				bin|usr/bin)	SECTION="1"
+					;;
+				usr/games)	SECTION="6"
+					;;
+				*)	SECTION=""
+					echo "Warning: Unusual executable location $BINPATH/$BINNAME"
+					;;
+			esac
+			if [ "$SECTION" ]; then
+				Y=`find $2/usr/man $2/usr/X11R6/man -name "$BINNAME.*" 2>/dev/null`
+				if [ "$Y" = "" ]; then
+					if [ "$UNDOC" ]; then
+						install -d $2/usr/man/man$SECTION
+						ln -s ../man7/undocumented.7.gz $2/usr/man/man$SECTION/$BINNAME.$SECTION
+						echo "$BINPATH/$BINNAME has no manpage. Link to undocumented.7 added."
+					else
+						echo "Warning : Executable $BINPATH/$BINNAME has no manpage!"
+					fi
+				fi
+			fi
+		done
+		X="`cat /tmp/$$`"
+		rm /tmp/$$
+		if [ "$X" = "" ]; then
+			if [ "$SHLIBS" ]; then
+				echo "-- Figuring out dependencies of ELF libaries"
+				dpkg-shlibdeps -T$3substvars $SHLIBS
+			fi
+		else
+			echo "-- Figuring out dependencies of ELF objects"
+			dpkg-shlibdeps -T$3substvars -Ldebian/shlibs.local $X $SHLIBS
+		fi
+	fi
+
+	pushd $2 >/dev/null
+	# Compress manpages. Convert manpages that have just .so in them to symlinks
+	if [ -d usr/man -o -d usr/X11*/man ]; then
+		echo "-- Compressing/Converting Manpages"
+		X=`find usr/man usr/X11*/man -type f -size -50c 2>/dev/null`
+		if [ "$X" != "" ]; then
+   			for i in $X; do
+				Y=`head -1 $i`
+				Y=`expr "$Y" : '\.so \(.*\)'`			
+				if [ "$Y" != "" ]; then
+					# Convert it to a symlink
+					rm $i
+					ln -s ../$Y $i
+					echo "Manpage $i converted into symlink (../$Y)"
+				else
+					echo "Manpage $i does not seem to contain .so although smaller than 50 bytes."
+					echo "Something might be wrong here!"
+				fi
+			done
+		fi
+		gzip -9 `find usr/man usr/X11*/man -type f 2>/dev/null`
+	fi
+
+	# Compress Info
+	if [ -d usr/info ]; then
+		echo "-- Compressing Info files"
+		X="`find usr/info -type f`"
+		if [ "$X" ]; then
+			gzip -9 $X
+		else
+			echo "WARNING: /usr/info exists but no content"
+		fi
+	fi
+
+	# Compress Documentation
+	if [ -d usr/doc -a "$NOCOMPRESS" = "" ]; then
+		X="`find usr/doc -type f -size +4k ! -name "*.htm*" ! -name "*.gif"`"
+		if [ "$X" != "" ]; then
+			echo "-- Compressing Documentation"
+			gzip -9 $X
+		fi
+	fi
+
+	# Ensure that the symlinks survived the cure and point them to the gzipped
+	# file if necessary
+	echo "-- Checking Symlinks"
+	for i in `find . -type l`; do
+		DIRECTORY=`expr $i : "\(.*\)/[^/]*"`
+		NAME=`expr $i : ".*/\([^/]*\)"`
+		LINKVAL=`ls -l $DIRECTORY/$NAME | awk '{ print $11;}'`
+		if [ ! -e $DIRECTORY/$LINKVAL ]; then
+			if [ -f $DIRECTORY/$LINKVAL.gz ]; then
+				rm $DIRECTORY/$NAME
+				ln -s $LINKVAL.gz $DIRECTORY/$NAME.gz
+				echo "Changed symlink $i to $i.gz"
+			else
+				echo "Dangling symlink $i pointing to $LINKVAL"
+			fi
+		fi
+	done
+
+	# Some checks
+	if [ -d usr/local ]; then
+		echo "Warning: usr/local directory exists in $CPACKAGE!"
+	fi
+
+	if [ "$PERMS" ]; then
+		X=`find . -uid +199 -o -gid +199`
+		if [ "$X" ]; then
+			for i in $X; do
+				echo "Warning: Files $i has illegal user or group id in package $CPACKAGE"
+			done
+		fi
+	fi
+
+	# Add link to proper document directory
+#	if [ ! -d usr/doc/$CPACKAGE -a ! -L usr/doc/$CPACKAGE ]; then
+#		ln -s $PACKAGE usr/doc/$CPACKAGE;
+#	fi
+	popd >/dev/null
+}
+
+
+function packages()
+{
+	local i
+	BASE=$1
+	shift
+	for i in $*; do
+		install -d debian/$i
+		echo "** Package $i"
+		if [ -f debian/$i.files ]; then
+			echo "-- Moving files from debian/tmp into $i"
+	(cd debian/tmp;tar --create --remove-files `cat ../$i.files`) \
+	| (cd debian/$i;tar xp)
+		fi
+		package $i debian/$i "debian/$i."
+		dpkg-gencontrol -p$i -Pdebian/$i -Tdebian/$i.substvars
+		chown -R root.root debian/$i
+		chmod -R go=rX debian/$i
+		if [ -x debian/$i.prebuild ]; then
+			(cd debian/$i;../$i.prebuild)
+		fi
+		if [ "$SUMS" = "" ]; then
+			checksums debian/$i
+		fi
+		dpkg --build debian/$i ..
+	done
+	if [ -f debian/clean ]; then
+		# Try to clean up base package
+		find debian/tmp -type d -links 2 -exec rmdir '{}' \; 2>/dev/null
+		find debian/tmp -type d -links 2 -exec rmdir '{}' \; 2>/dev/null
+	fi
+	echo "** Main Package $BASE"
+	package $BASE debian/tmp "debian/"
+	if [ "$SUMS" = "" ]; then
+		checksums debian/tmp
+	fi
+}
+
+#
+# Things uniquely done to the base package
+# 
+
+echo "--------------- debstd processing --------------"
+cd debian
+
+install -d -m755 tmp/usr/doc/$PACKAGE
+# Required files in /usr/doc/package
+if [ ! -e tmp/usr/doc/$PACKAGE/copyright ]; then
+	install -m644 copyright tmp/usr/doc/$PACKAGE
+fi
+
+if [ "$NATIVE" ]; then
+	install -m644 changelog tmp/usr/doc/$PACKAGE
+else
+	install -m644 changelog tmp/usr/doc/$PACKAGE/changelog.Debian
+fi
+
+# Special README
+if [ -f README.debian ]; then
+	install -m644 README.debian tmp/usr/doc/$PACKAGE
+fi
+
+# Special TODO
+if [ -f TODO ]; then
+	install -m644 TODO tmp/usr/doc/$PACKAGE
+fi
+
+# Record the Info of the machine the package was build on
+dpkg -l gcc 'libc*' debmake binutils ldso make dpkg-dev | awk '$1 == "ii" { printf("%s-%s\n", $2, $3) }' >tmp/usr/doc/$PACKAGE/buildinfo.Debian
+
+cd ..
+# Install Documentation files specified on the commandline
+echo "-- Installing Documentation"
+
+# Special case of changelog
+if [ "$1" ]; then
+	if echo "$1" | grep -i "change" >/dev/null; then
+		install -m644 $1 debian/tmp/usr/doc/$PACKAGE/changelog
+		shift
+	fi
+fi
+
+while [ "$1" != "" ]; do
+	install -m644 $1 debian/tmp/usr/doc/$PACKAGE
+	shift
+done
+
+# Manpage scan
+if [ "$NOAUTOMAN" = "" ]; then
+	echo "-- Looking for manpages in sourcepackage"
+	# Install manpages that might be somewhere in the source package
+	for i in `find * -name "*.[1-9]*" ! -name "*.ex"`; do
+		if ! expr $i : 'debian/tmp/.*' >/dev/null; then
+			if file $i|grep -q troff; then
+			  	if echo $i|grep -q /; then
+					NAME=`expr $i : '.*/\(.*\)'`
+				else
+					NAME=$i
+				fi
+				SECTION=man`expr $NAME : '.*\.\([123456789]\)'`
+				if [ -e debian/tmp/usr/man/$SECTION/$NAME -o -e debian/tmp/usr/X11*/man/$SECTION/$NAME ]; then
+					echo "Manpage $NAME exists.";
+				else
+					if [ ! -d debian/tmp/usr/man/$SECTION ]; then
+						install -d debian/tmp/usr/man/$SECTION
+					fi
+					install -m644 $i debian/tmp/usr/man/$SECTION/$NAME
+					echo -n "$NAME "
+				fi
+			fi
+		fi
+	done
+	echo
+fi
+
+# Create the binary packages
+PACKAGES=`grep "Package:" debian/control | sed -e 's/Package: //g'|tr "\n" " "`
+
+if [ "$PACKAGES" ]; then
+	packages $PACKAGES
+else
+	echo "No Packages specified in debian/control"
+fi
+
+echo "--------------- debstd processing finished --------------"
+
+exit 0

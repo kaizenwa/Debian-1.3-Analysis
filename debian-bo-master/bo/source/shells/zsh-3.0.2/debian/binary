@@ -1,0 +1,76 @@
+#!/bin/sh -ex
+#
+# Script to build a Debian binary package
+# Version 1.5
+#
+# Robert Leslie <rob@mars.org>
+
+test $# -eq 4 || exit 1
+
+PKG="$1"
+VER="$2"
+ARC="$3"
+TMP="$4"
+
+rm -rf $TMP
+umask 022
+
+install -m 755 -d $TMP/DEBIAN
+sed -e "2s/=/$VER/" -e "3s/=/$ARC/" debian/control > $TMP/DEBIAN/control
+chown 0.0 $TMP/DEBIAN/control
+chmod 644 $TMP/DEBIAN/control
+
+install -m 644 debian/conffiles $TMP/DEBIAN/.
+
+install -m 755 debian/prerm $TMP/DEBIAN/.
+install -m 755 debian/postinst $TMP/DEBIAN/.
+
+install -m 755 -d $TMP/usr/doc/copyright
+install -m 644 debian/README $TMP/usr/doc/copyright/$PKG
+
+# zsh proper
+
+make prefix=../$TMP/usr install
+
+# install -m 755 -d $TMP/usr/{bin,man/man1,info}
+# install -m 755 -s Src/zsh	$TMP/usr/bin/.
+# install -m 644 Doc/zsh*.1	$TMP/usr/man/man1/.
+# install -m 644 Doc/zsh.info*	$TMP/usr/info/.
+
+strip $TMP/usr/bin/zsh
+
+install -m 755 -d $TMP/etc
+install -m 644 debian/{zlogin,zlogout,zprofile,zshenv,zshrc} $TMP/etc/.
+
+# help files
+
+install -m 755 -d $TMP/usr/lib/$PKG/help
+man -l -7 Doc/zshbuiltins.man | colcrt - | sed -e 's/±/{+|-}/' | (
+    helpfiles=$(pwd)/Util/helpfiles
+    cd $TMP/usr/lib/$PKG/help
+    perl $helpfiles
+)
+
+# functions
+
+install -m 755 -d $TMP/usr/lib/$PKG/functions
+install -m 755 debian/run-help $TMP/usr/lib/$PKG/functions/.
+
+# documentation
+
+gzip -9v $TMP/usr/info/*
+
+install -m 755 -d $TMP/usr/doc/$PKG
+install -m 644 META-FAQ Doc/intro.ms Doc/zsh.texi Etc/* $TMP/usr/doc/$PKG/.
+rm -f $TMP/usr/doc/$PKG/Makefile*
+
+gzip -9v $TMP/usr/doc/$PKG/*
+
+ln -s ../examples/$PKG $TMP/usr/doc/$PKG/examples
+
+for dir in Functions Misc StartupFiles Util
+do
+    install -m 755 -d $TMP/usr/doc/examples/$PKG/$dir
+    install -m 644 $dir/* $TMP/usr/doc/examples/$PKG/$dir/.
+    rm -f $TMP/usr/doc/examples/$PKG/$dir/Makefile*
+done

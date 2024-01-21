@@ -1,0 +1,136 @@
+#
+# tksrc/Makefile.in --
+#
+# Makefile to build a wish with Extended Tcl (wishx).
+# 
+#------------------------------------------------------------------------------
+# Copyright 1992-1995 Karl Lehenbauer and Mark Diekhans.
+#
+# Permission to use, copy, modify, and distribute this software and its
+# documentation for any purpose and without fee is hereby granted, provided
+# that the above copyright notice appear in all copies.  Karl Lehenbauer and
+# Mark Diekhans make no representations about the suitability of this
+# software for any purpose.  It is provided "as is" without express or
+# implied warranty.
+#------------------------------------------------------------------------------
+# $Id: Makefile.in,v 5.0 1995/07/25 06:00:42 markd Rel $
+#------------------------------------------------------------------------------
+#
+SHELL = /bin/sh
+
+#------------------------------------------------------------------------------
+# Autoconfig defines that can be overridden in Config.mk
+
+CC          = @CC@
+CFLAGS      = @CFLAGS@
+RANLIB      = @RANLIB@
+srcdir      = @srcdir@
+srcbasedir  = @srcbasedir@
+bldbasedir  = @bldbasedir@
+VPATH       = @srcdir@
+prefix      = @prefix@
+exec_prefix = @exec_prefix@
+ARCH        = @TCL_ARCH@
+XINCLUDES   = @XINCLUDES@
+LIBS        = @LIBS@ @MATH_LIBS@
+XLIBSW      = @XLIBSW@
+
+#------------------------------------------------------------------------------
+# Include user-editable defines.
+
+@MAKEINCLUDE@ @MAKEQUOTE@${bldbasedir}/Config.mk@MAKEQUOTE@
+
+#------------------------------------------------------------------------------
+
+LIBTK        = ${TK_UCB_LIB}/libtk.a
+LIBTCL       = ${TCL_UCB_LIB}/libtcl.a
+LIBTCLX      = ../src/libtclx.a
+INST_MASTER  = ${TK_MASTERDIR}/`../tools/tkxversion`
+INSTCOPY     = ../runtcl ../tools/instcopy
+SYMLINKEXT   = ../tools/symlinkext
+
+# The ordering of the libraries is important.  Some X libs on SysV include
+# "random" in a BSD module.  This would conflict with the one in the TclX
+# library if it was brought in.
+
+LDLIBS = libtkx.a ${TK_UCB_LIB}/libtk.a ${XLIBSW} \
+	 ../src/libtclx.a ${TCL_UCB_LIB}/libtcl.a ${LIBS} ${XLDLIBS}
+
+SHLDLIBS = ${TKX_SHLIBS} ${XLIBSW} ${TCLX_SHLIBS} ${LIBS} ${XLDLIBS}
+
+CC_FLAGS = ${CPPFLAGS} ${XCFLAGS} ${CFLAGS} \
+           -I${srcbasedir}/src -I${bldbasedir}/src -I${srcbasedir}/tksrc \
+           -I${TK_UCB_SRC} -I${TCL_UCB_SRC} ${XINCLUDES}
+
+LD_FLAGS = ${LDFLAGS} ${XLDFLAGS} ${XCFLAGS} ${CFLAGS}
+
+.c.o:
+	${CC} ${CC_FLAGS} -c $<
+
+#------------------------------------------------------------------------------
+
+OBJS=tkXinit.o tkXshell.o
+
+#------------------------------------------------------------------------------
+# Compile the TkX library and link wishx.  If the link fails, purge
+# the executable, as some systems leave invalid executables around.
+
+all: made.tmp wishx
+
+wishx: tkXAppInit.o libtkx.a ${LIBTK} ${LIBTCLX} ${LIBTCL} made.tmp
+	${CC} ${LD_FLAGS} tkXAppInit.o ${LDLIBS} -o wishx || \
+	    (rm -f wishx; exit 1)
+
+made.tmp libtkx.a: ${OBJS}
+	${AR} cr libtkx.a ${OBJS} ${UCBOBJS}
+	${RANLIB} libtkx.a
+	touch made.tmp
+
+tkXinit.o: ${srcdir}/tkXinit.c
+	${CC} -c -I${TK_UCB_SRC} ${CC_FLAGS} ${DEFS} \
+	    -DTKX_LIBRARY=\"${INST_MASTER}\" ${srcdir}/tkXinit.c
+
+#------------------------------------------------------------------------------
+# Relink using shared libraries.  The libraries must be built and installed
+# by hand.
+
+shlink:
+	${CC} ${LD_FLAGS} tkXAppInit.o ${SHLDLIBS} -o wishx || \
+	    (rm -f wishx; exit 1)
+
+#------------------------------------------------------------------------------
+
+install: install-exec
+
+install-exec:
+	${INSTCOPY} wishx ${INSTALL_ROOT}${TCL_BINDIR}
+	${STRIP} ${INSTALL_ROOT}${TCL_BINDIR}/wishx
+	${INSTCOPY} libtkx.a ${INSTALL_ROOT}${TCL_LIBDIR}
+	${RANLIB} ${INSTALL_ROOT}${TCL_LIBDIR}/libtkx.a
+	${INSTCOPY} tkxlibs.mk ${INSTALL_ROOT}${TCL_LIBDIR}
+
+install-master: install-master-exec
+	${INSTCOPY} ${TK_UCB_SRC}/tk.h ${INSTALL_ROOT}${INST_MASTER}/include
+	${SYMLINKEXT} ${INST_MASTER}/include/* ${INSTALL_ROOT}${TCL_INCLUDEDIR}
+
+install-master-exec:
+	${INSTCOPY} wishx ${INSTALL_ROOT}${INST_MASTER}/bin${ARCH}
+	${STRIP} ${INSTALL_ROOT}${INST_MASTER}/bin${ARCH}/wishx
+	${INSTCOPY} ${LIBTK} libtkx.a ${INSTALL_ROOT}${INST_MASTER}/lib${ARCH}
+	${RANLIB} ${INSTALL_ROOT}${INST_MASTER}/lib${ARCH}/*.a
+	${INSTCOPY} tkxlibs.mk ${INSTALL_ROOT}${INST_MASTER}/lib${ARCH}
+	${SYMLINKEXT} ${INST_MASTER}/bin${ARCH}/* ${INSTALL_ROOT}${TCL_BINDIR}
+	${SYMLINKEXT} ${INST_MASTER}/lib${ARCH}/* ${INSTALL_ROOT}${TCL_LIBDIR}
+
+#------------------------------------------------------------------------------
+clean:
+	-rm -f made.tmp tkXAppInit.o ${OBJS} wishx libtkx.a
+
+#------------------------------------------------------------------------------
+# Restore to the distributed state.
+
+distclean: clean
+	rm -f Makefile tkxlibs.mk
+
+# Disable Sun's parallel make, it doesn't get the dependencies right.
+.NO_PARALLEL:

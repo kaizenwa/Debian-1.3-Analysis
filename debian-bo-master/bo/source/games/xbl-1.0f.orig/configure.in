@@ -1,0 +1,155 @@
+dnl ATTENTION : on HP9000/300 HPUX7.0 the configure script must be hand patched
+dnl It's a /bin/sh bug who can't understand : cat <<EOF > config.status
+
+AC_INIT(Makefile.in)
+
+MANPATH=""
+
+dnl
+dnl
+dnl Look for include and library place
+dnl This search is unecessary if imake or xmkmf exists
+dnl
+dnl
+test -d [/usr/local/include/X11] && DEFS="$DEFS -I[/usr/local/include]"
+test -d [/usr/openwin/include/X11] && DEFS="$DEFS -I[/usr/openwin/include]"
+test -d [/usr/local/X11/include] && DEFS="$DEFS -I[/usr/local/X11/include]"
+test -d [/usr/local/X11R3/include] && DEFS="$DEFS -I[/usr/local/X11R3/include]"
+test -d [/usr/local/X11R4/include] && DEFS="$DEFS -I[/usr/local/X11R4/include]"
+test -d [/usr/local/X11R5/include] && DEFS="$DEFS -I[/usr/local/X11R5/include]"
+test -d [/usr/local/X11R6/include] && DEFS="$DEFS -I[/usr/local/X11R6/include]"
+test -d [/usr/local/X11R7/include] && DEFS="$DEFS -I[/usr/local/X11R7/include]"
+test -f [/usr/local/lib/libX11.a] && LIBS="/usr/local/lib/libX11.a"
+test -f [/usr/lib/libX11.a] && LIBS="-lX11"
+test -f [/usr/openwin/lib/libX11.a] && LIBS="/usr/openwin/lib/libX11.a"
+test -f [/usr/local/X11R3/lib/libX11.a] && LIBS="/usr/local/X11R3/lib/libX11.a"
+test -f [/usr/local/X11R4/lib/libX11.a] && LIBS="/usr/local/X11R4/lib/libX11.a"
+test -f [/usr/local/X11R5/lib/libX11.a] && LIBS="/usr/local/X11R5/lib/libX11.a"
+test -f [/usr/local/X11R6/lib/libX11.a] && LIBS="/usr/local/X11R6/lib/libX11.a"
+test -f [/usr/local/X11R7/lib/libX11.a] && LIBS="/usr/local/X11R7/lib/libX11.a"
+dnl
+dnl Create an Imakefile which print variable values 
+dnl
+cat <<'EOF' >Imakefile
+ALL:
+	@echo DEFS=\"$(CFLAGS)\"
+	@echo LIBS=\"$(XLIB) $(LDLIBS)\"
+	@echo XAPPLOADDIR=\"RESOURCEDIR=$(XAPPLOADDIR)\"
+	@echo BINDIR=\"BINDIR=$(BINDIR)\"
+	@echo SCOREDIR=\"SCOREDIR=$(LIBDIR)/xbl\"
+	@echo CP=\"CP=$(CP)\"
+	@echo RM=\"RM=$(RM)\"
+	@echo LN=\"LN=$(LN)\"
+	@echo COMPRESS=\"COMPRESS=$(COMPRESS)\"
+	@echo MANPATH=\"MANPATH=$(MANPATH)\"
+	@echo CC=\"$(CC)\"
+	@echo LDOPTIONS=\"$(LDOPTIONS)\"
+	@echo LINT=\"LINT=$(LINT)\"
+	@echo LINTFLAGS=\"LINTFLAGS=$(LINTFLAGS)\"
+EOF
+dnl
+dnl
+dnl Try to run xmkmf and imake
+dnl
+dnl
+AC_PROGRAM_CHECK(XMKMF,xmkmf,xmkmf)
+test "" = "$XMKMF" && XMKMF=false
+test 0 -eq `grep -c "^USE_XMKMF=YES" Makefile.in` && XMKMF=false
+
+AC_PROGRAM_CHECK(IMAKE,imake,imake)
+test "" = "$IMAKE" && IMAKE=false
+IMAKE_OPTIONS=`grep "^IMAKE_OPTIONS=" Makefile.in | sed "s/IMAKE_OPTIONS=//"`
+test "" = "$IMAKE_OPTIONS" && IMAKE=false
+
+if $XMKMF 2>/dev/null >/dev/null
+   then
+	 echo "I will use informations from : xmkmf"
+   else 
+        if $IMAKE $IMAKE_OPTIONS 2>/dev/null >/dev/null
+		then
+		echo "I will use informations from : imake $IMAKE_OPTIONS"
+	else
+		dnl
+		dnl Create an Makefile which print variable values 
+		dnl This Makefile is used if nor imake and xmkmf exits
+		dnl
+		cat <<EOF >Makefile
+ALL:
+	@echo DEFS=\"$DEFS\"
+	@echo LIBS=\"$LIBS\"
+EOF
+	fi
+fi 2>/dev/null
+dnl
+dnl
+dnl Eval to take variables values
+dnl
+dnl
+
+eval `make ALL`
+rm Makefile Imakefile
+
+AC_SUBST(CC)
+AC_SUBST(LDOPTIONS)
+AC_SUBST(CP)
+AC_SUBST(RM)
+AC_SUBST(LN)
+AC_SUBST(LINT)
+AC_SUBST(LINTFLAGS)
+AC_SUBST(COMPRESS)
+AC_SUBST(MANPATH)
+AC_SUBST(XAPPLOADDIR)
+AC_SUBST(BINDIR)
+AC_SUBST(SCOREDIR)
+dnl
+dnl
+dnl Continue tests
+dnl
+dnl
+AC_PROG_CC
+AC_MODE_T
+AC_SIZE_T
+AC_STDC_HEADERS
+AC_HAVE_HEADERS(stdlib.h)
+AC_HAVE_HEADERS(unistd.h)
+AC_HAVE_HEADERS(string.h)
+AC_HAVE_HEADERS(fcntl.h)
+AC_HAVE_HEADERS(sys/stat.h)
+AC_HAVE_HEADERS(sys/select.h)
+AC_HAVE_HEADERS(malloc.h)
+test -f /usr/lib/libmalloc.a && LIBS="$LIBS -lmalloc"
+AC_COMPILE_CHECK("Prototypes",,extern int y(int z);y(5);}y(z)int z;{,DEFS="$DEFS -DHAVE_PROTOTYPES")
+
+
+AC_TEST_PROGRAM([
+#include <sys/time.h>
+main()
+{
+long i,j;
+struct  timeval timeout ;
+i=time(0L);
+timeout.tv_sec = 2 ;
+timeout.tv_usec = 0 ; 
+select(0,&j,&j,&j,&timeout);
+return( time(0L)-i ) ;
+}
+],				DEFS="$DEFS -DBAD_SELECT")
+
+
+
+dnl I must indicate the LDOPTION in LIBS before test FUNCTION
+OLDLIB=$LIBS
+LIBS="$LDOPTIONS $LIBS"
+AC_HAVE_FUNCS(XGetGCValues,echo OUI,echo NON)
+LIBS=$OLDLIB
+
+
+dnl Next line is complex because autoconf does not like ","
+dnl And on HP some option contains ","
+LINTFLAGS=`echo "$LINTFLAGS" | sed 's/,/\\\,/g'`
+DEFS=`echo "$DEFS" | sed 's/,/\\\,/g'`
+LDOPTIONS=`echo "$LDOPTIONS" | sed 's/,/\\\,/g'`
+
+
+
+AC_OUTPUT(Makefile)

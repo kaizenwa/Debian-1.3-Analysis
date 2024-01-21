@@ -1,0 +1,426 @@
+;; virtual-door.gwm --- Doors for the virtual screen in "virtual.gwm"
+;;
+;; Author: Anders Holst  (aho@sans.kth.se)  
+;; Copyright (C) 1995  Anders Holst
+;; Version: virtual-1.0
+;; Last change: 17/6 1995
+;;
+;; This file is copyrighted under the same terms as the rest of GWM
+;; (see the X Inc license for details). There is no warranty that it
+;; works. 
+;;
+;; --------------------------------------------------------------------- 
+;;
+;; This file defines "doors" on the virtual screen, ie. buttons that
+;; when pressed moves the real screen somewhere on the virtual screen.
+;; The position to move to can be fixed, or given by an expression.
+;;
+;; It also defines some very simple "door managing" functions, to add
+;; or remove doors dynamically. Use '(add-door NAME)' to add a door to
+;; the next area with no door already. Use '(add-door NAME 'free)' to
+;; add a door to some area in addition free from windows. Use
+;; '(maybe-add-door NAME)' to add a door (to a window-free area) only
+;; if a door of that name does not exist.
+;; '(goto-door NAME)' moves through a door, and '(remove-door NAME)' 
+;; removes a door. 
+;;
+
+(declare-screen-dependent
+  door-font
+  door-background
+  door-foreground
+  door-borderwidth
+  door-xsize
+  door-ysize
+  door-mgr-dir-horiz
+  door-mgr-dir-len
+  door-mgr-mdir-horiz
+  door-mgr-mdir-len
+  door-mgr-xpos
+  door-mgr-ypos
+  door-mgr-tile
+  door-mgr
+  door-context
+)
+
+;;
+;;    USER CUSTOMIZABLE VARIABLES
+;;    ---------------------------  
+;;    Adjust these in your own profile
+;;
+(for screen (list-of-screens)
+     (defaults-to 
+       door-font (font-make "8x13")   ; Font in door buttons                
+       door-background white          ; Background color of door buttons
+       door-foreground black          ; Foreground color of door buttons
+       door-borderwidth 2             ; Border width of door buttons
+       door-xsize 90                  ; Door button size
+       door-ysize 16                  ;  - " -
+                               
+       door-mgr-dir-horiz t    ; Controls mapping of doors on virtual screen,
+       door-mgr-dir-len 2      ; e.g. two screenfulls in a (horizontal) row.
+       door-mgr-mdir-horiz t   ; Controls position of door buttons, e.g.
+       door-mgr-mdir-len 2     ; place two buttons in each (horizontal) row.
+       door-mgr-xpos 0         ; Upper left corner of door manager
+       door-mgr-ypos 0         ;  - " -
+       door-mgr-tile t         ; tile of empty positions, t = transparent 
+       door-context ()         ; p-list of customizations per door name
+       )
+)
+
+(for screen (list-of-screens)
+     (setq door-mgr '(() () () ())))
+
+(setq door-fsm
+  (fsm-make 
+    (state-make
+      (on (button any alone)
+	(with (
+	    pos (# 'pos wob-property)
+	    lst (if (and pos (= (type pos) 'list))
+	      pos
+	      (= (type pos) 'quoted-expr)
+	      (eval (eval pos))
+	      ()))
+	  (if lst
+	    (virtual-move-to (# 0 lst) (# 1 lst)))
+)))))
+
+(defun door-make (name xpos ypos gotopos)
+  (process-events)
+  (with (background door-background
+         foreground door-foreground
+         borderpixel door-foreground
+         borderwidth door-borderwidth
+         menu-min-width door-xsize
+         menu-max-width door-xsize
+         bar-min-width door-ysize
+         bar-max-width door-ysize
+         direction vertical
+         reenter-on-opening ())
+    (place-menu "door"
+                (with (borderwidth 0
+                       fsm door-fsm
+                       property (+ (list 'pos gotopos) property)) 
+                  (menu-make 
+                   (bar-make
+                    ()
+                    (plug-make
+                     (label-make name door-font))
+                    ())))
+                xpos ypos)))
+
+(defun door-make-plug (name gotopos)
+  (with (background door-background
+      foreground door-foreground
+      tile ()
+      borderwidth 0
+      bar-min-width door-xsize
+      bar-max-width door-xsize
+      context (# (atom name) door-context)
+      door-icon ()
+      property (+ (list 'pos gotopos 'name name) property)
+      fsm door-fsm)
+    (with context
+      (bar-make 
+	(with (bar-min-width door-ysize
+	    bar-max-width door-ysize
+	    property ()
+	    fsm ())
+	  (bar-make 
+	    ()
+	    (plug-make
+	      (if door-icon
+		door-icon
+		(label-make name door-font))
+	    )
+	    ())))))
+)
+
+(defun door-make-space ()
+  (with (background door-background
+         foreground door-foreground
+         borderwidth 0
+         bar-min-width door-xsize
+         bar-max-width door-xsize
+         tile ()
+         fsm ())
+    (bar-make 
+      (with (bar-min-width door-ysize
+             bar-max-width door-ysize
+             tile door-mgr-tile)
+        (bar-make )))))
+
+(defun door-make-vborder (ele1 ele2)
+  (with (background door-foreground
+         borderwidth 0
+         bar-min-width door-borderwidth
+         bar-max-width door-borderwidth
+         tile (if (and (eq door-mgr-tile t)
+                       (not (or ele1 ele2)))
+                  t)
+         fsm ())
+    (bar-make )))
+
+(defun door-make-hborder-aux (len tl)
+  (with (bar-min-width len
+         bar-max-width len
+         tile tl)
+    (list (bar-make ))))
+
+(defun door-make-hborder (lst i1 i2 step num)
+  (with (background door-foreground
+         borderwidth 0
+         bar-min-width door-borderwidth
+         bar-max-width door-borderwidth
+         tile ()
+         fsm ())
+    (if (eq door-mgr-tile t)
+        (with (tlst (list-make num)
+               blst ()
+               n 1
+               i 0)
+          (while (< i num)
+            (## i tlst (not (or (# i1 lst) (# i2 lst))))
+            (setq i (+ i 1))
+            (setq i1 (+ i1 step))
+            (setq i2 (+ i2 step)))
+          (setq i 0)
+          (while (< i num)
+            (if (and (< (+ i 1) num) (= (# i tlst) (# (+ i 1) tlst)))
+                (setq n (+ n 1))
+              (not (# i tlst))
+                (progn
+                  (setq blst 
+                        (+ blst 
+                           (door-make-hborder-aux (+ (* n (+ door-xsize
+                                                             door-borderwidth)) 
+                                                     door-borderwidth)
+                                                  ())))
+                  (setq n 1))
+                (progn
+                  (setq blst 
+                        (+ blst 
+                           (door-make-hborder-aux (+ (* n (+ door-xsize
+                                                             door-borderwidth))
+                                                     (if (= (+ i 1) n)
+                                                         door-borderwidth 0)
+                                                     (if (= (+ i 1) num)
+                                                         door-borderwidth 0)
+                                                     (- door-borderwidth))
+                                                  t)))
+                  (setq n 1)))
+            (setq i (+ i 1)))
+          (apply bar-make blst))
+        (bar-make ))))
+
+(defun door-mgr-show ()
+  (process-events)
+  (if (and door-mgr
+           (# 0 door-mgr)
+           (wob-is-valid (# 0 door-mgr)))
+      (with (wob (# 0 door-mgr)
+             xpos (# 1 door-mgr)
+             ypos (# 2 door-mgr))
+        (setq xpos (if (and xpos (< xpos 0))
+                       (+ wob-x (- wob-borderwidth) window-client-x window-client-borderwidth 
+                          (- screen-width) (width wob))
+                     (+ wob-x wob-borderwidth window-client-x window-client-borderwidth)))
+        (setq ypos (if (and ypos (< ypos 0))
+                       (+ wob-y (- wob-borderwidth) window-client-y window-client-borderwidth
+                          (- screen-height) (height wob))
+                     (+ wob-y wob-borderwidth window-client-y window-client-borderwidth)))
+        (## 1 door-mgr xpos)
+        (## 2 door-mgr ypos)
+        (delete-window)))
+  (if (and door-mgr
+           (# 3 door-mgr)
+           (> (door-mgr-find-last (# 3 door-mgr)) 0))
+      (with (background door-background
+             foreground door-foreground
+             borderpixel door-foreground
+             bar-separator 0
+             plug-separator 0
+             borderwidth 0
+             direction vertical
+             reenter-on-opening ()
+             bar-list (door-mgr-construct-bar-list (# 3 door-mgr))
+             mgr (apply menu-make bar-list)
+             xpos (or (# 1 door-mgr) door-mgr-xpos)
+             ypos (or (# 2 door-mgr) door-mgr-ypos)
+             xpos (if (< xpos 0)
+                      (- (+ screen-width xpos) (with (wob (menu-wob mgr))
+                                                 (width wob)))
+                    xpos)
+             ypos (if (< ypos 0)
+                      (- (+ screen-height ypos) (with (wob (menu-wob mgr))
+                                                  (height wob)))
+                    ypos))
+        (## 0 door-mgr (place-menu
+                        "door-mgr"
+                        mgr
+                        xpos ypos)))))
+  
+(defun door-mgr-find-last (lst)
+  (with (i (- (length lst) 1))
+    (while (and (> i -1) (not (# i lst)))
+      (setq i (- i 1)))
+    (+ i 1)))
+
+(defun door-mgr-construct-bar-list (door-lst)
+  (with (num (door-mgr-find-last door-lst)
+         rows (if door-mgr-mdir-horiz
+                  (+ (/ (- num 1) door-mgr-mdir-len) 1)
+                (min num door-mgr-mdir-len))
+         cols (if door-mgr-mdir-horiz
+                  (min num door-mgr-mdir-len)
+                (+ (/ (- num 1) door-mgr-mdir-len) 1))
+         step (if door-mgr-mdir-horiz
+                  1 door-mgr-mdir-len)
+         bstep (if door-mgr-mdir-horiz
+                  door-mgr-mdir-len 1)
+         len (+ (* 2 rows) 1)
+         lst (list-make len)
+         i 1
+         n 0)
+    (## 0 lst (door-make-hborder door-lst (- bstep) 0 step cols))
+    (while (< i len)
+      (## i lst (apply bar-make (door-mgr-construct-plug-list door-lst n step cols)))
+      (## (+ i 1) lst (door-make-hborder door-lst n (+ n bstep) step cols))
+      (setq i (+ i 2))
+      (setq n (+ n bstep)))
+    lst))
+
+(defun door-mgr-construct-plug-list (door-lst n step num)
+  (with (len (+ (* 2 num) 1)
+         lst (list-make len)
+         i 1)
+    (## 0 lst (door-make-vborder () (# n door-lst)))
+    (while (< i len)
+      (## i lst (with (door (# n door-lst))
+                  (if door 
+                      (door-make-plug (# 0 door) (door-virt-coord n))
+                    (door-make-space))))
+      (## (+ i 1) lst (door-make-vborder (# n door-lst)
+                                         (if (< (+ i 2) len)
+                                             (# (+ n step) door-lst))))
+      (setq i (+ i 2))
+      (setq n (+ n step)))
+    lst))
+
+(defun door-virt-coord (nr)
+  (if door-mgr-dir-horiz
+      (list (* screen-width (% nr door-mgr-dir-len))
+            (* screen-height (/ nr door-mgr-dir-len)))
+      (list (* screen-width (/ nr door-mgr-dir-len))
+            (* screen-height (% nr door-mgr-dir-len)))))
+
+
+;; Door Manager Functionality
+
+(defun get-door (nr)
+  (# nr (# 3 door-mgr)))
+
+(defun set-door (nr ele)
+  (if (not (> (length (# 3 door-mgr)) nr))
+      (## 3 door-mgr (+ (# 3 door-mgr)
+                        (list-make (- (+ 1 nr) (length (# 3 door-mgr)))))))
+  (## nr (# 3 door-mgr) ele))
+
+(defun door-empty-space (virtcoord)
+  (with (left (+ (# 0 virtcoord) (# 0 virt-pos))
+         right (+ left screen-width)
+         top (+ (# 1 virtcoord) (# 1 virt-pos))
+         bottom (+ top screen-height))
+    (tag ret
+         (for wob (list-of-windows 'window 'mapped)
+              (if (not (virtual-nailed))
+                  (with (midx (+ window-x (/ window-width 2))
+                         midy (+ window-y (/ window-height 2)))
+                    (if (and (> midx left)
+                             (< midx right)
+                             (> midy top)
+                             (< midy bottom))
+                        (exit ret ())))))
+         t)))
+
+(defun door-find-index (ind free movable)
+  (if (and free movable)
+      (while (or (get-door ind) (not (door-empty-space (door-virt-coord ind))))
+        (setq ind (+ ind 1)))
+      movable
+      (while (get-door ind)
+        (setq ind (+ ind 1)))
+      free
+      (while (or (not (door-empty-space (door-virt-coord ind)))
+                 (and (get-door ind)
+                      (not (# 2 (get-door ind)))))
+        (setq ind (+ ind 1)))
+      (while (and (get-door ind)
+                  (or (not (# 2 (get-door ind)))
+                      (not (door-empty-space (door-virt-coord ind)))))
+        (setq ind (+ ind 1))))
+  ind)
+
+(defun door-find-name (name)
+  (with (ind 0
+         ele (get-door ind)
+         len (length (# 3 door-mgr)))
+    (while (and (< ind len)
+                (not (= name (# 0 ele))))
+      (setq ind (+ 1 ind))
+      (setq ele (get-door ind)))
+    (if (< ind len)
+        ind
+      ())))
+
+(defun add-door args
+  (with (name (# 0 args)
+         startind (if (= (type (# 1 args)) 'number) (# 1 args) 0)
+         free (member 'free args)
+         movable (member 'movable args)
+         ind (door-find-index startind free movable)
+         virtpos (door-virt-coord ind)
+         ele (list name free movable))
+    (while (get-door ind)
+      (with (startind (+ 1 ind)
+             oldele (get-door ind)
+             newind (door-find-index startind (# 1 oldele) ()))
+        (set-door ind ele)
+        (setq ele oldele)
+        (setq ind newind)))
+    (set-door ind ele)
+    (door-mgr-show)
+    virtpos))
+
+(defunq maybe-add-door args
+  (with (ind (door-find-name (eval (# 0 args))))
+    (if ind
+        (door-virt-coord ind)
+        (eval (+ (list 'add-door) args)))))
+
+(defun goto-door (name)
+  (with (ind (door-find-name name)
+         pos (if ind (door-virt-coord ind)))
+    (if ind
+        (virtual-move-to (# 0 pos) (# 1 pos)))))
+
+(defun remove-door (arg)
+  (with (ind ())
+    (if (= (type arg) 'string)
+        (: ind (door-find-name arg))
+        (= (type arg) 'number)
+        (: ind arg))
+    (if ind
+        (with (ele (get-door ind))
+          (set-door ind ())
+          (if (door-empty-space (door-virt-coord ind))
+              (with (newind (door-find-index (+ 1 ind) t ())
+                     newele ())
+                (while (setq newele (get-door newind))
+                  (set-door ind newele)
+                  (setq ind newind)
+                  (setq newind (door-find-index (+ 1 ind) t ())))
+                (set-door ind ())))))
+    (door-mgr-show)))
+

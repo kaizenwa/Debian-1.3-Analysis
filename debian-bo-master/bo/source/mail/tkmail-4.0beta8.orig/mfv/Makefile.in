@@ -1,0 +1,184 @@
+# Makefile for TkMail4.0's mfv package
+# 
+# You should not need to edit this. Edit ../Config.mk instead
+#
+
+SHELL = /bin/sh
+
+#----------------------------------------------------------------------
+# Basic compiler and installation (as found by configure script)
+
+# Default top-level directories in which to install architecture-
+# specific files (exec_prefix) and machine-independent files such
+# as scripts (prefix).  The values specified here may be overridden
+# at configure-time with the --exec-prefix and --prefix options
+# to the "configure" script.
+
+prefix =                @prefix@
+exec_prefix =           @exec_prefix@
+
+# A "-I" switch that can be used when compiling to make all of the
+# X11 include files accessible (the configure script will try to
+# set this value, and will cause it to be an empty string if the
+# include files are accessible via /usr/include).
+X11_INCLUDES =          @XINCLUDES@
+
+# Linker switch(es) to use to link with the X11 library archive (the
+# configure script will try to set this value automatically, but you
+# can override it).
+X11_LIB_SWITCHES =      @XLIBSW@
+
+# Libraries to use when linking:  must include at least Tk, Tcl, Xlib,
+# and the math library (in that order).  The "LIBS" part will be
+# replaced (or has already been replaced) with relevant libraries as
+# determined by the configure script.
+LIBS = $(TKX_LIB) $(TK_LIB) $(TCLX_LIB) $(TCL_LIB) \
+	$(X11_LIB_SWITCHES) @LIBS@ @MATH_LIBS@
+
+
+#----------------------------------------------------------------
+# The symbols below provide support for dynamic loading and shared
+# libraries.  The values of the symbols are normally set by the
+# configure script.  You shouldn't normally need to modify any of
+# these definitions by hand.  However, you can reverse the comments
+# on the pairs of lines to force "no dynamic loading or shared
+# libraries".
+#----------------------------------------------------------------
+
+# Flags to pass to cc when compiling the components of a shared
+# library:
+SHLIB_CFLAGS = @SHLIB_CFLAGS@
+#SHLIB_CFLAGS =
+
+# Base command to use for combining object files into a shared
+# library:
+SHLIB_LD = @SHLIB_LD@
+
+# Suffix to use for the name of the shared library.  An empty string
+# means we don't know how to use shared libraries on this platform.
+SHLIB_SUFFIX = @SHLIB_SUFFIX@
+#SHLIB_SUFFIX = .a
+
+# Library file(s) to include in tclsh and other base applications
+# in order to provide facilities needed by DLOBJ above.
+DL_LIBS = @DL_LIBS@
+#DL_LIBS =
+
+# Flags to pass to the compiler when linking object files into
+# an executable tclsh or tcltest binary.
+LD_FLAGS = @LD_FLAGS@
+#LD_FLAGS =
+
+#----------------------------------------------------------------
+# The information below is modified by the configure script when
+# Makefile is generated from Makefile.in.  You shouldn't normally
+# modify any of this stuff by hand.
+#----------------------------------------------------------------
+
+AC_FLAGS =              @DEFS@
+SRC_DIR =               @srcdir@
+TOP_DIR =               @srcdir@/..
+VPATH =                 @srcdir@
+CC =            	@CC@
+INSTALL = 		$(TOP_DIR)/install-sh -c
+INSTALL_PROGRAM =       @INSTALL_PROGRAM@
+INSTALL_DATA =          @INSTALL_DATA@
+
+#------------------------------------------------------------------------------
+# Include user-editable defines.
+#------------------------------------------------------------------------------
+
+include ${TOP_DIR}/Config.mk
+
+#----------------------------------------------------------------
+# The information below should be usable as is.  The configure
+# script won't modify it and you shouldn't need to modify it
+# either.
+#----------------------------------------------------------------
+
+MFV_VERSION = 0.8
+
+CC_SWITCHES =   $(CFLAGS) $(TCL_INC) $(TK_INC) $(TCLX_INC) \
+	$(X11_INCLUDES) $(AC_FLAGS)
+
+SRC = mfv.c tkAppInit.c tclXsignal.c tclXutil.c \
+	tclExtdInt.h tclXconf.h dotlock.c regtest.c
+SUPPORT = ChangeLog Makefile.in README 
+
+VERSIONSTR = -DVERSIONSTR=\"$(MFV_VERSION)\"
+DOTLOCK = -DDOTLOCK=\"$(BIN_DIR)/dotlock\"
+TMPDIRPATH = -DTMPDIRPATH=\"$(TMPDIR)\"
+
+PROGPATHS = $(SPOOL) $(DOTLOCK) $(TMPDIRPATH) $(VERSIONSTR)
+
+OBJS = mfv.o tkAppInit.o $(TCLX_OBJS)
+
+all: mfv_wish dotlock
+
+mfv_wish: $(OBJS)
+	$(CC) -o mfv_wish $(CC_SWITCHES) $(OBJS) $(LIBS) $(DL_LIBS)
+
+mfv.o: mfv.c
+	$(CC) -c $(CC_SWITCHES) $(PROGPATHS) mfv.c
+
+tkAppInit.o: tkAppInit.c
+	$(CC) -c $(CC_SWITCHES) tkAppInit.c
+
+tclXsignal.o: tclXsignal.c
+	$(CC) -c $(CC_SWITCHES) tclXsignal.c
+
+tclXutil.o: tclXutil.c
+	$(CC) -c $(CC_SWITCHES) tclXutil.c
+
+dload: mfv$(SHLIB_SUFFIX)
+
+# Not very clean as it alway rebuilds everything
+mfv$(SHLIB_SUFFIX): mfv.c $(TCLX_SRCS)
+	if [ "${HAVE_TCLX}" = "" ] ; then \
+	   $(CC) $(CC_SWITCHES) $(SHLIB_CFLAGS) -c tclXsignal.c -o tclXsignal.o; \
+	   $(CC) $(CC_SWITCHES) $(SHLIB_CFLAGS) -c tclXutil.c -o tclXutil.o; \
+	fi
+	$(CC) $(CC_SWITCHES) $(SHLIB_CFLAGS) $(PROGPATHS) -c mfv.c -o mfv.o
+	$(SHLIB_LD) mfv.o $(TCLX_OBJS) -o mfv$(SHLIB_SUFFIX)
+
+dotlock: dotlock.c
+	$(CC) -o dotlock $(CC_SWITCHES) $(SPOOL) dotlock.c
+
+regtest: regtest.o tkAppInit.o
+	$(CC) -o regtest $(CC_SWITCHES) regtest.o tkAppInit.o $(LIBS)
+
+clean:
+	rm -rf regtest dotlock mfv_wish mfv.so core *.o
+
+distclean: clean
+	rm -rf Makefile
+
+tar:
+	rm -f mfv*.tar.g*[zZ]*
+	mkdir mfv-$(VERSION)
+	cp -r $(SRC) $(SUPPORT) mfv-$(VERSION)
+	tar chvf mfv-$(VERSION).tar mfv-$(VERSION)
+	gzip mfv-$(VERSION).tar
+	rm -rf mfv-$(VERSION)
+	@echo "*** Did you remember to cvs commit first?"
+
+install:
+	@if [ -d $(BIN_INSTALL_DIR) ]; then \
+	  rm -rf $(BIN_INSTALL_DIR)/mfv_wish;  \
+	  rm -rf $(BIN_INSTALL_DIR)/dotlock;  \
+	else (set -x; mkdir $(BIN_INSTALL_DIR)); fi
+	$(INSTALL_PROGRAM) mfv_wish $(BIN_INSTALL_DIR)
+	$(INSTALL_PROGRAM) dotlock $(BIN_INSTALL_DIR)
+	@echo "Installation is not complete. If users cannot create files"; \
+	echo "in the mail spool directory, you will need to modify the"; \
+	echo "dotlock program to be setgid for the same group as the mail"; \
+	echo "spool directory. If the group cannot write to the mail spool"; \
+	echo "directory, dotlock will need to be setuid to the owner."; \
+	echo "Example:";\
+	echo "    chown root.mail $(BIN_INSTALL_DIR)/dotlock"; \
+	echo "    chmod g+s $(BIN_INSTALL_DIR)/dotlock"; \
+	echo " or chmod u+s $(BIN_INSTALL_DIR)/dotlock"; \
+	echo ""
+
+
+

@@ -1,0 +1,22 @@
+/*************************************************************************
+ *  TinyFugue - programmable mud client
+ *  Copyright (C) 1993, 1994, 1995, 1996 Ken Keys
+ *
+ *  TinyFugue (aka "tf") is protected under the terms of the GNU
+ *  General Public License.  See the file "COPYING" for details.
+ ************************************************************************/
+/* $Id: expand.h,v 35004.4 1996/02/19 01:02:15 hawkeye Exp $ */
+
+#ifndef EXPAND_H
+#define EXPAND_H
+
+/* note: these numbers must agree with enum_subs[] in variable.c. */
+#define SUB_LITERAL -1  /* send literally (no /command interpretation, even) */
+#define SUB_KEYWORD  0  /* SUB_NEWLINE if initial keyword, else no subs      */
+#define SUB_NEWLINE  1  /* %; subs and command execution                     */
+#define SUB_FULL     2  /* all subs and command execution                    */
+#define SUB_MACRO    3  /* all subs and command execution, from macro        */
+
+extern int   FDECL(process_macro,(CONST char *body, CONST char *args, int subs));
+
+#endif /* EXPAND_H */

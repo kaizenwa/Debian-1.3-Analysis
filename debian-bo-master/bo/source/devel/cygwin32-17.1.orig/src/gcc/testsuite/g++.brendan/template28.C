@@ -1,0 +1,11 @@
+class X {
+        const char *fptr;
+public:
+        X(const char *ptr) { fptr = ptr; }
+        operator const char*() { return fptr; }
+};
+
+main(){
+        X x1("1234");
+        X x2(x1+1);
+}

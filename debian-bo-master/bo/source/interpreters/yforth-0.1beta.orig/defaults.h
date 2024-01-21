@@ -1,0 +1,15 @@
+
+#define MIN_DSPACE_SIZE		1024
+#define MIN_DSTACK_SIZE		32
+#define MIN_RSTACK_SIZE		16
+#define MIN_FSTACK_SIZE		0
+#define MIN_TIB_SIZE		80
+#define MIN_PAD_SIZE		80
+
+#define DEF_DSPACE_SIZE		16384
+#define DEF_DSTACK_SIZE		512
+#define DEF_RSTACK_SIZE		64
+#define DEF_FSTACK_SIZE		6
+#define DEF_TIB_SIZE		128
+#define DEF_PAD_SIZE		128
+

@@ -1,0 +1,65 @@
+CXX      = @CXX@
+CXXFLAGS = @CXXFLAGS@ @X_CFLAGS@
+LDFLAGS  = @LDFLAGS@
+LIBS     = @X_LIBS@ @X_EXTRA_LIBS@
+
+srcdir      = @srcdir@
+prefix      = @prefix@
+exec_prefix = @exec_prefix@
+bindir      = @bindir@
+man1dir     = @mandir@/man1
+VPATH       = @srcdir@
+
+INSTALL         = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA    = @INSTALL_DATA@
+
+.cc.o:
+	$(CXX) -c $(CXXFLAGS) $<
+
+TARGET=	dxpc
+
+all: $(TARGET)
+
+pure: pure_$(TARGET)
+quantify: quant_$(TARGET)
+
+SRCS=	main.cc util.cc constants.cc Stats.cc \
+	Multiplexer.cc ClientMultiplexer.cc ServerMultiplexer.cc \
+	ClientChannel.cc ServerChannel.cc ReadBuffer.cc \
+	ProxyReadBuffer.cc ClientReadBuffer.cc ServerReadBuffer.cc \
+	EncodeBuffer.cc DecodeBuffer.cc WriteBuffer.cc \
+	IntCache.cc CharCache.cc PixelCache.cc HuffmanCoder.cc \
+	ClientCache.cc ServerCache.cc \
+	TextCompressor.cc LastPixels.cc SequenceNumQueue.cc \
+	BlockCache.cc BlockCacheSet.cc
+
+OBJS=	$(SRCS:.cc=.o)
+
+$(TARGET):	$(OBJS)
+	$(CXX) $(CCFLAGS) -o $@ $(OBJS) $(LDFLAGS) $(LIBS)
+
+pure_$(TARGET):	$(OBJS)
+	purify $(CXX) $(CCFLAGS) -o $@ $(OBJS) $(LDFLAGS) $(LIBS)
+
+quant_$(TARGET):	$(OBJS) $(OBJS)
+	quantify $(CXX) $(CCFLAGS) -o $@ $(OBJS) $(LDFLAGS) $(LIBS)
+
+depends:	
+	makedepend -f Makefile $(SRCS)
+
+install: install.bin install.man
+
+install.bin:	$(TARGET)
+	$(srcdir)/mkinstalldirs $(bindir)
+	$(INSTALL) $(TARGET) $(bindir)/$(TARGET)
+
+install.man:
+	$(srcdir)/mkinstalldirs $(man1dir)
+	$(INSTALL_DATA) $(TARGET).man $(man1dir)/$(TARGET).1
+
+clean:
+	-rm -f *~ *.o $(TARGET) pure_* quant_* *.bak core gmon.out
+
+distclean: clean
+	-rm -f config.status config.log config.cache Makefile tags

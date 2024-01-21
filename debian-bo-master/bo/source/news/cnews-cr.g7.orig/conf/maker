@@ -1,0 +1,50 @@
+#! /bin/sh
+# fake make for people who don't have an include feature in theirs
+
+CONFIG_MAKE=${CONFIG_MAKE-../include/config.make}
+
+mfs=
+options=
+for dummy
+do
+	case "$1" in
+	-f)	mfs="$mfs $2" ; shift	;;
+	--)	shift ; break		;;
+	-*)	options="$options $1"	;;
+	*)	break			;;
+	esac
+	shift
+done
+
+if test " $mfs" = " "
+then
+	if test -r Makefile
+	then
+		mfs=Makefile
+	elif test -r makefile
+	then
+		mfs=makefile
+	else
+		echo "$0: cannot locate makefile" >&2
+		exit 1
+	fi
+fi
+
+tmp=/tmp/maker$$
+status=1
+trap "rm -f $tmp ; trap 0 ; exit \$status" 0 1 2 15
+
+( cat $CONFIG_MAKE ; echo '===' ; cat $mfs ) |
+awk '	BEGIN { includeline = 0 ; inconfig = 1 }
+	$0 ~ /^===$/ && inconfig == 1 { inconfig = 0 ; next }
+	inconfig == 1 { config[++nconfig] = $0 ; next }
+	$0 == "# =()<@<INCLUDE>@>()=" { includeline = NR + 1 }
+	NR == includeline {
+		for (i = 1; i <= nconfig; i++)
+			print config[i]
+		next
+	}
+	{ print }' >$tmp
+${REALMAKE-make} -f $tmp $options $*
+status=$?
+# and the exit trap does the actual exiting

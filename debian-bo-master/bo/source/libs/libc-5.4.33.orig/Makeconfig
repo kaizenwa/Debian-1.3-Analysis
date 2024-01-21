@@ -1,0 +1,416 @@
+#
+# Makefile for the Linux C library
+#
+
+#.EXPORT_ALL_VARIABLES:
+
+# We only support ELF from this release on.
+ELF=true
+
+#
+# include a configuration file if one exists and ignore all the
+# setup stuff.
+#
+# This hack so subdirectories may include toplevel config.in
+
+include $(TOPDIR)/config.in
+
+ifeq ($(NYS),true)
+NYS_DIR_SUFFIX=-nys
+endif
+
+# That is for new ld.so. Please make sure they are the same as
+# the one used in ld.so package.
+LDSO_ADDR = 62f00000
+LDSO_ENTRY = "(0x$(LDSO_ADDR)+32)"
+
+ifeq ($(WHICH),)
+
+ifeq ($(STATIC),true)
+SHARED=false
+DEBUG=false
+PROFILE=false
+CHECKER=false
+STATIC_SHARED=false
+WHICH=STATIC
+endif
+
+ifeq ($(SHARED),true)
+STATIC=false
+DEBUG=false
+PROFILE=false
+CHECKER=false
+STATIC_SHARED=false
+
+ifeq ($(ELF),)
+JUMP_CFLAGS=-B$(JUMPAS)
+endif
+
+ifeq ($(WHICH),)
+WHICH=SHARED
+endif
+
+endif
+
+ifeq ($(STATIC_SHARED),true)
+STATIC=true
+SHARED=true
+DEBUG=false
+PROFILE=false
+CHECKER=false
+WHICH=STATIC_SHARED
+endif
+
+ifeq ($(DEBUG),true)
+STATIC=false
+SHARED=false
+PROFILE=false
+CHECKER=false
+STATIC_SHARED=false
+WHICH=DEBUG
+endif
+
+ifeq ($(PROFILE),true)
+STATIC=false
+SHARED=false
+DEBUG=false
+CHECKER=false
+STATIC_SHARED=false
+WHICH=PROFILE
+endif
+
+ifeq ($(CHECKER),true)
+STATIC=false
+SHARED=false
+PROFILE=false
+DEBUG=false
+STATIC_SHARED=false
+WHICH=CHECKER
+endif
+
+ifeq ($(WHICH),)
+
+ifeq ($(STATIC),)
+STATIC=true
+endif
+
+ifeq ($(SHARED),)
+SHARED=true
+endif
+
+ifeq ($(PROFILE),)
+PROFILE=true
+endif
+
+ifeq ($(DEBUG),)
+DEBUG=true
+endif
+
+ifeq ($(STATIC_SHARED),)
+STATIC_SHARED=true
+endif
+
+WHICH=ALL
+
+endif
+
+endif
+
+ifeq ($(NYS),true)
+# Where we get those dll files.
+SHLIB:=libc-nys
+YPDIR=$(NYSDIR)
+ifeq ($(JUMP_LIB),)
+JUMP_LIB=libc-nys
+endif
+endif
+
+ifeq ($(SHLIB),)
+# Where we get those dll files.
+SHLIB:=libc
+endif
+
+ifeq ($(JUMP_LIB),)
+JUMP_LIB:=libc
+endif
+
+
+ifeq ($(TARGET_ROOTDIR),/)
+TARGET_LIB_DIR=$(TARGET_ROOTDIR)usr/lib
+TARGET_SBIN_DIR=$(TARGET_ROOTDIR)sbin
+TARGET_SO_DIR=$(TARGET_ROOTDIR)lib
+TARGET_LIBM_SO_DIR=$(TARGET_ROOTDIR)lib
+CROSS_ROOTDIR=$(HOST_ROOTDIR)
+TARGET_LIBEXTRA_DIR=$(TARGET_ROOTDIR)usr/lib
+
+TARGET_ELF_SO_DIR=$(TARGET_ROOTDIR)lib
+
+LDCONFIG=ldconfig
+
+else
+TARGET_LIB_DIR=$(TARGET_ROOTDIR)/usr/lib
+TARGET_SBIN_DIR=$(TARGET_ROOTDIR)/sbin
+TARGET_SO_DIR=$(TARGET_ROOTDIR)/lib
+TARGET_LIBM_SO_DIR=$(TARGET_ROOTDIR)/lib
+CROSS_ROOTDIR=$(HOST_ROOTDIR)/$(TARGET_MACHINE)
+TARGET_LIBEXTRA_DIR=$(TARGET_ROOTDIR)/usr/lib
+
+TARGET_ELF_SO_DIR=$(TARGET_ROOTDIR)/lib
+
+LDCONFIG=true
+
+endif
+
+# ELF is the default.
+TARGET_ELF_LIB_DIR=$(TARGET_LIB_DIR)
+TARGET_ELF_LIBEXTRA_DIR=$(TARGET_LIBEXTRA_DIR)
+TARGET_ELF_SO_EXTRA_DIR=$(TARGET_LIBEXTRA_DIR)
+
+CROSS_INCDIR=$(CROSS_ROOTDIR)/include
+CROSS_BINDIR=$(CROSS_ROOTDIR)/bin
+DLLDIR=$(CROSS_ROOTDIR)/bin
+JUMPAS=$(CROSS_ROOTDIR)/bin/jump
+PICASDIR=$(CROSS_ROOTDIR)/pic/bin
+
+#
+# Don't change anything below unless you know what you are doing.
+#
+ifeq ($(TARGET_ARCH_x86),5)
+TARGET_ARCH=i386
+IX86FLAGS=-m486 -malign-loops=2 -malign-jumps=2 -malign-functions=2
+IX86LDFLAGS=-m486
+else
+ifeq ($(TARGET_ARCH_x86),4)
+TARGET_ARCH=i386
+IX86FLAGS=-m486
+IX86LDFLAGS=-m486
+else
+ifeq ($(TARGET_ARCH),i386)
+IX86FLAGS=-m386
+IX86LDFLAGS=
+endif
+endif
+endif
+
+MKDIR=mkdir -p
+
+ifeq ($(LD),ld)
+ifeq ($(ELF),true)
+ifeq ($(TARGET_ARCH),i386)
+LD=$(CROSS_BINDIR)/ld -m elf_i386
+endif
+ifeq ($(TARGET_ARCH),m68k)
+LD=$(CROSS_BINDIR)/ld -m m68kelf
+endif
+else
+LD=$(CROSS_BINDIR)/ld -m $(TARGET_ARCH)linux
+endif
+#LD=/usr/gnu/i486-linux/binutils/1.9/ld
+LDFLAGS=-r -x $(IX86LDFLAGS)
+endif
+
+ifneq ($(MV),true)
+MV	=mv
+endif
+
+AR	=$(CROSS_BINDIR)/ar
+ARFLAGS=ucv
+# For new binutils.
+ARFLAGS=ucrv
+AR_FLAGS=$(ARFLAGS)
+
+AS	=$(CROSS_BINDIR)/as
+NM	=$(CROSS_BINDIR)/nm
+STRIP	=$(CROSS_BINDIR)/strip
+REALRANLIB=$(CROSS_BINDIR)/ranlib
+
+RANLIB	=true
+
+NEWSTDIOFLAGS= -I$(TOPDIR)/libio -I$(TOPDIR)/libio/stdio
+
+GNU_MAKE=gmake
+
+ELF_SHARED_DIR=$(TOPDIR)/elfshared
+ELF_STATIC_DIR=$(TOPDIR)/elfstatic
+ELF_DEBUG_DIR=$(TOPDIR)/elfdebug
+ELF_PROFILE_DIR=$(TOPDIR)/elfprofile
+ELF_REENTRENT_DIR=$(TOPDIR)/elfreentrent
+
+SHARED_DIR=$(ELF_SHARED_DIR)
+STATIC_DIR=$(ELF_STATIC_DIR)
+DEBUG_DIR=$(ELF_DEBUG_DIR)
+PROFILE_DIR=$(ELF_PROFILE_DIR)
+
+REENTRENT_DIR=$(ELF_REENTRENT_DIR)
+
+# No need for ELF libraries
+CHECKER_DIR=$(TOPDIR)/checker
+
+# It is used for cleaning up.
+OBJS_DIRS=$(STATIC_DIR) $(SHARED_DIR) $(DEBUG_DIR) $(PROFILE_DIR) \
+	$(SHARED_LITE_DIR) $(ELF_STATIC_DIR) $(ELF_SHARED_DIR) \
+	$(ELF_DEBUG_DIR) $(ELF_PROFILE_DIR) \
+	$(REENTRENT_DIR) $(ELF_REENTRENT_DIR) $(CHECKER_DIR)
+
+# It is used for installation
+INSTALL_DIRS=$(STATIC_DIR) $(DEBUG_DIR) $(PROFILE_DIR)
+
+ifeq ($(MATH),true)
+
+STATIC_LIB=$(STATIC_DIR)/libm.a
+SHARED_LIB=$(SHARED_DIR)/libm.a
+LIBALIAS=$(TOPDIR)/libmalias.a
+
+# Overiwrite the default values.
+SHLIB=libm
+JUMP_LIB=libm
+
+else
+
+ifeq ($(STATIC_LIB),)
+STATIC_LIB=$(STATIC_DIR)/libc$(NYS_DIR_SUFFIX).a
+endif
+
+ifeq ($(SHARED_LIB),)
+SHARED_LIB=$(SHARED_DIR)/libc$(NYS_DIR_SUFFIX).a
+endif
+
+ifeq ($(LIBALIAS),)
+LIBALIAS=$(TOPDIR)/libalias.a
+endif
+
+endif
+
+ifneq ($(DEBUG_LIB),false)
+DEBUG_LIB=$(DEBUG_DIR)/libg$(NYS_DIR_SUFFIX).a
+endif
+
+ifneq ($(PROFILE_LIB),false)
+PROFILE_LIB=$(PROFILE_DIR)/libc_p$(NYS_DIR_SUFFIX).a
+endif
+
+ifneq ($(REENTRENT_LIB),false)
+REENTRENT_LIB=$(REENTRENT_DIR)/libc_r$(NYS_DIR_SUFFIX).a
+endif
+
+# The relative directory from the TOPDIR.
+SUBDIR=$(JUMP_LIB)
+#SUBDIR=$(subst $(shell cd $(TOPDIR); pwd)/,,$(shell pwd))
+
+ifneq ($(NYS),true)
+YP=true
+YPFLAGS=-DYP
+YPDIR=yp
+endif
+
+NLS=true
+NLSFLAGS=-DNLS -I$(TOPDIR)/nls
+NLSDIR=nls
+
+ifneq ($(SHADOW_COMPAT),true)
+SHADOWFLAGS=-DNO_SHADOW
+endif
+
+WFLAGS=-Wall -Wstrict-prototypes -Wmissing-prototypes
+
+REALCC  =$(HOST_BINDIR)/gcc -V $(GCCVERSION) -b $(TARGET_MACHINE) \
+		$(IX86FLAGS)
+
+ifeq ($(CHECKER),true)
+CC	=checkergcc -V $(GCCVERSION) -b $(TARGET_MACHINE) $(IX86FLAGS) -DCHECKER
+else
+CC	=$(REALCC)
+endif
+
+
+XCFLAGS = -D_GNU_SOURCE -DSTDC_HEADERS -DUSG -DDIRENT -DSYSV \
+	-DUSE_BSD_REGEX -D_LIBC \
+	-DINTERNAL_LINUX_C_LIB -D_REENTRANT # -D__USE_BSD_SIGNAL
+
+ifeq ($(ELF),)
+XCFLAGS+= -DHAVE_GNU_LD
+else
+PIC=true
+endif
+
+CHARFLAGS=-funsigned-char
+PTHREAD_CFLAGS=-D_POSIX_THREAD_SAFE_FUNCTIONS -D_POSIX_THREADS \
+	-D_MIT_POSIX_THREADS
+INTERNAL_INC_CFLAGS=-I$(TOPDIR)/internal
+
+# You can put your system header files in somewhere else. We
+# assume they are in ../include.
+SYSTEM_INC_DIR=$(TOPDIR)/../include
+SYSTEM_INC_CFLAGS:=-nostdinc -I$(SYSTEM_INC_DIR) -I$(GCC_ARCH_INC_DIR)
+
+BASE_CFLAGS= $(INC_CFLAGS) \
+		$(NEWSTDIOFLAGS) \
+		$(NLSFLAGS) \
+		$(JUMP_CFLAGS) \
+		$(YPFLAGS) \
+		$(SHADOWFLAGS) \
+		$(SHFLAGS) \
+		$(XCFLAGS) \
+		$(WFLAGS) \
+		$(CHARFLAGS) \
+		$(INTERNAL_INC_CFLAGS) \
+		$(SYSTEM_INC_CFLAGS)
+
+ifeq ($(OPT_CFLAGS),)
+OPT_CFLAGS= -O6 #-fomit-frame-pointer
+OPT_CFLAGS= -O1 -funroll-loops
+endif
+ifeq ($(PIC_OPT_CFLAGS),)
+PIC_OPT_CFLAGS= -fPIC -O1 -funroll-loops -fomit-frame-pointer
+PIC_OPT_CFLAGS= -fPIC -O6 -funroll-loops -fomit-frame-pointer -g1
+endif
+ifeq ($(DEBUG_OPT_CFLAGS),)
+DEBUG_OPT_CFLAGS=-O -g # -mreg-alloc=d
+endif
+ifeq ($(PROFILE_OPT_CFLAGS),)
+PROFILE_OPT_CFLAGS=-O -pg # -mreg-alloc=d
+endif
+ifeq ($(CHECKER_OPT_CFLAGS),)
+CHECKER_OPT_CFLAGS=-O # -mreg-alloc=d
+endif
+ifeq ($(CHECKER_ASFLAGS),)
+CHECKER_ASFLAGS = -real-fnstcw
+endif
+
+CFLAGS= $(OPT_CFLAGS) $(BASE_CFLAGS)
+ifeq ($(PIC),)
+PIC_CFLAGS= $(CFLAGS)
+else
+PIC_CFLAGS= $(PIC_OPT_CFLAGS) $(BASE_CFLAGS)
+endif
+DEBUG_CFLAGS= $(DEBUG_OPT_CFLAGS) $(BASE_CFLAGS)
+PROFILE_CFLAGS= $(PROFILE_OPT_CFLAGS) $(BASE_CFLAGS)
+CHECKER_CFLAGS= $(CHECKER_OPT_CFLAGS) $(BASE_CFLAGS)
+
+REENTRENT_OPT_CFLAGS=-D_REENTRENT
+REENTRENT_CFLAGS= $(REENTRENT_OPT_CFLAGS) $(BASE_CFLAGS)
+
+CPP	=$(CC) -E $(INC_CFLAGS) # $(XCFLAGS)
+RM	=/bin/rm
+
+TARGET__MACHINE	= $(subst -unknown-,-,$(TARGET_MACHINE))
+
+ifeq ($(TARGET__MACHINE),i386-linux)
+CANONICAL_TARGET_MACHINE=ix86-linux
+endif
+
+ifeq ($(TARGET__MACHINE),i486-linux)
+CANONICAL_TARGET_MACHINE=ix86-linux
+endif
+
+ifeq ($(TARGET__MACHINE),i586-linux)
+CANONICAL_TARGET_MACHINE=ix86-linux
+endif
+
+ifeq ($(TARGET__MACHINE),pentium-linux)
+CANONICAL_TARGET_MACHINE=ix86-linux
+endif
+
+ifeq ($(TARGET__MACHINE),m68k-linux)
+CANONICAL_TARGET_MACHINE=m68k-linux
+endif

@@ -1,0 +1,339 @@
+@node Guile Tk reference
+@chapter Guile Tk reference
+
+@strong{[NOTE: this entire chapter applies to the old Cygnus Guile
+release.  It is not yet clear how Tk will be implemented in Guile.]}
+
+
+@menu
+* Tk preliminaries::            
+* Creating widgets::            
+* Widgets as procedures::       
+* Geometry management procedures::  
+* Event handling procedures::   
+* Miscellaneous Tk procedures::  
+@end menu
+
+@node Tk preliminaries
+@section Tk preliminaries
+@cindex Tk
+
+Some aspects of the Tk implementation for Guile are not yet in final
+form, so I will give you the recipe for using Tk in the
+@emph{guile-r0.3} release.  Remember to check this section for changes
+in new releases of Guile.
+
+This chapter is written assuming that you are running the @emph{guile}
+program directly.  If you are writing a C program instead, and linking
+with @emph{libguile}, you can follow the instructions in @ref{Libguile
+-- high level interface reference} to initialize Tk correctly, and then
+follow this chapter when you write scheme code.
+
+@cindex Tk prerequisites
+The following lines should be at the top of your scheme source file:
+@smallexample
+(require 'Gwish)
+
+(use-library tcl)
+(use-interface tcl)
+(use-interface tclhack)
+@end smallexample
+
+Your program will then typically create widgets and bind callbacks to
+the widgets.  To then enter the Tk main loop, you need to call:
+@smallexample
+(tk-main-loop)
+@end smallexample
+
+@cindex tcl-lambda
+@cindex widget callbacks
+It is important to remember that Tk widget callbacks must always be
+specified via the special Guile primitive @code{tcl-lambda}, rather than
+the ordinary scheme @code{lambda}.  This is for two reasons: first,
+procedures created by @code{tcl-lambda} know that they are still
+referenced as callbacks, and thus don't get garbage collected away.
+Second, Guile's Tk implementation is still based on Tcl, and
+@code{tcl-lambda} knows how to convert Tcl calling syntax to scheme.
+
+@cindex Tk without Tcl
+This is expected to change as: (1) Sun works on making Tk independent of
+Tcl, and (2) the Free Software Foundation makes Guile independent of
+Tcl.
+
+
+@node Creating widgets
+@section Creating widgets
+@cindex creating widgets
+@cindex widget creation
+@cindex widget options
+@cindex Tk options
+
+The Tk package adds several primitive procedures to scheme; most of
+these correspond to Tk widget classes, and when invoked they create a
+new widget.  Most of these procedures take the same basic set of
+options, but then each widget class has its own specific options.
+
+@cindex Tk man pages
+Each widget type is described in detail in the very complete @emph{Tk
+man pages}, so I will only give a brief description of them here.
+
+The User Manual (@pxref{Creating a widget, Guile User Manual, ,
+guile-user, Guile User Manual}) got you used to going back and forth
+between the Tcl/Tk and Guile/Tk calling conventions.  The thing to
+remember here is that @code{pathName} arguments are always scheme quoted
+symbols, and the variables begin with a @key{.} (period).
+
+
+@deffn {Tk Widget Creation} button pathName [options @dots{}]
+@deffnx {Tk Widget Creation} canvas pathName [options @dots{}]
+@deffnx {Tk Widget Creation} checkbutton pathName [options @dots{}]
+@deffnx {Tk Widget Creation} entry pathName [options @dots{}]
+@deffnx {Tk Widget Creation} frame pathName [options @dots{}]
+@deffnx {Tk Widget Creation} label pathName [options @dots{}]
+@deffnx {Tk Widget Creation} listbox pathName [options @dots{}]
+@deffnx {Tk Widget Creation} menu pathName [options @dots{}]
+@deffnx {Tk Widget Creation} menubutton pathName [options @dots{}]
+@deffnx {Tk Widget Creation} message pathName [options @dots{}]
+@deffnx {Tk Widget Creation} listbox pathName [options @dots{}]
+@deffnx {Tk Widget Creation} radiobutton pathName [options @dots{}]
+@deffnx {Tk Widget Creation} scale pathName [options @dots{}]
+@deffnx {Tk Widget Creation} scrollbar pathName [options @dots{}]
+@deffnx {Tk Widget Creation} text pathName [options @dots{}]
+@deffnx {Tk Widget Creation} toplevel pathName [options @dots{}]
+@deffnx {Tk Widget Creation} update pathName [options @dots{}]
+These procedures create new widgets of the respective type.  The
+@var{options} are described in the very detailed man pages for each
+widget, but also in the special @code{options} man page provided by Tk.
+@end deffn
+
+@deffn {Tk Widget Creation} tk_popup menu x y [entries @dots{}]
+Posts a popup menu at location @emph{(x, y)} on the screen.  The
+@var{menu} widget should already have been created.  The @var{entry}
+parameter is the index in the menu to which the mouse will point by
+default.
+@end deffn
+
+Widgets are destroyed with the @code{destroy} procedure:
+@deffn {Tk Widget Creation} destroy [windows @dots{}]
+Deletes the given @var{windows} plus all their descendants.  If the root
+window "." is destroyed, then the entire application will be destroyed.
+@end deffn
+
+
+@node Widgets as procedures
+@section Widgets as procedures
+@cindex Tk widgets as procedures
+@cindex widgets as procedures
+
+@cindex widget configuration
+@cindex configuring widgets
+Once you have created a widget, it automatically becomes a new scheme
+procedure.  This procedure can be invoked with arguments, and such
+invocation will configure or modify the widget.
+
+@deffn {Tk Widget Configuration} WIDGET [options @dots{}]
+Configure WIDGET according to the @var{options}.  Once again:
+@var{options} are described in detail in the @var{options} man page.
+@end deffn
+
+
+@node Geometry management procedures
+@section Geometry management procedures
+@cindex geometry management
+@cindex packer
+
+The basic procedure used by Tk to arrange widgets on the screen is the
+packer.  To talk to it, use:
+
+@deffn {Tk Geometry Management} pack option arg [args @dots{}]
+This geometry manager packas the child windows in order around the edges
+of the parent.
+@end deffn
+
+Tk is shipped with two other geometry management mechanisms:
+@code{place}, and a way of arranging objects in canvases.
+
+@deffn {Tk Geometry Management} place window option value [@{option value@} @dots{}
+@deffnx {Tk Geometry Management} place configure window option value [@{option value@} @dots{}]
+@deffnx {Tk Geometry Management} forget window
+@deffnx {Tk Geometry Management} info window
+@deffnx {Tk Geometry Management} slaves window
+This geometry manager fixed placement of windows, where you specify the
+exact size and location of the master and slave.  This is seldom used,
+since @code{pack} is the more common Tk geometry manager.
+@end deffn
+
+Tk widgets also interact properly with the window manager (as long as
+you have a good window manager).  There is a procedure which allows you
+to explicitly talk to the window manager:
+
+@cindex window manager
+@deffn {Tk Geometry Management} wm option window [args @dots{}]
+Interacts with the window manager, allowing the Tk programmer to set
+such resources as the title, geometry, resize increments, @dots{} of
+that window.  There are many possible values for @var{option},
+documented in the Tk @code{wm} man page.
+@end deffn
+
+
+
+@node Event handling procedures
+@section Event handling procedures
+@cindex events
+@cindex event handlers
+
+Whenever an action happens on the display that might be interesting to
+the Guile/Tk application (mouse motion, mouse clicks, keyboard events),
+Tk generates an @emph{event}.  The application can install event
+handlers to be invoked when these events occur.
+
+Many of the event handlers are @emph{widget callbacks}, which are
+treated in @ref{Creating widgets}; here we discuss other procedures that
+relate to event handling and flow control in Tk.
+
+@deffn {Tk Event Handling} bind widget "<BUTTON-ACTION>" callback
+Binds the given button action to the procedure @var{callback}.
+@end deffn
+
+@deffn {Tk Event Handling} fileevent input-port 'readable [callback]
+@deffnx {Tk Event Handling} fileevent output-port 'writeable [callback]
+Creates an event handler for the open file associated with
+@var{input-port} or @var{output-port}.  The event handler invokes the
+given @var{callback} procedure when the file becomes available for
+reading (or writing, respectively).
+@end deffn
+
+@deffn {Tk Event Handling} focus
+@deffnx {Tk Event Handling} focus window
+@deffnx {Tk Event Handling} focus option [args @dots{}]
+Manages the input focus.  Without arguments it returns the path name of
+the focus window.  With a single @var{window} argument it sets the focus
+to that window.  See the @code{focus} man page for a description of the
+third form.
+@end deffn
+
+@deffn {Tk Event Handling} grab [:global] window
+@deffnx {Tk Event Handling} grab option [args @dots{}]
+Confine pointer and keyboard events to the subtree of the specified
+@var{window}.  The second form has several behaviours according to the
+value of @var{option}, which can be @code{current}, @code{release},
+@code{set}, @code{status}.
+@end deffn
+
+@c @deffn {Tk Event Handling} tk_focusNext window
+@c @deffnx {Tk Event Handling} tk_focusPrev window
+@c @deffnx {Tk Event Handling} tk_focusFollowMouse
+@c These are Tk utility procedures from the @emph{Tk script library} that
+@c don't seem to be implemented in Guile.
+@c @end deffn
+
+@cindex tk-main-loop
+@cindex Tk main loop
+@deffn {Tk Event Handling} tk-main-loop
+Enters the Tk loop, which waits for events and invokes the appropriate
+callbacks.  This is typically called after all widgets have been set
+up.  It never returns until the @var{.} window is destroyed.  This means
+that after invoking @code{(tk-main-loop)} in a Guile/Tk program, all
+future computation has to be done in widget callbacks.
+@end deffn
+
+@deffn {Tk Event Handling} tkwait variable name
+@deffnx {Tk Event Handling} tkwait visibility name
+@deffnx {Tk Event Handling} tkwait window name
+Wait for a variable to change, or a window to be destroyed.
+@end deffn
+
+@deffn {Tk Event Handling} update ['idletasks]
+Process pending events, flush all output, process @emph{when-idle}
+handlers, until there are no pending events.  If the @var{'idletasks}
+symbol is passed, only process @emph{when-idle} handlers.
+@end deffn
+
+
+@node Miscellaneous Tk procedures
+@section Miscellaneous Tk procedures
+
+Here are some procedures that come from the Tk module, and which do not
+belong in the above sections.  As usual, complete details are available
+in the man pages.
+
+@deffn {Tk Misc} after ms
+@deffnx {Tk Misc} after ms [commands @dots{}]
+@deffnx {Tk Misc} after cancel id
+@deffnx {Tk Misc} after cancel [commands @dots{}]
+@deffnx {Tk Misc} after idle [commands @dots{}]
+Exececute the given @var{commands} after @var{ms} microseconds.
+@end deffn
+
+@deffn {Tk Misc} bell [display]
+Rings the bell on the @var{display}, or the default display if no
+@var{display} argument is given.
+@end deffn
+
+@deffn {Tk Misc} bindtags window [tagList]
+Returns a string describing the bindings associated with the given
+window.
+@end deffn
+
+@deffn {Tk Misc} clipboard cmd [args @dots{}]
+Allows manipulation of the Tk clipboard.  The @var{cmd} argument selects
+what type of action is taken on the clipboard.  This can be
+@code{clear} or @code{append}.
+@end deffn
+
+@deffn {Tk Misc} exit [returnCode]
+Exits the process.  If @var{returnCode} is not given it defaults to 0.
+@end deffn
+
+@deffn {Tk Misc} image option [args @dots{}]
+The image command can create and manipulate images.  The @var{option}
+parameter can be @code{create}, @code{delete}, @code{height},
+@code{names}, @code{type}, @code{width}.  The builtin image types are
+@emph{bitmap} (for black and white images) and @emph{photo} for
+full-color pixmaps.
+@end deffn
+
+@deffn {Tk Misc} lower window [belowThis]
+Without arguments, @code{lower} will place the given @var{window} under
+all its siblings in the stacking order.  If @var{belowThis} is a window
+pathname, then @var{window} will be placed right underneath
+@var{belowThis}.
+@end deffn
+
+@deffn {Tk Misc} option add pattern value [priority]
+@deffnx {Tk Misc} option clear
+@deffnx {Tk Misc} option get window name class
+@deffnx {Tk Misc} option readfile fileName [priority]
+Add (or retrieve) window options to (or from) the option database.
+@end deffn
+
+@deffn {Tk Misc} raise window [aboveThis]
+Without arguments, @code{raise} will place the given @var{window} over
+all its siblings in the stacking order.  If @var{aboveThis} is a window
+pathname, then @var{window} will be placed right above @var{aboveThis}.
+@end deffn
+
+@deffn {Tk Misc} selection option [args @dots{}]
+Allows manipulation of the X selection.
+@end deffn
+
+@deffn {Tk Misc} send [options @dots{}] app cmd [args @dots{}]
+Arranges for a command @var{cmd} to be executed in the application
+@var{app}.
+@end deffn
+
+@deffn {Tk Misc} tk option [args @dots{}]
+Manipulates internal state variables in Tk.
+@end deffn
+
+@deffn {Tk Misc} winfo option [args @dots{}]
+Retrieve information about Tk's windows.  The @var{option} argument
+specifies what type of information; it can be @code{'atom},
+@code{'atomname}, @code{'cells}, @code{'children}, @code{'class},
+@code{'colormapfull}, @code{'containing}, @code{'depth}, @code{'exists},
+@code{'fpixels}, @code{'geometry}, @code{'height}, @code{'id},
+@code{'interps}, @code{'ismapped}, @code{'manager}, @code{'name},
+@code{'parent}, @code{'pathname}, @code{'pixels}, @code{'pointerx},
+@code{'pointerxy}, @code{'pointery} and many others listed in the
+@code{winfo} man page.
+@end deffn

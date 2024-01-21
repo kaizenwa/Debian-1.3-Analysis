@@ -1,0 +1,162 @@
+.\" Copyright 1991 The Regents of the University of California.
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. All advertising materials mentioning features or use of this software
+.\"    must display the following acknowledgement:
+.\"	This product includes software developed by the University of
+.\"	California, Berkeley and its contributors.
+.\" 4. Neither the name of the University nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"     @(#)popen.3	6.4 (Berkeley) 4/30/91
+.\"
+.\" Converted for Linux, Mon Nov 29 14:45:38 1993, faith@cs.unc.edu
+.\" Translated into German Sat May 18 13:45:00 1996 by Patrick Rother (krd@burn.rhein-ruhr.de)
+.\" Modified Mon Jun 10 01:05:39 1996 by Martin Schulze (joey@linux.de)
+.\"
+.TH POPEN 3  "17. Mai 1996" "BSD" "Bibliotheksfunktionen"
+.SH BEZEICHNUNG
+popen, pclose \- bearbeite E/A
+.SH ÜBERSICHT
+.B #include <stdio.h>
+.sp
+.BI "FILE *popen(const char *" command ", const char *" type );
+.sp
+.BI "int pclose(FILE *" stream );
+.SH BESCHREIBUNG
+Die Funktion
+.B popen()
+Funktion öffnet einen Prozeß dadurch, daß sie sich nach Erzeugen einer Pipe
+aufteteilt und eine Shell öffnet.  Da eine Pipe nach Definition
+unidirektional ist darf das Argument
+.I type
+nur Lesen oder Schreiben angeben, nicht beides; der resultierende Datenkanal
+ist demzufolge nur-lesend oder nur-schreibend.
+.PP
+Das Argument
+.I command
+ist ein Zeiger auf einen mit NULL beendeten String, der ein Shell-Kommandozeile
+enthält.  Dieses Kommando wird an
+.B \-c
+-Flag an 
+.I /bin/sh
+übergeben; Interpretation, falls nötig, wird von der Shell durchgeführt.
+Das Argument
+.I mode
+ist ein Zeiger auf einen mit NULL beendeten String, der entweder `r' für Lesen
+oder `w' für Schreiben sein muß.
+.PP
+Der Rückgabewert von
+.B popen()
+ist ein normaler Standard-E/A-Datenkanal in jeder Hinsicht, trotzdem muß er
+mit
+.B pclose() ,
+nicht mit
+.B fclose()
+geschlossen werden.
+Schreiben in solch einen Datenkanal bewirkt Schreiben in die Standardeingabe
+des Kommandos; die Standardausgabe der Kommandos ist die des Prozesses, der
+.BR popen() ,
+aufgerufen hat, wenn dies nicht vom Programm selbst geändert wird.  Umgekehrt
+lesen mit popen geöffnete Kanäle von der Standardausgabe des Programms während
+die die Standardeingabe dieselbe des aufrufenden Programms ist.
+.PP
+Beachten Sie, daß Ausgabe-
+.BR popen() \-Kanäle
+nach Voreinstellung voll gepuffert sind.
+.PP
+Die Funktion
+.B pclose()
+wartet bis der zugehörige Prozess beendet ist und gibt den Rückgabewert des
+Kommandos wie von 
+.B wait4()
+geliefert, zurück.
+.SH "RÜCKGABEWERT"
+Die Funktion
+.B popen()
+gibt
+.B NULL
+zurück wenn die Aufrufe
+.BR fork (2)
+oder
+.BR pipe (2)
+fehlschlagen, oder wenn kein Speicher belegt werden kann.
+.PP
+Die Funktion
+.B pclose()
+gibt \-1 zurück wenn
+.I stream
+nicht mit einem durch ``popen'' erzeugten Datenkanal verbunden werden
+kann, wenn
+.I stream
+bereits mit ``pclose'' geschlossen wurde, oder wenn
+.B wait4 ()
+einen Fehler zurückliefert.
+.SH FEHLER
+Die Funktion
+.B popen()
+setzt 
+.I errno
+nicht zuverlässig.
+(Gilt das unter Linux?)
+.SH BUGS
+Da die zum lesen geöffnete Standardeingabe eines Programms ihren Suchindex
+mit dem Prozeß teilt, der 
+.B popen()
+aufgerufen hat, kann es vorkommen, daß die Leseposition des Programms nicht
+wie erwartet ist, wenn der Originalprozeß gepuffertes Schreiben durchgeführt
+hat.  Genauso kann die Ausgabe eines zum Schreiben geöffneten Kommandos
+durcheinandergeraten mit dem Originalprozeß.
+Letzteres kann vermieden werden durch Aufruf von
+.BR fflush (3)
+vor
+.BR popen() .
+.PP
+Fehler, die Shell aufzurufen, kann nicht unterschieden werden von Fehler
+der Shell, das Programm aufzurufen, oder einem sofortigen Ende des Programms.
+Einziger Hinweis ist ein Rückgabewert von 127.  (Gilt das unter Linux?)
+.PP
+Die Funktion
+.B popen()
+ruft immer 
+.BR sh ,
+nicht
+.BR csh
+auf.
+.SH GESCHICHTE
+Funktionen()
+.B popen
+und
+.B pclose()
+erschienen in Version 7 AT&T UNIX.
+.SH "SIEHE AUCH"
+.BR fork (2),
+.BR sh (1),
+.BR pipe (2),
+.BR wait4 (2),
+.BR fflush "(3),
+.BR fclose (3),
+.BR fopen (3),
+.BR stdio (3),
+.BR system (3).

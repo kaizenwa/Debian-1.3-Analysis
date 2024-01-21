@@ -1,0 +1,145 @@
+#!/bin/sh
+
+#
+# install - install a program, script, link, or datafile
+# This comes from X11R5; it is not part of GNU.
+#
+# Modified 6/13/94 by Garrett D'Amore to handle -l and -d options
+# for directories and links, respectively.
+#
+# $XConsortium: install.sh,v 1.2 89/12/18 14:47:22 jim Exp $
+#
+# This script is compatible with the BSD install script, but was written
+# from scratch.
+#
+
+
+# set DOITPROG to echo to test this script
+
+# Don't use :- since 4.3BSD and earlier shells don't like it.
+doit="${DOITPROG-}"
+
+
+# put in absolute paths if you don't have them in your path; or use env. vars.
+
+mdprog="${MDPROG-mkdir}"
+lnprog="${LNPROG-ln}"
+mvprog="${MVPROG-mv}"
+cpprog="${CPPROG-cp}"
+chmodprog="${CHMODPROG-chmod}"
+chownprog="${CHOWNPROG-chown}"
+chgrpprog="${CHGRPPROG-chgrp}"
+stripprog="${STRIPPROG-strip}"
+rmprog="${RMPROG-rm}"
+
+instcmd="$mvprog"
+mdcmd=""
+lncmd=""
+chmodcmd=""
+chowncmd=""
+chgrpcmd=""
+stripcmd=""
+rmcmd="$rmprog -f"
+mvcmd="$mvprog"
+src=""
+dst=""
+
+while [ x"$1" != x ]; do
+    case $1 in
+	-l) instcmd=""
+		mdcmd=""
+		lncmd="$lnprog"
+		shift
+		continue;;
+
+	-d) instcmd=""
+		lncmd=""
+		mdcmd="$mdprog -p"
+		shift
+		continue;;
+
+	-c) instcmd="$cpprog"
+	    shift
+	    continue;;
+
+	-m) chmodcmd="$chmodprog $2"
+	    shift
+	    shift
+	    continue;;
+
+	-o) chowncmd="$chownprog $2"
+	    shift
+	    shift
+	    continue;;
+
+	-g) chgrpcmd="$chgrpprog $2"
+	    shift
+	    shift
+	    continue;;
+
+	-s) stripcmd="$stripprog"
+	    shift
+	    continue;;
+
+	*)  if [ x"$src" = x ]
+	    then
+		src=$1
+	    else
+		dst=$1
+	    fi
+	    shift
+	    continue;;
+    esac
+done
+
+if [ x"$src" = x ]
+then
+	echo "install:  no input file specified"
+	exit 1
+fi
+
+if [ x"$dst" = x ]
+then
+if [ x"$mdcmd" = x ]
+then
+	echo "install:  no destination specified"
+	exit 1
+fi
+fi
+
+
+# If destination is a directory, append the input filename; if your system
+# does not like double slashes in filenames, you may need to add some logic
+
+if [ -d "$dst" ]
+then
+	dst="$dst"/`basename $src`
+fi
+
+# Make a temp file name in the proper directory.
+
+dstdir=`dirname $dst`
+dsttmp=$dstdir/#inst.$$#
+
+# Move or copy the file name to the temp name
+
+if   [ x"$instcmd" != x ]; then $doit $instcmd $src $dsttmp; 
+elif [ x"$mdcmd" != x ];   then $doit $mdcmd $src; dsttmp=$src;
+elif [ x"$lncmd" != x ];   then $doit $lncmd $src $dsttmp;
+fi
+
+# and set any options; do chmod last to preserve setuid bits
+
+if [ x"$chowncmd" != x ]; then $doit $chowncmd $dsttmp; fi
+if [ x"$chgrpcmd" != x ]; then $doit $chgrpcmd $dsttmp; fi
+if [ x"$stripcmd" != x ]; then $doit $stripcmd $dsttmp; fi
+if [ x"$chmodcmd" != x ]; then $doit $chmodcmd $dsttmp; fi
+
+# Now rename the file to the real destination.
+
+if [ x"$mdcmd" = x ]; then
+$doit $rmcmd $dst
+$doit $mvcmd $dsttmp $dst
+fi
+
+exit 0

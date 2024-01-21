@@ -1,0 +1,88 @@
+#!/usr/bin/make -f
+#
+# Debian rules for building a Debian package
+# Version 1.5
+#
+# These rules have been specifically designed NOT to require root to
+# run them. At any time root privileges are required, the command to be
+# executed will be made obvious and root's password will be prompted for.
+# Of course, root may still run this and no password will be required.
+#
+# Robert Leslie <rob@mars.org>
+
+PKG =	sendmail
+VER =	8.8.5
+DEB =	1
+BLD =	debian/.build
+TMP =	debian/.tmp
+ARC =	$(shell dpkg --print-architecture)
+
+build :: $(BLD)
+
+binary :: $(BLD)
+	su -c 'exec ./debian/binary $(PKG) $(VER)-$(DEB) $(ARC) $(TMP)'
+	dpkg --build $(TMP) && dpkg-name -o -s .. $(TMP).deb
+
+$(BLD):
+	cd src && ./makesendmail sendmail  \
+		CC="gcc"  \
+		O="-O2 -g"  \
+		DBMDEF="-DNDBM -DNEWDB -DNIS"  \
+		ENVDEF="-DHASFLOCK=1"  \
+		INCDIRS="-I/usr/include -I/usr/include/db"  \
+		LIBDIRS=""
+	cd mailstats && make -f Makefile.dist mailstats  \
+		CC="gcc"  \
+		O="-O2 -g"  \
+		INCDIRS="-I../src"  \
+		LIBDIRS=""
+	cd makemap && make -f Makefile.dist makemap  \
+		CC="gcc"  \
+		O="-O2 -g"  \
+		INCDIRS="-I../src -I/usr/include -I/usr/include/db"  \
+		LIBDIRS=""
+		LIBS="-lgdbm -ldb"
+	cd praliases && make -f Makefile.dist praliases  \
+		CC="gcc"  \
+		O="-O2 -g"  \
+		INCDIRS="-I../src -I/usr/include -I/usr/include/db"  \
+		LIBDIRS=""
+		LIBS="-lgdbm -ldb"
+	cd smrsh && make -f Makefile.dist smrsh  \
+		CC="gcc"  \
+		O="-O2 -g"  \
+		ENVDEF="-DCMDDIR=\\\"/usr/lib/sm.bin\\\"  \
+			-DPATH=\\\"/usr/bin:/bin\\\""  \
+		INCDIRS="-I../src"  \
+		LIBDIRS=""
+	cd rmail && {  \
+	    test -f rmail || gcc -O2 -g rmail.c -o rmail  \
+	}
+	cd doc && {  \
+	    for doc in changes/changes intro/intro op/op usenix/usenix;  \
+	    do test -f $$doc.txt ||  \
+	      nroff -me $$doc.me | cat -s > $$doc.txt; done  \
+	}
+	touch $(BLD)
+
+clean ::
+	test ! -d $(TMP) || su -c 'rm -rf $(TMP)'
+	rm -f $(BLD)
+	rm -f doc/{changes/changes,intro/intro,op/op,usenix/usenix}.txt
+	cd rmail && rm -f rmail
+	cd smrsh && make -f Makefile.dist clean
+	cd praliases && make -f Makefile.dist clean
+	cd makemap && make -f Makefile.dist clean
+	cd mailstats && make -f Makefile.dist clean
+	rm -rf src/obj.*
+
+source ::
+	test ! -f $(BLD) || make -f debian/rules clean
+	cd .. && tar cf - $(PKG)-$(VER) |  \
+	    gzip -9f > $(PKG)_$(VER)-$(DEB).tar.gz
+
+diff ::
+	test ! -f $(BLD) || make -f debian/rules clean
+	test -d ../$(PKG)-$(VER).orig
+	cd .. && diff -cNr $(PKG)-$(VER).orig $(PKG)-$(VER) |  \
+	    gzip -9f > $(PKG)_$(VER)-$(DEB).diff.gz

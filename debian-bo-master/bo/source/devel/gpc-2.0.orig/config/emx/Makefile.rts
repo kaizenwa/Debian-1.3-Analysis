@@ -1,0 +1,210 @@
+#   Copyright (C) 1991, 1996 Free Software Foundation, Inc.
+#
+#   This file is part of GNU Pascal Library.
+#
+#   Makefile to generate the run time system
+#
+# The GNU Pascal Library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Library General Public License as
+# published by the Free Software Foundation; either version 2 of the
+# License, or (at your option) any later version.
+#
+# The GNU Pascal Library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Library General Public License for more details.
+#
+# You should have received a copy of the GNU Library General Public
+# License along with the GNU Pascal Library; see the file COPYING.LIB.  If
+# not, write to the Free Software Foundation, Inc., 675 Mass Ave,
+# Cambridge, MA 02139, USA.  */
+
+# If you have problems withh RANLIB, check that your standard BSD
+# ranlib (which calls "ar" internally) does not get GNU ar, since
+# GNU ar does not allow non-object files to be placed into the
+# archive!!!!
+
+VPATH= ../../gcc-2.7
+
+VERSION = 2.8
+
+GPCLIB = libgpc.a
+GPCSOLIB = libgpc.so.$(VERSION)
+
+LIBDIR = \emx\lib
+
+# We don't install, the upper level make does it for us.
+
+# This needs to be GNU C compiler. Otherwise you'll have trouble
+# with the run time system. (e.g. complex_type arguments)
+CC = gcc
+CFLAGS = -O2
+AR =  ar
+AR_FLAGS= rcs
+#RANLIB = ranlib
+
+#
+# These might be overriden by the upper level makefile.
+#
+objdir = ..
+
+# $(srcdir) is the RTS source directory
+srcdir = .
+gccbin = ../../gcc-2.7
+gccsrc = ../../gcc-2.7
+
+# Some extra checks for run time system compilation
+RTS_WARN=-Wall -Wno-implicit
+
+RTS_CFLAGS = -DGPC -DDEBUG $(RTSFLAGS) $(RTS_WARN) $(CFLAGS)
+
+#
+# DEBUG		to be able to see run time system debug messages
+#		(-Grts -d -- option to your Pascal program. On by default.)
+#
+#
+# You can define these in command line by setting e.g.:
+# MY_LIBFLAGS="-DNO_CASECMP" on the top level gpc make command.
+#
+# The following HAVE_* are defined in rts/rts.h unless you define NO_*
+# e.g. HAVE_FTRUNCATE is defined unless you define NO_FTRUNCATE
+#
+# NO_DEVNULL
+#
+# In addition, you might define the following (undefined otherwise):
+#
+# HAVE_STRDUP
+# HAVE_TIME
+# WARN_READ_ONLY
+# PATH_SEPARATOR	default '/'
+#
+# If the included system header files don't specify which kind of system you are,
+# the following are currently recognized:
+# 
+# BSD			BSD system
+# _BSD			-"-
+#
+# USG			SYSTEM V
+# SYSV			-"-
+#
+
+RTSFLAGS= -DDEBUG -DHAVE_TIME
+
+INCLUDES= -I$(gccbin) -I$(gccsrc) -I$(gccsrc)/config -I.
+
+ALL_CFLAGS= $(RTS_CFLAGS) $(CPPFLAGS) $(INCLUDES)
+
+PRINT=	print
+
+#
+# If you need malloc libary, get it from Emacs or somewere.
+#
+#MALLOC = malloc.o
+MALLOC =
+
+SRCS=	rts-vers.c rts-writ.c rts-read.c rts-file.c \
+	rts-rand.c rts-heap.c rts-setu.c rts-rt0.c  \
+	rts-erro.c rts-time.c rts-misc.c rts-set.c  \
+	rts-math.c rts-stri.c rts-rdsu.c rts-zmat.c \
+	rts-bind.c gcc_bcmp.c
+
+# Also as defines to split the math file
+MATHOBJS= p_ARCTAN.o p_SQRT.o p_LN.o p_EXP.o p_SIN.o p_COS.o p_POW.o p_EXPON.o
+ZMATHOBJS=z_ARCTAN.o z_SQRT.o z_LN.o z_EXP.o z_SIN.o z_COS.o z_POW.o z_EXPON.o \
+	  p_POLAR.o p_ARG.o
+
+OBJS=	rts-vers.o rts-writ.o rts-read.o rts-file.o \
+	rts-rand.o rts-heap.o rts-setu.o rts-rt0.o  \
+	rts-erro.o rts-time.o rts-misc.o rts-set.o  \
+	rts-stri.o rts-bind.o gcc_bcmp.o $(MALLOC)
+
+HS=	rts.h rts-fdr.h rts-hdr.h rts-machine.h
+
+all:	$(GPCLIB)
+
+.c.o:
+	$(CC) -c $(ALL_CFLAGS) $<
+
+$(GPCLIB): rts-vers.c $(OBJS) $(MATHOBJS) $(ZMATHOBJS)
+#	@del $(GPCLIB)
+	$(AR) $(AR_FLAGS) $(GPCLIB) $(OBJS) $(MATHOBJS) $(ZMATHOBJS)
+#	$(RANLIB) $(GPCLIB)
+
+$(GPCSOLIB): rts-vers.c $(OBJS) $(MATHOBJS) $(ZMATHOBJS)
+	-rm -f $(GPCSOLIB)
+	$(CC) -shared -Wl,-soname,$(GPCSOLIB) $(GPCLIB) $(OBJS) $(MATHOBJS) $(ZMATHOBJS)
+	ln -s $(GPCSOLIB) libgpc.so
+
+# Always remake to update build count.
+#rts-version.c: Makefile
+#	echo 'VARLIST="PROG1"'  > gnuvers.conf
+#	echo 'PROG1='$(VERSION) >> gnuvers.conf
+#	sh $(srcdir)/gnuvers.sh gnuvers.conf $(srcdir)/rts-version.in
+#	rm -f gnuvers.conf
+#	mv version.c rts-version.c
+rts-vers.c:
+	@copy ..\config\emx\rts-vers.c .\rts-vers.c > NUL
+
+rts-stri.o: rts-stri.c rts-rdsu.c
+rts-read.o: rts-read.c rts-rdsu.c
+
+$(MATHOBJS):  math-sta
+$(ZMATHOBJS): zmath-st
+
+math-sta: rts-math.c rts.h
+	$(CC) -c $(ALL_CFLAGS) -o p_ARCTAN.o -Dp_ARCTAN rts-math.c
+	$(CC) -c $(ALL_CFLAGS) -o p_SQRT.o -Dp_SQRT rts-math.c
+	$(CC) -c $(ALL_CFLAGS) -o p_LN.o -Dp_LN rts-math.c
+	$(CC) -c $(ALL_CFLAGS) -o p_EXP.o -Dp_EXP rts-math.c
+	$(CC) -c $(ALL_CFLAGS) -o p_SIN.o -Dp_SIN rts-math.c
+	$(CC) -c $(ALL_CFLAGS) -o p_COS.o -Dp_COS rts-math.c
+	$(CC) -c $(ALL_CFLAGS) -o p_POW.o -Dp_POW rts-math.c
+	$(CC) -c $(ALL_CFLAGS) -o p_EXPON.o -Dp_EXPON rts-math.c
+	touch math-sta
+
+zmath-st: rts-zmat.c rts.h
+	$(CC) -c $(ALL_CFLAGS) -o z_ARCTAN.o -Dz_ARCTAN rts-zmath.c
+	$(CC) -c $(ALL_CFLAGS) -o z_SQRT.o -Dz_SQRT rts-zmath.c
+	$(CC) -c $(ALL_CFLAGS) -o z_LN.o -Dz_LN rts-zmath.c
+	$(CC) -c $(ALL_CFLAGS) -o z_EXP.o -Dz_EXP rts-zmath.c
+	$(CC) -c $(ALL_CFLAGS) -o z_SIN.o -Dz_SIN rts-zmath.c
+	$(CC) -c $(ALL_CFLAGS) -o z_COS.o -Dz_COS rts-zmath.c
+	$(CC) -c $(ALL_CFLAGS) -o z_POW.o -Dz_POW rts-zmath.c
+	$(CC) -c $(ALL_CFLAGS) -o z_EXPON.o -Dz_EXPON rts-zmath.c
+	$(CC) -c $(ALL_CFLAGS) -o p_POLAR.o -Dp_POLAR rts-zmath.c
+	$(CC) -c $(ALL_CFLAGS) -o p_ARG.o -Dp_ARG rts-zmath.c
+	touch zmath-st
+
+# Not done here
+#install: $(libsubdir)/$(GPCLIB)
+#
+#$(libsubdir)/$(GPCLIB): $(GPCLIB)
+#	$(INSTALL_PROGRAM) $(GPCLIB) $(libsubdir)/$(GPCLIB)
+#	$(RANLIB) $(libsubdir)/$(GPCLIB)
+
+install:
+	copy libgpc.a $(LIBDIR)\gpc.a
+
+depend: $(SRCS) $(HS)
+	mkdep $(CFLAGS) $(SRCS) $(HS)
+
+clean:
+	@del $(GPCLIB) $(OBJS) $(MATHOBJS) $(ZMATHOBJS)
+	@del math-stamp zmath-stamp rts-version.o rts-version.c gnuvers.conf
+	@del core *~ *.BAK miten.meni* 
+
+lint:
+	lint $(CCFLAGS) $(SRCS)
+
+distclean: clean
+	@del Makefile rts-config.h rts-version.c version 
+
+print:
+	$(PRINT) $(HS) $(SRCS)
+
+# DO NOT DELETE THIS LINE -- mkdep uses it.
+# DO NOT PUT ANYTHING AFTER THIS LINE, IT WILL GO AWAY.
+
+# IF YOU PUT ANYTHING HERE IT WILL GO AWAY
+
+

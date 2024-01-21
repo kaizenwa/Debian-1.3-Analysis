@@ -1,0 +1,198 @@
+#
+# Copyright (c) 1990 Jan-Simon Pendry
+# Copyright (c) 1990 Imperial College of Science, Technology & Medicine
+# Copyright (c) 1990 The Regents of the University of California.
+# All rights reserved.
+#
+# This code is derived from software contributed to Berkeley by
+# Jan-Simon Pendry at Imperial College, London.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+# 3. All advertising materials mentioning features or use of this software
+#    must display the following acknowledgement:
+#      This product includes software developed by the University of
+#      California, Berkeley and its contributors.
+# 4. Neither the name of the University nor the names of its contributors
+#    may be used to endorse or promote products derived from this software
+#    without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+#
+#	%W% (Berkeley) %G%
+#
+# $Id: Makefile.amd,v 5.2.2.1 1992/02/09 15:11:10 jsp beta $
+#
+
+PROG = ${AMD}
+SRCS = ${AMDSRC}
+
+OBJS = \
+	afs_ops.o	\
+	am_ops.o	\
+	amd.o		\
+	amq_subr.o	\
+	amq_svc.o	\
+	cdfs_ops.o	\
+	clock.o		\
+	efs_ops.o	\
+	get_args.o	\
+	host_ops.o	\
+	ifs_ops.o	\
+	info_file.o	\
+	info_hes.o	\
+	info_ndbm.o	\
+	info_nis.o	\
+	info_nisplus.o	\
+	info_passwd.o	\
+	info_union.o	\
+	lofs_ops.o	\
+	map.o		\
+	mapc.o		\
+	misc_rpc.o	\
+	mntfs.o		\
+	mount_fs.o	\
+	mount_xdr.o	\
+	mtab.o		\
+	mtab_aix.o	\
+	mtab_bsd.o	\
+	mtab_file.o	\
+	mtab_isc3.o	\
+	mtab_mach3.o	\
+	mtab_osf1.o	\
+	mtab_svr4.o	\
+	mtab_ultrix.o	\
+	nfs_ops.o	\
+	nfs_prot_svc.o	\
+	nfs_prot_xdr.o	\
+	nfs_start.o	\
+	nfs_subr.o	\
+	nfsx_ops.o	\
+	opts.o		\
+	pcfs_ops.o	\
+	pfs_ops.o	\
+	re.o		\
+	restart.o	\
+	rpc_fwd.o	\
+	sched.o		\
+	sfs_ops.o	\
+	srvr_afs.o	\
+	srvr_nfs.o	\
+	ufs_ops.o	\
+	umount_fs.o	\
+	util.o		\
+	wire.o		\
+	xutil.o
+
+
+# List of file that mount_fs.c may depend on.  Take the worst-case approach
+# and assume they are are all affecting mount_fs.c.  <ezk@cs.columbia.edu>
+MOUNT_HELPER_SRCS=	../config/mount_aix.c		\
+			../config/mount_irix.c		\
+			../config/mount_isc3.c		\
+			../config/mount_linux.c		\
+			../config/mount_stellix.c	\
+			../config/mount_svr4.c
+
+${PROG}: ${OBJS} version.${PROG}
+	sh ../config/newvers.sh $@ ${ARCH} ${OS} ${OSVER}
+	${CC_COMPILE} vers.$@.c
+	@rm -f $@
+	${CC} -o $@ ${CFLAGS} ${OBJS} vers.$@.o ${XLIBDIR} ${DBM} ${RPCLIB} ${RESOLV} ${SYSLIB}
+
+${OBJS}: ../include/am.h ../config/${OS_HDR} ../config/os-defaults.h ../include/fstype.h ../config/Makefile.config
+
+nfs_start.o: ../rpcx/amq.h
+get_args.o: ../include/patchlevel.h
+
+# We can't use gcc here (at least on sparc) ....
+host_ops.o: ../amd/host_ops.c; ${SYSCC_COMPILE} ../amd/host_ops.c
+info_ndbm.o: ../amd/info_ndbm.c; ${SYSCC_COMPILE} ../amd/info_ndbm.c
+
+install:: ${PROG}
+	@echo Please install the ${PROG} manual page by hand
+
+install.man::
+	@if [ -f ../$(PROG)/$(PROG).$(MANEXT) ] ; then \
+		set -x ; \
+		$(INSTALL) -c -m 444 ../$(PROG)/$(PROG).$(MANEXT) \
+		$(MANDIR)/man$(MANEXT)/$(PROG).$(MANEXT) ; \
+	else \
+		echo No man page in ../$(PROG)/$(PROG).$(MANEXT) ; \
+		true ; \
+	fi
+
+clean::
+	rm -f core mtab
+
+afs_ops.o: ../amd/afs_ops.c; ${CC_COMPILE} ../amd/afs_ops.c
+am_ops.o: ../amd/am_ops.c; ${CC_COMPILE} ../amd/am_ops.c
+amd.o: ../amd/amd.c; ${CC_COMPILE} -DOS_REP=\"${OS}\" -DOSVER_REP=\"${OSVER}\" -DARCH_REP=\"${ARCH}\" ../amd/amd.c
+amq_subr.o: ../amd/amq_subr.c; ${CC_COMPILE} ../amd/amq_subr.c
+amq_svc.o: ../rpcx/amq_svc.c; ${CC_COMPILE} ../rpcx/amq_svc.c
+clock.o: ../amd/clock.c; ${CC_COMPILE} ../amd/clock.c
+efs_ops.o: ../amd/efs_ops.c; ${CC_COMPILE} ../amd/efs_ops.c
+get_args.o: ../amd/get_args.c; ${CC_COMPILE} ../amd/get_args.c
+#host_ops.o: ../amd/host_ops.c; ${CC_COMPILE} ../amd/host_ops.c
+cdfs_ops.o: ../amd/cdfs_ops.c; ${CC_COMPILE} ../amd/cdfs_ops.c
+ifs_ops.o: ../amd/ifs_ops.c; ${CC_COMPILE} ../amd/ifs_ops.c
+info_file.o: ../amd/info_file.c; ${CC_COMPILE} ../amd/info_file.c
+info_hes.o: ../amd/info_hes.c; ${CC_COMPILE} ../amd/info_hes.c
+#info_ndbm.o: ../amd/info_ndbm.c; ${CC_COMPILE} ../amd/info_ndbm.c
+info_nis.o: ../amd/info_nis.c; ${CC_COMPILE} ../amd/info_nis.c
+info_nisplus.o: ../amd/info_nisplus.c; ${CC_COMPILE} ../amd/info_nisplus.c
+info_passwd.o: ../amd/info_passwd.c; ${CC_COMPILE} ../amd/info_passwd.c
+info_union.o: ../amd/info_union.c; ${CC_COMPILE} ../amd/info_union.c
+lofs_ops.o: ../amd/lofs_ops.c; ${CC_COMPILE} ../amd/lofs_ops.c
+map.o: ../amd/map.c; ${CC_COMPILE} ../amd/map.c
+mapc.o: ../amd/mapc.c; ${CC_COMPILE} ../amd/mapc.c
+misc_rpc.o: ../amd/misc_rpc.c; ${CC_COMPILE} ../amd/misc_rpc.c
+mntfs.o: ../amd/mntfs.c; ${CC_COMPILE} ../amd/mntfs.c
+mount_fs.o: ../amd/mount_fs.c ${MOUNT_HELPER_SRCS}; ${CC_COMPILE} ../amd/mount_fs.c
+mount_xdr.o: ../rpcx/mount_xdr.c; ${CC_COMPILE} ../rpcx/mount_xdr.c
+mtab.o: ../amd/mtab.c; ${CC_COMPILE} ../amd/mtab.c
+mtab_aix.o: ../config/mtab_aix.c; ${CC_COMPILE} ../config/mtab_aix.c
+mtab_bsd.o: ../config/mtab_bsd.c; ${CC_COMPILE} ../config/mtab_bsd.c
+mtab_file.o: ../config/mtab_file.c; ${CC_COMPILE} ../config/mtab_file.c
+mtab_isc3.o: ../config/mtab_isc3.c; ${CC_COMPILE} ../config/mtab_isc3.c
+mtab_mach3.o: ../config/mtab_mach3.c; ${CC_COMPILE} ../config/mtab_mach3.c
+mtab_osf1.o: ../config/mtab_osf1.c; ${CC_COMPILE} ../config/mtab_osf1.c
+mtab_svr4.o: ../config/mtab_svr4.c; ${CC_COMPILE} ../config/mtab_svr4.c
+mtab_ultrix.o: ../config/mtab_ultrix.c; ${CC_COMPILE} ../config/mtab_ultrix.c
+nfs_ops.o: ../amd/nfs_ops.c; ${CC_COMPILE} ../amd/nfs_ops.c
+nfs_prot_svc.o: ../rpcx/nfs_prot_svc.c; ${CC_COMPILE} ../rpcx/nfs_prot_svc.c
+nfs_prot_xdr.o: ../rpcx/nfs_prot_xdr.c; ${CC_COMPILE} ../rpcx/nfs_prot_xdr.c
+nfs_start.o: ../amd/nfs_start.c; ${CC_COMPILE} ../amd/nfs_start.c
+nfs_subr.o: ../amd/nfs_subr.c; ${CC_COMPILE} ../amd/nfs_subr.c
+nfsx_ops.o: ../amd/nfsx_ops.c; ${CC_COMPILE} ../amd/nfsx_ops.c
+opts.o: ../amd/opts.c; ${CC_COMPILE} ../amd/opts.c
+pcfs_ops.o: ../amd/pcfs_ops.c; ${CC_COMPILE} ../amd/pcfs_ops.c
+pfs_ops.o: ../amd/pfs_ops.c; ${CC_COMPILE} ../amd/pfs_ops.c
+re.o: ../amd/re.c; ${CC_COMPILE} ../amd/re.c
+restart.o: ../amd/restart.c; ${CC_COMPILE} ../amd/restart.c
+rpc_fwd.o: ../amd/rpc_fwd.c; ${CC_COMPILE} ../amd/rpc_fwd.c
+sched.o: ../amd/sched.c; ${CC_COMPILE} ../amd/sched.c
+sfs_ops.o: ../amd/sfs_ops.c; ${CC_COMPILE} ../amd/sfs_ops.c
+srvr_afs.o: ../amd/srvr_afs.c; ${CC_COMPILE} ../amd/srvr_afs.c
+srvr_nfs.o: ../amd/srvr_nfs.c; ${CC_COMPILE} ../amd/srvr_nfs.c
+ufs_ops.o: ../amd/ufs_ops.c; ${CC_COMPILE} ../amd/ufs_ops.c
+umount_fs.o: ../amd/umount_fs.c; ${CC_COMPILE} ../amd/umount_fs.c
+util.o: ../amd/util.c; ${CC_COMPILE} ../amd/util.c
+version.o: ../amd/version.c; ${CC_COMPILE} ../amd/version.c
+wire.o: ../amd/wire.c; ${CC_COMPILE}  ${FIXINC_OPT} ../amd/wire.c
+xutil.o: ../amd/xutil.c; ${CC_COMPILE} ../amd/xutil.c

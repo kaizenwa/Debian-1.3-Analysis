@@ -1,0 +1,114 @@
+#!/bin/sh
+# 
+# This script must echo the name of the generated PK file (and nothing
+# else) to standard output. Yes, this is different from the original dvips.
+# 
+# Parameters:
+#   name [destdir]
+#
+#   `name' is the base name of the font, such as `cmr10'.
+#   `destdir', if supplied, is either the absolute directory name to use
+#     (if it starts with a /) or relative to the default DESTDIR (if not).
+
+# TEMPDIR needs to be unique for each process because of the possibility
+# of processes simultaneously running this script.
+TEMPDIR=${TMPDIR-/tmp}/mttfm.$$
+
+# Clean up on normal or abnormal exit.
+trap 'cd /; test -f $TEMPDIR/mtout.$$ && cat $TEMPDIR/mtout.$$; rm -rf $TEMPDIR; trap '' 0; exit 0' 0 1 2 15
+
+(
+# These search paths will be changed to include `pwd`. This is necessary
+# since wo will cd to $TEMPDIR.
+: ${KPSE_DOT=`pwd`}; export KPSE_DOT
+
+# Go to the unique working directory.
+test -d $TEMPDIR || mkdir $TEMPDIR 
+cd $TEMPDIR || exit 1
+
+progname=`basename $0`
+
+if test $# -lt 1; then
+  echo "Usage: $progname name [destdir]."
+  exit 1
+fi
+
+NAME=`basename $1 .tfm`
+MAG=1
+DEST=$2
+
+: ${TEXMF=`kpsetool -v '$TEXMF'`}
+: ${MAKETEXDIR=$TEXMF/maketex}
+export TEXMF MAKETEXDIR
+
+# Possible local customizations?
+test -r $MAKETEXDIR/maketex.site && . $MAKETEXDIR/maketex.site
+
+MODE=${MT_DEF_MODE-ljfour}
+BDPI=${MT_DEF_BDPI-600}
+DPI=$BDPI
+
+cmd="mf \mode:=$MODE; mag:=$MAG; scrollmode; input $NAME"
+
+set x `MakeTeXnames $NAME $DPI $MODE $DEST`
+PKDEST=$2
+TFMDEST=$3
+PKDESTDIR=`echo $PKDEST | sed 's/^[^\/]*$/./; s/\/[^\/]*$//'`
+TFMDESTDIR=`echo $TFMDEST | sed 's/^[^\/]*$/./; s/\/[^\/]*$//'`
+PKNAME=`basename $PKDEST`
+TFMNAME=$NAME.tfm
+GFNAME=$NAME.$DPI'gf'
+
+# Allow fonts to be read and written (especially in case we make
+# directories) by everyone.  
+umask 0
+
+if test -r $TFMDESTDIR/$TFMNAME; then
+  echo "$progname: $TFMDESTDIR/$TFMNAME already exists."
+  echo $TFMDESTDIR/$TFMNAME >  $TEMPDIR/mtout.$$
+  append_db $TFMDESTDIR $TFMNAME
+  exit
+fi
+
+# Try to create the destdir first. Do not create fonts, if this fails.
+MakeTeXmkdir "$TFMDESTDIR"
+test -d "$TFMDESTDIR" ||
+  { echo "$progname: could not mkdir $TFMDESTDIR."; exit 1; }
+
+echo "$progname: Running $cmd"
+$cmd </dev/null
+test -f $TFMNAME ||
+  { echo "$progname: '$cmd' failed to make $TFMNAME."; exit 1; }
+
+# Install the TFM file carefully, since others may be working simultaneously.
+mv $TFMNAME $TFMDESTDIR/tfmtmp.$$ \
+  || { echo "$progname: Could not mv $TFMNAME $TFMDESTDIR/tfmtmp.$$."; exit 1; }
+
+cd $TFMDESTDIR || exit 1
+mv tfmtmp.$$ $TFMNAME
+chmod 644 $TFMNAME
+
+# If this line (or an equivalent) is not present, dvipsk/xdvik/dviljk
+# will think MakeTeXTFM failed.
+echo $TFMDESTDIR/$TFMNAME >  $TEMPDIR/mtout.$$
+append_db $TFMDESTDIR $TFMNAME
+
+MakeTeXmkdir "$PKDESTDIR"
+test -d "$PKDESTDIR" || exit 1
+if test ! -f $PKDESTDIR/$PKNAME; then
+  cd $TEMPDIR
+  test -r $GFNAME ||
+    { echo "$progname: Metafont failed to make $GFNAME."; exit 1; }
+  gftopk ./$GFNAME $PKNAME || exit 1
+  mv $PKNAME $PKDESTDIR/pktmp.$$
+  cd $PKDESTDIR
+  if test -f $PKNAME; then
+    rm -f pktmp.$$
+  else
+    cd $PKDESTDIR
+    mv pktmp.$$ $PKNAME
+    chmod 644 $PKNAME
+    append_db $PKDESTDIR $PKNAME
+  fi
+fi
+) 1>&2 </dev/null

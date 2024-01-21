@@ -1,0 +1,115 @@
+/* Copyright (C) 1994 Free Software Foundation, Inc.
+This file is part of the GNU C Library.
+
+The GNU C Library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Library General Public License as
+published by the Free Software Foundation; either version 2 of the
+License, or (at your option) any later version.
+
+The GNU C Library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Library General Public License for more details.
+
+You should have received a copy of the GNU Library General Public
+License along with the GNU C Library; see the file COPYING.LIB.  If
+not, write to the Free Software Foundation, Inc., 675 Mass Ave,
+Cambridge, MA 02139, USA.  */
+
+/* Linux takes system call arguments in registers:
+	0: %eax	This is the system call number.
+   	1: %ebx This is the first argument.
+	2: %ecx
+	3: %edx
+	4: %esi
+	5: %edi
+ */
+
+#define PUSH_0	/* No arguments to push.  */
+#define PUSH_1	pushl %ebx;
+#define PUSH_2	PUSH_1
+#define PUSH_3	PUSH_1
+#define PUSH_4	pushl %esi; PUSH_3
+#define PUSH_5	pushl %edi; PUSH_4
+
+#if defined(__PIC__) || defined (__pic__)
+#define	MOVE_0	movl 8(%esp),%eax;
+#define	MOVE_1	movl 12(%esp),%eax; movl 16(%esp),%ebx;
+#define	MOVE_2	MOVE_1 movl 20(%esp),%ecx;
+#define	MOVE_3	MOVE_2 movl 24(%esp),%edx;
+#define	MOVE_4	movl 16(%esp),%eax; movl 20(%esp),%ebx; \
+			movl 24(%esp),%ecx; movl 28(%esp),%edx; \
+			movl 32(%esp),%esi;
+#define	MOVE_5	movl 20(%esp),%eax; movl 24(%esp),%ebx; \
+			movl 28(%esp),%ecx; movl 32(%esp),%edx; \
+			movl 36(%esp),%esi; movl 40(%esp),%edi;
+
+#else
+
+#define	MOVE_0	movl 4(%esp),%eax;
+#define	MOVE_1	movl 8(%esp),%eax; movl 12(%esp),%ebx;
+#define	MOVE_2	MOVE_1 movl 16(%esp),%ecx;
+#define	MOVE_3	MOVE_2 movl 20(%esp),%edx;
+#define	MOVE_4	movl 12(%esp),%eax; movl 16(%esp),%ebx; \
+			movl 20(%esp),%ecx; movl 24(%esp),%edx; \
+			movl 28(%esp),%esi;
+#define	MOVE_5	movl 16(%esp),%eax; movl 20(%esp),%ebx; \
+			movl 24(%esp),%ecx; movl 28(%esp),%edx; \
+			movl 32(%esp),%esi; movl 36(%esp),%edi;
+
+#endif
+
+#define POP_0	/* No arguments to pop.  */
+#define POP_1	popl %ebx;
+#define POP_2	POP_1
+#define POP_3	POP_1
+#define POP_4	POP_3 popl %esi;
+#define POP_5	POP_4 popl %edi;
+
+	.text
+
+#ifdef __ELF__
+#define _syscall syscall
+#endif
+
+#if defined(__i486__) || defined(i486)
+	.align	4
+#else
+	.align	2
+#endif
+	.globl _syscall
+_syscall:
+	PUSH_5
+#if defined(__PIC__) || defined (__pic__)
+	call	L4
+L4:
+	popl	%ebx
+	addl	$_GLOBAL_OFFSET_TABLE_+[.-L4],%ebx
+	pushl	%ebx
+	MOVE_5
+	int	$0x80
+	popl	%ebx
+	movl	%eax,%edx
+	test	%edx,%edx
+	jge	Lexit
+	negl	%edx
+	movl	_errno@GOT(%ebx),%eax
+	movl	%edx,(%eax)
+	movl	$-1,%eax
+#else
+	MOVE_5
+	int	$0x80
+	test	%eax,%eax
+	jge	Lexit
+	negl	%eax
+	movl	%eax,_errno
+	movl	$-1,%eax
+#endif
+
+Lexit:
+	POP_5
+	ret
+
+#ifdef __ELF__
+.type syscall,@function
+#endif

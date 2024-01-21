@@ -1,0 +1,212 @@
+/* include/tweak.h.  Generated automatically by configure.  */
+#ifndef _FSP_TWEAK_H_
+#define _FSP_TWEAK_H_
+
+/* define this if your system allows file names > 14 characters */
+#define HAVE_LONG_FILE_NAMES 1
+
+/* Define if you have dirent.h.  */
+#undef DIRENT
+
+/* Define if you don't have vprintf but do have _doprnt.  */
+#undef HAVE_DOPRNT
+
+/* Define if you have unistd.h.  */
+#define HAVE_UNISTD_H 1
+
+/* Define this if you have tzfile.h */
+#define HAVE_TZFILE_H 1
+
+/* Define if you have the vprintf function.  */
+#define HAVE_VPRINTF 1
+
+/* Define this if your compiler understands ANSI prototyping */
+#define HAVE_ANSI_PROTO 1
+
+/* Define if you have the ANSI C header files. (ansi strings, ctype, etc.) */
+#define STDC_HEADERS 1
+
+/* Define this if you are running on an AIX system. */
+#undef _ALL_SOURCE
+
+/* Define this if you have posix compliance
+#undef _POSIX_SOURCE
+
+/* Define if you don't have dirent.h, but have sys/dir.h.  */
+#define SYSDIR 1
+
+/* Define if you don't have dirent.h, but have sys/ndir.h.  */
+#undef SYSNDIR
+
+/* Define if the closedir function returns void instead of int.  */
+#define VOID_CLOSEDIR 1
+
+/* Define to `int' if <sys/types.h> doesn't define.  */
+#undef uid_t
+#undef gid_t
+#define pid_t int
+#define mode_t int
+#undef size_t
+#define nlink_t int
+
+/* Define HAVE_D_INO if you have d_ino in dirent (or direct) struct */
+/* see /usr/include/dir.h or ndir.h or dirent.h */
+#define HAVE_D_INO 1
+
+/* Define HAVE_D_FILENO if you have d_fileno in dirent (or direct) struct */
+/* see /usr/include/dir.h or ndir.h or dirent.h */
+#undef HAVE_D_FILENO
+
+/* Define to empty if the keyword does not work.  */
+#undef const
+
+/* Define the following if your site has a funky bsearch */
+#define bsearch ansi_bsearch
+
+/* define the following if your site doesn't define 'strdup()' */
+#undef NEED_STRDUP
+
+/* define the following if your site doesn't define 'random()' */
+#undef NEED_RANDOM
+
+/* define the following if your site doesn't define 'bcopy()' */
+#undef NEED_BCOPY
+
+/* Define the following if your site has lockf() */
+#undef HAVE_LOCKF
+
+/* Define the following if you site has shared memory */
+#undef HAVE_SHMEM
+
+/* Define the following if your system has flock() */
+#define HAVE_FLOCK 1
+
+/* define this if WEXITSTATUS is defined on your system */
+#undef HAVE_WEXITSTATUS
+
+/* define this if S_ISREG is defined on your system */
+#undef HAVE_S_ISREG
+
+/* define this if S_ISDIR is defined on your system */
+#undef HAVE_S_ISDIR
+
+/* define this if you have 'union wait' in <sys/wait.h> */
+#ifndef __hpux
+#define HAVE_UNION_WAIT 1
+#endif
+
+/* define this if you have SECSPERDAY */
+#define HAVE_SECSPERDAY 1
+
+/* define this if you have DAYSPERNYEAR */
+#define HAVE_DAYSPERNYEAR 1
+
+/* define this if your have strings.h */
+#define HAVE_STRINGS_H 1
+
+/* define this if your have string.h */
+#define HAVE_STRING_H 1
+
+/* define this if you have memory.h */
+#define HAVE_MEMORY_H 1
+
+/* define this if your string.h has bogus type declarations for a few things */
+#undef STRING_H_BOGUS
+
+/* These two will be automatically set by the configure script if needed */
+#undef USE_SECSPERDAY
+#undef USE_DAYSPERNYEAR
+
+/* defined if these data types have the indicated sizes in bytes */
+#define SIZE_SRT_2 1
+#define SIZE_LNG_4 1
+#undef SIZE_INT_2
+#define SIZE_INT_4 1
+
+#ifndef HAVE_WEXITSTATUS
+#define WEXITSTATUS(x) ((x).w_T.w_Retcode)
+#endif
+
+#ifndef HAVE_S_ISREG
+#define S_ISREG(mode) ((mode) & S_IFREG)
+#endif
+
+#ifndef HAVE_S_ISREG
+#define S_ISDIR(mode) ((mode) & S_IFDIR)
+#endif
+
+#if defined(DIRENT)
+#define HAVE_STRUCT_DIRENT
+#else
+#undef HAVE_STRUCT_DIRENT
+#endif
+
+#ifndef HAVE_SECSPERDAY
+#define SECSPERDAY USE_SECSPERDAY
+#endif
+
+#ifndef HAVE_DAYSPERNYEAR
+#define DAYSPERNYEAR USE_DAYSPERNYEAR
+#endif
+
+#if defined(HAVE_D_INO) && !defined(HAVE_D_FILENO)
+#define d_fileno d_ino
+#else
+#if !defined(HAVE_D_INO) && defined(HAVE_D_FILENO)
+#define d_ino d_fileno
+#endif
+#endif
+
+/****************************************************************************
+*  Macros to read and write multi-byte fields from the message header.
+****************************************************************************/
+
+#if defined(SIZE_SRT_2)
+#define WORD_TYPE_2 unsigned short
+#else
+#if defined(SIZE_INT_2)
+#define WORD_TYPE_2 unsigned
+#endif
+#endif
+
+#if defined(SIZE_LNG_4)
+#define WORD_TYPE_4 unsigned long
+#else
+#if defined(SIZE_INT_4)
+#define WORD_TYPE_4 unsigned
+#endif
+#endif
+
+#ifdef WORD_TYPE_4
+/* there is an integer type of size 4 */
+#define BB_READ4(V) ntohl(*(WORD_TYPE_4 *)(V))
+#define BB_WRITE4(V,A) *(WORD_TYPE_4 *)(V) = htonl(A)
+#else
+/* there is no integer type of size 4 */
+#define BB_READ4(V) ((((V)[0] << 24) & 0xff000000) + \
+		     (((V)[1] << 16) & 0x00ff0000) + \
+		     (((V)[2] <<  8) & 0x0000ff00) + \
+		     (((V)[3]      ) & 0x000000ff))
+
+#define BB_WRITE4(V,A) ((V)[0] = ((A) >> 24) & 0xff, \
+			(V)[1] = ((A) >> 16) & 0xff, \
+			(V)[2] = ((A) >>  8) & 0xff, \
+			(V)[3] = ((A)      ) & 0xff)
+#endif
+
+#ifdef WORD_TYPE_2
+/* there is an integer type of size 2 */
+#define BB_READ2(V) ntohs(*(WORD_TYPE_2 *)(V))
+#define BB_WRITE2(V,A) *(WORD_TYPE_2 *)(V) = htons(A)
+#else
+/* there is no integer type of size 2 */
+#define BB_READ2(V) ((((V)[0] <<  8) & 0xff00) + \
+		     (((V)[1]      ) & 0x00ff))
+
+#define BB_WRITE2(V,A) ((V)[0] = ((A) >>  8) & 0xff, \
+			(V)[1] = ((A)      ) & 0xff)
+#endif
+
+#include "proto.h"
+
+#endif /* _FSP_TWEAK_H_ */

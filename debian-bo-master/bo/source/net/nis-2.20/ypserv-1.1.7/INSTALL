@@ -1,0 +1,108 @@
+
+HOW TO BUILD AND INSTALL:
+
+  1. Generate a Makefile:
+     For a standart installation, run "BUILD"
+     Or you could run configure 
+     configure accepts a lot of options. Try configure --help.
+     Normally, you only need the following:     
+
+     --with-gdbm-dir=BASE-DIR : 
+       If your system do not have the gdbm library in /lib, /usr/lib
+       or /usr/local/lib, and the header files in a usually place,
+       you could tell the linker where to find the library and header files.
+       On our Sun's, the libgdbm.a is installed under
+       /usr/local/gnu/gdbm/[lib|include], so the option is:
+       --with-gdbm-dir=/usr/local/gnu/gdbm
+                                
+     --enable-tcp-wrapper[=BASE-DIR] :
+       By default, ypserv will look in the /var/yp/securenets file, if
+       a host is allow to connect to the server. The tcp wrapper lib
+       is much more flexible. With this option, you could enable it.
+       The securenets file will not be used in this case. As optional
+       argument you could give the path to the header file and library.
+
+     --enable-ypmake : 
+       ypmake is a perl script, which creates the maps faster for smaller
+       sites.
+
+     For more information, look at the README.secure file.
+
+  2. Edit the "Makefile" to suit your needs.
+     If you set "tryresolve: yes" in ypserv.conf, ypserv will log 
+     messages with the FQDN and not with the IP Nr. This only works, 
+     if you have a gethostbyaddr function, which calls directly the 
+     nameserver and do not use NIS. In this case, you will have a loop
+     and nothing works. Under linux, ypserv uses the functins form
+     dns_hosts.c. Under SunOS or Solaris you could use the resolv+ 
+     library. On other systems, I don't know.
+
+  3. Type "make". 
+
+  4. Type "make install" as root.
+
+  5. Go in the etc subdirectory and edit the "ypserv.conf" and 
+     "securenets" file for your system and copy them to the correct 
+     places. If you use the tcp wrapper, you don't need "securenets".
+
+  6. If you use the tcp wrapper library, you must modify your
+     /etc/hosts.allow and /etc/hosts.deny files. Else you should
+     create the /var/yp/securenets file. If not, everybod on the 
+     world could connect to your server, if he knows the NIS domainname.
+
+  7. Possible modify /var/yp/Makefile to suit your setup.
+	
+  8. If you will use "ypmake", copy /var/yp/ypmake.conf.sample
+     to /var/yp/<yp-domainname>/ypmake.conf and modify it for
+     your system.
+
+  9. If you only have one ypserv server in your domain, do:
+     cd /var/yp; make or call ypmake
+     This will create the maps.
+
+  10 If you have more then one ypserv server in your domain (you should
+     have one for every subnet), run "/usr/lib/yp/ypinit -m" on the 
+     master host. ypinit will ask some Questions and create all
+     neccessary maps. You must comment out the NOPUSH = "True" line
+     in /var/yp/Makefile, or the master will never send updates to the
+     slave server.
+     On the slave server hosts, you only have to run 
+     "/usr/lib/yp/ypinit -s masterhost", this will get all the maps from
+     the master ypserv. 
+     WARNING: If you use a libc with NYS support or ypinit has trouble
+              to find the maps, install ypwhich from the ypwhich-nys
+              directory. This ypwhich will not work with GNU libc !
+
+ 11. If you have slave NYS server, you should start rpc.ypxfrd on the
+     master host. You don't need rpc.ypxfrd on any slave server. You 
+     could start rpc.ypxfrd from a /etc/rc* script or by inetd. For
+     the last, you have to add:
+     * to /etc/rpc:
+       fypxfrd         600100069 freebsd-ypxfrd
+     * to /etc/inetd.conf:
+       fypxfrd/1 dgram  rpc/udp wait   root /usr/sbin/rpc.ypxfrd rpc.ypxfrd
+       fypxfrd/1 stream rpc/tcp nowait root /usr/sbin/rpc.ypxfrd rpc.ypxfrd
+     Since this ypxfrd implementation uses the FreeBSD ypxfrd protocoll,
+     you could not contact a Sun ypxfrd and you could not use the ypxfrd
+     entrys from a Sun.
+     ypxfrd needs a lot of time by starting from inetd, you should start it
+     by a /etc/rc* script.
+
+ 12. On bootup, start ypserv from a /etc/rc* script.
+
+
+IMPORTANT NOTES:
+================
+
+Please note that the /var/yp/Makefile needs GNU Awk (or a compatible
+version like mawk, which is much faster) to work.
+
+If you will use the -dns flag, you need gethostbyname and gethostbyaddr
+functions, which querys directly the nameserver, and do not call the
+server `ypserv', which calls the functions, and you have a loop.
+Under Linux, ypserv uses the functions in dns_hosts.c by default, you
+have nothing to do. Under SunOS/Solaris, you could install and use the
+resolv+ library, which worked great for me.
+
+
+Thorsten Kukuk <kukuk@uni-paderborn.de>

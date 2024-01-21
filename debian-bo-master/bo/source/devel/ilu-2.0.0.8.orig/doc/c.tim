@@ -1,0 +1,1246 @@
+@c $Id: c.tim,v 1.36 1996/05/07 00:58:13 janssen Exp $
+@setfilename ilu-fort.info
+@settitle Using ILU with ANSI C
+@ifclear largerdoc
+@titlepage
+@title Using ILU with ANSI C
+@author Bill Janssen @code{<janssen@@parc.xerox.com>}
+@sp
+(Typeset @today{})
+@sp
+Copyright @copyright{} 1993, 1994 Xerox Corporation@*
+All Rights Reserved.
+@end titlepage
+@ifinfo
+@node Top, Using ILU with ANSI C, (dir), (dir)
+@top Using ILU with ANSI C
+@menu
+* Using ILU with ANSI C:: chapter contents
+@end menu
+@end ifinfo
+@syncodeindex vr cp
+@syncodeindex pg cp
+@syncodeindex tp cp
+@syncodeindex fn cp
+@node ILU with ANSI C, , , Top
+@chapter ILU with ANSI C
+@end ifclear
+
+@menu
+* Introduction::
+* The ISL Mapping to ANSI C::
+* Libraries and Linking::
+* ILU C API::
+@end menu
+
+@node Introduction, The ISL Mapping to ANSI C, , Using ILU with ANSI C
+@section Introduction
+@cindex ILU and ANSI C
+
+This document is for the @language{ANSI C} programmer who wishes to use 
+@system{ILU}. The following sections will show how @language{ILU} is
+mapped into @language{ANSI C} constructs and how both @language{ANSI C}
+clients and servers are generated and built.
+
+@cindex ILU and the CORBA ANSI C mapping
+Using @system{ILU} with @language{ANSI C} is intended to be compatible
+with the OMG @system{CORBA} specification.  That is, all of the naming
+and stub generation comply with the Common Object Request Broker
+Architecture, revision 2.0.
+@footnote{The Common Object Request Broker: Architecture and Specification,
+revision 2.0, Draft July 1995}
+
+Note that @system{ILU} does not support non-ANSI variants of
+the @language{C} language.  In particular, it relies on having
+prototypes, all @language{ANSI C} library functions, and the
+capabilities of the @language{ANSI C} pre-processor.
+
+When functions are described in this section,
+they are sometimes accompanied by @dfn{locking comments},
+which describe the locking invariants maintained by @system{ILU} on a threaded system.
+See the file @file{@metavar{ILUHOME}/include/iluxport.h}
+for more information on this locking scheme, and the types of locking comments used.
+
+A number of macros are used in function descriptions, to indicated optional arguments, and ownership of potentially
+malloc'ed objects.  The macro @C{OPTIONAL(@metavar{type})} means that the value
+is either of the type indicated by @metavar{type}, or the value @C{NULL}.  This macro
+may only be used with pointer types.  The macro @C{RETAIN(@metavar{type})}
+indicates, when used on a parameter, that the caller retains ownership of the value,
+and when used in the result position, that the called function retains ownership of the
+value.  The macro @C{PASS(@metavar{type})} indicates, when used on a parameter,
+that the caller is passing ownership of the storage to the called function, and when
+used in the result position, that the called function is passing ownership of the called
+value to the caller.  The macro @C{GLOBAL(@metavar{type})} means that neither
+the caller nor the calling function owns the storage.
+@page
+@node The ISL Mapping to ANSI C, Libraries and Linking, Introduction, Using ILU with ANSI C
+@section The ISL Mapping to ANSI C
+
+@menu
+* Names::
+* Mapping Type Constructs Into ANSI C::
+* Objects and Methods::
+* Exceptions::
+* Parameter Passing Considerations::
+* True Module Construction::
+* Using ILU Modules::
+* Stub Generation::
+* Tailoring Identifier Names::
+@end menu
+
+@node Names, Mapping Type Constructs Into ANSI C, , The ISL Mapping to ANSI C
+@subsection Names
+@cindex Mapping ISL names to ANSI C identifiers
+
+In general, @system{ILU} constructs @language{ANSI C} names from 
+@language{ISL} names by replacing hyphens with underscores.  Type names and class
+names are prepended with their interface name. For example, for
+the @language{ISL} type @isl{T-1} in interface @isl{I},
+the generated name of the @language{ANSI C} type would be @C{I_T_1}.
+
+Enumeration value names are formed by prepending the interface
+name and ``_'' to the @language{ISL} enumeration value name.
+Enumeration names and values are then cast into @language{ANSI C}
+@C{enum} statements.
+
+Constant names are prepended with their interface name.  They are
+implemented with the @C{const} declaration statements.
+
+@cindex CORBA naming for ANSI C
+Method name prefixes are specified by @system{CORBA} to be 
+@C{@metavar{module-name}_@metavar{interface-name}}.
+@language{ANSI C} function names for @language{ISL} methods are composed of the generated class name prepended to
+the method name. For example, if the interface name is @interface{X} and the
+class type name is @type{Y} and the @language{ISL} method name is @method{Z} then the
+@language{ANSI C} callable method name will be @C{X_Y_Z}.
+@system{ILU} @language{ANSI C} servers for this method must implement a function called @C{server_X_Y_Z}.
+
+For field names within records, hyphens are replaced with underscores.
+
+@node Mapping Type Constructs Into ANSI C, Objects and Methods, Names, The ISL Mapping to ANSI C
+@subsection Mapping Type Constructs Into ANSI C
+@cindex Mapping ISL Type Constructs Into ANSI C
+
+@subsubsection Basic Types
+
+The following basic @language{ISL} types have the corresponding mappings in @language{ANSI C}, as
+specified by the @system{CORBA} 2.0 standard mapping for @language{C}:
+
+@itemize @bullet
+@item
+@isl{BOOLEAN} => @C{CORBA_boolean}
+@item
+@isl{BYTE} => @C{CORBA_octet}
+@item
+@isl{CHARACTER} => @C{ilu_character}
+@item
+@isl{SHORT CHARACTER} => @C{CORBA_char}
+@item
+@isl{CARDINAL} => @C{CORBA_unsigned_long}
+@item
+@isl{SHORT CARDINAL} => @C{CORBA_unsigned_short}
+@item
+@isl{LONG CARDINAL} => @C{ilu_longcardinal}
+@item
+@isl{INTEGER} => @C{CORBA_long}
+@item
+@isl{SHORT INTEGER} => @C{CORBA_short}
+@item
+@isl{LONG INTEGER} => @C{ilu_longinteger}
+@item
+@isl{REAL} => @C{CORBA_double}
+@item
+@isl{SHORT REAL} => @C{CORBA_float}
+@item
+@isl{LONG REAL} => @C{ilu_longreal}
+@end itemize
+
+@subsubsection Records
+@cindex ANSI C mapping for RECORD
+Records map directly into corresponding @language{ANSI C} structures.
+
+@subsubsection Unions
+@cindex ANSI C mapping for UNION
+Because of the somewhat baroque @system{CORBA} specification,
+unions may take one of several forms.
+
+Generally, @system{ILU} unions in @language{ANSI C} consist of a struct with two members:  the type discriminator 
+(a member named ``_d''),
+and a union (a member named ``_u'') of the possible values.  In a simple @language{ISL} union that does not
+name the elements, the union member names are derived from the
+@language{ISL} data types which compose the union. For example, if the
+@language{ISL} type in interface @interface{I} is @isl{TYPE u1 = UNION INTEGER, SHORT REAL END;}
+the generated @language{ANSI C} struct would be
+@codeexample
+typedef struct _I_u1_union I_u1;
+enum I_u1_allowableTypes @{
+  I_u1_integer,
+  I_u1_shortreal
+@};
+struct _I_u1_union @{
+  enum I_u1_allowableTypes _d;
+  union @{
+    ilu_integer integer;
+    ilu_shortreal shortreal;
+  @} _u;
+@};
+@end codeexample
+
+Note the discriminator @C{_d} may take on the values of @C{I_u1_integer}
+or @C{u_u1_shortreal} indicating how to interpret the data in the union.
+Also note how the enumerated names are formed:  with the interface name
+and the type name prepended to the enumeration element name.
+
+In more complex union forms, the user may specify the type of the discriminator as
+well as the member names and which member corresponds to which discriminator
+value. Consider the following @language{ISL} example:
+
+@codeexample
+INTERFACE I;
+TYPE e1 = ENUMERATION red, blue, green, yellow, orange END;
+TYPE u1 = e1 UNION 
+ a : INTEGER = red, green END,
+ b : SHORT REAL = blue END,
+ c : REAL
+END;
+@end codeexample
+
+The generated union is:
+
+@codeexample
+typedef struct _I_u1_union I_u1;
+typedef enum @{
+  I_red = 0, 
+  I_blue = 1, 
+  I_green = 2, 
+  I_yellow = 3, 
+  I_orange = 4
+@} I_e1;
+struct _I_u1_union @{
+  I_e1 _d;
+  union @{
+    ilu_integer a;
+    ilu_shortreal b;
+    ilu_real c;
+  @} _u;
+@};
+@end codeexample
+
+This example shows that the discriminator type is to be @C{I_e1} and that
+the member names are to be @C{a}, @C{b}, and @C{c}. When the discriminator
+has the value @C{I_red} or @C{I_green} the member @C{a} has a valid value
+and the type is interpreted to be integer. When the discriminator has
+the value @C{I_green} the member @C{b} has a valid value and the type is
+interpreted to be shortreal. If the discriminator has any other value,
+the member @C{c} is expected to have a valid value and the type is interpreted
+to be ilu_real (double).
+
+Discriminator types may be @isl{INTEGER}, @isl{ENUMERATION}, or @isl{SHORT INTEGER}.
+The default for an unspecified discriminator is @isl{SHORT INTEGER}.
+
+@subsubsection Floating Point Values
+@cindex ANSI C floating point mappings
+The @language{ISL} @isl{SHORT REAL} primitive type maps to the
+@language{ANSI C} @C{float} data type while @isl{REAL}
+maps to @C{double}. The @language{ISL} @isl{LONG REAL} 
+primitive type currently doesn't map to anything real.
+ 
+@subsubsection Sequences
+@cindex ANSI C sequence mappings
+Sequence type names, as most type definitions, are formed with the interface name
+and the type name. 
+Sequence instances are represented to the @language{ANSI C} programmer
+as a pointer to the sequence descriptor structure.
+For each sequence type declared in the interface description, a pseudo-object sequence type
+is defined in @language{ANSI C}.  These sequence types will hold any number of
+values of type sequence's @dfn{primary type}.
+For the sequence@*
+@isl{INTERFACE I;}@*
+@isl{TYPE @metavar{T2} = SEQUENCE OF @metavar{T1};}@*
+the following functions are defined:
+
+@deftypefn {[ANSI C]} @metavar{I}_@metavar{T2} * @metavar{I}_@metavar{T2}_Create ( OPTIONAL(unsigned long) @metavar{length}, OPTIONAL(@metavar{T1} *) @metavar{initial-values} )
+
+This function creates and returns a pointer to a newly allocated
+instance of @metavar{T2}.  If @metavar{length} is specified,
+but @metavar{initial-values} is not specified, enough space for @metavar{length} values of type @metavar{T1}
+is allocated in the sequence.  If @metavar{initial-values} is specified, @metavar{length} is assumed
+to be the number of values pointed to by @metavar{initial-values}, and must be specified.
+Note that if type @metavar{T1} is a @isl{character} or @isl{short character} type, a pointer
+to a NIL-terminated sequence will be returned; otherwise, a normal @system{CORBA} sequence structure
+will be returned by reference.
+
+@end deftypefn
+
+@deftypefn {[ANSI C]} CORBA_unsigned_long @metavar{I}_@metavar{T2}_Length ( @metavar{I}_@metavar{T2} * @metavar{s} )
+
+Returns the length of @metavar{s}.
+ 
+@end deftypefn
+
+@deftypefn {[ANSI C]} void @metavar{I}_@metavar{T2}_Append ( @metavar{I}_@metavar{T2} * @metavar{s}, @metavar{T1} @metavar{value} )
+
+Appends @metavar{value} to the end of @metavar{s}.  This function will reallocate space and copy, if necessary.
+
+@end deftypefn
+
+@deftypefn {[ANSI C]} void @metavar{I}_@metavar{T2}_Push ( @metavar{I}_@metavar{T2} * @metavar{s}, @metavar{T1} @metavar{value} )
+
+Pushes @metavar{value} on to the beginning of the sequence.  This function will reallocate space and copy, if necessary.
+ 
+@end deftypefn
+
+@deftypefn {[ANSI C]} void @metavar{I}_@metavar{T2}_Pop ( @metavar{I}_@metavar{T2} * @metavar{s}, @metavar{T1} * @metavar{value-ptr} )
+
+Removes the first value from the sequence @metavar{s}, and places it in the location
+pointed to by @metavar{value-ptr}.
+
+@end deftypefn
+
+@deftypefn {[ANSI C]} void @metavar{I}_@metavar{T2}_Every ( @metavar{I}_@metavar{T2} * @metavar{s}, void (*@metavar{func})(@metavar{T1}, void *), void * @metavar{data} )
+
+Calls the function @metavar{func} on each element of @metavar{s} in sequence, passing @metavar{data}
+as the second argument to @metavar{func}.
+
+@end deftypefn
+
+@deftypefn {[ANSI C]} {@metavar{I}_@metavar{T1} *} @metavar{I}_@metavar{T2}_Nth ( @metavar{I}_@metavar{T2} * @metavar{s}, CORBA_unsigned_long @metavar{n} )
+
+Returns the address of the @metavar{n}th element of the sequence @metavar{s}.  Returns @C{ILU_NIL}
+if @metavar{n} is out of range.
+
+@end deftypefn
+
+@deftypefn {[ANSI C]} void @metavar{I}_@metavar{T2}_Init ( @metavar{I}_@metavar{T2} * @metavar{s}, OPTIONAL(CORBA_unsigned_long) @metavar{length}, OPTIONAL(@metavar{T1} *) @metavar{initial-values} )
+
+This function works like @C{@metavar{T2}_Create}, except that it takes
+a the address of an already-existing @metavar{T2} to initialize.  This can be used
+to initialize instances of @metavar{T2} that have been stack-allocated.
+
+@end deftypefn
+
+@deftypefn {[ANSI C]} void @metavar{I}_@metavar{T2}__Free ( @metavar{I}_@metavar{T2} * @metavar{s} )
+
+Frees allocated storage used internally by @metavar{s}.  Does not free @metavar{s} itself.
+
+@end deftypefn
+
+String sequences (@isl{SEQUENCE OF SHORT CHARACTER} or @isl{SEQUENCE OF CHARACTER})
+are just arrays of the character codes for the characters, using either Latin-1 codes (for
+@isl{SEQUENCE OF SHORT CHARACTER}), or ISO 10646 Unicode codes (for @isl{SEQUENCE OF CHARACTER}).
+These sequences are terminated with a character code of zero.  The terminating code is not
+counted in the length of the sequence.  All other sequence types have a record structure, mandated by @system{CORBA}:
+
+@codeexample
+typedef struct @metavar{I}_@metavar{T2} @{
+  unsigned long _maximum;
+  unsigned long _length;
+  long *_buffer;
+@} @metavar{I}_@metavar{T2};
+@end codeexample
+
+The field @C{_maximum} contains the number of elements pointed to by
+@C{_buffer}. The field @C{_length} indicates the number of valid or
+useful elements pointed to by @C{_buffer}.
+
+For example, the @language{ISL} specification
+@codeexample
+INTERFACE I;
+ 
+TYPE iseq = SEQUENCE OF INTEGER;
+@end codeexample
+would have in its @language{ANSI C} mapping the type
+@codeexample
+typedef struct I_iseq @{
+  unsigned long _maximum;
+  unsigned long _length;
+  ilu_integer *_buffer;
+@} I_iseq;
+@end codeexample
+In a client program, a pointer to this type would be instantiated and
+initialized by calling the type specific sequence creation function generated
+for the sequence, e.g.
+@codeexample
+        ...
+    I_O h;
+    ILU_C_ENVIRONMENT s;
+    I_iseq sq;
+        ... 
+    sq = I_iseq_Create (0, NULL);
+    I_iseq_Append (&sq, 4);
+        ...
+@end codeexample
+
+@node Objects and Methods, Exceptions, Mapping Type Constructs Into ANSI C, The ISL Mapping to ANSI C
+@subsection Objects and Methods
+@cindex ANSI C methods
+
+As indicated earlier, method names are generated by prepending the
+interface name and the
+class name to the method name. 
+@cindex ANSI C method arguments
+The first argument to a method is
+an object instance.  The object instance is an opaque pointer value returned from
+a class specific constructor function.  All object types are subtypes 
+for the type defined by @macro{ILU_C_OBJECT}, a macro which
+expands to the appropriate @system{CORBA} object type for the version of @system{CORBA}
+being used.  @system{CORBA} also
+specifies that the type of the handle be called @C{@metavar{interface-name}_@metavar{type-name}}.
+A typedef of the @system{CORBA}-specified name to the @C{ILU_C_OBJECT} type
+is therefore generated for each object type.
+In the example above, the type of the object instance would be @C{I_O}.
+
+@cindex Binding an ANSI C object instance
+Two binding procedures are specified for each object type.  A @dfn{binding procedure}
+is a procedure that takes some name for an object instance, and returns the
+actual instance.  Users of a module typically use a surrogate-side binding
+procedure, which takes the string binding handle of the object, and the most specific
+type ID of the object's type (if known).
+Suppliers of a module
+typically bind objects with a creation procedure, which takes an instance ID, a server on which
+to maintain the object, and arbitrary user data, and creates and returns
+the true instance of the object.
+
+In general, for any object type @metavar{T}, the following @language{ANSI C} functions
+are defined:
+
+@deftypefn {[ANSI C]} OPTIONAL(@metavar{T}) @metavar{T}__CreateTrue ( OPTIONAL(RETAIN(char *)) @metavar{instance-id}, OPTIONAL(GLOBAL(ilu_Server)) @metavar{server}, OPTIONAL(PASS(void *)) @metavar{user-data} )
+
+Locking:  Main Invariant holds
+
+Creates a true instance of type @metavar{T}, exporting it with instance-id @metavar{instance-id}, exporting it
+via server @metavar{server}, associating the value @metavar{user-data} with it.  If @metavar{instance-id}
+is not specified, a server-relative instance-id will be assigned automatically.  If @metavar{server} is not specified,
+a default server will be created automatically.
+
+@end deftypefn
+
+@deftypefn {[ANSI C]} OPTIONAL(@metavar{T}) @metavar{T}__OTCreateTrue ( RETAIN(char *) @metavar{instance-id}, GLOBAL(ilu_Server) @metavar{server}, OPTIONAL(PASS(void *)) @metavar{user-data} )
+
+Locking:  Inside(@metavar{server}, @metavar{T})
+
+Similar to @fn{@metavar{T}__CreateTrue()}, but designed to be used within the @fn{ot_object_of_ih}
+function of an object table (@ref{Using C Object Tables}).  Requires kernel server locks to be held
+before invocation.
+
+Creates a true instance of type @metavar{T}, exporting it with instance-id @metavar{instance-id}, exporting it
+via server @metavar{server}, associating the value @metavar{user-data} with it.
+
+@end deftypefn
+
+@deftypefn {[ANSI C]} OPTIONAL(@metavar{T}) @metavar{T}__CreateFromSBH ( RETAIN(char *) @metavar{sbh}, RETAIN(CORBA_Environment *) @metavar{Env})
+
+Locking:  Main Invariant holds
+
+Finds or creates an instance of @metavar{T}, using the given object reference.  
+
+@end deftypefn
+
+@deftypevr {[ANSI C]} extern @C{ilu_Class} @metavar{T}__MSType
+
+A value of type @C{ilu_Class} which identifies the most specific @system{ILU} type of the type @metavar{T}.
+
+@end deftypevr
+
+In the following example, the @language{ILU} definition is:
+@codeexample
+INTERFACE I;
+ 
+TYPE T = OBJECT
+  METHODS
+    M ( r : REAL ) : INTEGER
+  END;
+@end codeexample
+
+This definition defines an interface @isl{I}, an object type @isl{T}, and a
+method @isl{M}. The method @isl{M} takes a @isl{REAL} as an
+argument and returns an @isl{INTEGER} result. The generated
+@language{ANSI C} header file would include the following statements:
+
+@codeexample
+typedef ILU_C_OBJECT I_T;
+
+I_T I_T__CreateTrue (ilu_string ih, ilu_Server server, void *user_data);
+I_T I_T__CreateFromSBH (char *sbh, ILU_C_ENVIRONMENT *Env);
+
+ilu_integer I_T_M (I_T, ilu_real, ILU_C_ENVIRONMENT *);
+@end codeexample
+
+The functions @C{I_T__CreateTrue} and @C{I_T__CreateFromSBH}
+are used to create instances
+of the class @C{I_T}.  @C{I_T__CreateTrue} is used by servers
+while @C{I_T__CreateFromSBH} is used by clients. The pointer
+returned in each case is the object instance and must be
+passed with each method invocation.
+
+In addition to its specified arguments, the method @C{I_T_M} takes an
+instance of the type @C{I_T} and a reference to a variable of type
+@C{ILU_C_ENVIRONMENT *}, which is a macro defined to be the appropriate
+@system{CORBA} environment type, and is used to return exception codes.  The environment
+struct pointed to by the environment argument must be instantiated in a client; its
+address is passed as the last argument to each method.  True procedures
+must expect a pointer to this structure as the last
+argument.
+ 
+Finally, the @language{ANSI C} client calling the method for @method{M} 
+might be as follows:
+@codeexample
+#include "I.h"
+ 
+int main (int ac, char **av)
+@{
+  double atof( );
+  I_T inst;
+  int xx;
+  double f;
+  ILU_C_ENVIRONMENT ev;
+ 
+  I__Initialize( );
+  f = atof (av[1]);
+  inst = I_T__CreateFromSBH (av[2], &ev);
+  if (!ILU_C_SUCCESSFUL(&ev)) @{
+    printf( "CreateFromSBH raised exception <%s>\n",
+      ILU_C_EXCEPTION_ID(&ev));
+    return(1);
+  @}
+  xx = I_T_M (inst, f, &ev);
+  if (!ILU_C_SUCCESSFUL(&ev)) @{
+    printf( "exception <%s> signalled on call to I_T_M\n",
+      ILU_C_EXCEPTION_ID(&ev));
+    return(2);
+  @}
+  printf( "result is %d\n", xx );
+  return(0);
+@}
+@end codeexample
+
+Note the call on the interface-specific client initialization procdedure @C{I__Initialize}; these are described in a later section.
+
+In this example, the
+string binding handle is obtained from standard input along
+with some floating-point value.
+
+The class specific function @C{I_T__CreateFromSBH} is called to
+obtain the object instance.  This function was passed
+the string binding handle,
+and a @system{CORBA} environment in which to report exceptions.
+The returned object instance is then passed as the first argument
+to the method @C{I_T_M}, along with the environment @C{ev},
+and the single actual @C{ilu_real} argument @C{f}.  @C{I_T_M} returns
+an @C{ilu_integer} value which is placed in @C{xx}.
+
+The true implementation of the method @method{M} might be as follows:
+@codeexample
+ilu_integer server_I_T_M ( I_T h, ilu_real u, ILU_C_ENVIRONMENT *s )
+@{
+  return( (ilu_integer) (u + 1) );
+@}
+@end codeexample
+
+In this simple example, the corresponding server, or true, method computes
+some value to be returned.  In this case it adds one
+to its @C{ilu_real} argument @C{u}, converts the value to an integer,
+and returns that value.  Note that the server method, if not signalling
+any exceptions, may ignore the environment parameter.
+
+@subsubsection Interface Inheritance
+@cindex ANSI C object type inheritance
+Through interface inheritance, an object type may participate in the behaviors
+of several different types that it inherits from.  These types are called
+@dfn{ancestors} of the object type.  In @language{ANSI C}, an object type supplies
+all methods either defined directly on that type, or on any of its
+ancestor types.
+
+Consider the following example:
+@codeexample
+INTERFACE I2;
+ 
+EXCEPTION E1;
+
+TYPE T1 = OBJECT
+  METHODS
+    M1 (a : ilu.CString) : REAL RAISES E1 END
+  END;
+
+TYPE T2 = OBJECT
+  METHODS
+    M2 ( a : INTEGER, Out b : INTEGER )
+  END;
+ 
+TYPE T3 = OBJECT SUPERTYPES T1, T2 END
+  METHODS
+    M3 ( a : INTEGER )
+  END;
+@end codeexample
+
+The object type @isl{T3} inherits from the object type @isl{T2}. Thus, five @language{ANSI C} methods
+are relevant to the interface @isl{I2}:  @C{server_I2_T1_M1}, @C{server_I2_T2_M2},
+@C{server_I2_T3_M1}, @C{server_I2_T3_M2}, and @C{server_I2_T3_M3}.
+A module that implements true instances of @isl{T3} would have to define
+the last three true methods.  A client uses only three generic functions: @C{I2_T1_M1}, @C{I2_T2_M2}, and @C{I2_T3_M3}.
+
+@subsubsection Object Implementation
+@cindex ANSI C object implementation
+@emph{This information is provided for those interested in the
+implementation of the ANSI C object system.  It is @strong{not} guaranteed
+to remain the same from release to release.}
+
+Each object type is represented by a @dfn{TypeVector}, which is a vector
+of pointers to @dfn{MethodBlock} structs, one for each component type of
+the object type, ordered in the proper class precedence for that object
+type.  Each MethodBlock struct contains a @C{ilu_Class} value, followed
+by a vector of pointers to the methods directly defined by that
+@C{ilu_Class}.  There are two different TypeVectors for each object
+type, one for the surrogate class of the type, and the other for the
+true class of the type.  The TypeVector for the surrogate class uses the
+MethodBlocks of its supertypes; the TypeVector for the true class uses
+its own MethodBlocks for both direct and inherited methods, as true
+classes in the @language{ANSI C} implementation override all of their
+methods.  The TypeVectors, and MethodBlocks for true classes, are not
+exported; the MethodBlocks for surrogate classes are, as they are used
+by their subclasses.
+
+For each method directly defined in the type, a generic function is
+defined in the common code for its interface, which dispatches to the
+appropriate method.  It does this by walking down the TypeVector for the
+object, till it finds a MethodBlock which contains the appropriate
+@c{ilu_Class} value (that is, the value of ilu_Class which matches the
+ilu_Class on which this method is directly defined), then calling the
+method pointer which is indexed in the MethodBlock's vector of method
+pointers by the index of the method.  The generic functions have the
+correct type signature for the method.  They can be referenced with the @C{&} operator.
+
+@node Exceptions, Parameter Passing Considerations, Objects and Methods, The ISL Mapping to ANSI C
+@subsection Exceptions
+@cindex ANSI C Exceptions
+
+@language{ANSI C} has no defined
+exception mechanism. As already indicated, exceptions are passed in @system{ILU} @language{ANSI C} by adding to the end of each method 
+an additional status argument
+that can convey an exception code and a value of a type associated with that exception.
+To signal an exception, a method implementation sets the exception code and supplies the parameter value (if any).
+
+An exception parameter is conveyed in the status argument as a @language{C} pointer; the parameter-conveying member is declared to be a @C{void *}.  In particular, this pointer is a pointer to a value of the type that is the @language{ANSI C} mapping of the exception's @language{ISL} parameter.  For an exception that has no parameter, the parameter-conveying member is not meaningful.
+
+In the following example, the @isl{div} method can raise the exception
+@isl{DivideByZero}:
+@codeexample
+INTERFACE calc;
+ 
+TYPE numerator = INTEGER;
+ 
+EXCEPTION DivideByZero : numerator;
+ 
+TYPE self = OBJECT
+  METHODS
+    Div( v1 : INTEGER, v2 : INTEGER ) : INTEGER RAISES DivideByZero END
+  END;
+@end codeexample
+
+The generated include file @file{calc.h} contains the exception definitions:
+
+@codeexample
+#ifndef __calc_h_
+#define __calc_h_
+/*
+** this file was automatically generated for C
+** from the interface spec calc.isl.
+*/
+ 
+#ifndef __ilu_c_h_
+#include "ilu-c.h"
+#endif
+ 
+extern ILU_C_ExceptionCode    _calc__Exception_DivideByZero;
+#define ex_calc_DivideByZero _calc__Exception_DivideByZero
+ 
+typedef ilu_integer calc_numerator;
+typedef calc_numerator calc_DivideByZero;
+ 
+typedef ILU_C_OBJECT calc_self;
+ 
+calc_self calc_self__CreateTrue ( char *id, ilu_Server server,
+   void * user_data);
+calc_self calc_self__CreateFromSBH ( char * sbh, ILU_C_ENVIRONMENT *Env );
+
+ilu_integer calc_self_Div( calc_self, ilu_integer, ilu_integer,
+   ILU_C_ENVIRONMENT *Env );
+
+extern void calc__BindExceptionValue (ILU_C_ENVIRONMENT *, ilu_Exception, ...);
+
+#endif 
+@end codeexample
+
+The method implementation for @isl{Div} in the true module must detect the
+divide-by-zero condition and raise the exception:
+
+@codeexample
+long server_calc_self_Div (calc_self h, ilu_integer u, ilu_integer v,
+                           ILU_C_ENVIRONMENT *s)
+@{
+  calc_numerator n = 9;
+
+  if ( v == 0 )
+    @{
+      s->_major = ILU_C_USER_EXCEPTION;
+      s->returnCode = ex_calc_DivideByZero;
+      s->ptr = (void *) malloc(sizeof(calc_numerator));
+      *((calc_numerator *) (s->ptr)) = n;
+      s->freeRoutine = (void (*) (void *)) 0;
+      return( u );
+    @}
+  else
+    return( u / v );
+@}
+@end codeexample
+
+When freeing the parameter requires more than just freeing @C{s->ptr}, a non-NULL @C{s->freeRoutine} is provided that does the additional freeing; @C{s->freeRoutine} is given one argument, @C{s->ptr}, and returns @C{void}.
+
+The generated stubs offer as a convenience a variadic procedure (@C{calc__BindExceptionValue}) that can be used to raise any exception declared in the interface.  For an exception that has no parameter, this procedure takes just two actual arguments.  For an exception with a parameter, the parameter value is given as the third actual argument, using the usual calling convention for passing @isl{IN} arguments of its type.  Using this procedure, the above code would be:
+
+@codeexample
+long server_calc_self_Div (calc_self h, ilu_integer u, ilu_integer v,
+                           ILU_C_ENVIRONMENT *s)
+@{
+  calc_numerator n = 9;
+
+  if ( v == 0 )
+    @{
+      calc__BindExceptionValue(s, ex_calc_DivideByZero, n);
+      return( u );
+    @}
+  else
+    return( u / v );
+@}
+@end codeexample
+
+
+The exception is sent back to the client, which can detect it thusly:
+@codeexample
+  ...
+  calc_self instance;
+  ILU_C_ENVIRONMENT s;
+  ilu_integer i, j;
+  ilu_integer val;
+  ...
+  instance = calc_self__CreateFromSBH (sbh, &s);
+  
+  if (! ILU_C_SUCCESSFUL(&s)) @{
+    fprintf (stderr, "CreateFromSBH(%s) raised %s\n",
+      sbh, ILU_C_EXCEPTION_ID (&s) );
+    exit(1);
+  @}
+
+  val = calc_self_Div (instance, i, j, &s);
+
+  /* check to see if an exception occured */
+
+  if (! ILU_C_SUCCESSFUL(&s)) @{
+    /* report exception to user */
+    char *p;
+
+    p = ILU_C_EXCEPTION_ID (&s);
+
+    if (p == ex_calc_DivideByZero) @{
+      calc_numerator *ip;
+      ip = (calc_numerator *) ILU_C_EXCEPTION_VALUE (&s);
+      fprintf (stderr, "%s signaled:  numerator = %d\n", p, *ip);
+      @}
+    else @{
+      /* odd exception at this point */
+      fprintf (stderr, "Unexpected <%s> on call to Div.\n", p);
+      @}
+    /* free up any transient exception data */
+    ILU_C_EXCEPTION_FREE (&s);
+    @}
+  else @{
+    /* no exception - print the result */
+    printf( "result is %d \n", val );
+    @}
+  ...
+@end codeexample
+
+
+@node Parameter Passing Considerations, True Module Construction, Exceptions, The ISL Mapping to ANSI C
+@subsection Parameter Passing Considerations
+@cindex ANSI C Parameter Passing Considerations
+
+Here is @system{ILU}'s version of table 20 from the @system{CORBA 2.0} spec.
+
+@example
+DataType        In      InOut   Out        Return    Exn
+--------        --      -----   ---        ------    ---
+scalar          T       T*      T*         T         T*
+optional        T       T*      T*         T         T*
+object          T       T*      T*         T         T*
+record, fixed   T*      T*      T*         T         T*
+record, var     T*      T*      T**        T*        T*
+union, fixed    T*      T*      T*         T         T*
+union, var      T*      T*      T**        T*        T*
+string          T       T*      T*         T         T*
+other sequence  T*      T*      T**        T*        T*
+array, fixed    T       T       T          T_slice*  T*
+array, var      T       T       T_slice**  T_slice*  T*
+@end example
+
+Here @code{T} is the @language{ANSI C} mapping of the type in question.
+
+The @code{Exn} column describes how exception parameters appear in the parameter-conveying member of a status struct.
+
+
+@node True Module Construction, Using ILU Modules, Parameter Passing Considerations, The ISL Mapping to ANSI C
+@subsection True Module Construction
+@cindex ANSI C true modules
+
+This section will outline the construction of a true module exported by an address space.
+For the example, we will demonstrate the calculator interface described above.
+We will also use the @system{CORBA} 2.0 names for standard types and exceptions,
+to show that it can be done. 
+
+First, some runtime initialization of the server stubs must be done.  Call @C{@metavar{Foo}__InitializeServer} for every @language{ISL} interface @metavar{Foo} containing an object type implemented by the address space.  Also call any client initialization procedures needed (see next section).  These server and client initialization calls can be made in any order, and each initialization procedure can be called more than once.  However, no two calls may be done concurrently (this is an issue only for those using some sort of multi-threading package).
+
+Then we create an instance of @C{calc_self}.
+We then make the string binding handle of the object available by printing it to stdout.
+Finally the @fn{ILU_C_Run} procedure is called. This procedure listens for connections
+and dispatches server methods.
+
+The main program for the server is as follows:
+@codeexample
+#include "I2.h"
+ 
+CORBA_long
+  server_calc_self_Div (calc_self h,
+                        CORBA_long u,
+                        CORBA_long v,
+                        CORBA_Environment *s)
+@{
+  calc_numerator n = 9;
+
+  if ( v == 0 )
+    @{
+      calc__BindExceptionValue(s, ex_calc_DivideByZero, n);
+      return( u );
+    @}
+  else
+    return( u / v );
+@}
+
+main ()
+@{
+  calc_self s;
+  char * sbh;
+  CORBA_Environment ev;
+
+  calc__InitializeServer( );
+
+  s = calc_self__CreateTrue (NULL, NULL, NULL);
+  if (s == NULL)
+    @{
+      fprintf (stderr, "Unable to create instance of calc_self.\n");
+      exit(1);
+    @}
+  else
+    @{
+      sbh = CORBA_ORB_object_to_string (ILU_C_ORB, &ev, s);
+      if (ev._major == CORBA_NO_EXCEPTION)
+        @{
+          printf ("%s\n", sbh);
+          ILU_C_Run (); /* enter main loop; hang processing requests */
+        @}
+      else
+        @{
+          fprintf (stderr,
+                   "Attempt to obtain sbh of object %p signalled <%s>.\n",
+                   s, CORBA_exception_id(&ev));
+          exit(1);
+        @}
+    @}
+@}
+@end codeexample
+
+@node Using ILU Modules, Stub Generation, True Module Construction, The ISL Mapping to ANSI C
+@subsection Using ILU Modules
+@cindex Using ILU modules from ANSI C
+
+Before manipulating surrogate objects, a client module must first call a runtime initialization procedure @C{@metavar{Foo}__Initialize} for each @language{ISL} interface @metavar{Foo} that declares object types whose surrogates are to be manipulated.  Additionally, server modules must also call server initialization procedures (see previous section).  These initialization calls may be made in any order, and each procedure may be called more than once.  However, no two calls may be done concurrently (this is an issue only for those using some sort of multi-threading package).
+
+A client of an exported module may obtain an object instance
+either by calling a method which returns the instance,
+or by calling @C{@metavar{TYPE}__CreateFromSBH()} on the string
+binding handle of an instance.  Once the object instance,
+which is typically a surrogate instance, but may in fact
+be a true instance, is held by the client, it can be used
+simply by making method calls on it, as shown above.
+
+@node Stub Generation, Tailoring Identifier Names, Using ILU Modules, The ISL Mapping to ANSI C
+@subsection Stub Generation
+@cindex ANSI C stub generation
+
+To generate @language{ANSI C} stubs from an @language{ISL} file, use the
+program @language{c-stubber}.
+@pindex c-stubber
+Four files are generated from the
+@file{.isl} file:
+@itemize @bullet
+@item
+@file{@metavar{interface-name}.h} contains the definitions for the types
+and procedures defined by the interface and used by the generated stubs.
+@item
+@file{@metavar{interface-name}-common.c} contains the general code used
+by both client and server; and
+@item
+@file{@metavar{interface-name}-surrogate.c} contains the client-side and general code
+for the interface; and
+@item
+@file{@metavar{interface-name}-true.c} contains the server-side
+stubs and code for the interface.
+@end itemize
+Typically, clients of a module never have a need for the 
+@file{@metavar{interface-name}-true.c} file.
+
+@transcript
+% @userinput{c-stubber foo.isl}
+header file interface foo to ./foo.h...
+code for interface foo to ./foo-common.c...
+code for interface foo to ./foo-surrogate.c...
+code for server stubs of interface foo to ./foo-true.c...
+%
+@end transcript
+
+@node Tailoring Identifier Names, , Stub Generation, The ISL Mapping to ANSI C
+@subsection Tailoring Identifier Names
+@cindex ANSI C identifier tailoring
+
+The option @code{-renames @metavar{renames-filename}} may be used with 
+@program{c-stubber} to specify particular @language{ANSI C} names for 
+@language{ISL} types. 
+
+It is sometimes necessary to have the @language{ANSI C} names of an 
+@system{ILU} interface
+match some other naming scheme.  A mechanism is provided to allow the programmer to
+specify the names of @language{ANSI C} language artifacts directly, and thus 
+override the automatic @language{ISL} to @language{ANSI C} name mappings.
+
+To do this, you place a set of synonyms for @language{ISL} names in a
+@dfn{renames-file}, and invoke the @program{c-stubber} 
+program with the switch @code{-renames},
+specifying the name of the renames-file.  The lines in the file are of the form
+@display
+@metavar{construct} @metavar{@language{ISL}-name} @metavar{@language{ANSI C}-name}
+@end display
+@noindent
+where @metavar{construct} is one of @kwd{method}, @kwd{exception}, 
+@kwd{type}, @kwd{interface},
+or @kwd{constant}; @metavar{@language{ISL}-name} is the name of the 
+construct, expressed either
+as the simple name, for interface names, the concatenation
+@code{@metavar{interface-name}.@metavar{construct-name}} for exceptions, 
+types, and constants,
+or @code{@metavar{interface-name}.@metavar{type-name}.@metavar{method-name}} 
+for methods;
+and @metavar{@language{ANSI C}-name} is the name the construct should have 
+in the generated
+@language{ANSI C} code.  For example:
+
+@example
+# change "foo_r1" to plain "R1"
+type foo_r1 r1
+# change name of method "m1" to "method1"
+method foo_o1_m1 method1
+@end example
+
+@noindent
+Lines beginning with the `sharp' character @samp{#} are treated as comment lines,
+and ignored, in the renames-file.
+
+This feature of the @program{c-stubber} should be used as little and as carefully
+as possible, as it can cause confusion for readers of the @language{ISL} interface,
+in trying to follow the @language{ANSI C} code.  It can also create name conflicts
+between different modules, unless names are carefully chosen.
+
+@node Libraries and Linking, ILU C API, The ISL Mapping to ANSI C, Using ILU with ANSI C
+@section Libraries and Linking
+@cindex ANSI C Libraries and Linking
+
+For clients of an @system{ILU} module, it is only necessary to link
+with the @file{@metavar{interface-name}-surrogate.o} and @file{@metavar{interface-name}-common.o}
+files generated from the
+@language{ANSI C} files generated for the interface or interfaces
+being used, and with the two libraries
+@file{@metavar{ILUHOME}/lib/libilu-c.a} and @file{@metavar{ILUHOME}/lib/libilu.a} 
+(in this order, as @file{libilu-c.a} uses functions in @file{libilu.a}).
+
+For implementors of servers, the code for the server-side
+stubs, in the file @file{@metavar{interface-name}-true.o} compiled
+from @file{@metavar{interface-name}-true.c}, and
+in the file @file{@metavar{interface-name}-common.o} compiled
+from @file{@metavar{interface-name}-common.c}, should be included along
+with the other files and libraries.
+
+@node ILU C API, , Libraries and Linking, Using ILU with ANSI C
+@section ILU C API
+@cindex ANSI C utility API
+
+In addition to the functions defined by the CORBA mapping, the @system{ILU} @language{ANSI C}
+mapping provides some other functions, chiefly for type manipulation, object manipulation,
+and server manipulation.  There are also a number of macros provided for compatibility
+with both versions of @system{CORBA} (revision 2.0).
+
+@menu
+* Type Manipulation::
+* Object Manipulation::
+* Server Manipulation::
+* CORBA Compatibility Macros::
+@end menu
+
+@node Type Manipulation, Object Manipulation, , ILU C API
+@subsection Type Manipulation
+
+@deftypefn {[ILU C API]} OPTIONAL(ilu_Class) ILU_C_FindILUClassByTypeName ( RETAIN(ilu_string) @metavar{type-name} )
+
+Locking:  L1_sup < otmu, L2, Main unconstrained.
+
+Given the @metavar{type-name} of an ILU object type, of the form @C{"Interface.Typename"},
+returns the @C{ilu_Class} value for it.  This value can be used to compare
+types for equality.
+@end deftypefn
+
+@deftypefn {[ILU C API]} OPTIONAL(ilu_Class) ILU_C_FindILUClassByTypeID ( RETAIN(ilu_string) @metavar{type-id})
+
+Locking:  L1_sup < otmu; L2, Main unconstrained.
+
+Given the @metavar{type-id} of an ILU object type, of the form @C{"ilu:gfbSCM7tsK9vVYjKfLole1HOBDc"},
+returns the @C{ilu_Class} value for it.  This value can be used to compare
+types for equality.
+@end deftypefn
+
+@deftypefn {[ILU C API]} GLOBAL(OPTIONAL(ilu_string)) ILU_C_ClassName ( RETAIN(CORBA_Object) )
+
+Locking:  unconstrained.
+
+Returns the ILU name for the most specific type of an object instance.
+@end deftypefn
+
+@deftypefn {[ILU C API]} GLOBAL(OPTIONAL(ilu_string)) ILU_C_ClassID ( RETAIN(CORBA_Object) )
+
+Locking:  unconstrained.
+
+Returns the ILU type ID for the most specific type of an object instance.
+@end deftypefn
+
+@deftypefn {[ILU C API]} ilu_Class ILU_C_ClassRecordOfInstance (CORBA_Object)
+
+Locking:  unconstrained.
+
+Returns the @C{ilu_Class} value for the most specific type of an object instance.
+@end deftypefn
+
+@node Object Manipulation, Server Manipulation, Type Manipulation, ILU C API
+@subsection Object Manipulation
+
+@deftypefn {[ILU C API]} ilu_string ILU_C_SBHOfObject ( CORBA_Object @metavar{instance} )
+
+Locking:  Main invariant holds.
+
+Given an @metavar{instance}, returns a reference to that instance.  The CORBA-specified
+routine @C{CORBA_ORB_object_to_string()} should typically be used instead.
+@end deftypefn
+
+@deftypefn {[ILU C API]} OPTIONAL(CORBA_Object) ILU_C_SBHToObject (char * @metavar{sbh}, ilu_Class @metavar{static_type}, RETAIN(CORBA_Environment *) Env)
+
+Locking:  Main invariant holds.
+
+Takes an object reference and returns the object.
+@metavar{static_type} is a type the caller knows the object to have.
+@end deftypefn
+
+@deftypefn {[ILU C API]} OPTIONAL(PASS(char*)) ILU_C_PublishObject ( CORBA_Object @metavar{instance} )
+
+Locking:  Main invariant holds.
+
+Publishes the OID of the @metavar{instance} in a domain-wide registry.  This is an experimental
+interface, and may change in the future.
+@end deftypefn
+
+@deftypefn {[ILU C API]} ilu_boolean ILU_C_WithdrawObject ( CORBA_Object @metavar{instance}, PASS(char *) @metavar{proof})
+
+Locking:  Main invariant holds.
+
+Removes the OID of the @metavar{instance} from the domain-wide registry.
+@metavar{proof} is the string returned from the call to @C{ILU_C_PublishObject()}.
+@end deftypefn
+
+@deftypefn {[ILU C API]} OPTIONAL(GLOBAL(CORBA_Object)) ILU_C_LookupObject ( RETAIN(char *) @metavar{sid}, RETAIN(char *) @metavar{ih}, ilu_Class @metavar{static-class} )
+
+Locking:  Main invariant holds.
+
+Using the local registry, find and return the object specified by the given
+Server ID and server-relative Instance Handle.
+@metavar{static_type} is one you know the actual object must have;
+it may also have more refined types.
+For an already-reified surrogate this procedure will reconsider
+what contact info to use for reaching the server.
+@end deftypefn
+
+@deftypefn {[ILU C API]} OPTIONAL(GLOBAL(CORBA_Object)) ILU_C_CreateSurrogateObject ( ilu_Class @metavar{type}, RETAIN(char *) @metavar{ih}, ilu_Server @metavar{server}, ILU_C_ENVIRONMENT *@metavar{env} )
+
+Locking:  Main invariant holds.
+
+Create a new object instance of the specified @metavar{type}
+on the specified @metavar{server}, with the specified @metavar{ih}.
+If unable to create such an object, return @C{ILU_NIL}, and signal
+the error in @metavar{env}.
+
+This procedure can be used to create new client-side objects for
+which no true object yet exists.  This is the way a client using
+a server with an object table causes the server to create new instances
+`on the fly'.  When used in this way, the @metavar{ih} must contain
+all information necessary to allow the server to create the proper
+true object, as it is the only information passed to the object table's
+object creation procedure.
+@end deftypefn
+
+@node Server Manipulation, CORBA Compatibility Macros, Object Manipulation, ILU C API
+@subsection Server Manipulation
+
+@deftypefn {[ILU C API]} ilu_boolean ILU_C_ENABLE_THREADS
+
+Locking:  Main invariant holds.
+
+This macro expands to a function call.
+If @system{ILU} has been configured with os-level thread support, calling this
+routine will `turn on' that thread support for use with @language{C}.  This
+means that a new thread will be forked to handle each incoming connection,
+in servers, and if the wire protocol being used permits it, a thread will
+be forked to handle each incoming request.  This routine returns FALSE,
+and emits an error message, if something goes wrong with enabling thread
+support.  It must be called before making any other ILU calls, and before
+initializing any interfaces via calls to @code{@metavar{interface}__Initialize}
+or @code{@metavar{interface}__InitializeServer}.
+@end deftypefn
+
+@deftypefn {[ILU C API]} void ILU_C_FINISH_MAIN_THREAD ( int @metavar{returnvalue} )
+
+Locking:  Main invariant holds.
+
+This routine will return from the `main' thread with the specified value.  If the main thread
+cannot be terminated until the program ends, the call will block appropriately.
+
+@end deftypefn
+
+@deftypefn {[ILU C API]} void ILU_C_Run (void)
+
+Locking:  Main invariant holds.
+
+Called to animate a server and/or other parts of the program.  Used only in single-threaded mode.  Invokes the event handling loop.  Never returns.
+@end deftypefn
+
+@deftypefn {[ILU C API]} OPTIONAL(ilu_Server) ILU_C_InitializeServer (OPTIONAL(RETAIN(char *)) @metavar{serverID}, OPTIONAL(GLOBAL(ILU_C_ObjectTable)) @metavar{obj_tab}, OPTIONAL(RETAIN(char *)) @metavar{protocol}, OPTIONAL(RETAIN(ilu_TransportInfo)) @metavar{transport}, OPTIONAL(RETAIN(ilu_Passport)) @metavar{identity}, ilu_boolean @metavar{setdefaultport})
+
+Locking:  Main invariant holds.
+
+Creates and returns an @C{ilu_Server} with ID @metavar{serverID}, object mapping table @metavar{obj_tab}, using protocol @metavar{protocol} over a transport stack specified by @metavar{transport}.  If @metavar{serverID} is specified as @C{NULL}, a unique string is generated automatically for the server ID.  If @metavar{obj_tab} is specified as @C{NULL}, the default hash table object table is used.
+
+If either @metavar{protocol} or @metavar{transport} is specified, or if @metavar{setdefaultport}, an @C{ilu_Port} will automatically be created and added to the @C{ilu_Server}.  @metavar{protocol}, if not @C{NULL},
+is a string that specifies which RPC protocol to use on the port; @C{NULL} causes use of @protocol{Sun RPC}.  @metavar{transport}, if not @C{NULL}, is a sequence of strings that specifies the transport stack to use below the RPC protocol; @C{NULL} signifies use of SunRPC Record Marking over TCP to/from one of the IP addresses of this host.  Chapter 8 gives details on protocol and transport strings.  If an @metavar{identity} is specified, it may be used for communications security purposes.  If @metavar{setdefaultport} is true, the newly created @C{ilu_Port} will become the default port of the @C{ilu_Server}.
+@end deftypefn
+
+@menu
+* Using C Object Tables::
+@end menu
+
+@node Using C Object Tables, , , Server Manipulation
+@subsubsection Using C Object Tables
+
+It is sometimes useful to have a server create true objects only when they are
+mentioned by a client's actual invocation of a method on them.  This is allowed
+in @system{ILU} by an interface called an @dfn{object table}.  A value of type @C{ILU_C_ObjectTable}
+may be created by a call on
+
+@deftypefn {[ILU C API]} ILU_C_ObjectTable ILU_C_CreateObjectTable (CORBA_Object (*@metavar{object_of_ih})(ilu_string instance-handle, ilu_private user-data), void (*@metavar{free_user_data})(ilu_private user-data), ilu_private @metavar{user-data} )
+
+Locking:  Main invariant holds.
+@br
+Locking for @metavar{object_of_ih}:  L1 >= @{server@}, L1 >= @{gcmu@} if result is true and collectible; L2, Main unconstrained.
+@br
+Locking for @metavar{free_user_data}:  L1 >= @{server@}; L2, Main unconstrained.
+
+Creates and returns a value of type @C{ILU_C_ObjectTable} encapsulating the two procedures @metavar{object_of_ih} and @metavar{free_user_data}, and the user-specified data element @metavar{user-data}.  When @metavar{object_of_ih} is called, it should create an appropriate @C{CORBA_Object} with the specified instance handle, and return it.  When @metavar{free_user_data} is called, it indicates the end of the object table, and @metavar{free_user_data} should free up any storage associated with @metavar{user-data}.
+
+An object table is associated with a kernel server by passing the object table as
+a parameter to the function @fn{ILU_C_InitializeServer}.  A single object
+table may be used with multiple different @C{ilu_Server} instances.
+@end deftypefn
+
+@node CORBA Compatibility Macros, , Server Manipulation, ILU C API
+@subsection CORBA Compatibility Macros
+
+@system{ILU} supports @system{CORBA} 2.0, and formerly supported either 1.1 or 1.2, depending
+on how it was installed at your site.  A number of macros are defined
+to make programs less dependent on which version they use.
+
+@defmac ILU_C_OBJECT
+
+Expands to @C{CORBA_Object}.
+
+@end defmac
+
+@defmac ILU_C_ENVIRONMENT
+
+Expands to @C{CORBA_Environment}.
+
+@end defmac
+
+@defmac ILU_C_NO_EXCEPTION
+
+Expands to @C{CORBA_NO_EXCEPTION}.
+
+@end defmac
+
+@defmac ILU_C_USER_EXCEPTION
+
+Expands to @C{CORBA_USER_EXCEPTION}.
+
+@end defmac
+
+@defmac ILU_C_SYSTEM_EXCEPTION
+
+Expands to @C{CORBA_SYSTEM_EXCEPTION}.
+
+@end defmac
+
+@defmac ILU_C_SUCCESSFUL ( ILU_C_ENVIRONMENT * @metavar{ev} )
+
+Evaluates to true if no exception has been raised.
+
+@end defmac
+
+@defmac ILU_C_SET_SUCCESSFUL ( ILU_C_ENVIRONMENT * @metavar{ev} )
+
+Sets @metavar{ev} to a successful result.
+
+@end defmac
+
+@defmac ILU_C_EXCEPTION_ID ( ILU_C_ENVIRONMENT * @metavar{ev} )
+
+Returns the @C{char *} value that is the exception's ID.
+
+@end defmac
+
+@defmac ILU_C_EXCEPTION_VALUE ( ILU_C_ENVIRONMENT * @metavar{ev} )
+
+Expands to @C{CORBA_exception_value(@metavar{ev})}.
+
+@end defmac
+
+@defmac ILU_C_EXCEPTION_FREE ( ILU_C_ENVIRONMENT * @metavar{ev} )
+
+Expands to @C{CORBA_exception_free(@metavar{ev})}.
+
+@end defmac
+
+@ifclear largerdoc
+@page
+@section Index
+@printindex cp
+@end ifclear

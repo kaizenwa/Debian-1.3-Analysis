@@ -1,0 +1,36 @@
+#!/usr/bin/make -f
+
+build:
+	[ -d debian/objs ] || mkdir debian/objs
+	cd debian/objs && ( \
+		[ -f Makefile ] || \
+		CFLAGS='-O2 -Wall -g -DNDEBUG' LDFLAGS='' ../../configure; \
+		$(MAKE))
+
+binary: binary-arch binary-indep
+
+binary-arch: checkroot build
+	rm -rf debian/tmp
+	install -d debian/tmp/usr/X11R6/bin
+	install -d debian/tmp/usr/X11R6/lib/X11/app-defaults
+	install -d debian/tmp/usr/doc/sex
+	install -d debian/tmp/usr/X11R6/man/man1
+	cd debian/objs && $(MAKE) install prefix=../tmp/usr/X11R6 \
+		appdir=../tmp/usr/X11R6/lib/X11/app-defaults \
+		manualdir=../tmp/usr/doc/sex
+	cp debian/dwww-index debian/tmp/usr/doc/sex/.dwww-index
+	debstd sex README
+	install debian/objs/sex debian/tmp/usr/X11R6/bin/sex
+	find debian/tmp -name '*.html.gz' | xargs --no-run-if-empty gunzip
+	dpkg-gencontrol
+	chown -R root.root debian/tmp
+	chmod -R g-ws debian/tmp
+	dpkg --build debian/tmp ..
+
+binary-indep:
+
+clean:
+	rm -rf debian/tmp build debian/objs
+
+checkroot:
+	test root = "`whoami`"

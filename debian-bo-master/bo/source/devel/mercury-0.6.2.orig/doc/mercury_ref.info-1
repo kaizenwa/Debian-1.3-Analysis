@@ -1,0 +1,1225 @@
+This is Info file mercury_ref.info, produced by Makeinfo-1.63 from the
+input file reference_manual.texi.
+
+START-INFO-DIR-ENTRY
+* Mercury: (mercury_ref).        The Mercury Language Reference Manual
+END-INFO-DIR-ENTRY
+
+   This file documents the Mercury programming language.
+
+   Copyright (C) 1995 University of Melbourne.
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+   Permission is granted to copy and distribute modified versions of
+this manual under the conditions for verbatim copying, provided also
+that the entire resulting derived work is distributed under the terms
+of a permission notice identical to this one.
+
+   Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions.
+
+
+File: mercury_ref.info,  Node: Top,  Up: (mercury)
+
+
+
+* Menu:
+
+* Introduction::      A brief introduction to Mercury
+* Syntax::            Mercury's syntax is similar to ISO Prolog
+* Types::             Mercury has a strong parametric polymorphic type system
+* Modes::             Modes allow you to specify the direction of data flow
+* Unique modes::      Unique modes allow you to specify when there is only one
+                      reference to a particular value, so the compiler can
+                      safely use destructive update to modify that value
+* Determinism::       Determinism declarations let you specify that a predicate
+                      should never fail or should never succeed more than once
+* Higher-order::      Mercury supports higher-order predicates and functions,
+                      with closures, lambda expressions, and currying
+* Modules::           Modules allow you to divide a program into smaller parts
+* Semantics::         Declarative and operational semantics of Mercury programs
+* Pragmas::           Various compiler directives, used for the C interface
+                      and to control optimization.
+
+
+File: mercury_ref.info,  Node: Introduction,  Next: Syntax,  Prev: Top,  Up: Top
+
+Introduction
+************
+
+   Mercury is a new general-purpose programming language, designed and
+implemented by a small group of researchers at the University of
+Melbourne, Australia.  Mercury is based on the paradigm of purely
+declarative programming, and was designed to be useful for the
+development of large and robust "real-world" applications.  It improves
+on existing logic programming languages by providing increased
+productivity, reliability and efficiency, and by avoiding the need for
+non-logical program constructs.  Mercury provides the traditional logic
+programming syntax, but also allows the syntactic convenience of
+user-defined functions, smoothly integrating logic and functional
+programming into a single paradigm.
+
+   Mercury requires programmers to supply type, mode and determinism
+declarations for the predicates and functions they write.  The compiler
+checks these declarations, and rejects the program if it cannot prove
+that every predicate or function satisfies its declarations.  This
+improves reliability, since many kinds of errors simply cannot happen
+in successfully compiled Mercury programs.  It also improves
+productivity, since the compiler pinpoints many errors that would
+otherwise require manual debugging to locate.  The fact that
+declarations are checked by the compiler makes them much more useful
+than comments to anyone who has to maintain the program.  The compiler
+also exploits the guaranteed correctness of the declarations for
+significantly improving the efficiency of the code it generates.
+
+   To facilitate programming-in-the-large, to allow separate
+compilation, and to support encapsulation, Mercury has a simple module
+system.  Mercury's standard library has a variety of pre-defined modules
+for common programming tasks -- see the Mercury Library Reference
+Manual.
+
+
+File: mercury_ref.info,  Node: Syntax,  Next: Types,  Prev: Introduction,  Up: Top
+
+Syntax
+******
+
+* Menu:
+
+* Syntax Overview::
+* Tokens::
+* Terms::
+* Items::
+* Declarations::
+* Facts::
+* Rules::
+* Goals::
+* DCG-rules::
+* DCG-goals::
+* Data-terms::
+* Implicit quantification::
+* Elimination of double negation::
+
+
+File: mercury_ref.info,  Node: Syntax Overview,  Next: Tokens,  Up: Syntax
+
+Syntax overview
+===============
+
+   Mercury's syntax is similar to the syntax of Prolog, with some
+additional declarations for types, modes, determinism, the module
+system, and pragmas, and with the distinction that function symbols may
+stand also for invocations of user-defined functions as well as for
+data constructors.
+
+   A Mercury program consists of a set of modules.  Each module is a
+file containing a sequence of items (declarations and clauses).  Each
+item is a term followed by a period.  Each term is composed of a
+sequence of tokens, and each token is composed of a sequence of
+characters.  Like Prolog, Mercury has the Definite Clause Grammar (DCG)
+notation for clauses.
+
+
+File: mercury_ref.info,  Node: Tokens,  Next: Terms,  Prev: Syntax Overview,  Up: Syntax
+
+Tokens
+======
+
+   Tokens in Mercury are the same as in ISO Prolog.  The only
+difference is the `#LINE' token, which is used as a line number
+directive (see below).
+
+   The different tokens are as follows.  Tokens may be separated by
+whitespace or line number directives.
+
+*line number directive*
+     A line number directive consists of the character `#', a positive
+     integer specifying the line number, and then a newline.  A `#LINE'
+     directive's only role is to specifying the line number; it is
+     otherwise ignored by the syntax.  Line number directives may occur
+     anywhere a token may occur.  They are used in conjunction with the
+     `pragma source_file' declaration to indicate that the Mercury code
+     following was generated by another tool; they serve to associate
+     each line in the Mercury code with the source file name and line
+     number of the original source from which the Mercury code was
+     derived, so that the Mercury compiler can issue more informative
+     error messages using the original source code locations.  A
+     `#LINE' directive specifies the line number for the immediately
+     following line.  Line numbers for lines after that are incremented
+     as usual, so the second line after a `#100' directive would be
+     considered to be line number 101.
+
+*string*
+     A string is a sequence of characters enclosed in double quotes
+     (`"').  Strings may contain backslash escapes.  `\a' stands for
+     "alert" (a beep character), `\b' for backspace, `\r' for
+     carriage-return, `\f' for form-feed, `\t' for tab, `\n' for
+     newline, `\v' for vertical-tab.  An escaped backslash,
+     single-quote, or double-quote stands for itself.  The sequence
+     `\x' introduces a hexadecimal escape; it must be followed by a
+     sequence of hexadecimal digits and then a closing backslash.  It
+     is replaced with the character whose character code is identified
+     by the hexadecimal number.  Similarly, a backslash followed by an
+     octal digit is the beginning of an octal escape; as with
+     hexadecimal escapes, the sequence of octal digits must be
+     terminated with a closing backslash.  A backslash followed
+     immediately by a newline is deleted; thus an escaped newline can
+     be used to continue a string over more than one source line.
+     (String literals may also contain embedded newlines.)
+
+*name*
+     A name is either an unquoted name or a quoted name.  An unquoted
+     name is a lowercase letter followed by zero or more letters,
+     underscores, and digits.  A quoted name is any sequence of zero or
+     more characters enclosed in single quotes (`'').  Quoted names can
+     contain backslash escapes of the same form as for strings.
+
+*variable*
+     A variable is an uppercase letter or underscore followed by zero or
+     more letters, underscores, and digits.  A variable token
+     consisting of single underscore is treated specially: each
+     instance of `_' denotes a distinct variable.  (In addition,
+     variables starting with an underscore are presumed to be
+     "don't-care" variables; the compiler will issue a warning if a
+     variable that does not start with an underscore occurs only once,
+     or if a variable starting with an underscore occurs more than once
+     in the same scope.)
+
+*integer*
+     An integer is either a decimal, binary, octal, hexadecimal, or
+     character-code literal.  A decimal literal is any sequence of
+     decimal digits.  A binary literal is `0b' followed by any sequence
+     of binary digits.  An octal literal is `0o' followed by any
+     sequence of octal digits.  A hexadecimal literal is `0x' followed
+     by any sequence of hexadecimal digits.  A character-code literal
+     is `0'' followed by any single character.
+
+*float*
+     A floating point literal consists of a sequence of decimal digits,
+     a decimal point and a sequence of digits (the fraction part), and
+     the letter `E' and another sequence of decimal digits (the
+     exponent).  The fraction part or the exponent (but not both) may
+     be omitted.
+
+*open_ct*
+     A left parenthesis, `(', that is not preceded by whitespace.
+
+*open*
+     A left parenthesis, `(', that is preceded by whitespace.
+
+*close*
+     A right parenthesis, `)'.
+
+*open_list*
+     A left square bracket, `['.
+
+*close_list*
+     A right square bracket, `]'.
+
+*open_curly*
+     A left curly bracket, `{'.
+
+*close_curly*
+     A right curly bracket, `}'.
+
+*ht_sep*
+     A "head-tail separator", i.e. a vertical bar, `|'.
+
+*comma*
+     A comma, `,'.
+
+*end*
+     A full stop (period), `.'.
+
+*eof*
+     The end of file.
+
+
+File: mercury_ref.info,  Node: Terms,  Next: Items,  Prev: Tokens,  Up: Syntax
+
+Terms
+=====
+
+   Syntactically, terms in Mercury are exactly the same as in ISO
+Prolog, except that as an extension we permit higher-order terms, as
+described below.  However, the meaning of some terms in Mercury is
+different to that in Prolog.  See *Note Data-terms::.
+
+   A term is either a variable or a functor.
+
+   A functor is an integer, a float, a string, a name, a compound term,
+or a higher-order term.
+
+   A compound term is a name followed without any intervening
+whitespace by an open parenthesis (i.e. an open_ct token), a sequence
+of argument terms separated by commas, and a close parenthesis.
+Compound terms may also be specified using operator notation, as in
+Prolog.
+
+   A higher-order term is a variable followed without any intervening
+whitespace by an open parenthesis (i.e. an open_ct token), a sequence
+of argument terms separated by commas, and a close parenthesis.  A
+higher-order term is equivalent to a compound term whose functor is the
+empty name, and whose arguments are the the variable followed by the
+arguments of the higher-order term.  That is, a term such as `Var(Arg1,
+..., ArgN)' is parsed as `''(Var, Arg1, ..., ArgN)',
+
+
+File: mercury_ref.info,  Node: Items,  Next: Declarations,  Prev: Terms,  Up: Syntax
+
+Items
+=====
+
+   Each item in a Mercury module is either a declaration or a clause.
+If the top-level functor of the term is `:-/1', the item is a
+declaration, otherwise it is a clause.  There are three types of
+clauses.  If the top-level functor of the item is `:-/2', the item is a
+rule.  If the top-level functor is `-->/2', the item is a DCG rule.
+Otherwise, the item is a fact.  There are two types of rules and facts.
+If the top-level functor of the head of a rule is `=/2', the rule is a
+function rule, otherwise it is a predicate rule.  If the top-level
+functor of the head of a fact is `=/2', the fact is a function fact,
+otherwise it is a predicate fact.
+
+
+File: mercury_ref.info,  Node: Declarations,  Next: Facts,  Prev: Items,  Up: Syntax
+
+Declarations
+============
+
+   The allowed declarations are:
+
+     :- type
+     :- pred
+     :- func
+     :- inst
+     :- mode
+     :- pragma
+     :- module
+     :- interface
+     :- implementation
+     :- import_module
+     :- external
+     :- end_module
+
+   The `type', `pred' and `func' declarations are used for the type
+system, the `inst' and `mode' declarations are for the mode system, the
+`pragma' declarations are for the C interface, and for compiler hints
+about inlining, and the remainder are for the module system.  They are
+described in more detail in their respective chapters.
+
+   (The current implementation allows `when/2' declarations, but
+ignores them.  This helps when one wants to write a program that is
+both a Mercury program and an NU-Prolog program.)
+
+
+File: mercury_ref.info,  Node: Facts,  Next: Rules,  Prev: Declarations,  Up: Syntax
+
+Facts
+=====
+
+   A function fact is an item of the form `HEAD = RESULT'.  A predicate
+fact is an item of the form `HEAD', where the top-level functor of HEAD
+is not `:-/1', `:-/2', `-->/2', or `=/2'.  In both cases, the HEAD term
+must not be a variable.  The top-level functor of the HEAD determines
+which predicate or function the fact belongs to; the predicate or
+function must have been declared in a preceding `pred' or `func'
+declaration in this module.  The arguments of the head must be valid
+data-terms.  A fact is equivalent to a rule whole body is `true'.
+
+
+File: mercury_ref.info,  Node: Rules,  Next: Goals,  Prev: Facts,  Up: Syntax
+
+Rules
+=====
+
+   A function rule is an item of the form `HEAD = RESULT :- BODY'.  A
+predicate rule is an item of the form `HEAD :- BODY' where the top-level
+functor of `Head' is not `=/2'.  In both cases, the HEAD term must not
+be a variable.  The top-level functor of the HEAD determines which
+predicate or function the clause belongs to; the predicate or function
+must have been declared in a preceding `pred' or `func' declaration in
+this module.  The arguments of the head must be valid data-terms.  The
+BODY must be a valid goal.
+
+
+File: mercury_ref.info,  Node: Goals,  Next: DCG-rules,  Prev: Rules,  Up: Syntax
+
+Goals
+=====
+
+   A goal is a term of one of the following forms:
+
+`some VARS GOAL'
+     An existential quantification.  VARS must be a list of variables.
+     GOAL must be a valid goal.
+
+`all VARS GOAL'
+     A universal quantification.  VARS must be a list of variables.
+     GOAL must be a valid goal.  This is an abbreviation for `not (some
+     VARS not GOAL)'.
+
+`GOAL1, GOAL2'
+     A conjunction.  GOAL1 and GOAL2 must be valid goals.
+
+`GOAL1 ; GOAL2'
+     where GOAL1 is not of the form `Goal1a -> Goal1b': a disjunction.
+     GOAL1 and GOAL2 must be valid goals.
+
+`true'
+     The empty conjunction.  Always succeeds.
+
+`fail'
+     The empty disjunction.  Always fails.
+
+`not GOAL'
+`\+ GOAL'
+     A negation.  The two different syntaxes have identical semantics.
+     GOAL must be a valid goal.
+
+`GOAL1 => GOAL2'
+     An implication.  This is an abbreviation for `not (GOAL1, not
+     GOAL2)'.
+
+`GOAL1 <= GOAL2'
+     A reverse implication.  This is an abbreviation for `not (GOAL2,
+     not GOAL1)'.
+
+`GOAL1 <=> GOAL2'
+     A logical equivalence.  This is an abbreviation for `(GOAL1 =>
+     GOAL2), (GOAL1 <= GOAL2').
+
+`if CONDGOAL then THENGOAL else ELSEGOAL'
+`CONDGOAL -> THENGOAL ; ELSEGOAL'
+     An if-then-else.  The two different syntaxes have identical
+     semantics.  CONDGOAL, THENGOAL, and ELSEGOAL must be valid goals.
+     Note that the "else" part is *not* optional.
+
+`TERM1 = TERM2'
+     A unification.  TERM1 and TERM2 must be valid data-terms.
+
+`TERM1 \= TERM2'
+     An inequality.  TERM1 and TERM2 must be valid data-terms.  This is
+     an abbreviation for `not (TERM1 = TERM2)'.
+
+`call(Closure)'
+`call(Closure1, Arg1)'
+`call(Closure2, Arg1, Arg2)'
+`call(Closure3, Arg1, Arg2, Arg3)'
+...
+     A higher-order predicate call.  The closure and arguments must be
+     valid data-terms.  `call(Closure)' just calls the specified
+     closure.  The other forms append the specified arguments onto the
+     argument list of the closure before calling it.  See *Note
+     Higher-order::.
+
+`Var'
+`Var(Arg1)'
+`Var(Arg2)'
+`Var(Arg2, Arg3)'
+...
+     A higher-order predicate call.  VAR must be a variable.  The
+     semantics are exactly the same as for the corresponding
+     higher-order call using the `call/N' syntax, i.e.  `call(Var)',
+     `call(Var, Arg1)', etc.
+
+`CALL'
+     Any goal which does not match any of the above forms must be a
+     predicate call.  The top-level functor of the term determines the
+     predicate called; the predicate must be declared in a `pred'
+     declaration in the module or in the interface of an imported
+     module.  The arguments must be valid data-terms.
+
+
+File: mercury_ref.info,  Node: DCG-rules,  Next: DCG-goals,  Prev: Goals,  Up: Syntax
+
+DCG-rules
+=========
+
+   DCG-rules in Mercury have identical syntax and semantics to
+DCG-rules in Prolog.
+
+   A DCG-rule is an item of the form `HEAD --> BODY'.  The HEAD term
+must not be a variable.  A DCG-rule is an abbreviation for an ordinary
+rule with two additional implicit arguments appended to the arguments
+of HEAD.  These arguments are fresh variables which we shall call V_IN
+and V_OUT.  The BODY must be a valid DCG-goal, and is an abbreviation
+for an ordinary goal.  The next section defines a mathematical function
+`DCG-transform(V_IN, V_OUT, DCG-GOAL)' which specifies the semantics of
+how DCG goals are transformed into ordinary goals.  (The
+`DCG-transform' function is purely for the purposes of exposition, to
+define the semantics -- it is not part of the language.)
+
+
+File: mercury_ref.info,  Node: DCG-goals,  Next: Data-terms,  Prev: DCG-rules,  Up: Syntax
+
+DCG-goals
+=========
+
+   A DCG-goal is a term of one of the following forms:
+
+`some VARS DCG-GOAL'
+     A DCG existential quantification.  VARS must be a list of
+     variables.  DCG-GOAL must be a valid DCG-goal.
+
+     Semantics:
+          transform(V_in, V_out, some Vars DCG_goal) =
+          some Vars transform(V_in, V_out, DCG_goal)
+
+`all VARS DCG-GOAL'
+     A DCG universal quantification.  VARS must be a list of variables.
+     DCG-GOAL must be a valid DCG-goal.
+
+     Semantics:
+          transform(V_in, V_out, all Vars DCG_goal) =
+          all Vars transform(V_in, V_out, DCG_goal)
+
+`DCG-GOAL1, DCG-GOAL2'
+     A DCG sequence.  Intuitively, this means "parse DCG-goal1 and then
+     parse DCG-goal2" or "do DCG-goal1 and then do DCG-goal2".  (Note
+     that the only way this construct actually forces the desired
+     sequencing is by the modes of the implicit DCG arguments.)
+     DCG-GOAL1 and DCG-GOAL2 must be valid DCG-goals.
+
+     Semantics:
+          transform(V_in, V_out, (DCG-goal1, DCG-goal2)) =
+          transform(V_in, V_new, DCG_goal1), transform(V_new, V_out, DCG_goal2)
+     where V_new is a fresh variable.
+
+`DCG-GOAL1 ; DCG-GOAL2'
+     A disjunction.  DCG-GOAL1 and DCG-GOAL2 must be valid goals.
+     DCG-GOAL1 must not be of the form `DCG-goal1a -> DCG-goal1b'.  (If
+     it is, then the goal is an if-then-else, not a disjunction.)
+
+     Semantics:
+          transform(V_in, V_out, (DCG_goal1 ; DCG_goal2)) =
+          transform(V_in, V_out, DCG_goal1) ; transform(V_in, V_out, DCG_goal2)
+
+`{ GOAL }'
+     A brace-enclosed ordinary goal.  GOAL must be a valid goal.
+
+     Semantics:
+          transform(V_in, V_out, { Goal }) = (Goal, V_out = V_in)
+
+`[TERM, ...]'
+     A DCG input match.  Unifies the implicit DCG input variable V_in,
+     which must have type `list(_)', with a list whose initial elements
+     are the terms specified and whose tail is the implicit DCG output
+     variable V_out.  The terms must be valid data-terms.
+
+     Semantics:
+          transform(V_in, V_out, [Term1, ...]) = (V_in = [Term, ... | V_Out])
+
+`[]'
+     The null DCG goal (an empty DCG input match).  Equivalent to `{
+     true }'.
+
+     Semantics:
+          transform(V_in, V_out, []) = (V_out = V_in)
+
+`not DCG-GOAL'
+`\+ DCG-GOAL'
+     A DCG negation.  The two different syntaxes have identical
+     semantics.  GOAL must be a valid goal.
+
+     Semantics:
+          transform(V_in, V_out, not DCG_goal) =
+          (not transform(V_in, V_new, DCG_goal), V_out = V_in)
+     where V_new is a fresh variable.
+
+`if CONDGOAL then THENGOAL else ELSEGOAL'
+`CONDGOAL -> THENGOAL ; ELSEGOAL'
+     A DCG if-then-else.  The two different syntaxes have identical
+     semantics.  CONDGOAL, THENGOAL, and ELSEGOAL must be valid
+     DCG-goals.
+
+     Semantics:
+          transform(V_in, V_out, if CondGoal then ThenGoal else ElseGoal) =
+          if transform(V_in, V_cond, CondGoal) then
+                  transform(V_cond, V_out, ThenGoal)
+          else
+                  transform(V_in, V_out, ElseGoal)
+
+`=(TERM)'
+     A DCG unification.  Unifies TERM with the implicit DCG argument.
+     TERM must be a valid data-term.
+
+     Semantics:
+          transform(V_in, V_out, =(Term)) = (Term = V_in, V_out = V_in)
+
+`DCG-CALL'
+     Any term which does not match any of the above forms must be a DCG
+     predicate call.  If the term is a variable VAR, it is treated as
+     if it were `call(VAR)'.  Then, the two implicit DCG arguments are
+     appended to the specified arguments.
+
+     Semantics:
+          transform(V_in, V_out, p(A1, ..., AN)) =
+          p(A1, ..., AN, V_in, V_out)
+
+
+File: mercury_ref.info,  Node: Data-terms,  Next: Implicit quantification,  Prev: DCG-goals,  Up: Syntax
+
+Data-terms
+==========
+
+   Syntactically, a data-term is just a term.
+
+   There are a couple of differences from Prolog.  The first one is
+that double-quoted strings are atomic in Mercury, they are not
+abbreviations for lists of character codes.  The second is that Mercury
+terms may contain function applications, higher-order function
+applications, and lambda expressions.
+
+   A data-term is either a variable, a data-functor, a higher-order
+function application, or a lambda expression.
+
+   A data-functor is an integer, a float, a string, a character literal
+(any single-character name), a name, or a compound data-term.  A
+compound data-term is a compound term whose form does not match the
+form of a lambda expression or higher-order function application and
+whose arguments are data-terms.  If a data-functor is a name or a
+compound data-term, its top-level functor must name a function,
+predicate, or data constructor declared in the program or in the
+interface of an imported module.
+
+   A lambda expression is a compound term of one of the following forms
+
+     lambda([Var1::Mode1, Var2::Mode2, ...] is Det, Goal)
+     pred(Var1::Mode1, Var2::Mode2, ...) is Det :- Goal
+     func(Var1::Mode1, Var2::Mode2, ...) = (Var::Mode) is Det :- Goal
+     func(Var1, Var2, ...) = Var :- Goal
+
+where Var1, Var2, ... are variables, Mode1, Mode2, ... are modes [*Note
+Modes::], Det is a determinism [*Note Determinism::], and Goal is a
+goal [*Note Goals::].  It denotes a higher-order predicate or function
+term whose value is the predicate or function of the specified arguments
+determined by the specified goal.  See *Note Higher-order::.
+
+   A higher-order function application is a compound term of one of the
+following two forms
+
+     apply(FUNC, ARG1, ARG2, ..., ARGN)
+     FUNCVAR(ARG1, ARG2, ..., ARGN)
+
+where N >= 1, FUNC is a term of type `func(T1, T2, ..., Tn) = T',
+FUNCVAR is a variable of that type, and ARG1, ARG2, ..., ARGN are terms
+of types `T1', `T2', ..., `Tn'.  The type of the higher-order function
+application term is T.  It denotes the result of applying the specified
+function to the specified arguments.  See *Note Higher-order::.
+
+
+File: mercury_ref.info,  Node: Implicit quantification,  Next: Elimination of double negation,  Prev: Data-terms,  Up: Syntax
+
+Implicit quantification
+=======================
+
+   The rule for implicit quantification in Mercury is not the same as
+the usual one in mathematical logic.  In Mercury variables that do not
+occur in the head of a clause are implicitly existentially quantified
+around their closest enclosing scope (in a sense to be made precise in
+the following paragraphs).  This allows most existential quantifiers to
+be omitted, and leads to more concise code.
+
+   An occurrence of a variable is "in a negated context" if it is in a
+negation, in a universal quantification, in the condition of an
+if-then-else, in an inequality, or in a lambda expression.
+
+   Two goals are "parallel" if they are different disjuncts of the same
+disjunction, or if one is the "else" part of an if-then-else and the
+other goal is either the "then" part or the condition of the
+if-then-else, or if they are the goals of disjoint (distinct and
+non-overlaping) lambda expressions.
+
+   If a variable occurs in a negated context and does not occur outside
+of that negated context other than in parallel goals (and in the case
+of a variable in the condition of an if-then-else, other than in the
+"then" part of the if-then-else), then that variable is implicitly
+existentially quantified inside the negation.
+
+
+File: mercury_ref.info,  Node: Elimination of double negation,  Prev: Implicit quantification,  Up: Syntax
+
+Elimination of double negation
+==============================
+
+   The treatment of inequality, universal quantification, implication,
+and logical equivalence as abbreviations can cause the introduction of
+double negations which could make otherwise well-formed code
+mode-incorrect.  To avoid this problem, the language specifies that
+double negations are removed after syntax analysis, before mode
+analysis is performed.
+
+
+File: mercury_ref.info,  Node: Types,  Next: Modes,  Prev: Syntax,  Up: Top
+
+Types
+*****
+
+   The type system is based on polymorphic many-sorted logic.
+
+   Certain special types are builtin, or are defined in the Mercury
+library:
+
+Primitive types: `char', `int', `float', `string'.
+     There is a special syntax for constants of type `int', `float',
+     and `string'.  (For `char', the standard syntax suffices.)
+
+Predicate types: `pred', `pred(T)', `pred(T1, T2)', ...
+Function types: `func(T1) = T', `func(T1, T2) = T', ...
+     These higher-order function and predicate types are used to pass
+     procedure addresses and closures to other predicates.  See *Note
+     Higher-order::.
+
+The universal type: `univ'.
+     The type `univ' is defined in the standard library module
+     `std_util', along with the predicates `type_to_univ/2' and
+     `univ_to_type/2'.  With those predicates, any type can be
+     converted to the universal type and back again.  The universal
+     type is useful for situations where you need heterogeneous
+     collections.
+
+The "state-of-the-world" type: `io__state'.
+     The type `io__state' is defined in the standard library module
+     `io', and represents the state of the world.  Predicates which
+     perform I/O are passed the old state of the world and produce a
+     new state of the world.  In this way, we can give a declarative
+     semantics to code that performs I/O.
+
+   New types can be introduced with `:- type' declarations.  There are
+several categories of derived types:
+
+   * Discriminated unions: these encompass both enumeration and record
+     types in other languages.  A derived type is defined using `:-
+     type TYPE ---> BODY'.  (Note there are *three* dashes in that
+     arrow.  It should not be confused with the two-dash arrow used for
+     DCGs or the one-dash arrow used for if-then-else.) If the TYPE
+     term is a functor of arity zero, it names a monomorphic type.
+     Otherwise, it names a polymorphic type; the arguments of the
+     functor must be distinct type variables.  The BODY term is defined
+     as a sequence of constructor definitions separated by semi-colons.
+     Each constructor definition is a functor whose arguments (if any)
+     are types.  Type definitions must be "transparent": all type
+     variables occurring in the BODY must also occur in the TYPE.
+
+     Here are some examples:
+
+          :- type fruit
+                  --->    apple
+                  ;       orange
+                  ;       banana
+                  ;       pear.
+          
+          :- type strange
+                  --->    foo(int)
+                  ;       bar(string).
+          
+          :- type employee
+                  --->    employee(
+                                 string,               % name
+                                 int,                  % age
+                                 string                % department
+                          ).
+          
+          :- type tree
+                  --->    empty
+                  ;       leaf(int)
+                  ;       branch(tree, tree).
+          
+          :- type list(T)
+                  --->    []
+                  ;       [T | list(T)].
+          
+          :- type pair(T1, T2)
+                  --->    T1 - T2.
+
+     If the body of a discriminated union type definition contains a
+     term whose top-level functor is `';'/2', the semi-colon is
+     normally assumed to be a separator.  This makes it difficult to
+     define a type whose constructors include `';'/2'.  To allow this,
+     curly braces can be used to quote the semi-colon.  It is then also
+     necessary to quote curly braces.  The following example
+     illustrates this:
+
+          :- type tricky
+                  --->    { int ; int }
+                  ;       { { int } }.
+
+     This defines a type with two constructors, `';''/2 and `'{}'/1',
+     whose argument types are all `int'.
+
+     Each discriminated union type definition introduces a distinct
+     type.  Mercury considers two discriminated union types that have
+     the same bodies to be distinct types (name equivalence).  Having
+     two different types with the same name and arity in the program is
+     an error.  (We hope to relax this in the future, to allow types
+     with the same name and arity in different modules.)
+
+   * Equivalence types: these are type abbreviations.  They are defined
+     using `==' as follows.  They may be polymorphic.
+
+          :- type money == int.
+          :- type assoc_list(KeyType, ValueType)
+                  == list(pair(KeyType, ValueType)).
+
+     Like discriminated union type definitions, equivalence type
+     definitions must be transparent.
+
+     Mercury treats an equivalence type as an abbreviation for the type
+     on the right hand side of the definition; the two are equivalent
+     in all respects in scopes where the equivalence type is visible.
+
+   * Abstract types: these are types whose implementation is hidden.
+     The type declarations
+
+          :- type t1.
+          :- type t2(T1, T2).
+
+     declare types `t1/0' and `t2/2' to be abstract types.  Such
+     declarations are only useful in the interface section of a module.
+     This means that the type names will be exported, but the
+     constructors (functors) for these types will not be exported.  The
+     implementation section of a module must have give the definition
+     of all the abstract types named in the interface section of the
+     module.  Abstract types may be defined as either discriminated
+     union types or as equivalence types.
+
+   Constructors may be overloaded among different types: there may be
+any number of constructors with a given name and arity, so long as they
+all have different types.  However, there must be only one constructor
+with a given name, arity, and result type.  (There is no particularly
+good reason for this restriction; in the future we may allow several
+such functors as long as they have different argument types.) Note that
+excessive overloading of constructors can slow down type checking and
+can make the program confusing for human readers, so overloading should
+not be over-used.
+
+   The argument types of each predicate must be explicitly declared
+with a `:- pred' declaration.  The argument types and return type of
+each function must be explicitly declared with a `:- func' declaration.
+These declarations may be polymorphic.  For example:
+
+     :- pred member(T, list(T)).
+     
+     :- func length(list(T)) = int.
+
+   There must only be one predicate with a given name and arity in each
+module, and only one function with a given name and arity in each
+module.  The current implementation does not support defining a
+function of arity N and a predicate of arity N+1 in the same module.
+
+   The compiler infers the types of data-terms, and in particular the
+types of variables and overloaded constructors, functions, and
+predicates.  A "type assignment" is an assignment of a type to every
+variable and of a particular constructor, function, or predicate to
+every name in a clause.  A type assignment is "valid" if it satisfies
+the following conditions.
+
+   Each constructor in a clause must have been declared in at least one
+visible type declaration.  The type assigned to each constructor term
+must match one of the type declarations for that constructor, and the
+types assigned to the arguments of that constructor must match the
+argument types specified in that type declaration.
+
+   The type assigned to each function call term must match the return
+type of one of the `:- func' declarations for that function, and the
+types assigned to the arguments of that function must match the
+argument types specified in that type declaration.
+
+   The type assigned to each predicate argument must match the type
+specified in one of the `:- pred' declarations for that predicate.  The
+type assigned to each head argument in a predicate clause must exactly
+match the argument type specified in the corresponding `:- pred'
+declaration.
+
+   The type assigned to each head argument in a function clause must
+exactly match the argument type specified in the corresponding `:-
+func' declaration, and the type assigned to the result term in a
+function clause must exactly match the result type specified in the
+corresponding `:- func' declaration.
+
+   (Here "match" means to be an instance of, i.e. to be identical to
+for some substitution of the type parameters, and "exactly match" means
+to be identical up to renaming of type parameters.)
+
+   One type assignment A is said to be "more general" than another type
+assignment B if there is a binding of the type parameters in A that
+makes it identical (up to renaming of parameters) to B.  If there is
+more than one valid type assignment, the compiler must choose the most
+general one.  If there are two valid type assignments which are not
+identical up to renaming and neither of which is more general than the
+other, then there is a type ambiguity, and compiler must report an
+error.  A clause is "type-correct" if there is a unique (up to
+renaming) most general valid type assignment.  Every clause in a
+Mercury program must be type-correct.
+
+
+File: mercury_ref.info,  Node: Modes,  Next: Unique modes,  Prev: Types,  Up: Top
+
+Modes
+*****
+
+   The "mode" of a predicate, or function, is a mapping from the
+initial state of instantiation of the arguments of the predicate, or
+the arguments and result of a function, to their final state of
+instantiation.  To describe states of instantiation, we use information
+provided by the type system.  Types can be viewed as regular trees with
+two kinds of nodes: or-nodes representing types and and-nodes
+representing constructors.  The children of an or-node are the
+constructors that can be used to construct terms of that type; the
+children of an and-node are the types of the arguments of the
+constructors.  We attach mode information to the or-nodes of type trees.
+
+   An "instantiatedness tree" is an assignment of an "instantiatedness"
+-- either "free" or "bound" -- to each or-node of a type tree, with the
+constraint that all descendants of a free node must be free.
+
+   A term is "approximated by" an instantiatedness tree if for every
+node in the instantiatedness tree,
+
+   * if the node is "free", then the corresponding node in the term (if
+     any) is a free variable that does not share with any other variable
+     (we call such variables "distinct");
+
+   * if the node is "bound", then the corresponding node in the term
+     (if any) is a function symbol.
+
+   When an instantiatedness tree tells us that a variable is bound,
+there may be several alternative function symbols to which it could be
+bound.  The instantiatedness tree does not tell us which of these it is
+bound to; instead for each possible function symbol it tells us exactly
+which arguments of the function symbol will be free and which will be
+bound.  The same principle applies recursively to these bound arguments.
+
+   Mercury's mode system allows users to declare names for
+instantiatedness trees using declarations such as
+
+     :- inst listskel = bound( [] ; [free | listskel] ).
+
+   This instantiatedness tree describes lists whose skeleton is known
+but whose elements are distinct variables.  As such, it approximates
+the term `[A,B]' but not the term `[H|T]' (only part of the skeleton is
+known), the term `[A,2]' (not all elements are variables), or the term
+`[A,A]' (the elements are not distinct variables).
+
+   As a shorthand, the mode system provides `free' and `ground' as
+names for instantiatedness trees all of whose nodes are free and bound
+respectively.  The shape of these trees is determined by the type of
+the variable to which they apply.
+
+   As execution proceeds, variables may become more instantiated.  A
+"mode mapping" is a mapping from an initial instantiatedness tree to a
+final instantiatedness tree, with the constraint that no node of the
+type tree is transformed from bound to free.  Mercury allows the user
+to specify mode mappings directly by expressions such as `inst1 ->
+inst2', or to give them a name using declarations such as
+
+     :- mode m :: inst1 -> inst2.
+
+   Two standard shorthand modes are provided, corresponding to the
+standard notions of inputs and outputs:
+
+     :- mode in :: ground -> ground.
+     :- mode out :: free -> ground.
+
+   Prolog fans who want to use the symbols `+' and `-' can do so by
+simply defining them using a mode declaration:
+
+     :- mode (+) :: in.
+     :- mode (-) :: out.
+
+   These two modes are enough for most functions and predicates.
+Nevertheless, Mercury's mode system is sufficiently expressive to
+handle more complex data-flow patterns, including those involving
+partially instantiated data structures.  (The current implementation
+does not handle partially instantiated data structures yet.)
+
+   For example, consider an interface to a database that associates
+data with keys, and provides read and write access to the items it
+stores.  To represent accesses to the database over a network, you
+would need declarations such as
+
+     :- type operation
+             --->    lookup(key, data)
+             ;       set(key, data).
+     :- inst request =
+             bound(  lookup(ground, free)
+             ;       set(ground, ground)
+             ).
+     :- mode create_request :: free -> request.
+     :- mode satisfy_request :: request -> ground.
+
+   `inst' and `mode' declarations can be parametric.  For example, the
+following declaration
+
+     :- inst listskel(Inst) = bound( [] ; [Inst | listskel] ).
+
+defines the inst `listskel(Inst)' to be a list skeleton whose elements
+have inst `Inst'; you can the use insts such as
+`listskel(listskel(free))', which represents the instantiation state of
+a list of lists of free variables.  The standard library provides the
+parametric modes
+
+     :- mode in(Inst) :: Inst -> Inst.
+     :- mode out(Inst) :: free -> Inst.
+
+so that for example the mode `create_request' defined above could have
+be defined as
+
+     :- mode create_request :: out(request).
+
+   A "predicate mode declaration" assigns a mode mapping to each
+argument of a predicate.  A "function mode declaration" assigns a mode
+mapping to each argument of a function, and a mode mapping to the
+function result.  Each mode of a predicate or function is called a
+"procedure".  For example, given the mode names defined by
+
+     :- mode out_listskel ::
+             free -> listskel.
+     :- mode in_listskel ::
+             listskel -> listskel.
+
+   the (type and) mode declarations of the function length and
+predicate append are as follows:
+
+     :- func length(list(T) = int.
+     :- mode length(in_listskel) = out.
+     :- mode length(out_listskel) = in.
+     
+     :- pred append(list(T), list(T), list(T)).
+     :- mode append(in, in, out).
+     :- mode append(out, out, in).
+
+   Note that functions may have more than one mode, just like
+predicates; functions can be reversible.
+
+   Alternately, the mode declarations for `length' could use the
+standard library modes `in/1' and `out/1':
+
+     :- func length(list(T)) = int.
+     :- mode length(in(listskel)) = out.
+     :- mode length(out(listskel)) = in.
+
+   If a predicate or function has only one mode, the `pred' and `mode'
+declaration can be combined:
+
+     :- func length(list(T)::in) = (int::out).
+     :- pred append(list(T)::in, list(T)::in, list(T)::out).
+
+   If there is no mode declaration for a function, the compiler assumes
+a default mode for the function in which all the arguments have mode
+`in' and the result of the function has mode `out'.  (However, there is
+no requirement that a function have such a mode; if there is any
+explicit mode declaration, it overrides the default.)
+
+   A function or predicate mode declaration is an assertion by the
+programmer that for all possible argument terms and (if applicable)
+result term for the function or predicate that are approximated (in our
+technical sense) by the initial instantiatedness trees of the mode
+declaration and all of whose free variables are distinct, if the
+function or predicate succeeds then the resulting binding of those
+argument terms and (if applicable) result term will in turn be
+approximated by the final instantiatedness trees of the mode
+declaration, with all free variables again being distinct.  We refer to
+such assertions as "mode declaration constraints".  These assertions
+are checked by the compiler, which rejects programs if it cannot prove
+that their mode declaration constraints are satisfied.
+
+   Note that with the usual definition of append, the mode
+
+     :- mode append(in_listskel, in_listskel, out_listskel).
+
+   would not be allowed, since it would create aliasing between the
+different arguments -- on success of the predicate, the list elements
+would be free variables but they would not be distinct.
+
+   In Mercury it is always possible to call a procedure with an
+argument that is is more bound than the initial inst specified for that
+argument in the procedure's mode declaration.  In such cases, the
+compiler will insert additional unifications to ensure that the
+argument actually passed to the procedure will have the inst specified.
+For example, if the predicate `p/1' has mode `p(out)', you can still
+call `p(X)' if `X' is ground.  The compiler will transform this code to
+`p(Y), X = Y' where `Y' is a fresh variable.  It is almost as if the
+predicate `p/1' has another mode `p(in)'; we call such modes "implied
+modes".
+
+   To make this concept precise, we introduce the following definition.
+A term "satisfies" an instantiatedness tree if for every node in the
+instantiatedness tree,
+
+   * if the node is "free", then the corresponding node in the term (if
+     any) is either a distinct free variable, or a function symbol.
+
+   * if the node is "bound", then the corresponding node in the term
+     (if any) is a function symbol.
+
+   The "mode set" for a predicate or function is the set of mode
+declarations for the predicate or function.  A mode set is an assertion
+by the programmer that the predicate should only be called with
+argument terms that satisfy the initial instantiatedness trees of one
+of the mode declarations in the set (i.e. the specified modes and the
+modes they imply are the only allowed modes for this predicate or
+function).  We refer to the assertion associated with a mode set as the
+"mode set constraint"; these are also checked by the compiler.
+
+   A predicate or function P is "well-moded with respect to a given
+mode declaration" if given that the predicates and functions called by P
+all satisfy their mode declaration constraints, there exists an
+ordering of the literals in the definition of P such that
+
+   * P satisfies its mode declaration constraint, and
+
+   * P satisfies the mode set constraint of all of the predicates and
+     functions it calls
+
+   We say that a predicate or function is well-moded if it is
+well-moded with respect to all the mode declarations in its mode set,
+and we say that a program is well-moded if all its predicates and
+functions are well-moded.
+
+   The mode analysis algorithm checks one procedure at a time.  It
+abstractly interprets the definition of the predicate or function,
+keeping track of the instantiatedness of each variable, and selecting a
+mode for each call and unification in the definition.  To ensure that
+the mode set constraints of called predicates and functions are
+satisfied, the compiler may reorder the elements of conjunctions; it
+reports an error if no satisfactory order exists.  Finally it checks
+that the resulting instantiatedness of the procedure's arguments is the
+same as the one given by the procedure's declaration.
+
+   The mode analysis algorithm annotates each call with the mode used.
+
+
+File: mercury_ref.info,  Node: Unique modes,  Next: Determinism,  Prev: Modes,  Up: Top
+
+Unique modes
+************
+
+   Mode declarations can also specify so-called "unique modes".
+Mercury's unique modes are similar to "linear types" in some functional
+programming languages such as Clean.  They allow you to specify when
+there is only one reference to a particular value, and when there will
+be no more references to that value.  If the compiler knows there are
+will be more references to a value, it can perform "compile-time
+garbage collection" by automatically inserting code to deallocate the
+storage associated with that value.  Even more importantly, the
+compiler can also simply reuse the storage immediately, for example by
+destructively updating one element of an array rather than making a new
+copy of the entire array in order to change one element.  Unique modes
+are also the mechanism Mercury uses to provide declarative I/O.
+
+   We have not yet implemented unique modes fully, and the details are
+still in a state of flux.  So the following should be considered
+tentative.
+
+* Menu:
+
+* Destructive update::
+* Backtrackable destructive update::
+* Limitations of the current implementation::
+
+
+File: mercury_ref.info,  Node: Destructive update,  Next: Backtrackable destructive update,  Up: Unique modes
+
+Destructive update
+==================
+
+   In addition to the insts mentioned above (`free', `ground', and
+`bound(...)'), Mercury also provides "unique" insts `unique' and
+`unique(...)' which are like `ground' and `bound(...)' respectively,
+except that they carry the additional constraint that there can only be
+one reference to the corresponding value.  There is also an inst `dead'
+which means that there are no references to the corresponding value, so
+the compiler is free to generate code that reuses that value.  There
+are three standard modes for manipulation unique values:
+
+     % unique output
+     :- mode uo :: free -> unique.
+     
+     % unique input
+     :- mode ui :: unique -> unique.
+     
+     % destructive input
+     :- mode di :: unique -> dead.
+
+   Mode `uo' is used to create a unique value.  Mode `ui' is used to
+inspect a unique value without losing its uniqueness.  Mode `di' is
+used to deallocate or reuse the memory occupied by a value that will
+not be used.
+
+   Note that a value is not considered `unique' if it might be needed
+on backtracking.  This means that unique modes are generally only
+useful for code whose determinism is `det' or `cc_multidet' (*note
+Determinism::.).
+
+
+File: mercury_ref.info,  Node: Backtrackable destructive update,  Next: Limitations of the current implementation,  Prev: Destructive update,  Up: Unique modes
+
+Backtrackable destructive update
+================================
+
+     "Well it just so happens that your friend here is only *mostly*
+     dead.
+     There's a big difference between mostly dead and all dead...
+     Now, mostly dead is slightly alive.
+     Now, all dead -- well, with all dead, there's usually only one
+     thing that you can do."
+
+     "What's that?"
+
+     "Go through his clothes and look for loose change!"
+
+     -- from the movie "The Princess Bride".
+
+   To allow for backtrackable destructive updates -- that is, updates
+whose effect is undone on backtracking, perhaps by recording the
+overwritten values on a "trail" so that they can be restored after
+backtracking -- Mercury also provides "mostly unique" modes.  The insts
+`mostly_unique' and `mostly_dead' are equivalent to `unique' and `dead',
+except that only references which will be encountered during forward
+execution are counted - it is OK for `mostly_unique' or `mostly_dead'
+values to be needed again on backtracking.
+
+
+File: mercury_ref.info,  Node: Limitations of the current implementation,  Prev: Backtrackable destructive update,  Up: Unique modes
+
+Limitations of the current implementation
+=========================================
+
+   The implementation of the mode analysis algorithm is not quite
+complete; as a result, it is not possible to use nested unique modes,
+i.e.  modes in which anything but the top level of a variable is unique.
+If you do, you will get unique mode errors when you try to get a unique
+field of a unique data structure.
+
+   The Mercury compiler does not (yet) reuse `dead' values.  The only
+destructive update in the current implementation occurs in the library
+modules for I/O and arrays.  We do however plan to implement structure
+reuse and compile-time garbage collection in the very near future.
+
+   Reusing `mostly_dead' values would require keeping a trail, which
+might negatively impact on the performance of code which didn't use
+backtrackable destructive update.  Furthermore, it wouldn't have such a
+big impact as reuse of `dead' values; it really pays off only for large
+structures or arrays.  As a result, implementing reuse of `mostly_dead'
+values is a much lower priority on our implementation schedule.
+
+
+File: mercury_ref.info,  Node: Determinism,  Next: Higher-order,  Prev: Unique modes,  Up: Top
+
+Determinism
+***********
+
+* Menu:
+
+* Determinism categories::
+* Determinism checking and inference::
+* Replacing compile-time checking with run-time checking::
+* Interfacing nondeterministic code with the real world::
+* Committed choice nondeterminism::
+

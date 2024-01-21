@@ -1,0 +1,341 @@
+SIThis file describes:
+
+- Intro
+- NFS Exporting your filesystems
+- Making an nfsroot boot flop.
+- Configuring /etc for the clients
+- Files /etc/{fstab,inittab,init.d/boot} are special
+- Configuring other things than /etc
+- Running of bootpd
+- Location of /tftpboot
+- The other stuff on the /tftpboot diretories
+- Swapfile
+- System resources usage of nrprobenet
+- Misc
+
+***********
+Intro
+
+There are two ways to configure this package:
+  - For Manual operation: You setup the /etc/bootpdtab entries yourself,
+    and for each client you start "mknfsroot clientname" manually,
+    to make the /tftpboot/$clientip dir.
+    This is the default.
+
+  - By changing the "0" to "1" in /etc/init.d/nrprobenet, the nrprobenet
+    programme constantly sends pings around the network, to obtain
+    the hw addresses for all hosts (except those listed in
+    /etc/nfsroot/ignorehosts), makes /etc/bootpdtab, and
+    starts "mknfsroot clientname" for all clients found.
+
+    Before you do this, you may want to make /tftpboot reside off you
+    root partition (I make it point to my hdb1 partition this way):
+      rm -rf /tftpboot
+      mkdir /mnt/hdb1/tftpboot
+      ln -s /mnt/hdb1/tftpboot /tftpboot
+    (/tftpboot uses about 1326k + 30k/client (=3M in my 60 client case)).    
+
+    (nrprobenet also sends a SIGHUP to bootpd when it changes /etc/bootpdtab,
+    and kills and restarts the nfsdaemons when it created a /tftpboot
+    dir).
+
+Then, configure the clients:
+  - The default setup is to do the same as your server, without
+    some network daemons (see /etc/nfsroot/ignorefiles)
+  - If you do: "cd /etc/nfsroot/default/etc/init.d; cp boot.simple boot",
+    The clients will only start inetd and X (server needs to have XDM running)
+  - I've also included a file samba-print.tar.gz that, if
+    you unpack it in /etc/nfsroot/$IP/, will make host $IP a samba
+    printer server (I hope), using a modified version of boot.simple
+
+***********
+NFS Exporting your filesystems
+
+Before you do anything with this, you will have to make your
+nfsserver allow the servers to mount a couple of directories:
+
+/tftpboot
+/usr 
+/lib 
+/bin 
+/sbin
+/dev 
+/etc 
+/tmp 
+/home
+
+Althought the last two aren't really needed, the others are.
+You can do this by putting in your /etc/exports file:
+
+/tftpboot *.your.domain(rw,no_root_squash)
+/usr	  *.your.domain(ro,squash_uids=0-100,squash_gids=0-80)
+/etc      *.your.domain(ro,squash_uids=0-100,squash_gids=0-80)
+/dev	  *.your.domain(ro,squash_uids=0-100,squash_gids=0-80)
+/bin	  *.your.domain(ro,squash_uids=0-100,squash_gids=0-80)
+/sbin	  *.your.domain(ro,squash_uids=0-100,squash_gids=0-80)
+/lib	  *.your.domain(ro,squash_uids=0-100,squash_gids=0-80)
+/tmp	  *.your.domain(rw,squash_uids=0-100,squash_gids=0-80)
+
+(Or, read exports(5))
+
+(Configuring the clients to mount other directories than your
+top ones is really easy, just edit /etc/nfsroot/default/etc/fstab,
+and "rm -rf /tftpboot/*" (or read "Configuring /etc/ for the clients"))
+
+
+***********
+Making an nfsroot boot flop. (Part a: the precompiled kernel)
+
+I inserted a Linux kernel compiled for as many ethernet cards as I could
+find. dd-ing this file to a floppy shoul give you a nfsroot floppy.
+
+  dd if=/usr/lib/nfsroot/vmlinuz-2.0.21-nfsroot of=/dev/fd0
+
+To make it easy to create these floppies for any user
+(the command above us usually way to complicated for most users,
+and it always dd-s it to the server's /dev/fd0), I made a small
+skript that checks if $DISPLAY is  eighter ":0.0" or "" (localhost,
+dd to /dev/fd0), or anything else (remotehost, rsh to client, and
+dd it to client's /def/fd0).
+
+(BTW, the mknfsroot command will fail if issued on a client when
+the client doesn't allow the server to rsh to it (/etc/hosts.equiv),
+or when the client's /dev isn't writable by whoever executed the command).
+
+------
+Making an nfsroot boot flop. (Part a: compiling it yourself)
+
+when configuring the kernel, do everything just as you always do,
+but also say yes to:
+CONFIG_NFS_FS=y
+CONFIG_ROOT_NFS=y
+CONFIG_RNFS_BOOTP=y
+
+The server doesn't need to have anything special compiled in.
+
+**********
+Configuring /etc for the clients
+
+If, say, all (or most) of the computers on your network have for example
+S3 video cards, then you should put XF86Config+Xserver files in
+/etc/nfsroot/default/etc/X11/. This way, all clients will by default
+have a link from their /etc/X11/XF86Config to the server's etc (mounted 
+on /remote_etc), thus to /remote_etc/nfsroot/default/etc/X11/XF86Config.
+
+For the one computer that uses a Cirrus Logic card (say with
+IP address 123.45.67.89), you would create this directory on
+your server /etc:
+  /etc/nfsroot/132.45.67.89/etc/X11
+and put the CL XF86Config+Xserver files in there. This way, nfsroot
+will setup a link from their /etc/X11/XF86Config to 
+/remote_etc/nfsroot/123.45.67.89/etc/X11/XF86Config.
+
+BTW, after you put the files in /etc/nfsroot/default or
+/etc/nfsroot/$IP, you probably should remove the corresponding directories
+in /tftpboot, so that nrprobenet will notice them not existing, and
+recreating them (with the new links in them).
+
+This way, it's easy to setup a file in /etc that's by default different
+from the server, and, in addition, make them different for one
+specific client. Also, this way I fully comply with the Debian
+policy of putting all config stuff on /etc. (The other option,
+putting all config stuff on /tftpboot/*/etc probably doesn't).
+Another main advantage is (I think) that with this way, you
+only need 21K diskspace per possible client.
+
+
+On the other hand, to stick with the XF86Config example, the
+easiest way to create these files is by running xf86config
+on the client. Suppose you want to configure client
+123.45.67.88 this way. This I one way to do it:
+  on client 123.45.67.88:
+     # rm /etc/X11/{XF86Config,Xserver}
+     # xf86config
+    (and make the file /etc/X11/Xserver contain the name of the right
+     server)
+  Then, later WHEN the client is fully configured, you should run
+  on the server:
+     # nr2etc 123.45.67.88 
+     # rm -rf /tftpboot/132.45.67.88
+     # mknfsroot 123.45.67.88
+This way, the just created files in the client's /etc dir will
+first be copied to the server's /etc/nfsroot/123.45.67.88/etc
+The rm and mknfsroot commands are there to clear out the dir
+again (save diskspace).
+
+It's perfectly OK to leave the files on the /tftpboot/$IP dirs,
+although it does have the disadvantage that /tftpboot/$IP has to be 
+exported rw, and that all config files you've been toiling to creat can
+be deleted by anyone on the network if you leave them on /tftpboot/$IP
+
+
+***********
+Files /etc/{fstab,inittab,init.d/boot} are special
+
+There are currently 3 files in /etc handled differently from that described 
+above: /etc/{fstab,inittab,init.d/boot}.
+These files _have_ to be present before the client's remote_etc
+(the server's /etc) is mounted. This makes them not eligable for the
+symlinks, so instead of making symlinks I copy the files themselves.
+You can still create defaults for the different clients the same
+way as you do with the other files in /etc. (However, nr2etc
+doesn't work (yet?) on them).
+
+Also, in these files, you can use the strings
+  SERVERIP
+  CLIENTIP
+and they will be replaced by $SERVERIP, $CLIENTIP, respectively  
+
+
+************
+Configuring other things than /etc
+
+Bascially, you should not need to give one client a different than the
+server file in any other directory than /etc. But, life isn't perfect,
+so you should be able to do so. One way to do this is
+simply make a symlink into /etc, for example, I want my floppydisk
+writable by root only on the server, but for the clients I want them
+to be writable by anywone:
+
+(all on the server):
+  cd /dev
+  mv fd0 fd0-server
+  ln -s /etc/fd0 fd0
+
+  cd /etc
+  ln -s /dev/fd0-server fd0
+  
+  cd /etc/nfsroot/default/etc
+  ln -s /ldev/fd0 fd0
+  
+  echo "mkdir /ldev; mknod -m 666 /ldev/fd0 b 2 0" >> \
+    /etc/nfsroot/default/etc/init.d/boot
+
+(I cannot put the world-writable fd0 itself on /etc/nfsroot/default/etc,
+as then anyone on the server can still write to my floppies. That's
+why I had to add this extra stuff in the boot script, so that the
+clients create the world-writable fd0 at boot time, locally).
+
+
+************
+Running of bootpd.
+
+In order to make nfsroot work, you _have_ to run bootpd.
+The netstd package (with bootpd in it) didn't include a /etc/init.d/bootpd
+script, so I included one with this package.
+It gets executed when you install this package.
+
+Bootpd is the programme that answers the bootp requests (requests
+from the nfsroot clients that at boot time only know the hw adress of
+their ethernet card, and want to find out about their IP number).
+
+Bootpd can also inform the clients what gateway they should use.
+To configure this, add it to /etc/nfsroot/bootpdtab (see comment
+at end of file). (Maybe you have to kill nrprobenet and restart it
+for the change to take effect).
+
+
+************
+Location of /tftpboot
+
+At installation time, this directory lives in your root partition.
+However, it's quite likely this is not where you want it to be.
+Here's one way to move it to wherever you've mounted your /var
+partition:
+
+  # /etc/init.d/nrprobenet stop
+  # mkdir /var/tftpboot
+  # cp -a /tftpboot/* /var/tftpboot     #this is not really needed
+  # rm -rf /tftpboot
+  # ln -s /var/tftpboot /tftpboot
+  # /etc/init.d/nrprobenet start
+
+
+************
+The other stuff on the /tftpboot diretories
+
+There's:
+
+  /tftpboot/store
+This directory is created each time you run mknfsroot, and _seems_
+to have approx 1307 Kbyte in it. However, DO NOT remove it:
+-it will not increace your your free disk space, as in
+ /tftpboot/$IP/{bin,lib,sbin} diretories have hard links to
+ these files.
+-the next time you run mknfsroot, it will DECREASE your
+ free diskspace by 1307 Kbyte, as the newly created directory
+ will now use different files from the others.
+
+  /tftpboot/$IP/{bin,sbin,lib}
+These directories all have to have a few essential binaries
+(configurable with the NEED_BINS variable in /etc/nfsroot/def)
+in them, that are needed to mount the other directories from the
+server. Each direcotry only has hardlinks to the /tftpboot/store
+directory, so not much space is taken up by them.
+Although having them on /tftpboot neccecerily means allowing one
+client to averride the files (and thus causing all clients to
+stop booting), one simple "mknfsroot anyhost" will recover this.
+
+************
+Swapfile
+
+The default /etc/init.d/boot script from the clients will ask
+for a partition, fs type, filename and filesize. the answers to
+these questions will be saved to /etc/nrclientconfig (on the
+sever: /tftpboot/$ip/etc/nrclientconfig), and will be used the next
+time the client boots.
+
+If you want (like me) all clients to have the same swapfilename,
+size, device, etc, you can put the file nrclientconfig in
+/etc/nfsroot/default/etc/nrclientconfig (like this one):
+   SWAP=y
+   SWAPFILEDEV=/dev/hda1
+   FSTYPE=msdos
+   SWAPFILENAME=lin_swap
+   SWAPFILESIZE=8000
+
+(or, saying "n" to SWAP will stop swapping)   
+This way, the clients boot without questions.
+
+************
+System resources used by nrprobenet:
+
+Memory usage of nrprobenet: After some time, top will show that nrprobenet
+has (on my system) 636 kBytes memory resident. This seems _way to much
+for such a simple programme. Fortunately, out of those 636 kBytes, 616 kBytes
+are "Shared", i.e. libraries, also used by other programmes. So, it's not all
+that bad.
+
+CPU usage: The "main" nrpobenet process uses (again on my P90) about
+1 min cpu per 3 hours running, i.e. 0.5% (and that's with a probe interval
+of 2 s, default is 4 s). As I couldn't see how I could get the
+SO_SNDTIMEO to work, I had to fork of a seperate process for each
+ping. This seperate process's CPU time isn't recorded in this CPU time, but
+from testing in know that the simple ping process does can be itterated
+at least 100 times a second, without much CPU load. So, I guess the 0.5%
+CPU usage as total is rather accurate.
+
+
+***********
+Misc
+
+All the real work to boot the nfsroot clients is done by:
+
+ -- the kernel
+ -- the bootp daemon (to answer the requests for IP numbers from the clients)
+ -- the nfs server (all the rest).
+
+This package really only makes it easy to use all the fabulous
+functionality provided by the programmes mentioned above. Also,
+this package allows the nfsroot clients to be easily configured,
+or updated when you update your server. It may well be that other
+ways to do things result in a better system -- if you have any
+suggestions, please mail me.
+
+
+************
+
+GNU copyleft joost witteveen, <joostje@debian.org>
+
+Please, send your comments, success stories, failures, whatever,
+to me.

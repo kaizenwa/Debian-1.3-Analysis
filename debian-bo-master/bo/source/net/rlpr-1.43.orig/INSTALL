@@ -1,0 +1,151 @@
+This is a public release of rlpr 1.43
+$Id: INSTALL,v 1.12 1997/01/14 01:04:33 meem Exp $
+
+For details on getting started with rlpr please see the accompanying README
+
+Please report any bugs, suggestions, etc, to meem@gnu.ai.mit.edu
+Copyright (c) 1996, 1997 meem, meem@gnu.ai.mit.edu
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 1, or (at your option)
+any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of 
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+General Public License for more details.
+
+NOTE:   It is recommended you replace berkeley lpr with rlpr.
+====    However, there are some subtleties. Please read "REPLACING
+        LPR WITH RLPR" first!
+
+
+INSTALLATION OVERVIEW
+=====================
+
+Because the rlpr package can be used in two different ways, there
+are two different installation procedures.  No matter how you install
+rlpr, it accomplishes the same purpose: the ability to print from one
+computer on the internet to another, using server-side authorization.
+
+If you are a sysadmin looking to provide the ability for your users to
+print from your machine to another machine on the internet running
+lpd, follow the sysadmin instructions.  In this case you will install
+the rlpr client.  The rlprd proxy daemon will also be installed, but
+shouldn't be necessary for most configurations.  Sysadmins MUST do
+installations as root in order for rlpr to be installed setuid root.
+(rlpr needs to be setuid root to bind to a privileged port).
+
+If you are a user looking to gain the ability to print from a machine
+you don't have root access on, follow the user instructions.  Users
+using this configuration must either install the rlprd proxy agent
+setuid root on a machine they do have root access on, or must know of
+a public rlprd proxy on the internet that they can use.  rlprd must be
+root because it needs to bind to a privileged port.
+
+
+INSTALLATION INSTRUCTIONS FOR SYSADMINS
+=======================================
+
+  1) su to root
+  2) ./configure --prefix=/usr/local
+  3) make install
+
+  Users can now use rlpr to print to machines running lpd from your
+  machine by running the rlpr client. They will need to configure rlpr
+  to know about the machine and printqueue they wish to print to -- this
+  information is available by reading rlpr(1) and README.
+
+
+INSTALLATION INSTRUCTIONS FOR USERS
+===================================
+
+  On the machine you wish to print from, you need to install the rlpr
+  client.  Between the rlpr client and lpd server, there must be a hop
+  to an rlprd proxy, which can be installed on any machine so long as
+  it can be installed setuid root.  If the rlpr client can be
+  installed setuid root in the first place, rlprd isn't needed. 
+
+  client machine (root isn't needed)
+  ----------------------------------
+
+  1) ./configure
+  2) make 
+  3) move the manpages and binaries to wherever you wish.
+     rlpr is the only file that is necessary on the client side.
+
+  proxy (server) machine (root needed)
+  ------------------------------------
+
+  NOTE: this step may not be necessary.  If you know someone running
+        a rlprd proxy, you can use theirs.  See the README and rlpr(1)
+        for details.
+
+  1) su to root
+  2) ./configure --prefix=/usr/local
+  3) make install
+
+  proceed to the README for info on getting started
+
+
+GENERAL NOTES
+=============
+
+  The machine you wish to print to must be configured to allow
+  connections from the machine running the rlprd proxy.  Under
+  UNIX, this usually involves editing the local machine's
+  /etc/hosts.lpd file. 
+
+  If the proxy (the machine running the rlprd) is the same machine
+  as the final destination, you have to put an entry for your own
+  machine in the /etc/hosts.lpd
+
+  How to do this is beyond the scope of this documentation.
+	
+  Note that anyone print to your printer if they know the proxy
+  you trust, your printer name and your hostname, This is because
+  the proxy trusts everyone, and traditional Berzerkeley lpd has
+  lame host-based security.
+  IF THIS BOTHERS YOU, DO NOT USE RLPR THIS WAY.
+
+
+REPLACING LPR WITH RLPR
+=======================
+
+You are encouraged to use rlpr as your standard printing client.
+There are two main advantages to this:
+
+  1. If you are not printing documents locally, you do not need
+     to run an lpd(8).
+
+  2. lpr is plagued with buffer overflow problems which lead to
+     security holes.  rlpr allocates all of its buffers dynamically,
+     without the use of fixed buffersizes.  Additionally, rlpr only
+     uses its "setuid" privileges to do the port binds, and
+     otherwise runs under the privileges of the real uid.  This
+     makes rlpr less vulnerable to security holes.
+
+To use rlpr as lpr, just type "make lpr".  This will save your old lpr
+as /usr/bin/lpr.bsd, and create a symlink from "/usr/bin/lpr" (or
+wherever) to rlpr.  
+
+Additionally, you must set the RLPR_PRINTHOST shell variable to be the
+name of the local machine, or set up an .rlprrc file which associates
+a host with your PRINTER or LPDEST setting.  If you are a sysadmin who
+needs to provide defaults for all your users, you can create a
+systemwide /etc/rlprrc file.  See rlprrc(5) for details.
+
+rlpr will examine its argv[0] to see if it was invoked as lpr.  If it
+was, it will not display the usual diagnostic messages unless the
+--verbose option is given, in order to be compatible with programs
+that expect lpr's strong silent personality.
+
+BEWARE of hidden circular dependencies!  For example, programs that
+"do the printing themselves" like enscript actually spawn lpr to do
+the work.  For example, if you use Linux Magicfilter, this may lead to
+an infinite loop of lpr and enscript calling each other!  If this
+happens, you can use the -p option with enscript to specify an output
+file (-p - sends to stdout).  Note that this isn't a bug in any
+program, it's just an artifact of the configuration.
+

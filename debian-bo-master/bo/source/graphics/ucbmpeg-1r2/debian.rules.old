@@ -1,0 +1,125 @@
+#!/usr/bin/make -f
+# Copyright 1994,1995 by Ian Jackson, and Raul Miller.
+# We hereby give you perpetual unlimited permission to copy, modify and
+# relicense this file, provided that you do not remove our names from
+# the file itself.  (We assert our moral right of paternity under the
+# Copyright, Designs and Patents Act 1988.)
+
+
+package=ucbmpeg
+version=1r2
+debian=2
+
+# The next section may have to be extensively modified
+
+DIRS= convert mpeg_bits mpeg_blocks mpeg_encode mpeg_play mpeg_stat
+
+build:
+	$(checkdir)
+	cp -aul mpeg_play/Makefile.proto mpeg_play/Makefile
+	for d in $(DIRS); do (cd $$d; $(MAKE)) || exit 1; done
+	touch build
+
+clean:
+	$(checkdir)
+	rm -f build
+	for d in $(DIRS); do (cd $$d; make clobber || make clean) || exit 1; done
+	rm -rf debian-tmp *~
+
+EXECS = convert/ppmtoeyuv convert/eyuvtoppm convert/eyuvtojpeg convert/jmovie2jpeg \
+	convert/mpeg_demux mpeg_bits/mpeg_bits mpeg_blocks/mpeg_blocks \
+	mpeg_encode/mpeg_encode mpeg_play/mpeg_play mpeg_stat/mpeg_stat 
+
+DEB = $(package)-$(version)-$(debian).deb
+
+binary: ../$(DEB)
+
+../$(DEB):	checkroot build
+	-rm -rf debian-tmp
+	mkdir debian-tmp
+	# DEBIAN
+	cp -R DEBIAN debian-tmp/DEBIAN
+	sed -e 's/^Version: =/Version: $(version)/; s/Revision: =/Revision: $(debian)/' \
+		DEBIAN/control > debian-tmp/DEBIAN/control
+	-chmod +x debian-tmp/DEBIAN/p*
+	# /usr/lib/mpeg
+	install -d debian-tmp/usr/lib/mpeg/bits
+	cd mpeg_bits; cp -r bitmaps *Help helpModule show.tcl ../debian-tmp/usr/lib/mpeg/bits/
+	install -d debian-tmp/usr/lib/mpeg/blocks
+	cd mpeg_blocks; cp -r show.tcl bitmaps ../debian-tmp/usr/lib/mpeg/blocks/
+	# /usr/bin
+	install -d debian-tmp/usr/bin
+	cp $(EXECS) debian-tmp/usr/bin
+	strip debian-tmp/usr/bin/*
+	# /usr/man
+	install -d debian-tmp/usr/man/man1
+	find doc $(DIRS) -name '*.1' -print |				\
+		while read m;						\
+		do							\
+			([ -f debian-tmp/usr/bin/`basename $$m .1` ]   	\
+				|| echo $$m | grep 'jpe?g' >/dev/null) 	\
+			&& (cp $$m debian-tmp/usr/man/man1 || exit 1);	\
+		done
+	# /usr/doc
+	install -d debian-tmp/usr/doc/copyright
+	cp debian.README debian-tmp/usr/doc/copyright/$(package)
+	install -d debian-tmp/usr/doc/ucbmpeg/mpeg_encode/jpeg
+	cp doc/* debian-tmp/usr/doc/ucbmpeg
+	cp mpeg_encode/docs/* debian-tmp/usr/doc/ucbmpeg/mpeg_encode
+	cd mpeg_encode/jpeg; cp *.doc* README ../../debian-tmp/usr/doc/ucbmpeg/mpeg_encode/jpeg
+	install -d debian-tmp/usr/doc/examples/ucbmpeg/mpeg_encode/jpeg
+	cp mpeg_encode/examples/* debian-tmp/usr/doc/examples/ucbmpeg/mpeg_encode
+	cp mpeg_encode/jpeg/example.c debian-tmp/usr/doc/examples/ucbmpeg/mpeg_encode/jpeg
+	-rm `find debian-tmp/usr/doc -name '*.1' -print`
+	#
+	chmod -R go-ws debian-tmp
+	dpkg --build debian-tmp
+	mv -f debian-tmp.deb $(DEB)
+	ln -f $(DEB) ..
+
+define checkdir
+	test -f mpeg_play/video.h
+endef
+
+# Below here is fairly generic
+
+DIR = $(package)-$(version)
+SRC = $(DIR)-$(debian).tar.gz
+DIF = $(DIR)-$(debian).diff.gz
+
+source: 	../$(SRC)
+diff:		../$(DIF)
+
+sourcedir:	.$(DIR)
+
+.$(DIR):	debian.rules debian.README $(shell echo DEBIAN/*)
+	$(checkdir)
+	rm -rf $(package)-* ../t$(DIR) $(DIR)		# get rid of any existing source dir
+	chmod +x debian.rules
+	-cp -alu . ../t$(DIR)				# make prototype source dir
+	cd ../t$(DIR)/mpeg_encode; ln -s ../convert .	# work around bug in cp
+	mv ../t$(DIR) ./$(DIR)				# give it proper path name
+	cd $(DIR); ./debian.rules clean			# remove any binaries, if present
+	cd $(DIR); rm -rf $(package).orig debian-tmp Extra # remove any remaining garbage
+	touch $@					# mark target as done
+
+origdir:
+	cd $(package).orig && $(checkdir)
+
+../$(SRC): 	sourcedir
+	tar cf $(DIR)-$(debian).tar $(DIR)
+	gzip -9vf $(DIR)-$(debian).tar
+	ln -f $(SRC) $@
+ 
+../$(DIF):		sourcedir origdir
+	(diff -ruN $(package).orig $(DIR) >$(DIR)-$(debian).diff; [ $$? = 1 ])
+	gzip -9vf $(DIR)-$(debian).diff
+	ln -f $(DIF) $@
+
+checkroot:
+	$(checkdir)
+	test root = "`whoami`"
+
+all: build source diff binary
+
+.PHONY: binary source diff clean checkroot sourcedir origdir all

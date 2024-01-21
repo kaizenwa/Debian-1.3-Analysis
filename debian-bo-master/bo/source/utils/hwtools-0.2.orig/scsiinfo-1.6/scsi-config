@@ -1,0 +1,202 @@
+#!/usr/bin/wish -f
+# Copyright 1993 Yggdrasil Computing, Incorporated
+# You may copy this file according to the terms and conditions of version 2
+# of the GNU General Public License as published by the Free Software
+# Foundation.
+
+set postgres_file /etc/rc.postgres
+
+set whoami [exec whoami]
+if { [string compare $whoami root] != 0 && [string compare [lindex $argv 0] -demo] != 0} then {
+    frame .warn
+    frame .warn.h
+    label .warn.h.l -bitmap warning -background pink
+    message .warn.h.m -aspect 200 -background pink -justify center -text \
+	{You need to be root in order to read the scsi\
+	 configuration options for a scsi device}
+    pack .warn.h.l .warn.h.m -side left -padx 10
+    frame .warn.f
+    button .warn.f.quit -text "Quit" -command exit \
+	-activeforeground white -activebackground red
+    button .warn.f.continue -text "Continue anyway" -activebackground green \
+	-command {destroy .warn}
+    pack .warn.h .warn.f -side top -pady 10
+    pack .warn.f.continue .warn.f.quit -side left -padx 10
+    pack .warn
+    tkwait window .warn
+}
+
+set sdevice $argv
+while { [string compare [lindex $sdevice 0] ""] == 0 } {
+    frame .select
+    frame .select.h
+    label .select.h.l -bitmap questhead -background pink
+    message .select.h.m -aspect 200 -background pink -text \
+	{Select a scsi device}
+    frame .select.f
+    button .select.f.quit -text "Quit" -command exit \
+	-activeforeground white -activebackground red
+    button .select.f.continue -text "Continue" -activebackground green \
+	-command {destroy .select}
+    pack .select.f.continue .select.f.quit -side left -padx 10
+    pack .select.h.l .select.h.m -side left -padx 10
+    pack .select.h .select.f -pady 10
+    pack .select
+    exec /usr/bin/scsiinfo -l > /tmp/devices
+    if {[catch {set file [open /tmp/devices r]}] == 1} return;
+    gets $file line
+    close $file
+    exec rm /tmp/devices
+    set n 0
+    foreach x $line { 
+       radiobutton .select.$n -text "$x" -width 10   -variable sdevice -value $x -anchor w
+	pack .select.$n  -padx 3
+        set n [expr $n+1]
+    }
+    if { $n == 0 } then {
+	.select.f.continue configure -state disabled
+    } else {
+	.select.0 select
+    }
+    tkwait window .select
+}
+
+frame .header
+label .header.label -bitmap question -bg pink
+message .header.message -width 400 -bg pink -text \
+	"Scsi Mode Page configuration - $sdevice." 
+
+pack .header.label .header.message -side left -padx 15
+
+frame .f_top
+
+set line {}
+exec /usr/bin/scsiinfo -X -L $sdevice > /tmp/cachepage
+if {[catch {set file [open /tmp/cachepage r]}] == 1} return;
+gets $file line
+set pages_sup [lindex $line 0]
+set pages_notch [lindex $line 1]
+set curr_not [lindex $line 2]
+close $file
+exec rm /tmp/cachepage
+
+button .f_top.info -text "Device Info" -command "exec /usr/lib/scsi/inquiry $sdevice" \
+	-activebackground green
+pack .f_top.info -side left -padx 12 -ipadx 2 -ipady 2
+
+# This is not nice.. but it is how this works.. mabbe someone should change it.
+if { ($pages_sup & (1 << 3)) } then {
+  button .f_top.save -text "Save Changes"  -activebackground yellow   \
+    -command "exec /usr/lib/scsi/save-changes $sdevice"
+  pack .f_top.save -side left -padx 12 -ipadx 2 -ipady 2
+}
+
+button .f_top.filesave -activebackground green -text "Save To File"    \
+    -command "exec /usr/lib/scsi/save-file $sdevice"
+
+pack .f_top.filesave -side left -padx 12 -ipadx 2 -ipady 2
+
+button .f_top.quit -text "Quit" -command { exit } \
+	-activebackground red -activeforeground white
+
+pack .f_top.quit -side left -padx 12 -ipadx 2 -ipady 2
+
+pack .header .f_top -padx 10 -pady 10
+
+#At least one of pages 3,4,12 should be there to make this senseable
+if { ($pages_sup & ((1 << 3)|(1 << 4)|(1 << 12))) } then {
+  button .overview -text "Disk Drive Geometry Overview"  -activebackground green   \
+    -command "exec /usr/lib/scsi/overview $sdevice"
+  pack .overview -side top -pady 10 -ipadx 2 -ipady 2
+}
+
+message .copyright -width 400 -bg green -justify center -text\
+     {Copyright 1993 Yggdrasil Computing, Incorporated.  This configuration\
+     script may be copied and modified according to the terms and conditions\
+     of version 2 of the GNU General Public License as published by the\
+     Free Software Foundation (Cambridge, Massachusetts),\
+     provided that this notice is not removed.}
+
+# This script was originally the control panel from the yggdrasil
+# distribution.  I thought it looked pretty keen, and it was easy to
+# adapt, so I used it as the basis for the scsi configuration manager
+message .auinfo -width 400  -bg yellow -justify center -text\
+     {Modified by Eric Youngdale to form an X interface to the scsiinfo\
+      program. Some extensions made by Michael Weller.\
+      Note: Any changes you make will be lost when you power down \
+	the scsi device unless you save them. }
+
+pack .copyright -side top -pady 10 -padx 15
+pack .auinfo -side top -pady 10 -padx 15
+
+if { ($pages_sup & (1 << 12)) } then {
+  frame .notchinfo -bg SlateGray1
+  label .notchinfo.notchtext -bg SlateGray1\
+	-text "Notched pages are marked in SlateGray, current notch is:"
+  label .notchinfo.notchnum -bg SlateGray1 -text $curr_not
+  pack .notchinfo -side top -pady 10 -padx 15
+  pack .notchinfo.notchtext .notchinfo.notchnum -side left
+}
+
+frame .f1
+frame .f2
+
+proc notch_but_com {} {
+  global sdevice curr_not
+
+  exec /usr/lib/scsi/notch $sdevice
+  set line {}
+  exec /usr/bin/scsiinfo -X -L $sdevice > /tmp/cachepage
+  if {[catch {set file [open /tmp/cachepage r]}] == 1} return;
+  gets $file line
+  set curr_not [lindex $line 2]
+  close $file
+  exec rm /tmp/cachepage
+  .notchinfo.notchnum configure -text $curr_not
+}
+
+set next_frame f1
+
+proc setup_button { { button } { pageno } { text } { command } } {
+  global pages_sup pages_notch sdevice next_frame
+  
+# No button for unsupported features.
+  if { ! ($pages_sup & (1 << $pageno)) } then {
+    return 0 
+  }
+  if { [ string compare $command notch ] } then {
+#Standard button
+    button .$next_frame.$button -text $text\
+      -command "exec /usr/lib/scsi/$command $sdevice"
+  } else {
+#Additional stuff for notch button
+    button .$next_frame.$button -text $text -command notch_but_com
+  }
+  if { ($pages_notch & (1 << $pageno)) } then {
+    .$next_frame.$button configure -bg SlateGray1 -activebackground SlateGray2
+  }
+  pack .$next_frame.$button -pady 1 -anchor w
+  if { [ string compare $next_frame "f1" ] } then {
+    set next_frame "f1"
+  } else {
+    set next_frame "f2"
+  }
+}
+
+setup_button cache_button 8 "Cache Control Page" cache
+setup_button format_button 3 "Format Device Page" format
+setup_button control_button 10 "Control Mode Page" control
+setup_button error_button 1 "Read-Write Error Recovery Page" error
+setup_button verify_button 7 "Verify Error Recovery Page" verify
+setup_button disconnect_button 2 "Disconnect/Reconnect Page" disconnect
+setup_button rigid_button 4 "Rigid Disk Geometry Page" rigid
+setup_button periph_button 9 "Peripheral Device Page" peripheral
+setup_button notch_button 12 "Notch Page" notch
+
+# Add a dummy widget for proper alignment (if needed)
+if { [ string compare $next_frame "f1" ] } then {
+  label .f2.dummy -text " "
+  pack .f2.dummy -anchor w -pady 1
+}
+
+pack .f1 .f2 -side left -padx 15 -pady 10

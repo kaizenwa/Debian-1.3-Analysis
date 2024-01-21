@@ -1,0 +1,40 @@
+/* Copyright (C) 1991 Free Software Foundation, Inc.
+
+   This file is part of GNU Pascal Library.
+
+   Library Version number
+
+The GNU Pascal Library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Library General Public License as
+published by the Free Software Foundation; either version 2 of the
+License, or (at your option) any later version.
+
+The GNU Pascal Library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Library General Public License for more details.
+
+You should have received a copy of the GNU Library General Public
+License along with the GNU Pascal Library; see the file COPYING.LIB.  If
+not, write to the Free Software Foundation, Inc., 675 Mass Ave,
+Cambridge, MA 02139, USA.  */
+
+char *gpc_rts_version = "GNU Pascal run time library version 2.0(2.7.2.1)\n";
+
+#ifdef ALPHA_BUG
+/* I do not know why the linker starts to output the following,
+   but if it does, compiling this file and the RTS library fixes it...
+
+Warning: Linking some objects which contain exception information sections
+        and some which do not. This may cause fatal runtime exception handling
+        problems (last obj encountered without exceptions was <OBJ/LIB>)
+
+*/
+
+extern int _fpdata_size;
+_p_null_routine()
+{
+  int a = _fpdata_size;
+}
+
+#endif /* ALPHA_BUG */

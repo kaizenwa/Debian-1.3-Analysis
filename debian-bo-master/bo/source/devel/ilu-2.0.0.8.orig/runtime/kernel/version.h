@@ -1,0 +1,4 @@
+#define ILU_VERSION 2.0alpha8
+#define ILU_VERSION_STRING "2.0alpha8"
+#define ILU_MAJOR_VERSION 2
+#define ILU_MINOR_VERSION 0

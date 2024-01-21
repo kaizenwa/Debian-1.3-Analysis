@@ -1,0 +1,160 @@
+.\" Copyright (c) 1983, 1990, 1991 The Regents of the University of California.
+.\" Copyright (c) 1996 by Hanno Wagner <wagner@bidnix.bid.fh-hannover.de>
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. All advertising materials mentioning features or use of this software
+.\"    must display the following acknowledgement:
+.\"	This product includes software developed by the University of
+.\"	California, Berkeley and its contributors.
+.\" 4. Neither the name of the University nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"     @(#)accept.2	6.6 (Berkeley) 4/29/91
+.\"
+.\" Modified Sat Jul 24 16:42:42 1993 by Rik Faith (faith@cs.unc.edu)
+.\" Modified Wed May  8 21:15:12 1996 by Martin Schulze (joey@north.de)
+.\" Modified Mon Jun 10 00:55:48 1996 by Martin Schulze (joey@linux.de)
+.\"
+.TH ACCEPT 2 "8. Mai 1996" "BSD" "Systemaufrufe"
+.SH BEZEICHNUNG
+accept \- nimmt eine Verbindung auf einem Socket an
+.SH BEZEICHNUNG
+.B #include <sys/types.h>
+.sp
+.B #include <sys/socket.h>
+.sp
+.BI "int accept(int " s ", struct sockaddr *" addr ", int *" addrlen );
+.SH BESCHREIBUNG
+Der Parameter
+.I s
+ist ein Socket, der mit 
+.BR socket (2),
+erzeugt wurde, mit
+.BR bind (2)
+an eine Adresse gebunden wird und mit
+.BR listen (2) 
+auf Verbindungen wartet.  Die Funktion
+.B accept
+extrahiert den ersten Verbindungswunsch aus der Warteschlange
+der ankommenden Verbindungen, erzeugt einen neuen Socket mit den gleichen
+Eigenschaften von
+.I s
+und alloziiert einen neue Deskriptor für den Socket.  Wenn keine
+wartende Verbindung vorhanden ist und der Socket nicht als nicht-blockierend
+markiert ist, blockiert
+.B accept
+den aufrufenden Prozeß bis eine Verbindung vorhanden ist.  Wenn der Socket
+als nicht-blockierend markiert ist und keine wartenden Verbindungen
+vorhanden sind, gibt
+.B accept
+eine Fehlermeldung, wie sie unten beschrieben ist, zurück.  Der akzeptierte
+Socket kann nicht mehr für weitere Verbindungen benutzt werden.  Der
+Originalsocket
+.I s
+bleibt offen.
+
+Das Argument 
+.I addr
+ist ein Rückgabeparameter, das mit der Adresse der verbindenden
+Einheit gefüllt wird, wie sei der Kommunikationsschicht bekannt
+ist. Das exakte Format des 
+.I addr
+Parameters wird von der Domain festgelegt, in der die Kommunikation
+stattfindet. Die Variable
+.I addrlen
+ist ein Rückgabeparameter, sie sollte anfangs die Anzahl Bytes
+enthalten auf die
+.IR addr
+zeigt; bei der Rückgabe enthält es die aktuelle Länge der Adresse 
+(in Bytes).  Dieser Aufruf wird bei verbindungsbasierten Sockettypen
+benutzt, momentan in Verbindung mit
+.BR SOCK_STREAM . 
+
+Es ist möglich, einen Socket mit
+.BR select (2)
+aufzumachen, um ihn mit einem
+.B accept
+zum Lesen zu benutzen.
+
+Bei bestimmten Protokollen, die explizite Bestätigung verlangen, wie
+.B ISO
+oder
+.BR DATAKIT ,
+kann davon ausgegangen werden, daß
+.B accept
+nur die nächste Verbindung aus der Warteschlange holt ohne sie automatisch zu
+bestätigen.  Die Bestätigung kann ein normaler Lese- oder
+Schreibvorgang auf dem neuen Deskriptor mit sich bringen, eine
+Ablehung kann impliziert werden durch ein Schließen des neuen Sockets.
+
+Man kann die Daten einer Verbindungsanforderung ohne Bestätigung
+erhalten, indem man einen
+.BR recvmsg (2)
+Aufruf absetzt mit einer auf null gesetzten
+.I msg_iovlen
+un einem 
+.IR msg_controllen 
+ungleich null
+oder durch Aufruf von
+.BR getsockopt (2).
+Analog dazu kann man die Ablehnung einer Benutzerverbindung erzeugen,
+indem man 
+.BR sendmsg (2)
+nur mit den Kontrollinformationen aufruft oder durch
+.BR setsockopt (2).
+.SH "RUECKGABEWERTE"
+Die Funktion gibt bei Fehlern \-1 zurück. Wenn der Aufruf erfolgreich war,
+gibt sie einen positiven Integerwert zurück, der der Deskriptor für den
+aktzeptierten Socket ist.
+.SH FEHLER
+.TP
+.B EBADF
+Der Deskriptor ist ungültig.
+.TP
+.B ENOTSOCK
+Der Deskriptor referenziert eine Datei und keinen Socket.
+.TP
+.B EOPNOTSUPP
+Der referenzierte Socket ist nicht vom Typ
+.BR SOCK_STREAM . 
+.TP
+.B EFAULT
+Der Parameter
+.I addr
+ist kein beschreibbarer Teil des Adreßraums des Prozesses.
+.TP
+.B EWOULDBLOCK
+Der Socket ist als nicht-blockierend markiert, aber es sind keine zu
+akzeptierenden Verbindungen vorhanden.
+.SH GESCHICHTE
+Die Funktion
+.B accept
+erschien in BSD 4.2.
+.SH "SIEHE AUCH"
+.BR bind (2),
+.BR connect (2),
+.BR listen (2),
+.BR select (2),
+.BR socket (2).
+

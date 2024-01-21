@@ -1,0 +1,70 @@
+#!/bin/sh
+#
+# serial 1.18 1997/03/18 06:47:42 (David Hinds)
+#
+# Initialize or shutdown a PCMCIA serial device
+#
+# The first argument should be either 'start' or 'stop'.  The second
+# argument is the base name for the device.
+#
+# The script passes an extended device address to 'serial.opts' in the 
+# ADDRESS variable, to retrieve device-specific configuration options.
+# The address format is "scheme,socket,instance" where "scheme" is the
+# PCMCIA configuration scheme, "socket" is the socket number, and
+# "instance" is used to number multiple ports on a single card.  
+#
+
+. ./shared
+
+# Get device attributes
+get_info $DEVICE
+
+# Load site-specific settings
+ADDRESS="$SCHEME,$SOCKET,$INSTANCE"
+. ./serial.opts
+
+DIALOUT=cua${DEVICE#ttyS}
+
+case "$ACTION" in
+
+'start')
+    if [ ! -c /dev/${DEVICE} ] ; then
+	cd /dev
+	./MAKEDEV ${DEVICE}
+    fi
+    if [ "$LINK" != "" ] ; then
+	rm -f $LINK
+	ln -s /dev/$DIALOUT $LINK
+	if [ "$SERIAL_OPTS" != "" ] ; then
+	    setserial /dev/$DEVICE $SERIAL_OPTS
+	fi
+    fi
+    ;;
+
+'check')
+    fuser -s /dev/$DEVICE /dev/$DIALOUT $LINK && exit 1
+    ;;
+
+'stop')
+    fuser -s -k /dev/$DEVICE /dev/$DIALOUT $LINK
+    rm -f $LINK
+    ;;
+
+'suspend')
+    fuser -s -k -STOP /dev/$DEVICE /dev/$DIALOUT
+    ;;
+
+'resume')
+    if [ "$SERIAL_OPTS" != "" ] ; then
+	setserial /dev/$DEVICE $SERIAL_OPTS
+    fi
+    fuser -s -k -CONT /dev/$DEVICE /dev/$DIALOUT $LINK
+    ;;
+
+*)
+    usage
+    ;;
+
+esac
+
+exit 0

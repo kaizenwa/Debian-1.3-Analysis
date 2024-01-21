@@ -1,0 +1,60 @@
+#! /bin/sh
+# lock - lock the news system
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+usage="Usage: $0 [-o] [-v] lockname pid [sleeptime]"
+persist=y
+verbose=n
+for arg
+do
+	case "$1" in
+	-o)	persist=n	;;
+	-v)	verbose=y	;;
+	--)	shift ; break	;;
+	-*)	echo "$usage" >&2 ; exit 2	;;
+	*)	break		;;
+	esac
+	shift
+done
+case "$#" in
+2)	sleep=30	;;
+3)	sleep="$3"	;;
+*)	echo "$usage" >&2 ; exit 2	;;
+esac
+
+case "$1" in
+*/*)	lock=$1 ; ltemp=$1.$$	;;
+*)	lock=$NEWSCTL/$1 ; ltemp=$NEWSCTL/L.$$	;;
+esac
+pid="$2"
+
+status=1
+trap 'rm -f $ltemp ; trap 0 ; exit $status' 0 1 2 15
+echo "$pid" >$ltemp || exit 1
+while :
+do
+	if newslock $ltemp $lock
+	then
+		status=0
+		touch $lock		# make the date current
+		exit
+	elif test ! -f $ltemp
+	then
+		echo "$0: \`$ltemp' disappeared!!" >&2
+		exit
+	elif test " $persist" = " n"
+	then
+		exit
+	fi
+
+	if test " $verbose" = " y"
+	then
+		echo 'news system locked, waiting...'
+	fi
+	sleep $sleep
+done

@@ -1,0 +1,228 @@
+This file presents some information about application defined types and
+operator overloading.  See ../demo/complex.sl for an explicit example of the
+functions discussed here.
+-------------------------------------------------------------------------------
+
+Declaring a new type.
+=====================
+
+To create a new type and interface it with S-Lang, you have to do several
+things.
+
+   1.  You must write a routine to create the object.  This routine will
+       then have to be made available as an intrinsic function for the
+       applications's script to create the object.  For example, in the
+       complex.c demo, the function `complex' creates the object.
+
+   2.  You have to create a routine that destroy the object.  This routine
+       will be called automatically by S-Lang when it is necessary to delete
+       the object.  In order for S-Lang to achieve this, you must register
+       this ``callback'' when you register the new type.  The function
+       should be declared as taking no parameters and returning void, e.g.,
+       
+           void destroy_type_callback (void);
+
+   3.  Declare the new type to S-Lang.  This is achieved by using the
+       function `SLang_register_class'.  This function takes three
+       parameters and returns no-zero if the class (type) was sucessfully
+       added or zero if not (malloc failure).
+       
+       This function has the prototype:
+       
+           int SLang_register_class (unsigned char, VOID *, VOID *);
+	   
+       Here, VOID is a macro defined in slang.h.  In may be either `void' or
+       `unsigned char' depending on the compiler (Old compilers do not
+       support void *).
+
+       The first parameter is an unsigned character in the range 128 to 255.
+       Integers outside this range (0 through 127) are reserved for S-Lang
+       itself. This integer (unsigned char) will serve as an identification
+       number for the type.  For example, in complex.c, a macro is used:
+
+       #define COMPLEX_NUMBER 128
+       
+       If more than one type is created, two different numbers will have to
+       be used (e.g., 128 and 129).  As a result, an application may define
+       at most 128 different types.
+       
+       The second parameter represents the function that is to be called to
+       destroy a variable of the new type.  This function is described in
+       (2) above.  It must be typecast to `VOID *'.  If your type does not
+       need to be destroyed (it did not malloc anything and there is no
+       cleanup necessary), NULL may be used.
+       
+       The third parameter represents the function that will be called to
+       obtain a printable representation of a variable of the new type.
+       NULL may be used if the function does not exist.  See the discussion
+       below about this function.
+       
+Interacting with the new type
+=============================
+
+  There are two fundamentally different ways of manipulating a new type: via
+  new intrinsic functions and by operator overloading.  The latter method is
+  discussed in the next section.
+
+  In order for an intrinsic function to interact with an object it must
+  first access the object.  S-Lang will not pass application defined objects
+  directly to the intrinsic function.  It is up to the function to acquire
+  the object from the stack.  This is easily accomplished using the
+  `SLang_pop_user_object' function call.  It is prototyped:
+  
+     SLuser_Object_Type *SLang_pop_user_object (unsigned char);
+     
+  It takes a single parameter, the number which identifies the type, and
+  returns a pointer to the object.  If the requested object it not at the
+  top of the stack, NULL be be returned and SLang_Error will be set
+  appropriately.  Note that this function does not return a pointer to the
+  object; rather, it returns a pointer to a S-Lang defined structure that
+  serves as a wrapper around the object.  The actual object may be obtained
+  by accessing the `obj' member of this structure (See below).
+  
+  Because the object was popped from the stack, it is up to
+  the routine that popped it to handle memory management for the object.
+  This is facilitated by the function `SLang_free_user_object' which is 
+  prototyped:
+  
+     void SLang_free_user_object (SLuser_Object_Type *);
+     
+  This function should be called when the intrinsic function is finished
+  with the object.
+  
+  For example, consider the function `real_part' complex.c demo:
+  
+     static double real_part (void)
+     {
+        SLuser_Object_Type *u;
+	Complex_Type *z;
+	double x;
+   
+        if (NULL == (u = SLang_pop_user_object (COMPLEX_NUMBER))) return 0.0;
+        z = (Complex_Type *) (u->obj);
+        x = z->real_part;
+        SLang_free_user_object (u);
+        return x;
+     }
+
+  It contains all of the elements of the above discussion:  
+  
+     1.  It uses `SLang_pop_user_object' to access the object that
+	 represents the contains complex number.  The actual structure that
+	 represents the complex number is obtained from the `obj' member of
+	 the structure returned from the function call.
+
+     2.  It calls `SLang_free_user_object' when it is finished using the
+	 object.
+
+
+Operator Overloading
+====================
+ 
+  Sometimes, but not always, it is desirable to extend the arithemetic
+  binary and unary operators `+', `-', etc... as well as the binary
+  comparison operators `==', `<', etc... to the new type.  This is
+  definitely the case with the complex number type.  The complex number type
+  is even more complicated because one also wants an object of that type to
+  interact in binary operations not only with itself but with integer and
+  floating point numbers.
+  
+  The basic way to accomplish operator overloading is to create a function
+  that computes the value of the binary or unary operation and then declare
+  this function to S-Lang.  The S-Lang functions used for declaring the
+  binary and unary functions are prototyped:
+  
+    int SLang_add_unary_op (unsigned char, VOID *);
+    int SLang_add_binary_op (unsigned char, unsigned char, VOID *);
+    
+  They return 1 upon success or zero upon failure.  The third parameter is a
+  pointer to the appropriate function cast to a pointer to VOID.  In the
+  case of `SLang_add_unary_op' the first parameter represents the type for
+  which the unary operators are to be defined for.  The other function
+  requires two such types because a binary operation acts on two objects
+  which may or may not be of the same type.  For example, complex.c defines
+  a function `complex_binary' to manipulate binary operations with the
+  complex number:
+  
+     if (!SLang_add_binary_op (COMPLEX_NUMBER, COMPLEX_NUMBER, 
+			       (VOID *) complex_binary)
+         ||!SLang_add_binary_op (COMPLEX_NUMBER, FLOAT_TYPE,
+	  		         (VOID *) complex_binary)
+         ||!SLang_add_binary_op (COMPLEX_NUMBER, INT_TYPE,
+			         (VOID *) complex_binary)) return 0;
+
+  Here binary operations with the complex number are defined between the
+  complex number and another complex number, an integer, or a float.
+  
+  Note that the same function `complex_binary' has been used for all three
+  cases.  Once does not have to use the same function--- three different
+  ones could be used.
+  
+  The function used to perform binary functions must be prototype like:
+  
+    int complex_binary (int op, unsigned char a_type, unsigned char b_type,
+			VOID *ap, VOID *bp);
+
+  That is, it must return an integer and take 5 parameters.  The first
+  parameter indicates the particular binary operation to be performed and
+  the last 4 parameters determine the values of the objects that are to
+  participate in the binary operation.  Specifically, the paramters `ap' and
+  `bp' are pointers to the actual objects and `a_type' and `b_type' indicate
+  the type of the objects represented by `ap' and `bp', respectively.
+
+  For example, if the binary operation represented by the `!=' operator is
+  to be preformed between two complex numbers, `op' will have the  value
+  `SLANG_NE' and both `a_type' and `b_type' will have values of
+  `COMPLEX_NUMBER' (100) and `ap' and `bp' will be pointers to
+  `Complex_Type'.   
+  
+  However, if the same operation is to be performed between an integer and a
+  complex number as in `z != 1', then `b_type' will have the value INT_TYPE
+  and `bp' will be a pointer to integer.
+  
+  Note that the function must be able to handle all binary operations
+  defined for it.  This includes:
+  
+     SLANG_PLUS		       (+)
+     SLANG_MINUS	       (-)
+     SLANG_TIMES	       (*)
+     SLANG_DIVIDE	       (/)
+     SLANG_EQ 		       (==)
+     SLANG_NE		       (!=)
+     SLANG_GT		       (>)
+     SLANG_GE		       (>=)
+     SLANG_LT		       (<)
+     SLANG_LE		       (<=)
+
+   If the function handles the indicated binary operation, it should return
+   1; otherwise, the operation is not defined for the type and the function
+   should return zero.  For example, `<', `>', `>=' and `<=' operations are
+   not defined for complex numbers so the function should return 0 if `op'
+   represents one of these numbers.
+   
+   A similar discussion holds for unary operations.  In this case, the
+   function has a simpler protoptype of the form:
+   
+     int complex_unary (int op, unsigned char type, VOID *z)
+     
+   and `op' can be any of the following values:
+   
+     SLANG_CHS 		 -x
+     SLANG_SQR           sqr(x)       
+     SLANG_MUL2		 mul2(x)
+     SLANG_ABS		 abs(x)
+     SLANG_SIGN          sign(x)
+     
+
+
+      
+
+
+
+  
+  
+
+  
+
+  
+

@@ -1,0 +1,155 @@
+#!/bin/bash
+# This is the file "rc" which starts and stops services for the different
+# runlevels of the SysV init.
+#
+# Author:       Winfried Trümper <winni@xpilot.org>
+# Version:      0.2
+#
+# Misc fixes by Tom Lees <tom@lpsg.demon.co.uk>.
+#
+# Unlike traditional implementations it avoids the messy scheme with
+# expressing the setup through links but reads a central config file
+# instead. From a technical point of view both methods are almost
+# equivalent.
+#
+# To be compatible with the common configuration scheme in the Linux-world,
+# every script has two states: "on" or "off". The effect of this is that
+# once it is switched on, it is never started again when the runlevel changes
+# (it is only executed to switch it off if necessary).
+#
+
+# The following section is taken from the original rc with slight
+# modifications.
+
+  # Set onlcr to avoid staircase effect.
+stty onlcr 0>&1
+  # Is this done because RUNLEVEL and PREVLEVEL could be read-only?
+  #
+  # Now find out what the current and what the previous runlevel are.
+runlevel=$RUNLEVEL
+  # Get first argument. Set new runlevel to this argument.
+[ "$1" != "" ] && runlevel="$1"
+  # Is this necessary?
+prevlevel=${PREVLEVEL:="N"}
+  # Is this necessary?
+#export runlevel previous
+
+CFGFILE="/etc/runlevel.conf"
+BAKCFG="/etc/runlevel.fallback"
+LOCKFILE="/var/lock/runlevel.lock"
+TMPFILE="/tmp/runlevel.tmp"
+
+  # wait for any lock to vanish (but only when not booting)
+i=0
+while [ -f "$LOCKFILE" -a "$previous" != "N" ]
+do
+    read pid < "$LOCKFILE"
+    if ! kill -0 $pid &> /dev/null
+    then
+	echo "$0: found stale lockfile '$LOCKFILE'. Ignoring it." >&2
+# restriction on built-in functions ...
+#        rm -f "$LOCKFILE"
+        break
+    fi
+    if [ "$i" -gt "10" ]
+    then
+        echo "Process no. '$pid' is locking the configuration database. Terminating." >&2
+        exit 1
+    fi
+    sleep 2
+    let i+=1
+done
+
+
+  # This script is vital so we better keep an old copy of the configuration
+  # file as fallsave-configuration. This does not handle a broken config
+  # file, though.
+if [ ! -f "$CFGFILE" ]
+then
+    echo "Missing configuration file '$CFGFILE' using fallback config."
+
+      # This could be a link to /var/backup/runlevel.conf.
+    if [ ! -f "$BAKCFG" ]
+    then
+	echo "No configuration file at all. You're in serious trouble now. Aborting."
+	exit 1
+    fi
+    CFGFILE="$BAKCFG"
+fi
+
+
+function element() {
+    local element list IFS
+
+
+    element="$1"
+    case "$element" in
+	reboot | R) element=0 ;;
+	single | S) element=1 ;;
+	halt   | H) element=6 ;;
+    esac
+	
+    [ "$2" = "in" ] && shift
+    list="$2"
+    [ "$list" = "-" ] && return 1
+    [ "$list" = "*" ] && return 0
+
+    IFS=","
+    set -- $list
+    case $element in
+	"$1" | "$2" | "$3" | "$4" | "$5" | "$6" | "$7" | "$8" | "$9")
+	    return 0
+    esac
+    return 1
+}
+
+
+  # CMDLIST ensures scripts are killed in reversed order
+CMDLIST="set centerline=here"
+
+  # Experimental: To tell the scripts they are not called manually.
+  # (should be unset in init.d-scripts)
+CALL_FROM_RC="yes"
+
+
+#echo -n "Reading configuration file $CFGFILE " #DEBUG
+
+
+while read  SORT_NO  OFF_LEVELS  ON_LEVELS  CMD  OPTIONS
+do
+    case "$SORT_NO" in
+	"#*" | "") continue ;;
+    esac
+    [ ! -x "$CMD" ] && continue
+
+# currently OPTIONS is completely ignored ... we _could_ pass them to the
+# init-script after "start" or "stop".
+
+#    echo -n "." #DEBUG
+
+      # continue only if CMD was not started in previous runlevel
+    if element "$runlevel" in "$ON_LEVELS" \
+    && ! element "$prevlevel" in "$ON_LEVELS"
+    then
+	  # append CMD to the list of
+	CMDLIST="$CMDLIST; $CMD start"
+	continue
+    fi
+
+      # only kill when prevlevel != N
+    if element "$runlevel" in "$OFF_LEVELS" \
+    && ! element "$prevlevel" in "$OFF_LEVELS" \
+    && [ "$prevlevel" != "N" ]
+    then
+	  # prepending ensures scripts are killed in "reversed" order
+	CMDLIST="$CMD stop; $CMDLIST"
+    fi
+
+done < $CFGFILE
+
+#echo "" #DEBUG
+#echo "Would execute the following command-line:" #DEBUG
+#echo $CMDLIST #DEBUG
+
+  # Execute the commands collected above
+sh -c "$CMDLIST"

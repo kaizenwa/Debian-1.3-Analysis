@@ -1,0 +1,532 @@
+# Generated automatically from Makefile.in by configure.
+# Makefile for GNU Pascal compiler.
+#   Copyright (C) 1987, 1996 Free Software Foundation, Inc.
+#
+# This file is part of GNU Pascal.
+#
+# GNU Pascal is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 1, or (at your option)
+# any later version.
+#
+# GNU Pascal is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GNU Pascal; see the file COPYING.  If not, write to
+# the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
+
+# This makefile assumes you have already compiled the correct version
+# of GNU CC in $(gccsrc) to the directory $(gccbin), which should contain
+# necessary object files.
+
+# Wed Aug  7 13:49:07 1996 <j.j.vanderheijden@student.utwente.nl>
+# Makefile rewritten for GNU autoconf
+
+# Run 'configure' to build Makefile form Makefile.in
+
+# End-user make options:
+#    make all:        build the compiler and runtime system
+#    make clean:      remove binaries and object code
+#    make distclean:  romove config files too. You have to run configure again.
+#    make install:    install the compiler
+#    make uninstall:  undoes make install
+#
+# CFLAGS is used for compiler and RTS, RTSFLAGS are for RTS only, i.e.:
+#    make CFLAGS="-m486 -O2" RTSFLAGS=-Wall
+
+# GPCVERSION = 2.0
+# GPCVERSION = `date +%y%m%d`
+GPCVERSION = 2.0
+GCCVERSION = 2.7.2.1
+
+CROSS = 
+USE_COLLECT2 = 
+MAYBE_USE_COLLECT2 = 
+MAYBE_TARGET_DEFAULT = 
+VPATH = .:../gcc-2721
+
+srcdir = .
+gccsrc = ../gcc-2721
+gccbin = ../gcc-2721
+
+# Extracted from $(gccbin)/Makefile by configure
+gcc_version         = 2.7.2.1
+gcc_target          = go32
+gcc_prefix          = /usr
+gcc_local_prefix    = /usr/local
+
+EXTRA_OBJS          = 
+EXTRA_GCC_OBJS      = 
+out_object_file     = i386.o
+
+
+CC = gcc
+CFLAGS = -g -O
+RANLIB = ranlib
+AR = ar
+AR_FLAGS = rc
+LINT = lint
+LINT_FLAGS = -DGPC
+BISON = bison
+BISON_FLAGS = -d
+TAR = tar
+TAR_FLAGS = cvzf
+GPERF = gperf
+GPERF_FLAGS = -g -o -j1 -t -p -N is_reserved_word
+#DIFF = gdiff -u
+DIFF = diff -C2 -N -r
+SHELL = /bin/sh
+INSTALL_PROGRAM = $(srcdir)/install-sh
+
+# --------------- No user-servicable parts beyond here ----------------
+
+# IN_GCC tells obstack.h that we are using gcc's <stddef.h> file.
+# IN_GCC should be obsolete now. (?)
+# fancy_abort() is a bit controversial, if GCC defines it for your platform,
+# GPC will use it too. Do not force it otherwise. 
+# Define GPC if you wish to compile GPC (obviously)
+INTERNAL_CFLAGS = -DGPC -DIN_GCC $(CROSS) # -Dabort=fancy_abort
+
+# compiler flags including the above
+ALL_CFLAGS = $(INTERNAL_CFLAGS) $(CFLAGS)
+
+INCLUDES = -I. -I$(srcdir) -I$(gccbin) -I$(gccsrc) -I$(gccsrc)/config
+
+.c.o:
+	$(CC) -c $(ALL_CFLAGS) $(CPPFLAGS) $(INCLUDES) $<
+
+
+gpc_version = $(GPCVERSION)
+target = $(gcc_target)
+transform = s,x,x,
+
+# Common prefix for installation directories.
+# NOTE: This directory must exist when you start installation.
+prefix = $(gcc_prefix)
+# Directory in which to put localized header files. On the systems with
+# gcc as the native cc, `local_prefix' may not be `prefix' which is
+# /usr'.
+# NOTE: local_prefix *should not* default from prefix.
+localprefix = $(gcc_local_prefix)
+# Directory in which to put host dependent programs and libraries
+exec_prefix = $(prefix)
+# Directory in which to put the executable for the command `gcc'
+bindir = $(exec_prefix)/bin
+# Directory in which to put the directories used by the compiler.
+libdir = $(exec_prefix)/lib
+# Directory in which the compiler finds executables, libraries, etc.
+libsubdir = $(libdir)/gcc-lib/$(target)/$(gcc_version)
+# Directory in which the compiler finds g++ includes.
+gxx_include_dir = $(libdir)/g++-include
+# Directory to search for site-specific includes.
+includedir = $(localprefix)/include
+# Directory in which to find other cross-compilation tools and headers.
+# Used in install-cross.
+tooldir = $(exec_prefix)/$(target)
+
+infodir = $(prefix)/info
+
+# If you are making gcc for the first time, and if you are compiling it with
+# a non-gcc compiler, and if your system doesn't have a working alloca() in any
+# of the standard libraries (as is true for HP/UX or Genix),
+# then get alloca.c from GNU Emacs and un-comment the following line:
+#
+# Alloca is automatically loaded if it exists if $(gccbin)/alloca.o exists.
+#
+#GCC_ALLOCA = `if [ -f "$(gccbin)/alloca.o" ]; then echo "$(gccbin)/alloca.o" ; else true ; fi`
+
+# But if your system has alloca() in /lib/libPW.a, un-comment the following line:
+# CLIB= -lPW
+
+# If your system's malloc() routine fails for any reason (and gcc also uses a
+# separate malloc package, the following should cause malloc.o to be loaded also
+# in gpc)
+#
+#GCC_MALLOC = `if [ -f "$(gccbin)/malloc.o" ]; then echo "$(gccbin)/malloc.o" ; else true ; fi`
+
+# Change this to a null string if obstacks are installed in the
+# system library.
+#
+OBSTACK = $(gccbin)/obstack.o
+OBSTACK_SRC= $(gccbin)/obstack.c
+
+# Dependency on obstack, alloca, malloc or whatever library facilities
+# are not installed in the system libraries.
+#
+LIBDEPS = $(OBSTACK) $(ALLOCA) $(MALLOC)
+LINTLIBS = $(OBSTACK_SRC) $(ALLOCA_SRC) $(MALLOC_SRC)
+
+# How to link with both our special library facilities
+# and the system's installed libraries.
+#
+LIBS = $(OBSTACK) $(GCC_ALLOCA) $(ALLOCA) $(GCC_MALLOC) $(MALLOC) \
+	$(CLIB) $(LOADLIBES)
+
+# Language-independent object files, borrowed from GCC.
+# Therefore, they are in $(gccbin)
+#
+GCC_OBJS = $(gccbin)/tree.o $(gccbin)/print-tree.o $(gccbin)/stmt.o	\
+	$(gccbin)/calls.o $(gccbin)/expmed.o $(gccbin)/explow.o		\
+	$(gccbin)/varasm.o $(gccbin)/rtl.o $(gccbin)/print-rtl.o	\
+	$(gccbin)/rtlanal.o $(gccbin)/emit-rtl.o $(gccbin)/real.o	\
+	$(gccbin)/sdbout.o $(gccbin)/dwarfout.o $(gccbin)/xcoffout.o	\
+	$(gccbin)/integrate.o $(gccbin)/jump.o $(gccbin)/cse.o		\
+	$(gccbin)/loop.o $(gccbin)/unroll.o $(gccbin)/flow.o		\
+	$(gccbin)/stupid.o $(gccbin)/combine.o $(gccbin)/regclass.o	\
+	$(gccbin)/local-alloc.o $(gccbin)/global.o $(gccbin)/reload.o	\
+	$(gccbin)/reload1.o $(gccbin)/caller-save.o			\
+	$(gccbin)/insn-peep.o $(gccbin)/reorg.o $(gccbin)/sched.o	\
+	$(gccbin)/final.o $(gccbin)/recog.o $(gccbin)/reg-stack.o	\
+	$(gccbin)/insn-opinit.o $(gccbin)/insn-recog.o			\
+	$(gccbin)/insn-extract.o $(gccbin)/insn-output.o		\
+	$(gccbin)/insn-emit.o $(gccbin)/insn-attrtab.o			\
+	$(gccbin)/getpwd.o $(gccbin)/$(out_object_file) $(EXTRA_OBJS)
+
+# Language-independent SOURCE files. For LINT and ETAGS only
+#
+# See also $(GPC_LANG_IND) They should come back to this
+# list when compilers are merged.
+# (most of the changes don't affect the C-compiler anyway)
+#
+GCC_SRC = $(gccsrc)/tree.c $(gccsrc)/print-tree.c $(gccsrc)/stmt.c	\
+	$(gccsrc)/calls.c $(gccsrc)/expmed.c $(gccsrc)/explow.c		\
+	$(gccsrc)/varasm.c $(gccsrc)/rtl.c $(gccsrc)/print-rtl.c	\
+	$(gccsrc)/rtlanal.c $(gccsrc)/emit-rtl.c $(gccsrc)/real.c	\
+	$(gccsrc)/sdbout.c $(gccsrc)/dwarfout.c $(gccsrc)/xcoffout.c	\
+	$(gccsrc)/integrate.c $(gccsrc)/jump.c $(gccsrc)/cse.c		\
+	$(gccsrc)/loop.c $(gccsrc)/unroll.c $(gccsrc)/flow.c		\
+	$(gccsrc)/stupid.c $(gccsrc)/combine.c $(gccsrc)/regclass.c	\
+	$(gccsrc)/local-alloc.c $(gccsrc)/global.c $(gccsrc)/reload.c	\
+	$(gccsrc)/reload1.c $(gccsrc)/caller-save.c			\
+	$(gccbin)/insn-peep.c $(gccsrc)/reorg.c $(gccsrc)/sched.c	\
+	$(gccsrc)/final.c $(gccsrc)/recog.c $(gccsrc)/reg-stack.c	\
+	$(gccbin)/insn-opinit.c $(gccbin)/insn-recog.c			\
+	$(gccbin)/insn-extract.c $(gccbin)/insn-output.c		\
+	$(gccbin)/insn-emit.c $(gccbin)/insn-attrtab.c			\
+	$(gccsrc)/getpwd.c
+
+# These object files should be language independent but are currently
+# not so. Built from gpc $(srcdir) into current directory.
+#
+GPC_LANG_IND_OBJS = stor-layout.o dbxout.o expr.o fold-const.o	\
+	optabs.o convert.o function.o setop.o toplev.o
+
+GPC_LANG_IND_SRC = $(srcdir)/stor-layout.c $(srcdir)/dbxout.c		\
+	$(srcdir)/expr.c $(srcdir)/fold-const.c $(srcdir)/optabs.c	\
+	$(srcdir)/convert.c $(srcdir)/function.c $(srcdir)/setop.c	\
+	$(srcdir)/toplev.c
+
+# Language specific object files for Pascal
+#
+# Currently the (c-aux-info.c,c-iterate.c) file is not modified
+# so I use the original C-compiler file
+#
+GPC_OBJS_1 = gpc-parse.o gpc-decl.o gpc-typeck.o gpc-convert.o		\
+	gpc-util.o gpc-module.o gpc-lex.o gpc-common.o gpc-lang.o	\
+	$(gccbin)/c-aux-info.o $(gccbin)/c-iterate.o			\
+	$(gccbin)/c-pragma.o						\
+	$(GPC_LANG_IND_OBJS)
+
+GPC_SRC_1 = $(srcdir)/gpc-parse.c $(srcdir)/gpc-decl.c			\
+	$(srcdir)/gpc-typeck.c $(srcdir)/gpc-convert.c			\
+	$(srcdir)/gpc-util.c $(srcdir)/gpc-module.c $(srcdir)/gpc-lex.c \
+	$(srcdir)/gpc-common.c $(srcdir)/gpc-lang.c			\
+	$(gccsrc)/c-aux-info.c $(gccsrc)/c-iterate.c			\
+	$(gccsrc)/c-pragma.c $(GPC_LANG_IND_SRC)
+
+# Object files that make up the GNU Pascal compiler
+GPC_OBJS = gpc-version.o $(GPC_OBJS_1) $(GCC_OBJS)
+
+# All GPC source files.
+GPC_SRC = gpc-version.c $(srcdir)/gpc-defs.h $(srcdir)/gpc-gperf.c	\
+	$(GPC_SRC_1)
+
+# Files specific to the C interpreter bytecode compiler(s).
+BC_OBJS = $(gccbin)/bc-emit.o $(gccbin)/bc-optab.o
+
+TAGS_FILES = $(srcdir)/gpc-defs.h $(srcdir)/gpc-gperf.c $(GPC_SRC_1)	\
+	$(GCC_SRC) $(srcdir)/gpc-parse.y $(gccsrc)/*.h
+
+MISC_FILES = $(srcdir)/COPYING $(srcdir)/COPYING.LIB			\
+	$(srcdir)/ChangeLog $(srcdir)/INSTALL $(srcdir)/Makefile.in	\
+	$(srcdir)/PROBLEMS $(srcdir)/README $(srcdir)/TAGS		\
+	$(srcdir)/aclocal.m4 $(srcdir)/config.guess			\
+	$(srcdir)/config.sub $(srcdir)/configure $(srcdir)/configure.in	\
+	$(srcdir)/gpc-defs.h $(srcdir)/gpc-gperf.c			\
+	$(srcdir)/gpc-parse.y $(srcdir)/gpc-version.in 			\
+	$(srcdir)/gpc.gperf $(srcdir)/install-sh			\
+	$(srcdir)/move-if-change $(srcdir)/.gdbinit
+
+SUB_DIRS = $(srcdir)/contrib/* $(srcdir)/doc/* $(srcdir)/emx/*		\
+	$(srcdir)/old_doc/* $(srcdir)/rts/* $(srcdir)/test/* 
+
+TAR_FILES = $(GPC_SRC_1) $(MISC_FILES) $(SUB_DIRS)
+
+all: gpc gpc-cpp gpc1 library specs.gpc
+
+gpc: gcc.o  $(LIBDEPS) gpc-version.o $(EXTRA_GCC_OBJS)
+	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o gpc gcc.o gpc-version.o $(EXTRA_GCC_OBJS) $(LIBS)
+
+gpc-cpp: gpc-cccp.o $(gccbin)/cexp.o gpc-version.o $(LIBDEPS)
+	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o gpc-cpp gpc-cccp.o $(gccbin)/cexp.o gpc-version.o $(LIBS)
+
+gpc1: gpc-gperf.c $(GPC_OBJS) $(BC_OBJS)
+	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o gpc1 $(GPC_OBJS) $(BC_OBJS) $(LIBS)
+
+# Generate fresh config file.
+specs.gpc:
+	cp config/msdos/specs.gpc .
+
+gcc.o: gcc.c $(gccbin)/$(CONFIG_H) $(gccbin)/multilib.h
+	$(CC) $(ALL_CFLAGS) $(CPPFLAGS) $(INCLUDES) \
+	  -DSTANDARD_STARTFILE_PREFIX=\"$(libdir)/\" \
+	  -DSTANDARD_EXEC_PREFIX=\"$(libdir)/gcc-lib/\" \
+	  -DDEFAULT_TARGET_VERSION=\"$(gcc_version)\" \
+	  -DDEFAULT_TARGET_MACHINE=\"$(target)\" \
+	  -DTOOLDIR_BASE_PREFIX=\"$(exec_prefix)/\" \
+	  $(MAYBE_TARGET_DEFAULT) \
+	  -c gcc.c
+
+gpc-cccp.o: $(gccbin)/$(CONFIG_H) $(gccsrc)/pcp.h
+	$(CC) $(ALL_CFLAGS) $(CPPFLAGS) $(INCLUDES) \
+	  -DGCC_INCLUDE_DIR=\"$(libsubdir)/include\" \
+	  -DGPLUSPLUS_INCLUDE_DIR=\"$(gxx_include_dir)\" \
+	  -DLOCAL_INCLUDE_DIR=\"$(includedir)\" \
+	  -DCROSS_INCLUDE_DIR=\"$(libsubdir)/sys-include\" \
+	  -DTOOL_INCLUDE_DIR=\"$(tooldir)/include\" \
+	  -c gpc-cccp.c
+
+gpc-parse.o : $(srcdir)/gpc-parse.c gpc-parse.h
+
+gpc-common.o: gpc-common.c gpc-parse.h
+
+gpc-lex.o: gpc-lex.c gpc-gperf.c gpc-parse.h
+
+gpc-util.o: gpc-util.c $(srcdir)/rts/rts-types.h gpc-parse.h 
+
+# When $(gccsrc) is also $(gccbin) then stor-layout.o and friends, GPC's
+# stor-layout.o etc. would not be made because $(gccbin) is then in VPATH
+#
+stor-layout.o: stamp-stor-layout
+	$(CC) -c $(ALL_CFLAGS) $(CPPFLAGS) $(INCLUDES) $(srcdir)/stor-layout.c
+stamp-stor-layout: $(srcdir)/stor-layout.c
+	touch $@
+
+dbxout.o: stamp-dbxout
+	$(CC) -c $(ALL_CFLAGS) $(CPPFLAGS) $(INCLUDES) $(srcdir)/dbxout.c
+stamp-dbxout: $(srcdir)/dbxout.c
+	touch $@
+
+expr.o: stamp-expr
+	$(CC) -c $(ALL_CFLAGS) $(CPPFLAGS) $(INCLUDES) $(srcdir)/expr.c
+stamp-expr: $(srcdir)/expr.c
+	touch $@
+
+fold-const.o: stamp-fold-const
+	$(CC) -c $(ALL_CFLAGS) $(CPPFLAGS) $(INCLUDES) $(srcdir)/fold-const.c
+stamp-fold-const: $(srcdir)/fold-const.c
+	touch $@
+
+optabs.o: stamp-optabs
+	$(CC) -c $(ALL_CFLAGS) $(CPPFLAGS) $(INCLUDES) $(srcdir)/optabs.c
+stamp-optabs: $(srcdir)/optabs.c
+	touch $@
+
+convert.o: stamp-convert
+	$(CC) -c $(ALL_CFLAGS) $(CPPFLAGS) $(INCLUDES) $(srcdir)/convert.c
+stamp-convert: $(srcdir)/convert.c
+	touch $@
+
+function.o: stamp-function
+	$(CC) -c $(ALL_CFLAGS) $(CPPFLAGS) $(INCLUDES) $(srcdir)/function.c
+stamp-function: $(srcdir)/function.c
+	touch $@
+
+toplev.o: stamp-toplev
+	$(CC) $(ALL_CFLAGS) $(CPPFLAGS) $(INCLUDES) \
+	  $(MAYBE_TARGET_DEFAULT) $(MAYBE_USE_COLLECT2) \
+	  -c toplev.c
+
+stamp-toplev: $(srcdir)/toplev.c
+	touch $@
+
+# Generate a new edit number
+gpc-version.c: Makefile
+	sed -e "s/PROG1/$(gpc_version)/" -e "s/PROG2/$(gcc_version)/" $(srcdir)/gpc-version.in > tmp-version
+	update tmp-version gpc-version.c
+
+# Generate this to the source directory
+$(srcdir)/gpc-gperf.c: gpc.gperf
+	$(GPERF) $(GPERF_FLAGS) $(srcdir)/gpc.gperf > $(srcdir)/gpc-gperf.c
+
+$(srcdir)/gpc-parse.c $(srcdir)/gpc-parse.h: $(srcdir)/gpc-parse.y
+	$(BISON) $(BISON_FLAGS) -o tmp-gpc-parse.c $(srcdir)/gpc-parse.y
+	sh $(srcdir)/move-if-change tmp-gpc-parse.c $(srcdir)/gpc-parse.c
+	sh $(srcdir)/move-if-change tmp-gpc-parse.h $(srcdir)/gpc-parse.h
+
+# The runtime system.
+library: rts/libgpc.a
+rts/libgpc.a:
+	$(MAKE) -C rts RTSFLAGS="$(RTSFLAGS)"
+
+library-clean:
+	$(MAKE) -C rts clean
+
+info:
+	$(MAKE) -C doc info INFODIR=$(infodir)
+
+info-clean:
+	$(MAKE) -C doc clean
+
+clean: library-clean info-clean
+	rm -f *.exe gpc1 gpc gpc-cpp specs.gpc
+	rm -f *.o *.co *.s *.s[0-9] 
+	rm -f *.greg *.lreg *.combine *.flow *.cse *.jump *.rtl *.tree *.loop
+	rm -f core .stampdir stamp-*
+
+library-distclean:
+	$(MAKE) -C rts distclean
+
+info-distclean:
+	$(MAKE) -C doc distclean
+
+distclean: clean library-distclean info-distclean
+	rm -f *~ *.BAK *.gz
+	rm -f config.cache config.log
+	rm -f gpc-version.c version gnuvers.conf
+	rm -f Makefile
+
+# Install GPC. may overwrite existing libgcc.a
+install-gpc: all
+	$(INSTALL_PROGRAM) -d $(bindir)
+	$(INSTALL_PROGRAM) -d $(libsubdir)
+	$(INSTALL_PROGRAM) -c -m 755 -s gpc $(bindir)/`echo gpc | sed '$(transform)'`
+	$(INSTALL_PROGRAM) -c -m 755 -s gpc1 $(libsubdir)/gpc1
+	$(INSTALL_PROGRAM) -c -m 755 -s gpc-cpp $(libsubdir)/gpc-cpp
+	$(INSTALL_PROGRAM) -c -m 644 $(gccbin)/libgcc.a $(libsubdir)/libgcc.a
+	$(INSTALL_PROGRAM) -c -m 644 rts/libgpc.a $(libsubdir)/libgpc.a
+	$(INSTALL_PROGRAM) -c -m 755 specs $(libsubdir)/specs
+
+install-info: info
+	cd doc && $(MAKE) install INFODIR=$(infodir)
+
+install: install-gpc install-info
+
+# Uninstall GPC. leave libgcc.a and specs alone ; they might be in use by GCC
+uninstall:
+	-rm -f $(bindir)//`echo gpc | sed '$(transform)'`
+	-rm -f $(libsubdir)/gpc1
+	-rm -f $(libsubdir)/gpc-cpp
+	-rm -f $(libsubdir)/libgpc.a
+	-rm -f $(infodir)/gpc.info*
+
+# @@@@ works only if $(srcdir) == .
+test:
+	cd test ; $(MAKE) all
+
+# GPC tags file
+#
+TAGS: $(TAGS_FILES)
+	etags $(TAGS_FILES)
+
+#Ignore whether these exist.
+.PHONY: clean TAGS install backup ftp test info
+
+# Maintainer make options:
+#
+#    make maintainer-clean : remove everything that can be regenerated, even
+#                            if it belongs in the distribution.
+#    make distdir          : recover from maintainer-clean
+#    make bindist
+#    (make srcdist) !given up on this one. Not even gcc has this working...
+#             do make extraclean instead
+
+# Delete anything likely to be found in the source directory
+# that shouldn't be in the distribution.
+extraclean: distclean
+	-rm -rf =* ./"#"* *~* rts/=* rts/"#"* rts/*~*
+	-rm -f patch* *.orig *.rej rts/patch* rts/*.orig rts/*.rej
+	-rm -f rts/*/=* rts/*/"#"* rts/*/*~*
+	-rm -f rts/*/*.orig rts/*/*.rej
+	-rm -f *.dvi *.ps *.oaux *.d *.[zZ] *.gz
+	-rm -f *.tar *.xtar *diff *.diff.* *.tar.* *.xtar.* *diffs
+	-rm -f *lose rts/*lose rts/*/*lose
+	-rm -f *.s *.s[0-9] *.i install1.texi rts/ChangeLog
+	-rm -f */=* */"#"* */*~*
+	-rm -f */patch* */*.orig */*.rej
+	-rm -f */*.dvi */*.oaux */*.d */*.[zZ] */*.gz
+	-rm -f */*.tar */*.xtar */*diff */*.diff.* */*.tar.* */*.xtar.* */*diffs
+	-rm -f */*lose */*.s */*.s[0-9] */*.i
+	-rm -f *stamp* */*stamp*
+
+# Get rid of every file that's generated from some other file.
+# Most of these files ARE PRESENT in the GPC distribution.
+# You'll need gperf, etags and autoconf to recover from this one.
+maintainer-clean: extraclean
+	-rm -f configure TAGS
+	-rm -f gpc-gperf.c gpc-parse.c gpc-parse.h gpc-parse.output
+	-rm -f gpc.info* gpc.??s gpc.*aux
+
+# Create files that can be rebuilt but go in the distribution anyway.
+distdir: gpc-parse.c gpc-parse.y TAGS
+
+# Create a GPC unix binary distribution
+bindist: all info
+	-rm -f gpc-$(gpc_version)-$(gcc_version).$(target).tar.gz
+	$(INSTALL_PROGRAM) -d ./bindist/$(prefix)	
+	$(MAKE) install-gpc prefix=./bindist/$(prefix)
+	$(INSTALL_PROGRAM) -d ./bindist/$(infodir)
+	cd doc && $(MAKE) install INFODIR=../bindist/$(infodir)
+	cd ./bindist && $(TAR) $(TAR_FLAGS) ../gpc-$(gpc_version)-$(gcc_version).$(target).tar.gz *
+	-rm -rf bindist
+
+lint-gpc:
+	$(LINT) $(LINT_FLAGS) $(LDFLAGS) $(INCLUDES) $(GPC_SRC) $(GCC_SRC) $(LINTLIBS)
+
+# Pascal Validation Suite tests
+#
+pvsdir = /src/gnu/gpc/pvs
+
+# The following tests assume you have installed the
+# Pascal Validation Suite to $(pvsdir)
+#
+pvs-link:
+	-rm pvs pvsc
+	-ln -s $(pvsdir) pvs
+	-ln -s $(pvsdir)/CONFORMANCE pvsc
+
+pvs-test: pvs-link
+	cd pvsc; ./run
+
+# Create a TAR copy of the GPC sources
+# Run gpcdist from the generated makefile.
+# BROKEN
+gpcdist:
+	V=$(gcc_version) ; echo $(TAR_FILES) | sed -e "s,$(srcdir),$$V,g" > /tmp/gpc.files; \
+	cd $(srcdir)/.. && $(TAR) $(TAR_FLAGS) gpc-$(gpc_version)-$$V.tar.gz `cat /tmp/gpc.files`
+	rm -f /tmp/gpc.files
+
+all-diffs: ind-diff lang-diff driver-diff
+
+# take diffs of language independent files
+ind-diff:
+	-mkdir DIFF
+	-for i in stor-layout.c dbxout.c expr.c fold-const.c optabs.c convert.c function.c toplev.c ; do \
+		$(DIFF) $(gccsrc)/$$i $(srcdir)/$$i > DIFF/$${i}.diff; echo $$i; \
+	done	
+
+# take diffs of language dependent files
+lang-diff:
+	-mkdir DIFF-OTHER
+	-for i in gpc-parse.c gpc-decl.c gpc-typeck.c gpc-convert.c  \
+		  gpc-common.c gpc-lang.c ; do   \
+	   $(DIFF) $(gccsrc)/`echo $$i | sed -e "s/gpc-/c-/"` $(srcdir)/$$i > DIFF-OTHER/$${i}.diff; echo $$i; \
+	done
+
+driver-diff:
+	-mkdir DIFF-DRIVER
+	-$(DIFF) $(gccsrc)/gcc.c $(srcdir)/gcc.c > DIFF-DRIVER/gcc.c.diff; echo gcc.c
+	-$(DIFF) $(gccsrc)/cccp.c $(srcdir)/gpc-cccp.c > DIFF-DRIVER/gpc-cccp.c.diff; echo gpc-cccp.c

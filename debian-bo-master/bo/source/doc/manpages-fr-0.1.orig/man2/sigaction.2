@@ -1,0 +1,269 @@
+.\" Copyright (c) 1994,1995 Mike Battersby <mib@deakin.edu.au>
+.\" based on work by faith@cs.unc.edu
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\"
+.\" Modified, aeb, 960424
+.\"
+.\" Traduction 14/10/1996 par Christophe Blaess (ccb@club-internet.fr)
+.\"
+.TH SIGACTION 2 "14 Octobre 1996" Linux "Manuel du programmeur Linux"
+
+.SH NOM
+sigaction, sigprocmask, sigpending, sigsuspend \- Fonctions POSIX de
+manipulations de signaux.
+
+.SH SYNOPSIS
+.B #include <signal.h>
+.sp 2
+.BI "int sigaction(int " signum ", const struct sigaction *" act ","
+.BI "struct sigaction *" oldact );
+.sp
+.BI "int sigprocmask(int " how ", const sigset_t *" set ", "
+.BI "sigset_t *" oldset );
+.sp
+.BI "int sigpending(sigset_t *" set );
+.sp
+.BI "int sigsuspend(const sigset_t *" mask );
+
+.SH DESCRIPTION
+L'appel systeme
+.B sigaction
+sert a modifier l'action effectuee par un processus a la reception
+d'un signal specifique.
+.PP
+.I signum
+indique le signal concerne, a l'exception de
+.B SIGKILL
+et
+.BR SIGSTOP .
+.PP
+Si
+.I act
+est non nul, la nouvelle action pour le signal
+.I signum
+est definie par
+.IR act .
+Si
+.I oldact
+est non nul, l'ancienne action est sauvegardee dans
+.IR oldact .
+.PP
+La structure 
+.B sigaction
+est definie comme suit :
+.sp
+.RS
+.nf
+struct sigaction {
+    void (*sa_handler)(int);
+    sigset_t sa_mask;
+    int sa_flags;
+    void (*sa_restorer)(void);
+}
+.fi
+.RE
+.PP
+.I sa_handler
+indique l'action affectee au signal
+.I signum
+et peut etre
+.B SIG_DFL
+pour l'action par defaut,
+.B SIG_IGN
+pour ignorer le signal, ou un pointeur sur une fonction de gestion de signaux.
+.PP
+.I sa_mask
+fournit un masque de signaux a bloquer pendant l'execution du gestionnaire.
+De plus le signal ayant appele le gestionnaire est bloque a moins que
+les attributs
+.B SA_NODEFER
+ou
+.B SA_NOMASK
+soient precises.
+.PP
+.I sa_flags
+specifie un ensemble d'attributs qui modifient le comportement du
+gestionnaire de signaux. Il est forme par un OU binaire ( | ) entre
+les options suivantes :
+.RS
+.TP
+.B SA_NOCLDSTOP
+Si
+.I signum
+vaut
+.BR SIGCHLD ", "
+ne pas recevoir les signaux de notification d'arret d'un processus fils
+(quand le fils recoit un signal
+.BR SIGSTOP ", " SIGTSTP ", " SIGTTIN
+ou
+.BR SIGTTOU ")."
+.TP
+.BR SA_ONESHOT " or " SA_RESETHAND
+Restaurer l'action a son comportement par defaut une fois que le
+gestionnaire a ete appele (C'est le comportement par defaut avec
+la fonction
+.BR signal (2)
+)
+.TP
+.B SA_RESTART
+Fournir un comportement compatible avec la semantique BSD en reinstallant
+le gestionnaire de signaux apres son activation.
+.TP
+.BR SA_NOMASK " or " SA_NODEFER
+Ne pas empecher un signal d'etre recu depuis l'interieur de son propre
+gestionnaire.
+.RE
+.PP
+L'option
+.I sa_restorer
+est obsolete et ne doit pas etre utilisee.
+.PP
+L'appel
+.B sigprocmask
+est utilise pour changer la liste des signaux actuellement
+bloques. Son comportement est dependant de la valeur de
+.IR how ,
+avec les conventions suivantes :
+.RS
+.TP
+.B SIG_BLOCK
+L'ensemble des signaux bloques est l'union de l'ensemble actuel
+et de l'argument
+.I set.
+.TP
+.B SIG_UNBLOCK
+Les signaux dans l'ensemble
+.I set
+sont supprimes de la liste des signaux bloques. Il est possible
+de debloquer un signal non bloque.
+.TP
+.B SIG_SETMASK
+L'ensemble des signaux bloques est egal a l'argument
+.IR set .
+.RE
+.PP
+Si
+.I oldset
+est non nul, la valeur precedente du masque de signaux est
+stockee dans
+.IR oldset .
+.PP
+L'appel
+.B sigpending
+permet l'examen des signaux en attente (qui se sont declenches
+en etant bloques). Le masque de signaux en attente est stocke
+dans
+.IR set .
+.PP
+L'appel
+.B sigsuspend
+remplace temporairement le masque de signaux bloques par celui
+fourni dans
+.I mask
+puis endort le processus jusqu'a arrivee d'un signal.
+
+.SH "VALEUR RENVOYEE"
+.BR sigaction ,
+.BR sigprocmask ,
+.B sigpending
+et
+.B sigsuspend
+renvoient 0 s'ils reussissent, ou \-1 s'ils echouent, auquel
+cas 
+.I errno
+contient le code d'erreur.
+
+.SH ERREURS
+.TP
+.B EINVAL
+Un signal invalide est indique. Ceci se produit egalement si l'on
+tente de modifier l'action associee a
+.BR SIGKILL " ou " SIGSTOP ". "
+.TP
+.B EFAULT
+.IR act ", " oldact ", " set 
+ou 
+.I oldset
+pointent en\-dehors de l'espace d'adressage accessible.
+.TP
+.B EINTR
+L'appel systeme a ete interrompu
+
+.SH NOTES
+Il est impossible de bloquer
+.BR SIGKILL " or " SIGSTOP
+avec l'appel sigprocmask. Les tentatives seront ignorees silencieusement.
+.PP
+Suivant POSIX, le comportement d'un processus est indefini apres qu'il
+ait ignore un signal SIGFPE, SIGILL, ou SIGSEGV qui n'avait pas ete
+engendre par une fonction \fIkill()\fP ou \fIraise()\fP.
+La division entiere par zero a un resultat indefini.
+Sur certaines architectures, cela declenchera un signal SIGFPE.
+Ignorer ce signal peut mener a des boucles sans fin.
+.PP
+Placer
+.B SIGCHLD
+a
+.B SIG_IGN
+conduit a une terminaison immediate des processus fils qui meurent (ils ne
+restent pas a l'etat zombie).
+.PP
+les specifications POSIX definissent seulement
+.BR SA_NOCLDSTOP .
+L'utilisation des autres options de
+.I sa_flags
+n'est pas portable.
+.PP
+L'option
+.B SA_RESETHAND
+est compatible avec l'option SVR4 du meme nom.
+.PP
+L'option
+.B SA_NODEFER
+est compatible avec l'option SVR4 du meme nom pour les noyaux 1.3.9
+et ulterieurs. Pour les noyaux plus anciens, Linux autorisera la reception
+de tous les signaux et pas seulement celui qui vient de se declencher
+(ecrasant effectivement
+.I sa_mask
+).
+.PP
+Les noms
+.BR SA_RESETHAND " et " SA_NODEFER
+pour compatibilite avec SVR4 ne sont presents que dans les bibliotheques 3.0.9
+et suivantes.
+.PP
+.B sigaction
+peut etre appele avec un second argument null pour obtenir le gestionnaire 
+de signaux actuel. On peut aussi verifier si un signal est valide sur la
+machine actuelle en l'appellant avec les deuxieme et troisieme arguments
+nuls.
+.PP
+Voir
+.BR sigsetops (3)
+pour les details concernant les ensembles de signaux.
+.SH "CONFORME A"
+POSIX, SVR4
+
+.SH "VOIR AUSSI"
+.BR kill "(1), " kill "(2), " killpg "(2), " pause "(2), " raise "(3), " 
+.BR siginterrupt "(3), " signal "(2), " signal "(7), " sigsetops "(3), "
+.BR sigvec (2) 

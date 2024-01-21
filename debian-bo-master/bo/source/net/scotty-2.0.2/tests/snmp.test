@@ -1,0 +1,229 @@
+# Commands covered:  snmp
+#
+# This file contains a collection of tests for one or more of the Scotty
+# built commands.  Sourcing this file into Scotty runs the tests and
+# generates output for errors.  No output means no errors were found.
+#
+# Copyright (c) 1994, 1995
+#
+# J. Schoenwaelder
+# TU Braunschweig, Germany
+# Institute for Operating Systems and Computer Networks
+#
+# Permission to use, copy, modify, and distribute this
+# software and its documentation for any purpose and without
+# fee is hereby granted, provided that this copyright
+# notice appears in all copies.  The University of Braunschweig
+# makes no representations about the suitability of this
+# software for any purpose.  It is provided "as is" without
+# express or implied warranty.
+#
+
+if {[string compare test [info procs test]] == 1} then {source defs}
+
+set VERBOSE 0
+
+test snmp-1.1 {snmp create} {
+    set s [snmp session]
+    $s destroy
+} {}
+
+if { [catch {
+    set a [snmp session -port 9876 -agent ""]
+    set s [snmp session -port 9876]
+} ]} {
+    puts "can not setup agent -- skipping agent test"
+} {
+    
+    test snmp-2.1 {snmp get} {
+	global result
+	$s get sysDescr.0 {set result "%E %V"}
+	$s wait
+	set result
+    } {noError {1.3.6.1.2.1.1.1.0 {OCTET STRING} {scotty midlevel agent}}}
+    
+    test snmp-2.2 {snmp getnext} {
+	global result
+	$s getnext sysDescr {set result "%E %V"}
+	$s wait
+	set result
+    } {noError {1.3.6.1.2.1.1.1.0 {OCTET STRING} {scotty midlevel agent}}}
+    
+    test snmp-2.3 {snmp getbulk} {
+	global result
+	$s getbulk 0 1 sysDescr {set result "%E %V"}
+	$s wait
+	set result
+    } {noError {1.3.6.1.2.1.1.1.0 {OCTET STRING} {scotty midlevel agent}}}
+    
+    test snmp-2.4 {snmp exchanges} {
+	global result
+	$s set {{sysLocation.0 here}} {}
+	$s wait
+	$s get sysLocation.0 {set result "%E %V"}
+	$s wait
+	set result
+    } {noError {1.3.6.1.2.1.1.6.0 {OCTET STRING} here}}
+
+    test snmp-2.5 {snmp OID encoding} {
+	global result
+	set sysObjectID 1.2.64678.78456.1123456789.4123456789
+	$s get sysObjectID.0 {set result "%E %V"}
+	$s wait
+	set result
+    } {noError {1.3.6.1.2.1.1.2.0 {OBJECT IDENTIFIER} iso.2.64678.78456.1123456789.4123456789}}
+
+    test snmp-2.6 {snmp Integer32 encoding} {
+        global result a
+        $a instance snmpAlarmInterval.1.2.3.4 alarm 42
+        $s set [list [list snmpAlarmInterval.1.2.3.4 -88]] {set result "%E %V"}
+	$s wait
+	set result
+    } {noError {1.3.6.1.6.3.2.1.1.2.1.3.1.2.3.4 INTEGER -88}}
+
+    test snmp-2.7 {snmp wrong community name} {
+	global result
+	$s configure -community foobar
+	catch {$s get sysDescr.0 ""}
+	$s wait
+	$s configure -community public
+	$s get snmpInBadCommunityNames.0 {set result "%E %V"}
+	$s wait
+	set result
+    } {noError {1.3.6.1.2.1.11.4.0 Counter 4}}
+
+    test snmp-2.8 {snmp rollback processing} {
+	global result
+	$s set {{sysContact.0 "Bert Nase"}} {}
+	$s set {{sysContact.0 ga} {sysDescr.0 no}} {set result "%E@%I"}
+	$s get sysContact.0 { lappend result "%V" }
+	$s wait
+	set result
+    } {noSuchName@2 {{1.3.6.1.2.1.1.4.0 {OCTET STRING} {Bert Nase}}}}
+
+    test snmp-2.9 {snmp rollback processing} {
+	global result
+	$s set {{sysContact.0 "Bert Nase"}} {}
+	$s set {{sysContact.0 bi} {sysContact.0 bo} {sysDescr.0 no}} \
+	    {set result "%E@%I"}
+	$s get sysContact.0 { lappend result "%V" }
+	$s wait
+	set result
+    } {noSuchName@3 {{1.3.6.1.2.1.1.4.0 {OCTET STRING} {Bert Nase}}}}
+}
+
+test snmp-2.10 {snmp cleanup} {
+    foreach s [snmp info] {
+	$s destroy
+    }
+    snmp info
+} {}
+
+test snmp-3.1 {snmp alias} {
+    foreach a [snmp alias] {
+	snmp alias $a ""
+    }
+    snmp alias 
+} {}
+
+test snmp-3.2 {snmp alias} {
+    snmp alias foo
+} {}
+
+test snmp-3.3 {snmp alias} {
+    snmp alias foo bar
+} {}
+
+test snmp-3.4 {snmp alias} {
+    snmp alias foo
+} {bar}
+
+test snmp-3.5 {snmp alias} {
+    snmp alias bar foo
+} {}
+
+test snmp-3.6 {snmp alias} {
+    lsort [snmp alias]
+} {bar foo}
+
+test snmp-3.7 {snmp alias} {
+    snmp alias foo ""
+    snmp alias bar ""
+    snmp alias
+} {}
+
+test snmp-3.8 {snmp alias} {
+    snmp alias foo "-community foo"
+    snmp alias local "-address 127.0.0.1"
+    snmp alias focal "-alias foo -alias local"
+    set s [snmp session -alias focal]
+    set r [$s cget -community]
+    $s destroy
+    set r
+} {foo}
+
+test snmp-3.9 {snmp alias} {
+    snmp alias foo "-alias bar"
+    snmp alias bar "-alias foo"
+    list [catch {snmp session -alias foo} msg] $msg
+} {1 {alias loop detected}}
+
+test snmp-4.1 {snmp session binding} {
+    set s [snmp session]
+    set msg [$s bind "" trap]
+    $s destroy
+    set msg
+} {}
+
+test snmp-4.2 {snmp session binding} {
+    set s [snmp session]
+    $s bind "" trap foobar
+    set msg [$s bind "" trap]
+    $s destroy
+    set msg
+} {foobar}
+
+test snmp-4.3 {snmp session binding} {
+    set s [snmp session]
+    set msg [$s bind "" trap]
+    $s destroy
+    set msg
+} {}
+
+test snmp-4.4 {snmp session binding} {
+    set s [snmp session]
+    set msg [$s bind "" inform]
+    $s destroy
+    set msg
+} {}
+
+test snmp-4.5 {snmp session binding} {
+    set s [snmp session]
+    $s bind "" inform foobar
+    set msg [$s bind "" inform]
+    $s destroy
+    set msg
+} {foobar}
+
+test snmp-4.6 {snmp session binding} {
+    set s [snmp session]
+    set msg [$s bind "" inform]
+    $s destroy
+    set msg
+} {}
+
+# test snmp-5.1 {snmp traps} {
+#     global result dummy
+#     set result ""
+#     set s [snmp session -port 162]
+#     $s bind "" trap {lappend result [lindex [lindex "%V" 1] 2]}
+#     $s trap coldStart ""
+#     $s trap warmStart ""
+#     $s trap linkDown ""
+#     $s trap linkUp ""
+#     $s trap authenticationFailure ""
+#     $s trap egpNeighborLoss ""
+#     after 5000 "set dummy foo"
+#     tkwait variable dummy
+#     set result
+# } {coldStart warmStart linkDown linkUp authenticationFailure egpNeighborLoss}

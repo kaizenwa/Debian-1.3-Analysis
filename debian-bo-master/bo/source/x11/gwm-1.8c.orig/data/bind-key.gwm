@@ -1,0 +1,64 @@
+;; bind-key.gwm --- Bind keys or buttons to actions dynamically
+;;
+;; Author: Anders Holst  (aho@sans.kth.se)  
+;; Copyright (C) 1995  Anders Holst
+;; Last change: 9/2
+;;
+;; This file is copyrighted under the same terms as the rest of GWM
+;; (see the X Inc license for details). There is no warranty that it
+;; works. 
+;;
+;; --------------------------------------------------------------------- 
+;;
+;; The function 'bind-key' can be used to globally (ie in all windows
+;; and in the root) bind a key or button to some WOOL code action.
+;; The binding takes effect immediately after the call.
+;;
+;; The first argument to 'bind-key' can be an event (constructed with
+;; key, keypress, keyrelease, button, buttonpress or buttonrelease), a
+;; string denoting a key (like "a" or "F1" or "Insert"), or a number
+;; denoting a mouse button. It may also be a list where the first element
+;; is a string or number and the second element specifies which modifiers
+;; to use (with-shift, with-alt etc).
+;;
+;; The second argument is the WOOL code to run. To unbind a key or  
+;; button, use () as the second argument.
+;;
+;; For example:
+;;   (bind-key "F1" '(? "Silly action\n"))  ; Bind F1.
+;;   (bind-key "F1" ())                    ; Unbind it again.
+;;   
+
+(defun bind-interpret-event (event)
+  (if (= (type event) 'event)
+        event
+      (= (type event) 'string)
+        (keypress (key-make event) alone)
+      (= (type event) 'number)
+        (buttonbress event alone)
+      (and (= (type event) 'list)
+           (= (type (# 0 event)) 'string))
+        (keypress (key-make (# 0 event)) 
+                  (eval (+ '(together) (sublist 1 (length event) event))))
+      (and (= (type event) 'list)
+           (= (type (# 0 event)) 'number))
+        (buttonpress (# 0 event)
+                     (eval (+ '(together) (sublist 1 (length event) event))))))
+
+(defun bind-root-behavior (event action)
+  (if (boundp 'root-behavior)
+      (with (wob root-window
+             behavior (eval (list 'on event action))
+             grab (eval event))
+        (setq root-behavior (state-make behavior root-behavior))
+        (setq root-fsm (fsm-make root-behavior))
+        (wob-fsm root-fsm)
+        (if action
+            (set-grabs grab)
+          (unset-grabs grab)))))
+
+(defun bind-key (event action)
+  (with (event (bind-interpret-event event))
+    (if event
+        (bind-root-behavior event action))))
+

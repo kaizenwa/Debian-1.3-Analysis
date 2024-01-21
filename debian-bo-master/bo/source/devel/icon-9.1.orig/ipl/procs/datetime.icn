@@ -1,0 +1,300 @@
+############################################################################
+#
+#	File:     datetime.icn
+#
+#	Subject:  Procedures for date manipulation
+#
+#	Author:   Robert J. Alexander
+#
+#	Date:     May 18, 1992
+#
+############################################################################
+#
+#  This set of procedures facilitates conversion of dates among several
+#  different date formats.  Dates and times can be converted to and from
+#  pure seconds past a standard point in time, thus date and time
+#  computations can be easily done as integer arithmetic.
+#
+#
+#  DateBaseYear and HoursFromGmt
+#  -----------------------------
+#  Some of these procedures convert to and from the number of seconds
+#  past the start of a base year.  Several operating systems use this as
+#  a standard technique for storing dates, but the base year varies from
+#  system to system.  Environment variable "DateBaseYear" allows
+#  specification of the base year.  If the environment variable
+#  "DateBaseYear" is undefined, the UNIX standard of 1970 is used.
+#
+#  Some of these routines convert from a standard world time format in
+#  which times are stored as universal coordinated time (UTC, or
+#  commonly known by its older name, GMT).  To convert to local time it
+#  is necessary to know the number of hours from GMT to the local time.
+#  For example, PST is -8 hours from GMT, and PDT is -7 hours.  Some of
+#  the procedures here have an "hoursFromGmt" argument.  An environment
+#  variable "HoursFromGmt" can be used to provide a default for an
+#  installation.
+#
+#
+#  The procedures are:
+#
+#  SecToDateRec(sec,hoursFromGmt)
+#  Produces a date record computed from the seconds since the start of
+#  DateBaseYear.
+#
+#  DateRecToSec(dateRec,hoursFromGmt)
+#  Converts a DateRec to seconds since start of DateBaseYear.
+#
+#  SecToDateLine(sec,hoursFromGmt)
+#  Produces a date in the same format as Icon's &dateline.
+#
+#  SecToUnixDate(sec,hoursFromGmt)
+#  Returns a date and time in typical UNIX format:  Jan 14 10:24 1991.
+#
+#  DateLineToSec(dateline,hoursFromGmt)
+#  Converts a date in &dateline format to seconds since start of
+#  DateBaseYear.
+#
+#  ClockToSec(s)
+#  Converts a time in the format of &clock to seconds past midnight.
+#
+#  SecToClock(i)
+#  Converts seconds past midnight to a string in the format of &clock.
+#
+#  DateToSec(s)
+#  Converts a date string in Icon &date format (yyyy/mm/dd) do seconds
+#  past DateBaseYear.
+#
+#  SecToDate(i)
+#  Converts seconds past DateBaseYear to a string in Icon &date format
+#  (yyyy/mm/dd).
+#
+############################################################################
+
+record DateRec(year,month,day,hour,min,sec,weekday)
+
+global Months,Days,DateBaseYear
+
+procedure DateInit()
+#
+#  Initialize the date globals -- done automatically by calls to date
+#  procedures.
+#
+   initial {
+      Months := ["January","February","March","April","May","June",
+	    "July","August","September","October","November","December"]
+      Days := ["Sunday","Monday","Tuesday","Wednesday","Thursday",
+	    "Friday","Saturday"]
+      /DateBaseYear := integer(getenv("DateBaseYear")) | 1970
+      }
+   return
+end
+
+
+procedure SecToDateRec(sec,hoursFromGmt)
+#
+#  Produces a date record computed from the seconds since the start of
+#  DateBaseYear.
+#
+   local day,hour,min,month,secs,weekday,year
+   initial DateInit()
+   sec := integer(sec) | runerr(101,sec)
+   /hoursFromGmt := getenv("HoursFromGmt") | 0
+   hoursFromGmt := integer(hoursFromGmt) | runerr(101,hoursFromGmt)
+   sec +:= hoursFromGmt * 3600
+   weekday := (sec / 86400 % 7 + 4) % 7 + 1
+   year := DateBaseYear
+   repeat {
+      secs := if year % 4 = 0 & year % 400 ~= 0 then 31622400 else 31536000
+      if sec < secs then break
+      year +:= 1
+      sec -:= secs
+      }
+   month := 1
+   every secs :=
+	 2678400 |
+	 (if year % 4 = 0 & year % 400 ~= 0 then 2505600 else 2419200) |
+	 2678400 |
+	 2592000 |
+	 2678400 |
+	 2592000 |
+	 2678400 |
+	 2678400 |
+	 2592000 |
+	 2678400 |
+	 2592000 |
+	 2678400 do {
+      if sec < secs then break
+      month +:= 1
+      sec -:= secs
+      }
+   day := sec / 86400 + 1
+   sec %:= 86400
+   hour := sec / 3600
+   sec %:= 3600
+   min := sec / 60
+   sec %:= 60
+   return DateRec(year,month,day,hour,min,sec,weekday)
+end
+
+
+procedure SecToDateLine(sec,hoursFromGmt)
+#
+#  Produces a date in the same format as Icon's &dateline.
+#
+   local d,hour,halfday
+   d := SecToDateRec(sec,hoursFromGmt)
+   if (hour := d.hour) < 12 then {
+      halfday := "am"
+      }
+   else {
+      halfday := "pm"
+      hour -:= 12
+      }
+   if hour = 0 then hour := 12
+   return Days[d.weekday] || ", " || Months[d.month] || " " || d.day ||
+	 ", " || d.year || "  " || hour || ":" || right(d.min,2,"0") || " " ||
+	 halfday
+end
+
+
+procedure SecToUnixDate(sec,hoursFromGmt)
+#
+#  Returns a date and time in UNIX format: Jan 14 10:24 1991
+#
+   local d
+   d := SecToDateRec(sec,hoursFromGmt)
+   return Months[d.month][1+:3] || " " || d.day || " " ||
+	 d.hour || ":" || right(d.min,2,"0") || " " || d.year
+end
+
+
+procedure DateLineToSec(dateline,hoursFromGmt)
+#
+#  Converts a date in long form to seconds since start of DateBaseYear.
+#
+   local day,halfday,hour,min,month,sec,year
+   static months
+   initial {
+      DateInit()
+      months := table()
+      months["jan"] := 1
+      months["feb"] := 2
+      months["mar"] := 3
+      months["apr"] := 4
+      months["may"] := 5
+      months["jun"] := 6
+      months["jul"] := 7
+      months["aug"] := 8
+      months["sep"] := 9
+      months["oct"] := 10
+      months["nov"] := 11
+      months["dec"] := 12
+      }
+   map(dateline) ? {
+      tab(many(' \t'))
+      =("sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat") &
+	    tab(many(&letters)) | &null & tab(many(' \t,')) | &null
+      month := 1(tab(many(&letters)),tab(many('  \t')) | &null)
+      day <- integer(1(tab(many(&digits)),tab(many(' \t,')) | &null)) | &null &
+      year <- integer(1(tab(many(&digits)),tab(many(' \t')) | &null)) | &null &
+      (hour <- integer(tab(many(&digits))) &
+	    ((=":" & min <- integer(tab(many(&digits)))) &
+	    ((=":" & sec <- integer(tab(many(&digits)))) | &null) | &null) &
+	    tab(many(' \t')) | &null & halfday := =("am" | "pm") | &null &
+	    tab(many(' \t')) | &null) | &null & pos(0)
+      }
+   \month :=  \months[month[1+:3]] | fail
+   if not /(halfday | hour) then {
+      if hour = 12 then hour := 0
+      if halfday == "pm" then
+	    hour +:= 12
+      }
+   return DateRecToSec(DateRec(year,month,day,hour,min,sec),hoursFromGmt)
+end
+
+
+procedure DateRecToSec(dateRec,hoursFromGmt)
+#
+#  Converts a DateRec to seconds since start of DateBaseYear.
+#
+   local day,hour,min,month,sec,secs,year,yr
+   static days
+   initial {
+      DateInit()
+      days := [
+	 0,
+	 2678400,
+	 5097600,
+	 7776000,
+	 10368000,
+	 13046400,
+	 15638400,
+	 18316800,
+	 20995200,
+	 23587200,
+	 26265600,
+	 28857600
+      ]
+      }
+   /hoursFromGmt := getenv("HoursFromGmt") | 0
+   hoursFromGmt := integer(hoursFromGmt) | runerr(101,hoursFromGmt)
+   year := \dateRec.year | +&date[1+:4]
+   month := \dateRec.month | +&date[6+:2]
+   day := \dateRec.day | +&date[9+:2]
+   hour := \dateRec.hour | 0
+   min := \dateRec.min | 0
+   sec := \dateRec.sec | 0
+   secs := 0
+   every yr := DateBaseYear to year - 1  do {
+      secs +:= if yr % 4 = 0 & yr % 400 ~= 0 then 31622400 else 31536000
+      }
+   if month > 2 & year % 4 = 0 & year % 400 ~= 0 then secs +:= 86400
+   return secs + days[month] + (day - 1) * 86400 +
+	 (hour - hoursFromGmt) * 3600 + min * 60 + sec
+end
+
+
+procedure ClockToSec(s)
+#
+#  Converts a time in the format of &clock to seconds past midnight.
+#
+    s ? return (
+	 (1(tab(many(&digits)),move(1)) * 60 +
+	 1(tab(many(&digits)),move(1) | &null)) * 60 +
+	 (tab(many(&digits)) | 0)
+	 )
+end
+
+
+procedure SecToClock(i)
+#
+#  Converts seconds past midnight to a string in the format of &clock.
+#
+    local sec
+    sec := i % 60
+    i /:= 60
+    return right(i / 60,2,"0") || ":" || right(i % 60,2,"0") || ":" ||
+	     right(sec,2,"0")
+end
+
+
+procedure DateToSec(s)
+#
+#  Converts a date in Icon &date format (yyyy/mm/dd) do seconds
+#  past DateBaseYear.
+#
+    s ? return DateRecToSec(DateRec(+1(tab(find("/")),move(1)),
+	+1(tab(find("/")),move(1)),+tab(0)))
+end
+
+
+procedure SecToDate(i)
+#
+#  Converts seconds past DateBaseYear to a &date in Icon date format
+#  (yyyy,mm,dd).
+#
+    local r
+    r := SecToDateRec(i)
+    return right(r.year,4,"0") || "/" || right(r.month,2,"0") || "/" ||
+	     right(r.day,2,"0")
+end

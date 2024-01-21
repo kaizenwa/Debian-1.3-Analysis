@@ -1,0 +1,293 @@
+#!/usr/bin/perl
+#
+# dpkg-shlibdeps wrapper -- alternative implementation for non-native binaries
+#
+# Roman Hodek <Roman.Hodek@informatik.uni-erlangen.de>, 4 Feb 97
+# This is free software; see the GNU General Public Licence
+# version 2 or later for copying conditions.  There is NO warranty.
+
+CONF-INIT
+
+# if not called (indirectly) from dpkg-buildpackage -a..., then exec
+# the original
+exec '/usr/bin/dpkg-shlibdeps.orig', @ARGV
+	if !($arch = $ENV{'ARCH'}) || $ENV{'MAKEFLAGS'} ne "-e";
+
+
+$dpkglibdir= "/usr/lib/dpkg";
+
+use POSIX;
+use POSIX qw(:errno_h :signal_h);
+
+$shlibsoverride= '/etc/dpkg/shlibs.override';
+$shlibsdefault= '/etc/dpkg/shlibs.default';
+$shlibslocal= 'debian/shlibs.local';
+#$shlibsppdir= '/var/lib/dpkg/info';
+$shlibsppext= '.shlibs';
+$varnameprefix= 'shlibs';
+$dependencyfield= 'Depends';
+$varlistfile= 'debian/substvars';
+
+@depfields= qw(Suggests Recommends Depends Pre-Depends);
+
+read_config();
+setup();
+
+push(@INC,$dpkglibdir);
+require 'controllib.pl';
+
+sub usage {
+	# print original message
+	system "dpkg-shlibdeps.orig -h";
+	# and our comments...
+    print STDERR <<'EOF';
+
+dpkg-cross cross-compiling extension: Recognizes non-native binaries (on which
+ldd fails) and treats them differently to extract shlibs information.
+EOF
+}
+
+$i = 0;
+grep( $depstrength{$_} = ++$i, @depfields );
+
+# parse options
+while (@ARGV) {
+    $_ = shift(@ARGV);
+    if (m/^-T/) {
+        $varlistfile = $';
+    }
+	elsif (m/^-p(\w[-:0-9A-Za-z]*)$/) {
+        $varnameprefix = $1;
+    }
+	elsif (m/^-L/) {
+        $shlibslocal = $';
+    }
+	elsif (m/^-O$/) {
+        $stdout = 1;
+    }
+	elsif (m/^-h$/) {
+        usage();
+		exit 0;
+    }
+	elsif (m/^-d/) {
+        $dependencyfield = capit($');
+        defined($depstrength{$dependencyfield}) ||
+            &warn("unrecognised dependency field \`$dependencyfield'");
+    }
+	elsif (m/^-e/) {
+        push( @exec, $' );
+		push( @execf, $dependencyfield );
+    }
+	elsif (m/^-/) {
+        usageerr( "unknown option \`$_'" );
+    }
+	else {
+        push( @exec, $_ );
+		push( @execf, $dependencyfield );
+    }
+}
+@exec || usageerr( "need at least one executable" );
+
+# look at all given executables and try to extract the names of linked shared
+# libraries
+$objdump = find_objdump();
+for( $i = 0; $i <= $#exec; $i++ ) {
+
+	# The .dynstr section of an ELF executable contains all strings
+	# needed for dynamic linking, i.e. the names of the symbols to
+	# resolve, and also the names of the libraries to link with. Since
+	# '.' is not allowed in C identifiers, the pattern lib\S+\.so\.\S+
+	# used below should be fairly reliable to find the library names.
+	open( PIPE, "$objdump -j .dynstr -k -- $exec[$i] 2>&1 |" )
+		|| syserr( "cannot exec $objdump" );
+	
+    $nthisldd = 0;
+	{
+		local( $/ ) = "\000";
+		while( <PIPE> ) {
+			chomp;
+			if (/\S+:\s*file format ([^\s-]+)-([^\s-]+)/) {
+				if ($1 ne "elf32" || $2 ne $arch) {
+					&warn( "$exec[$i]: file format not elf32-$arch" );
+					last;
+				}
+			}
+			elsif (/^(lib\S+)\.so\.(\S+)$/) {
+				push( @libname, $1 );
+				push( @libsoname, $2 );
+				push( @libpath, ($p = "$1.so.$2") );
+				push( @libf, $execf[$i] );
+				$nthisldd++;
+			}
+		}
+	}
+    close( PIPE );
+	$? && subprocerr( "$objdump on \`$exec[$i]'" );
+    $nthisldd || &warn( "no library references found in \`$exec[$i]'" );
+}
+
+# make a list of packages providing files in $crosslib (dpkg -S functionality)
+for $file ( <$crossinfo/*.list> ) {
+	$package = ($file =~ m,^.*/(\S+)\.list$,)[0];
+	open( F, "<$file" ) || &syserr( "unable to open list file $file" );
+	while( <F> ) {
+		next unless m,^\Q$crosslib\E/(lib\S+\.so.*),;
+		$pkgof{$1} = $package;
+	}
+	close( F );
+}
+
+# Currently $libpath is "libfoo.so.x", which SHOULD be provided by the proper
+# library package. Just in case the package is broken and relies on ldconfig
+# to make that symlink, also look which package provides a file
+# "libfoo.so.x.*" in $crosslib 
+for( $i = 0; $i <= $#libname; $i++ ) {
+	foreach $f ( $libpath[$i],
+				 map m,^.*/(.*)$,, <$crosslib/$libpath[$i].*> ) {
+		$pathpackages{$libpath[$i]} = $pkgof{$f}, last
+			if defined($pkgof{$f});
+	}
+}
+	
+LIB: for( $i = 0; $i <= $#libname; $i++ ) {
+    scanshlibsfile( $shlibslocal,
+				    $libname[$i], $libsoname[$i], $libf[$i] ) && next;
+    scanshlibsfile( $shlibsoverride,
+				    $libname[$i], $libsoname[$i], $libf[$i] ) && next;
+    if (!defined($pathpackages{$libpath[$i]})) {
+        &warn("could not find any packages for $crosslib/$libpath[$i]".
+              " ($libname[$i].so.$libsoname[$i])");
+    } else {
+        @packages= split(/, /,$pathpackages{$libpath[$i]});
+        for $p (@packages) {
+            scanshlibsfile( "$crossinfo/$p$shlibsppext",
+                            $libname[$i], $libsoname[$i], $libf[$i] )
+                && next LIB;
+        }
+    }
+    scanshlibsfile( $shlibsdefault,
+				    $libname[$i], $libsoname[$i], $libf[$i] ) && next;
+    &warn("unable to find dependency information for ".
+          "shared library $libname[$i] (soname $libsoname[$i], path $crosslib/$libpath[$i], ".
+          "dependency field $libf[$i])");
+}
+
+
+sub scanshlibsfile {
+    my( $fn, $ln, $lsn, $lf ) = @_;
+    my( $da, $dv, $dk );
+
+    $fn= "./$fn" if $fn =~ m/^\s/;
+    if (!open( SLF,"< $fn" )) {
+        $! == ENOENT || syserr( "unable to open shared libs info file \`$fn'");
+        return 0;
+    }
+    while (<SLF>) {
+        s/\s*\n$//;
+		next if m/^\#/;
+		
+        if (!m/^\s*(\S+)\s+(\S+)/) {
+            &warn( "shared libs info file \`$fn' line $.: bad line \`$_'" );
+            next;
+        }
+        next if $1 ne $ln || $2 ne $lsn;
+        $da= $';
+        for $dv (split(/,/,$da)) {
+            $dv =~ s/^\s+//; $dv =~ s/\s+$//;
+            if (defined($depstrength{$lf})) {
+                if (!defined($predefdepfdep{$dv}) ||
+                    $depstrength{$predefdepfdep{$dv}} < $depstrength{$lf}) {
+                    $predefdepfdep{$dv}= $lf;
+                }
+            } else {
+                $dk= "$lf: $dv";
+                if (!defined($unkdepfdone{$dk})) {
+                    $unkdepfdone{$dk}= 1;
+                    $unkdepf{$lf}.= ', ' if length($unkdepf{$lf});
+                    $unkdepf{$lf}.= $dv;
+                }
+            }
+        }
+        return 1;
+    }
+    close(SLF);
+    return 0;
+}
+
+if (!$stdout) {
+    $varlistfile = "./$varlistfile" if $varlistfile =~ m/^\s/;
+	
+    open( Y, "> $varlistfile.new" ) ||
+        syserr( "open new substvars file \`$varlistfile.new'" );
+    chown( @fowner, "$varlistfile.new" ) ||
+		syserr( "chown of \`$varlistfile.new'" );
+
+    if (open( X, "<$varlistfile" )) {
+        while( <X> ) {
+            s/\n$//;
+            next if m/^(\w[-:0-9A-Za-z]*):/ && $1 eq $varnameprefix;
+            print( Y "$_\n" ) ||
+                syserr( "copy old entry to new varlist ".
+					    "file \`$varlistfile.new'" );
+        }
+    }
+	elsif ($! != ENOENT) {
+        syserr( "open old varlist file \`$varlistfile' for reading" );
+    }
+    $fh= 'Y';
+} else {
+    $fh= 'STDOUT';
+}
+
+for $dv (sort keys %predefdepfdep) {
+    $lf = $predefdepfdep{$dv};
+    $defdepf{$lf} .= ', ' if length($defdepf{$lf});
+    $defdepf{$lf} .= $dv;
+}
+for $lf (reverse @depfields) {
+    next unless defined($defdepf{$lf});
+    print( $fh "$varnameprefix:$lf=$defdepf{$lf}\n" )
+        || syserr( "write output entry" );
+}
+for $lf (sort keys %unkdepf) {
+    print( $fh "$varnameprefix:$lf=$unkdepf{$lf}\n" )
+        || syserr( "write userdef output entry" );
+}
+close($fh) || syserr( "close output" );
+if (!$stdout) {
+    rename( "$varlistfile.new",$varlistfile ) ||
+        syserr( "install new varlist file \`$varlistfile'" );
+}
+
+
+
+sub find_objdump {
+	my( $dir, $p );
+
+	# first try with $crossprefix in $PATH
+	foreach $dir ( split( ':', $ENV{'PATH'} ) ) {
+		$p = "$dir/${crossprefix}objdump";
+		return $p if -x $p;
+	}
+	# next guess is in $crossbin
+	$p = "$crossbin/objdump";
+	return $p if -x $p;
+	# default: simply 'objdump', and hope it's multi-arch
+	return "objdump";
+}
+
+
+sub getsoname {
+	my $f = @_;
+
+	open( PIPE, "$objdump -x $f 2>&1 |" ) || syserr( "cannot exec $objdump" );
+	while( <PIPE> ) {
+		if (/^\s*SONAME\s*(\S+)\s*$/) {
+			return $1;
+		}
+	}
+	close( PIPE );
+	return "";
+}
+
+CONF-SUB

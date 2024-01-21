@@ -1,0 +1,310 @@
+#! /bin/sh
+# @configure_input@
+#---------------------------------------------------------------------------#
+# Copyright (C) 1995 University of Melbourne.
+# This file may only be copied under the terms of the GNU General
+# Public License - see the file COPYING in the Mercury distribution.
+#---------------------------------------------------------------------------#
+#
+# MGNUC - Mercury GNU C
+#
+# Usage: mgnuc [<options>] [-- <gcc options>] files...
+# Options:
+# -v, --verbose
+#	Echo gcc command before executing it.
+# --no-ansi
+#	Don't pass -ansi.
+# --no-check
+#	Don't pass any of the -W options.
+# -s <grade>, --grade <grade>
+#	Select optimization/debug/gc options according to <grade>, which
+#	must be one of debug, none, jump, asm_jump, reg, fast, or asm_fast,
+#	or one of those with .gc appended.
+#
+# This runs gcc with all warnings enabled, except for the following
+# exceptions:
+#
+# -Wredundant-decls	causes too many complaints in system header files
+# -Wconversion		really only intended to help people using `unprotoize'
+# -Waggregate-return	not useful, IMHO
+#
+# -Wcast-align 		causes redundant warnings in memory.c
+# -pedantic		causes unsuppressable warnings about LVALUE_CAST()
+# -Wnested-externs	causes unsuppressable warnings about callentry()
+# -Wid-clash-31 	causes warnings about entry_mercury__xxx ...
+# -Wenum-clash 		is for C++ only
+# -Wunused		causes various spurious warnings
+#
+# Environment variables: MERCURY_C_INCL_DIR, MERCURY_DEFAULT_GRADE.
+
+# *************************************************************************
+# *** IMPORTANT NOTE: any changes to this file may also require similar ***
+# *** changes to compiler/mercury_compile.pp                            ***
+# *************************************************************************
+
+FULLARCH=@FULLARCH@
+NONSHARED_LIB_DIR=${MERCURY_NONSHARED_LIB_DIR=@NONSHARED_LIB_DIR@}
+C_INCL_DIR=${MERCURY_C_INCL_DIR=@LIBDIR@/inc}
+DEFAULT_GRADE=${MERCURY_DEFAULT_GRADE=@DEFAULT_GRADE@}
+CC=${MERCURY_C_COMPILER="@CC@"}
+CFLAGS_FOR_REGS="@CFLAGS_FOR_REGS@"
+CFLAGS_FOR_GOTOS="@CFLAGS_FOR_GOTOS@"
+AS=as
+
+ARG_OPTS=-DCOMPACT_ARGS
+
+case "$CC" in
+    *gcc*)
+	ANSI_OPTS="-ansi"
+	CHECK_OPTS="
+	      -Wall -Wwrite-strings -Wpointer-arith -Wcast-qual -Wtraditional
+	      -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wno-unused"
+	OPT_OPTS="-O2 -fomit-frame-pointer -DSPEED"
+	COMPILER=gcc
+	;;
+    *lcc*)
+	ANSI_OPTS=
+	CHECK_OPTS=
+	OPT_OPTS="-DSPEED"
+	COMPILER=lcc
+	;;
+    *)
+	ANSI_OPTS=
+	CHECK_OPTS=
+	OPT_OPTS="-O -DSPEED"
+	COMPILER=unknown
+	;;
+esac
+
+DEBUG_OPTS="-g"
+AS_OPTS=""
+SPLIT_OPTS=""
+
+grade=$DEFAULT_GRADE
+verbose=false
+assemble=false
+
+while : ; do
+    case "$1" in
+	--assemble)
+		assemble=true
+		shift
+		;;
+	--no-ansi)
+		ANSI_OPTS=
+		shift
+		;;
+	--no-check)
+		CHECK_OPTS=
+		shift
+		;;
+	--split-c-files)
+		SPLIT_OPTS=-DSPLIT_C_FILES
+		shift
+		;;
+	--no-split-c-files)
+		SPLIT_OPTS=
+		shift
+		;;
+	-v|--verbose)
+		verbose=true
+		shift
+		;;
+	-s|--grade)
+		shift
+		grade="$1";
+		shift
+		;;
+	-s*)
+		grade="` expr $1 : '-s\(.*\)' `"
+		shift
+		;;
+	--)
+		shift
+		break
+		;;
+	*)
+		break
+		;;
+    esac
+done
+
+case "$grade" in
+	*.cnstr) CNSTR_OPTS="-DCONSTRAINTS"
+		grade="` expr $grade : '\(.*\).cnstr' `"
+		;;
+	*)
+		CNSTR_OPTS=""
+		;;
+esac
+
+case "$grade" in
+	*.prof)	PROF_OPTS="-DPROFILE_TIME -DPROFILE_CALLS"
+		grade="` expr $grade : '\(.*\).prof' `"
+		;;
+	*)
+		PROF_OPTS="-DNO_SIGNALS"
+		;;
+esac
+
+case "$grade" in
+	*.agc)	GC_OPTS="-DNATIVE_GC"
+		grade="` expr $grade : '\(.*\).agc' `"
+		;;
+	*.gc)	GC_OPTS="-DCONSERVATIVE_GC"
+		grade="` expr $grade : '\(.*\).gc' `"
+		;;
+	*)
+		GC_OPTS=""
+		;;
+esac
+
+case "$grade" in
+	asm_fast)
+		GRADE_OPTS="$OPT_OPTS -DUSE_GCC_GLOBAL_REGISTERS
+				-DUSE_ASM_LABELS -DUSE_GCC_NONLOCAL_GOTOS"
+		;;
+	fast)
+		GRADE_OPTS="$OPT_OPTS
+			-DUSE_GCC_GLOBAL_REGISTERS -DUSE_GCC_NONLOCAL_GOTOS"
+		;;
+	reg)
+		GRADE_OPTS="$OPT_OPTS
+			-DUSE_GCC_GLOBAL_REGISTERS"
+		;;
+	asm_jump)
+		GRADE_OPTS="$OPT_OPTS
+			-DUSE_ASM_LABELS -DUSE_GCC_NONLOCAL_GOTOS"
+		;;
+	jump)
+		GRADE_OPTS="$OPT_OPTS
+			-DUSE_GCC_NONLOCAL_GOTOS"
+		;;
+	none)
+		GRADE_OPTS="$OPT_OPTS"
+		;;
+	init)
+		echo "$0: the \`-s init' option is no longer supported" 1>&2
+		exit 1
+		;;
+	debug)
+		GRADE_OPTS="$DEBUG_OPTS"
+		;;
+	*)
+		echo "$0: invalid grade \`$grade'" 1>&2;
+		exit 1
+esac
+
+# check that special grades are only used with gcc
+case $COMPILER in
+	gcc)	;;
+	*)	case $grade in
+			debug|none)	;;
+			*)
+		echo "$0: For compilers other than GNU C, the only" 1>&2
+		echo "$0: grades allowed are \`debug' and \`none'" 1>&2
+					;;
+		esac
+esac
+
+# if we're using global registers, add CFLAGS_FOR_REGS
+case "$GRADE_OPTS" in
+	*-DUSE_GCC_GLOBAL_REGISTERS*)
+		GRADE_OPTS="$GRADE_OPTS $CFLAGS_FOR_REGS"
+		;;
+esac
+
+# if we're using non-local gotos, add CFLAGS_FOR_GOTOS
+case "$GRADE_OPTS" in
+	*-DUSE_GCC_NONLOCAL_GOTOS*)
+		GRADE_OPTS="$GRADE_OPTS $CFLAGS_FOR_GOTOS"
+		;;
+esac
+
+#
+# Special case hacks for particular architectures
+# Any code here needs to be duplicated in ../configure.in.
+#
+
+ARCH_OPTS=""
+case "$FULLARCH" in
+	mips-sgi-irix5.*)
+		# nonlocal gotos don't work with PIC, which is the
+		# default for Irix 5, so if nonlocal gotos are enabled
+		# we need to disable the use of shared libraries.
+		case "$GRADE_OPTS" in
+			*-DUSE_GCC_NONLOCAL_GOTOS*)
+LIBRARY_PATH="$NONSHARED_LIB_DIR:/usr/lib/nonshared:$LIBRARY_PATH"
+				export LIBRARY_PATH
+				AS_OPTS="-non_shared"
+			;;
+		esac
+		;;
+	i?86-*)
+		# the use of stack_pointer in the ASM_JUMP macro
+		# defined in runtime/goto.h causes lots of warnings
+		# about using possibly uninitialized variables;
+		# there's no easy way to supress them except by
+		# disabling the warning.
+		CHECK_OPTS="$CHECK_OPTS -Wno-uninitialized"
+		;;
+esac
+
+#
+# Kludge for gcc-2.6.3 bug on mips: if you use gcc global registers and -O2,
+# gcc 2.6.3 gets an internal error compiling library/int.c.
+# As a work-around, we compile that file with -O1.
+# Ditto for gcc-2.6.3 on alpha with compiler/modules.c.
+#
+case $COMPILER in gcc)
+	case "$FULLARCH" in
+		mips*)
+			case "$*" in *" int.c "*|*" int.dir/int_"*".c "*)
+				case "`$CC --version 2>/dev/null`" in 2.6.*)
+					ARCH_OPTS="$ARCH_OPTS -O1" ;;
+				esac;;
+			esac ;;
+		alpha*)
+			case "$*" in
+			*" modules.c "*|*" modules.dir/modules_"*".c "*)
+				case "`$CC --version 2>/dev/null`" in 2.6.*)
+					ARCH_OPTS="$ARCH_OPTS -O1" ;;
+				esac
+			esac ;;
+	esac ;;
+esac
+
+#
+# On sparc-sun-solaris2, we need to use -fPIC rather than -fpic if we're
+# using grade `none', because otherwise the Mercury standard library
+# overflows the fixed limit on the number of "small pic" references.
+#
+case "$FULLARCH" in sparc-sun-solaris2*)
+	case "$grade" in none)
+		case "$*" in *-fpic*)
+			echo "mgnuc: using -fPIC rather than -fpic"
+			OVERRIDE_OPTS="$OVERRIDE_OPTS -fPIC" ;;
+		esac ;;
+	esac ;;
+esac
+
+case $assemble in true)
+	case $verbose in true)
+		echo $AS $AS_OPTS "$@" ;;
+	esac
+	exec $AS $AS_OPTS "$@" ;;
+esac
+
+case $verbose in true)
+	echo $CC -I$C_INCL_DIR $ANSI_OPTS $CHECK_OPTS \
+		$GRADE_OPTS $GC_OPTS $PROF_OPTS $CNSTR_OPTS $SPLIT_OPTS \
+		$ARCH_OPTS $ARG_OPTS "$@" $OVERRIDE_OPTS ;;
+esac
+case $# in
+	0) exec $CC -I$C_INCL_DIR $ANSI_OPTS $CHECK_OPTS \
+		$GRADE_OPTS $GC_OPTS $PROF_OPTS $CNSTR_OPTS $SPLIT_OPTS \
+		$ARCH_OPTS $OVERRIDE_OPTS ;;
+	*) exec $CC -I$C_INCL_DIR $ANSI_OPTS $CHECK_OPTS \
+		$GRADE_OPTS $GC_OPTS $PROF_OPTS $CNSTR_OPTS $SPLIT_OPTS \
+		$ARCH_OPTS $ARG_OPTS "$@" $OVERRIDE_OPTS ;;
+esac

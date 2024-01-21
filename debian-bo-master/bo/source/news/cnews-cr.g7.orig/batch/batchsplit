@@ -1,0 +1,90 @@
+#! /bin/sh
+# Prepare up to $3 batches of nominal size $1, max size $2, bytes in files
+#   named togo.[0-9] .
+# Exit status:  0 some have been prepared, 1 none can be.
+# This is now just central administration, with batchsplitter doing the work.
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/batch:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+regress=n
+case "$1" in
+'')	echo "Usage: $0 size max [nwanted]" >&2
+	exit 2
+	;;
+-X)	regress=y
+	shift
+	;;
+esac
+
+nominal=$1
+max=$2
+
+# Limit $3 to 7, to stay within awk's limits on file descriptors.
+case "$3" in
+[1-7])	nwanted="$3"	;;
+*)	nwanted=7	;;
+esac
+
+# We ultimately work from togo, but if it's all we've got, we immediately
+# rename it togo.more so that we can unlock the news system.  If there
+# is more than will fit in the numbered batches, we put the next few
+# lots in togo.next, and use that thereafter until it's empty.  This
+# avoids the need to paw through a long togo.more every time when there's
+# a large backlog.
+if test -s togo.next
+then
+	input=togo.next
+elif test -s togo.more
+then
+	input=togo.more
+else
+	sigs='1 2 15'
+	lock LOCKexplode $$ || exit 1
+	trap "unlock LOCKexplode ; exit 1" $sigs
+	rm -f togo.more
+	mv togo togo.more
+	>togo
+	input=togo.more
+	trap $sigs
+	unlock LOCKexplode
+fi
+
+# A little precaution... do there seem to be a lot of nonexistent files?
+# Check first three as quick screening, check next fifty to decide whether
+# a relatively-costly existence filtering is in order.
+nextonly=0
+lotsmissing=25
+if test " $regress" = " y"
+then
+	lotsmissing=0
+fi
+if test " `sed 3q $input | batchcheck -v | wc -l`" -gt 0 && \
+	test " `sed 50q $input | batchcheck -v | wc -l`" -gt $lotsmissing
+then
+	# We filter only togo.next, because filtering a big togo.more is
+	# a tedious job and best done a bit at a time.
+	while test -s $input
+	do
+		if test " $input" != " togo.next"
+		then
+			batchsplitter $input $nominal $max 0
+			input=togo.next
+		fi
+		batchcheck <togo.next >togo.tmp
+		mv togo.tmp togo.next
+		test -s togo.next && break	# if have articles, BREAK OUT
+		input=togo.more			# no luck -- try again
+	done
+fi
+
+if test -s $input
+then
+	batchsplitter $input $nominal $max $nwanted
+	exit 0
+else
+	exit 1
+fi

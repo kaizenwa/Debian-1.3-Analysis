@@ -1,0 +1,173 @@
+############################################################################
+#
+#	File:     largint.icn
+#
+#	Subject:  Procedures for large integer arithmetic
+#
+#	Authors:  Paul Abrahams and Ralph E. Griswold
+#
+#	Date:     May 11, 1989
+#
+############################################################################
+#
+#     These procedures perform addition, multiplication, and exponentiation
+#  On integers given as strings of numerals:
+#
+#        add(i,j)      sum of i and j
+#
+#        mpy(i,j)      product of i and j
+#
+#        raise(i,j)    i to the power j
+#
+#  Note:
+#
+#     The techniques used by add and mpy are different from those used by
+#  raise.  These procedures are combined here for organizational reasons.
+#  The procedures add and mpy are adapted from the Icon language book.
+#  The procedure raise was written by Paul Abrahams.
+#
+############################################################################
+
+record largint(coeff,nextl)
+
+global base, segsize
+
+# Add i and j
+#
+procedure add(i,j)
+
+   return lstring(addl(large(i),large(j)))
+
+end
+
+# Multiply i and j
+#
+procedure mpy(i,j)
+
+   return lstring(mpyl(large(i),large(j)))
+
+end
+
+# Raise i to power j
+#
+procedure raise(i,j)
+
+     return rstring(ipower(i,binrep(j)))
+
+end
+
+procedure addl(g1,g2,carry)
+   local sum
+   /carry := largint(0)	# default carry
+   if /g1 & /g2 then return if carry.coeff ~= 0 then carry
+   else &null
+   if /g1 then return addl(carry,g2)
+   if /g2 then return addl(g1,carry)
+   sum := g1.coeff + g2.coeff + carry.coeff
+   carry := largint(sum / base)
+   return largint(sum % base,addl(g1.nextl,g2.nextl,carry))
+end
+
+procedure large(s)
+   initial {
+      base := 10000
+      segsize := *base - 1
+      }
+
+   if *s <= segsize then return largint(integer(s))
+   else return largint(right(s,segsize),
+      large(left(s,*s - segsize)))
+end
+
+procedure lstring(g)
+   local s
+
+   if /g.nextl then s := g.coeff
+   else s := lstring(g.nextl) || right(g.coeff,segsize,"0")
+   s ?:= (tab(upto(~'0') | -1) & tab(0))
+   return s
+end
+
+procedure mpyl(g1,g2)
+   local prod
+   if /(g1 | g2) then return &null	# zero product
+   prod := g1.coeff * g2.coeff
+   return largint(prod % base,
+      addl(mpyl(largint(g1.coeff),g2.nextl),mpyl(g1.nextl,g2),
+      largint(prod / base)))
+end
+
+# Compute the binary representation of n (as a string)
+#
+procedure binrep(n)
+    local retval
+    retval := ""
+    while n > 0 do {
+        retval := n % 2 || retval
+        n /:= 2
+        }
+    return retval
+end
+
+# Compute a to the ipower bbits, where bbits is a bit string.
+# The result is a list of coefficients for the polynomial a(i)*k^i,
+# least significant values first, with k=10000 and zero trailing coefficient
+# deleted.
+#
+procedure ipower(a, bbits)
+    local b, m1, retval
+    m1 := (if a >= 10000 then [a % 10000, a / 10000] else [a])
+    retval := [1]
+    every b := !bbits do {
+        (retval := product(retval, retval)) | fail
+        if b == "1" then
+            (retval := product(retval, m1)) | fail
+        }
+    return retval
+end
+
+# Compute a*b as a polynomial in the same form as for ipower.
+# a and b are also polynomials in this form.
+#
+procedure product(a,b)
+    local i, j, k, retval, x
+    if *a + *b > 5001 then
+        fail
+    retval := list(*a + *b, 0)
+    every i := 1 to *a do
+        every j := 1 to *b do {
+            k := i + j - 1
+            retval[k] +:= a[i] * b[j]
+            while (x := retval[k]) >= 10000 do {
+                retval[k + 1] +:= x / 10000
+                retval[k] %:= 10000
+                k +:= 1
+            }   }
+    every i := *retval to 1 by -1 do
+        if retval[i] > 0 then
+            return retval[1+:i]
+    return retval[1+:i]
+end
+
+procedure rstring(n)
+    local ds, i, j, k, result
+
+    ds := ""
+    every k := *n to 1 by -1 do
+        ds ||:= right(n[k], 4, "0")
+    ds ?:= (tab(many("0")), tab(0))
+    ds := repl("0", 4 - (*ds - 1) % 5) || ds
+
+    result := ""
+    every i := 1 to *ds by 50 do {
+        k := *ds > i + 45 | *ds
+        every j := i to k by 5 do {
+	   ds
+           result ||:= ds[j+:5]
+	   }
+        }
+   result ? {
+      tab(many('0'))
+      return tab(0)
+      }
+end

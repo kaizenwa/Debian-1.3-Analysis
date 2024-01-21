@@ -1,0 +1,178 @@
+#!/usr/bin/awk -f
+#
+#	Reencoding script, (c) Jan Kasprzak, 1994-1996. Version 3.0
+#	Sun May 12 13:55:48 MET DST 1996
+#
+
+# Print error message and exit
+function usage()
+{
+	print "Usage: cstocs [options] inputencoding outputencoding [ file ... ]"
+	print "Where [options] is zero or more from:"
+	print "    --help        Prints out this message."
+	print "    --version     Prints out the version information."
+	print "    --fillstring=string    Characters from input the encoding not defined"
+	print "                  in the output encoding nor in the accent file will be replaced"
+	print "                  by this string (default is single space)."
+	print "    --null        Equivalent to --fillstring=''"
+	print "    --nochange    Do not use accent file at all."
+	print "    --onebyone    Use only those entries from the accent file, which will cause"
+	print "                  replacing of one character by exactly one character."
+	print "                  (this is the default behavior)."
+	print "    --onebymore   Use all entries from the accent file."
+	print "    --dir=string  Directory where to look encoding and accent files for."
+	print "                  Default is __DEFAULT_CSTOCSDIR__."
+	exit 1
+}
+
+function parse_args(	i,arg,newargc)
+{
+	for (arg=1; arg+2 < ARGC; arg++)
+	{
+		if (ARGV[arg] == "--null")
+		{
+			fillstring = ""
+			continue
+		}
+		if (ARGV[arg] == "--fillstring")
+		{
+			fillstring = ARGV[++arg]
+			continue
+		}
+		if (ARGV[arg] == "--nochange")
+		{
+			use_accent = "no"
+			continue
+		}
+		if (ARGV[arg] == "--onebyone")
+		{
+			use_accent = "onebyone"
+			continue
+		}
+		if (ARGV[arg] == "--onebymore")
+		{
+			use_accent = "onebymore"
+			continue
+		}
+		if (ARGV[arg] == "--dir")
+		{
+			libdir = ARGV[++arg]
+			continue
+		}
+		if (ARGV[arg] == "--version")
+		{
+			print "cstocs.awk version 3.0"
+			exit 0
+		}
+		if (ARGV[arg] == "--")
+			continue
+
+		if (ARGV[arg] ~ "^--*")
+		{
+			print "Unknown argument " ARGV[arg] > "/dev/stderr"
+			usage()
+		}
+		break
+	}
+
+	# Check nuber of arguments.
+	if (ARGC < 2+arg) { usage() }
+
+	srcfile = ARGV[arg++]
+	dstfile = ARGV[arg]
+
+	newargc = ARGC-arg
+	for (i=1; i<newargc; i++)
+		ARGV[i] = ARGV[i+arg]
+
+	ARGC=newargc
+}
+
+# Return one-character string with i-th character from the character set.
+function chr(i)
+{
+	return sprintf ("%c", i+0)
+}
+
+# Check if file exists.
+function testfile(name)
+{
+	if (system("test -r " name) != 0)
+	{
+		print "Cannot open file " name ". Possibly invalid encoding?" > "/dev/stderr"
+
+		usage()
+	}
+}
+# Initialization: Make reencoding vector translate[]
+BEGIN {
+	# Set the default values: libdir, fillstring and use_accent
+	# libdir is a directory with *.enc files.
+	if (ENVIRON["CSTOCSDIR"] == "") {
+		libdir="__DEFAULT_CSTOCSDIR__/"
+	} else {
+		libdir=ENVIRON["CSTOCSDIR"] "/"
+	}
+
+	# fillstring is a string to place instead of characters that are not
+	# in destination encoding
+	fillstring = " "
+	use_accent = "onebyone"
+
+	parse_args()
+
+	# Source encoding.
+	name = libdir srcfile ".enc"
+	testfile(name)
+	while (getline < name) src[($1+0)] = $2
+	close (name)
+
+	# Destination encoding.
+	name = libdir dstfile ".enc"
+	testfile(name)
+	while (getline < name) dst[($2 "")] = $1+0
+	close (name)
+
+	if (use_accent != "no")
+	{
+		# If dst[src[i]] does not exist, we will try to strip diacritic mark.
+		name = libdir "accent" 
+		testfile(name)
+		while (getline < name)
+		{
+			if (use_accent == "onebyone" && length($2) > 1)
+				continue
+			accent[($1 "")] = $2 ""
+		}
+		close (name)
+	}
+	
+	# Now make the translate[] vector.
+	# First, the initial values -- identical vector.
+	for (i=0; i<256; i++)
+		translate[chr(i)] = chr(i)	
+
+	for (i in src)
+	{
+		if (dst[src[i]] == "")
+		{
+			if (accent[src[i]] == "") {
+				translate[chr(i)] = fillstring
+			} else {
+				translate[chr(i)] = accent[src[i]]
+			}
+		} else
+			translate[chr(i)] = chr(dst[src[i]])
+	}
+}
+
+# Main program.
+# Yes, rather stupid and slow. Maybe we shoud pass translate[] to tr(1).
+{
+	for (i=1; i<=length($0); i++)
+		printf ("%s", translate[substr($0,i,1)]);
+
+	printf ("\n");
+}
+
+# That's all.

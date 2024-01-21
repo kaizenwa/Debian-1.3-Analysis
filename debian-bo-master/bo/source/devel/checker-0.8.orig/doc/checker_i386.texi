@@ -1,0 +1,2553 @@
+\input texinfo @c -*- texinfo -*-
+@comment %**start of header
+@setfilename checker.info
+@settitle Checker
+@comment %**end of header
+
+@iftex
+@finalout
+@end iftex
+
+@ifinfo
+@format
+START-INFO-DIR-ENTRY
+* Checker: (checker).		A detector of bad memory accesses.
+END-INFO-DIR-ENTRY
+@end format
+
+@ifinfo
+This file documents Checker, a memory access detector.
+
+This is edition 0.3 of the Checker documentation for Checker V0.7.
+
+Copyright (C) 1994, 1995, 1996 Tristan Gingold.
+
+Permission is granted to make and distribute verbatim copies of
+this manual provided the copyright notice and this permission notice
+are preserved on all copies.
+
+Permission is granted to copy and distribute modified versions of this
+manual under the conditions for verbatim copying, provided that the entire
+resulting derived work is distributed under the terms of a permission
+notice identical to this one.
+@end ifinfo
+
+@ignore
+Before reading this doc, you should know that English is not my native
+language.  So, if you find mistakes, please correct them, and send me your
+corrections.
+Moreover, since it is my first doc, the doc can be sometimes fuzzy, or
+unclear.  Please tell me about that.  If you think something is not
+developed enough, or needs an example, or is badly presented, please tell me.
+
+To produce a 'info' file: makeinfo checker.texi
+To see the info file: info -d . -f checker.info
+@end ignore
+
+@iftex
+@titlepage
+@title Checker
+@subtitle A memory access detector
+@subtitle Version 0.7
+@subtitle Copyright @copyright{} 1994, 1995 Tristan Gingold.
+@author by Tristan Gingold
+@end titlepage
+@setchapternewpage off
+@headings off
+@everyheading @| @thispage @|
+@end iftex
+
+@node Top, Introduction, (dir), (dir)
+@comment  node-name,  next,  previous,  up
+@top Checker
+
+This manual documents version 0.7 of @code{Checker}.
+
+@menu
+* Introduction::
+* Copying::                     The GNU General Public License says how
+                                  you can share and copy Checker
+
+* Simple Example::              Getting started
+* How to Compile::              How to compile your program with Checker
+* How to Run::                  How to specify options
+* How to Read the Output::
+
+* Features::
+* Memory Checked::
+* Garbage Detector::            How to use the garbage detector
+* Invoking::                    Options to @code{Checker}
+* Output Messages About Memory Access Error::  How to read the messages from @code{Checker}
+* Output Messages About Malloc::
+* More Output Messages::
+* Malloc::                      Describes malloc() and the other functions
+* Mmalloc::			Multi-heap through mmalloc()
+* Functions for Users::         Some functions that might help you
+
+* Troubles::
+* Misplaced Errors::            Misplaced warnings of @code{Checker}
+* Bad Writes::                  The consequences of memory writing errors
+* Bad Stack Frames::            One reason of bad histories
+* Signal Problems::             The problem with signals: they are delayed
+* Temporary File::              The temporary file can be not removed
+* Libraries::                   How to use your libraries
+* Bugs::                        How to report bugs
+
+* Binaries::
+* checker::			How to use checker
+* checkergcc::			How to use checkergcc
+* checkerg++::			How to use checkerg++
+* symctl::			How to use symctl
+* genmess::			How to use genmess
+
+* Installing Checker::
+
+* Internals::
+* Code Insertion::              Anything you ever wanted to know about code insertion
+* Code of Checker::             How Checker works.
+
+* Checker with GCC::
+* Concepts of GCC-Checker::
+* Writing stubs::
+* Porting GCC-Checker::
+
+* Concepts Index::
+* Functions Index::
+@end menu
+
+@node Introduction, Copying, Top, Top
+@comment  node-name,  next,  previous,  up
+@chapter Introduction
+@section What is the purpose of Checker?
+
+If you are not a wizard, you often have bugs in your own programs.  Of
+course, you have tools which help you to find bugs:
+@noindent
+@itemize @bullet
+@item
+The compiler detects bad syntax and strange constructions.
+@item
+@code{lint} can check your program more carefully than your compiler.
+@item
+You can examine your program at run time with your favorite debugger: you
+can read your variables, your data, set breakpoints@dots{}
+@item
+Other tools such as @code{strace} which displays all the system calls.
+@end itemize
+
+But some bugs can't be discovered with these standard tools.  The best example
+is memory leaks.  A memory leak is a zone of memory, allocated with
+@code{malloc} that is not used anymore.  So the memory allocated is lost.
+This increases the amount of memory needed by your program and makes
+your program slower since your OS might have to start swapping.
+
+@section Main features
+@code{Checker} can help you to find some bugs in your program.
+It can detect bad memory accesses such as the following:
+@itemize @bullet
+@item
+reading uninitialized memory
+@item
+writing in a freed zone
+@item
+writing or reading outside of a memory block
+@item
+using NULL pointers
+@end itemize
+
+This is really useful if you have a big program with a lot of functions.
+
+Moreover, @code{Checker} has a garbage detector: it is able to find the
+blocks of memory which are lost (memory leaks).
+
+@code{Checker} maintains bitmaps to keep track of  the status of each
+byte of memory.  The status can be writable, readable, both or none.
+When memory is allocated, the new memory becomes write-only: you are not
+allowed to read it because it has not been initialized.  However, when
+you write to the new block of memory, those bytes become readable
+and writable.  And when the block is freed, the bytes become unreadable and
+unwritable.  Red zones are unreadable and unwritable memory, so that
+each access to a red zone will produce a warning.
+
+@section What is Checker?
+@dfn{Checker} is a library to exploite the @samp{-fcheck-memory-usage}
+option of @code{GCC}.  Contrary to the usual passive libraries,
+@code{Checker} is an active library: it doesn't (really) provide you new
+options and is automatically run.
+
+In fact, the first versions were written without using this option. 
+However, these versions were not portable.  So, I write a patch for
+@code{GCC} to make it portable.
+
+At this version, you can use either the @code{GCC} version or the machine
+dependant one.
+
+
+On i486-Linux: @*
+@dfn{Checker} is a library and a modified assembler to compile your programs.
+
+When you compile your program through @code{Checker}, @code{Checker} calls its
+own @code{as} (a patched version of @code{GAS}) to insert code.  The code
+inserted checks each memory access.
+
+The library contains entry points for the inserted code, new @code{malloc}
+and co, and functions to detect memory leaks.
+
+
+On Sparc-Solaris2: @*
+@dfn{Checker} is a shared library that is loaded at the execution time. 
+This shared library emulates the code and checks each memory access.
+
+By the way, since @samp{C++} also uses @code{malloc} and @code{free} through
+@code{new} and @code{delete}, @code{Checker} also works with @samp{C++}
+programs.
+
+@ignore
+At this time, @code{Checker} is only available for Linux on i386/i486 and
+for Solaris2 on Sparc.
+@end ignore
+
+@node Copying, Simple Example, Introduction, Top
+@comment [ I have to justify why I have choosed GPL and not LGPL ]
+
+@ifset WITHGPL
+@include gpl.texinfo
+@end ifset
+@ifclear WITHGPL
+@chapter COPYING
+@comment @unnumbered LICENSE
+You can use, share, copy @code{Checker} according to the GNU GENERAL PUBLIC
+LICENSE.
+@end ifclear
+
+@node Simple Example, Features, Copying, Top
+@chapter Getting Started with an Example
+This chapter introduces you to @code{Checker} by running a small program
+through it with lots of bad memory accesses.
+
+@smallexample
+#include <stdlib.h>
+
+int
+dummy (char **a)         /* I use this function to clear 'ZONE' */
+@{
+ *a = 0;
+@}
+
+int
+main()
+@{
+ char *zone = malloc(20);
+ char *ptr = NULL;
+ int i;
+ char c;
+
+ c = zone[1];             /* error: read an uninitialized char */
+ c = zone[-2];            /* error: read before the zone */
+ zone[25] = ' ';          /* error: write after the zone */
+ zone[4] = (char)i;       /* error: read an uninitialized val */
+ dummy (&zone);          /* produce a leak */
+@}
+@end smallexample
+
+@menu
+* How to Compile::
+* How to Run::
+* How to Read the Output::
+@end menu
+
+@node How to Compile, How to Run, Simple Example, Simple Example
+@section How to Compile this Example
+@pindex checkergcc
+@pindex checkerg++
+@pindex as
+@pindex ld
+@cindex compilation
+@itemize @bullet
+@item On every machine, with @code{GCC-Checker}
+
+Compile and link your program with @samp{-checker}.
+@display
+$ gcc -checker -c example.c
+$ gcc -checker -o example example.o
+@end display
+
+@item On Linux
+
+To compile the program, just use @code{checkergcc} instead of @code{gcc}.
+You can provide compiler command line options as usual. @xref{checkergcc}.
+
+Now let's compile our little example (Note that @code{checkergcc}
+automatically set @samp{-g}):
+@display
+$ checkergcc -c example.c
+$ checkergcc -o example example.o
+@end display
+
+@item On Sparc
+
+Compile your program as usual (it is a good idea to use @samp{-g} so that
+symbolic names would be displayed instead of numeric values):
+@display
+$ cc -c -g example.c
+$ cc -o example example.o
+@end display
+@end itemize
+
+@node How to Run, How to Read the Output, How to Compile, Simple Example
+@section How to Run this Example
+Before running this example, it will be useful to tell @code{Checker} to
+detect memory leaks at the end of the program.  There is an option to do
+that, but instead of using additional command line arguments,
+@code{Checker} uses the environment variable @code{CHECKEROPTS}. So, to
+detect the memory leak at the end of the example, you can execute the
+following commands:
+@display
+(sh bash zsh) $ CHECKEROPTS='--detector=end'; export CHECKEROPTS
+(csh ksh tcsh)> setenv CHECKEROPTS '--detector=end'
+@end display
+
+@itemize @bullet
+@item On every machine with @code{GCC-Checker} and on Linux
+
+Now you can run @file{example}:
+@display
+$ ./example
+@end display
+
+@item On Sparc
+
+Now you can run @file{example} through @code{Checker}:
+@display
+$ /opt/checker/bin/checker ./example
+@end display
+@end itemize
+
+@subsection The output
+Here is what @file{example} displays.  Note that addresses and messages can
+be a little different.
+@display
+Checker version 0.7 Copyright (C) 1993,1994,1995 Tristan Gingold.
+This program has been compiled with 'checkergcc' or 'checkerg++'.
+Checker is a memory access detector.
+Checker is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+For more information, set CHECKEROPTS to '-h'
+From Checker (pid:00070): The messages for './example' will follow.
+
+From Checker (pid:00070): (ruh) read uninitialized byte(s) in a block.
+When Reading 1 byte(s) at address 0x1682d, inside the heap (sbrk).
+1 bytes into a block (start: 0x1682c, length: 20, mdesc: 0x0).
+The block was allocated from:
+	pc=0x00005d7b in _malloc() at ../l-malloc/malloc.c:188
+	pc=0x00005dda in malloc() at ../l-malloc/malloc.c:203
+	pc=0x000010ea in main() at example.c:12
+	pc=0x00001079 in __entry() at chkrcrt0.S:1
+Stack frames are:
+	pc=0x00001120 in main() at example.c:17
+	pc=0x00001079 in __entry() at chkrcrt0.S:1
+From Checker (pid:00070): (bvh) block bounds violation in the heap.
+When Reading 1 byte(s) at address 0x1682a, inside the heap (sbrk).
+2 bytes before a block (start: 0x1682c, length: 20, mdesc: 0x0).
+The block was allocated from:
+	pc=0x00005d7b in _malloc() at ../l-malloc/malloc.c:188
+	pc=0x00005dda in malloc() at ../l-malloc/malloc.c:203
+	pc=0x000010ea in main() at example.c:12
+	pc=0x00001079 in __entry() at chkrcrt0.S:1
+Stack frames are:
+	pc=0x00001147 in main() at example.c:18
+	pc=0x00001079 in __entry() at chkrcrt0.S:1
+From Checker (pid:00070): (bvh) block bounds violation in the heap.
+When Writing 1 byte(s) at address 0x16859, inside the heap (sbrk).
+after the last block.
+Stack frames are:
+	pc=0x0000116e in main() at example.c:19
+	pc=0x00001079 in __entry() at chkrcrt0.S:1
+From Checker (pid:00070): (rus) read uninitialized byte(s) in the stack.
+When Reading 1 byte(s) at address 0xbffffe08, inside the stack.
+known stack limit= 0xbffffe04
+          08 09 0a 0b 0c 0d 0e 0f 00 01 02 03 04 05 06 07
+bffffe08:  W  W  W  W RW RW RW RW RW RW RW RW -- -- -- --
+bffffe18: -- -- -- -- RW RW RW RW RW RW RW RW RW RW RW RW
+Stack frames are:
+	pc=0x0000118b in main() at example.c:20
+	pc=0x00001079 in __entry() at chkrcrt0.S:1
+From Checker (pid:00070): Garbage detector results:
+There is 1 leak and 0 potential leak(s).
+Leaks consume 20 bytes (0 KB) / 90 KB.
+( 0.02% of memory is leaked.)
+Found 1 block(s) of size 20.
+Block at ptr=0x16ab0
+	pc=0x00005d7b in _malloc() at ../l-malloc/malloc.c:188
+	pc=0x00005dda in malloc() at ../l-malloc/malloc.c:203
+	pc=0x000010ea in main() at example.c:12
+	pc=0x00001079 in __entry() at chkrcrt0.S:1
+@end display
+
+@node How to Read the Output, , How to Run, Simple Example
+@section How to Read the Output
+@cindex messages
+@cindex warnings
+@cindex type of error
+@cindex historic
+@cindex stack frame
+@cindex dump of rights
+When you run a program, @code{Checker} displays this message, just before
+calling @code{main()}:
+@display
+Checker version 0.7 Copyright (C) 1993,1994,1995 Tristan Gingold.
+This program has been compiled with 'checkergcc' or 'checkerg++'.
+Checker is a memory access detector.
+Checker is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+For more information, set CHECKEROPTS to '-h'
+From Checker (pid:00070): The messages for './example' will follow.
+@end display
+Note that this message displays the version of @code{Checker} you are using.
+After this, each message printed by @code{Checker} begins with a header
+line.  These headers show the pid of the process.
+@display
+From Checker (pid:01895):
+@end display
+
+Now I will explain each message.
+
+When @code{Checker} detects a memory access error, it displays these
+facts about it:
+@display
+From Checker (pid:00070): (ruh) read uninitialized byte(s) in a block.
+When Reading 1 byte(s) at address 0x1682d, inside the heap (sbrk).
+1 bytes into a block (start: 0x1682c, length: 20, mdesc: 0x0).
+@end display
+@noindent
+Here, the error is due to one uninitialized byte read in a block.  You can
+easily identify the type of error by reading the first line.  The
+abbreviation of the type, written in parentheses can be used to inform
+@code{Checker} about this type of error (e.g. to make @code{Checker} ignore
+this type of error, you can add this option: @samp{--disable=ruh}).
+The second line describes the 'action' which has caused this error: the
+program may have read, written or modified (which means read and written) some
+bytes at an address. After this line, you get information about the address.
+Here, the address is contained by a block, whose start address, size and
+mdesc are displayed.  The functions which allocated the block follow:
+@display
+	pc=0x00005d7b in _malloc() at ../l-malloc/malloc.c:188
+	pc=0x00005dda in malloc() at ../l-malloc/malloc.c:203
+	pc=0x000010ea in main() at example.c:12
+	pc=0x00001079 in __entry() at chkrcrt0.S:1
+@end display
+@noindent		
+
+This trace shows you that @code{_malloc} was called by @code{malloc}, which
+was called by @code{main}, which was called by @code{__entry}, the entry
+point of each program.  Each line describe a function called.  The main
+piece of information in a line is the program counter, also called @samp{pc}
+or @samp{eip}.  The program counter is a register of the processor which
+indicates which instruction to execute.  It is saved during each function
+called, in a block of data, allocated on the stack, called the
+@dfn{stack frame}.  However, the program counter is not really readable.
+So, @code{Checker} translates each @samp{pc} into a function name, a source
+file and a line number.
+After this, you get the history of the function in which the memory
+access error occured:
+@display
+Stack frames are:
+	pc=0x00001120 in main() at example.c:17
+	pc=0x00001079 in __entry() at chkrcrt0.S:1
+@end display
+
+The next message is another access error in a block:
+@display
+From Checker (pid:00070): (bvh) block bounds violation in the heap.
+When Reading 1 byte(s) at address 0x1682a, inside the heap (sbrk).
+2 bytes before a block (start: 0x1682c, length: 20, mdesc: 0x0).
+The block was allocated from:
+	pc=0x00005d7b in _malloc() at ../l-malloc/malloc.c:188
+	pc=0x00005dda in malloc() at ../l-malloc/malloc.c:203
+	pc=0x000010ea in main() at example.c:12
+	pc=0x00001079 in __entry() at chkrcrt0.S:1
+Stack frames are:
+	pc=0x00001147 in main() at example.c:18
+	pc=0x00001079 in __entry() at chkrcrt0.S:1
+@end display
+
+Yet another access error in a block, but without block
+information, since the address is too far from a known block (in fact, far
+from the end of the last block):
+@display
+From Checker (pid:00070): (bvh) block bounds violation in the heap.
+When Writing 1 byte(s) at address 0x16859, inside the heap (sbrk).
+after the last block.
+Stack frames are:
+	pc=0x0000116e in main() at example.c:19
+	pc=0x00001079 in __entry() at chkrcrt0.S:1
+@end display
+
+The next message discribes a memory access error in the stack:
+@display
+From Checker (pid:00070): (rus) read uninitialized byte(s) in the stack.
+When Reading 1 byte(s) at address 0xbffffe08, inside the stack.
+known stack limit= 0xbffffe04
+          08 09 0a 0b 0c 0d 0e 0f 00 01 02 03 04 05 06 07
+bffffe08:  W  W  W  W RW RW RW RW RW RW RW RW -- -- -- --
+bffffe18: -- -- -- -- RW RW RW RW RW RW RW RW RW RW RW RW
+Stack frames are:
+	pc=0x0000118b in main() at example.c:20
+	pc=0x00001079 in __entry() at chkrcrt0.S:1
+@end display
+@noindent
+The address of the top of the stack is displayed, but this information is not
+really useful.  Following that, you have a dump of the permissions for
+each byte of stack: the rights can be writable (W), readable (R), both
+(RW) or nothing (--).  For example, the byte at 0xbffffde8 is only
+writable, the byte at 0xbffffdfb can't be written or read.
+
+@ignore
+This dump could be used to locate the error:
+
+(***) [NOTE : how can this information be used to locate the error?]
+[ Just a story: I have implemented this dump to fix a bug in Checker, but I
+have also forgotten to remove the dump! ]
+[ It is rather difficult to use this dump.  I think I will make this dump
+  optional. ]
+@end ignore
+
+The last message is the output of the garbage detector.  First Checker displays
+a summary:
+@display
+From Checker (pid:00070): Garbage detector results:
+There is 1 leak and 0 potential leak(s).
+Leaks consume 20 bytes (0 KB) / 90 KB.
+( 0.02% of memory is leaked.)
+@end display
+@noindent
+And then it displays leaks by family: a family is a group of leaks which were
+allocated by the same functions:
+@display
+Found 1 block(s) of size 20.
+Block at ptr=0x16ab0
+	pc=0x00005d7b in _malloc() at ../l-malloc/malloc.c:188
+	pc=0x00005dda in malloc() at ../l-malloc/malloc.c:203
+	pc=0x000010ea in main() at example.c:12
+	pc=0x00001079 in __entry() at chkrcrt0.S:1
+@end display
+
+@node Features, Troubles, Simple Example, Top
+@chapter Features
+This chapter describes each feature you should know to use @code{Checker}.
+@menu
+* Memory Checked::              All types of memory treated by Checker
+* Garbage Detector::            How to use the garbage detector
+* Invoking::                    Options to Checker
+* Output Messages About Memory Access Error::             How to read the messages from Checker
+* Output Messages About Malloc::
+* More Output Messages::
+* Malloc::                      Features of malloc()
+* Mmalloc::			Multi-heap through mmalloc()
+* Functions for Users::         Some functions that might help you
+@end menu
+
+@node Memory Checked, Garbage Detector, , Features
+@section Memory Checked
+@cindex segment
+The memory of a process can be divided into segments.  The text and data
+segments are read from the binary file whereas the stack and BSS segments
+are initialized at running time.  Some memory pages can be created with
+system calls such as @code{mmap} or @code{shm}.
+@menu
+* Data and BSS::                The data and BSS segments
+* Stack::                       The stack
+* Heap::                        The heap
+* Text and NULL zone::          The text segment and NULL zone
+* Mmap::                        Memory allocated by mmap
+* Shm::                         Shared memory from IPC
+@end menu
+
+@node Data and BSS, Stack, , Memory Checked
+@subsection The Data and BSS Segment
+@cindex data segment
+@cindex BSS segment
+The space in these segments is always initialized either with 0 (BSS
+segment) or with values (Data segment).  So each access is always
+allowed and cannot generate a warning.  In fact, @code{Checker} doesn't need
+to maintain a bitmap for both segments.
+
+However, to improve the detection of bounds array violation, it would be useful
+to insert red zones between each array and each file in these segments.  The
+implementation of this feature could be done with @code{GCC-Checker}.
+We must have an option to disable these insertions, since sometimes the user
+assume the arrays are continuous.  Currently, it is not implemented.
+	
+@node Stack, Heap, Data and BSS, Memory Checked
+@subsection The Stack
+@cindex stack segment
+The stack space is automatically allocated at run time and is not
+initialized.  So, each time you allocate space, @code{Checker} sets
+the permissions of the space allocated to write-only.  There is usually
+no red zone in the stack, but the stored frame pointer and the stored
+instruction pointer are considered red zones.  So, you are not allowed
+to read them, which is not a problem, except for @code{setjump}.  To
+avoid a bad warning on Linux, I provide a @code{setjump} function.
+
+It would be useful to insert red zones between arguments, or between
+local automatic variables.  This could be only done by @code{GCC}.  It is not
+currently implemented.
+
+@node Heap, Text and NULL zone, Stack, Memory Checked
+@subsection The Heap
+@cindex heap
+The heap space (also named the heap or in this manual the standard heap) is
+allocated at run time by calling @code{malloc} and co.  @code{Checker}
+allocates red zones before and after each block.  The variables
+@var{be_red_zone} and @var{af_red_zone} contain the size of these red zones.
+The call chain of the functions is recorded in the red zone after
+the block.  The internal structure inside the heap are considered red
+zones: they are unwritable and unreadable.
+
+When a block is free, it isn't returned to the pool immediately, instead it
+becomes unreadable and unwritable.  This feature prevents you from accessing
+a block after freeing it.
+
+Note that the multi-heaps features provided by @code{mmalloc} are included.
+@xref{Mmalloc} for more informations.
+
+@node Text and NULL zone, Mmap, Heap, Memory Checked
+@subsection The Text Segment and the NULL Zone
+@cindex NULL zone
+@cindex text segment
+The NULL zone is the small zone at the beginning of memory that may be
+addressed by NULL pointers.  But trying to handle this zone is considered
+an error, and usually results in a segmentation fault.  @code{Checker}
+protects this zone, so that it will emit a warning at each memory access.
+The text segment is the space containing the code.  It is usually read-only,
+and the constants are usually stored in this zone.  So, @code{Checker} marks
+this zone read only.  This zone is read and written if you specify the
+@var{-N} option to the linker.  Of course, in this case, the text
+segment becomes readable and writable for @code{Checker}.
+
+@node Mmap, Shm, Text and NULL zone, Memory Checked
+@subsection Memory Allocated by mmap
+@cindex mmap memory
+@code{Checker} keeps only a global permission for the mmap'ed memory, since the
+mmap'ed pages are always initialized.  However the length granularity is byte
+and not page; this means that if you mmap a file whose size is less than a
+page, @code{Checker} will catch each bad memory access between the end of
+the file and the end of the page in the memory.  If the mmap'ed memory is
+not executable, @code{Checker} will catch each call or jump to this memory.
+If the memory is executable, you will have to inform @code{Checker} in the
+next versions that this memory contains code compatible with @code{Checker}.
+
+Mmap'ed memory can be also handled by @code{mmalloc}, which provides some
+interesting features.  @xref{Mmalloc} for more details.
+
+@node Shm, , Mmap, Memory Checked
+@subsection Shared Memory from IPC
+@cindex shared memory
+@code{Checker} keeps only a global permission for shared memory, since shared
+memory is always initialized.  You can't execute code in shared memory.
+
+@node Garbage Detector, Invoking, Memory Checked, Features
+@section Garbage Detector
+@cindex garbage detector
+@cindex garbage collector
+@findex __chkr_evol_detector
+@findex __chkr_garbage_detector
+The @dfn{garbage detector} detects memory leaks.  @dfn{Memory leaks}
+are blocks of memory usually allocated by @code{malloc} that cannot be
+accessed anymore, since the program has lost the pointer.  Normally, memory
+leaks should @emph{never} appear, since each block should be freed.  I think
+it is a bad idea to create leaks, since if there are many leaks, the
+program uses a lot of memory, which increases swapping and slows
+down your computer.
+
+In C, we can't be sure a block is a leak, since the pointer can be stored in
+a file, or perhaps the pointer has been sent through the Internet 5000 km
+away, and will be received soon@dots{}  That is the reason why there is no
+garbage collector, even if it could be easy to free the garbage.
+So, the garbage detector sets each block to one of these states:
+@itemize @bullet
+@item
+sure: blocks that are almost sure garbage (no pointers to it)
+@item
+maybe: blocks that are perhaps garbage (no pointers to the beginning of the
+blocks)
+@item
+no: blocks that are not garbage (pointers to the beginning of the blocks)
+@end itemize
+
+However, the word @dfn{pointer} usually refers to a C pointer.  But
+@code{Checker} finds pointers in the memory, and is not able to
+distinguish between an integer and a pointer.  So, an integer (or 4
+chars) can be a good pointer.
+
+@subsection How To Call The Garbage Detector
+You can call the garbage detector inside @code{GDB}, or in your program or
+automaticaly when the program is exiting.
+There are two functions for the garbage detector:
+@table @code
+@item void __chkr_garbage_detector (void)
+Display all leaks.
+@item void __chkr_evol_detector (void)
+Display all new leaks since the last call to one of the two functions.
+@end table
+
+To call the garbage detector from @code{GDB}, you can do:
+@smallexample
+(gdb) call __chkr_garbage_detector()
+@end smallexample
+or
+@smallexample
+(gdb) call __chkr_evol_detector()
+@end smallexample
+
+If you want the garbage detector to be automatically called when your
+program is exiting, simply use the option @samp{--detector=end}.
+
+@node Invoking, Output Messages About Memory Access Error, Garbage Detector, Features
+@section Invoking
+Since @code{Checker} can be considered a library, you cannot invoke it
+like a standard program: you invoke it by running your program. However, you
+can set options to @code{Checker}, but not with the command line arguments,
+since the command line is reserved for your program.
+
+An option always begins with a dash followed by a single letter for a
+short option, or with two dashes followed by a word for a long option.
+If an option needs an argument, the argument is separated from the option
+by a single equal sign "=".  You may not insert a space.
+
+@subsection The CHECKEROPTS variable
+The first way to set options is to set the environment variable
+@var{CHECKEROPTS}.  This can be done like this:
+@smallexample
+(csh tcsh zsh)> setenv CHECKEROPTS "-o=prog.log --detector=end -h"
+
+(sh ksh bash)$ CHECKEROPTS="-o=prog.log --detector=end -h"
+             $ export CHECKEROPTS
+@end smallexample
+Of course, this variable is inherited by the children of the processes, so
+if a process uses @code{fork()} and if the child has been compiled by
+@code{Checker}, the child will use the same options as its parent.
+
+@subsection The @file{~/.checker} File
+You can also set options through the @file{~/.checker} file.  The format of
+this file is rather simple: it consists of one or more group of options.  A
+group of options begins with a line of program names, separated by a '|'. 
+This line is followed by lines of options, which @emph{always} begins with a
+@key{TAB}.  Groups of options are separated by an empty line.  Comment lines
+can appear anywhere: a "#" in the first column means this line must be
+ignored.  Groups of options cannot be separed only by a comment line.  The
+options of a group of options are used only if your program matches the line
+of program names, ie a name of this line must be
+@itemize @bullet
+@item @var{argv[0]}
+The name you used to call the program,
+@item the full path name of the program
+It is made from @var{PATH}, from @var{argv[0]}, and from the current working
+directory.  If @var{argv[0]} is a single name, its full path is determined
+by looking for this single name in @var{argv[0]}; otherwise @var{argv[0]}
+is appended to the current directory, and the result is simplified: "//" is
+replaced by "/", "/*/../" by "/" and "/./" by "/". However, the symbolic
+links are not replaced.
+@item the basename of @var{argv[0]}
+@item "default"
+Which is always matched.
+@end itemize
+
+The @file{~/.checker} file is read in its entirety, and all the "good"
+groups of options are kept.
+
+Here is a simple example:
+@smallexample
+# a comment
+./try|foo
+	--profile
+
+default
+	--silent
+
+@end smallexample
+If your program is run with @samp{./try}, all options will be accepted.
+
+A special option, that can only be in @file{~/.checker} is @dfn{suppress}. 
+These lines must match this prototype:
+@smallexample
+./try|foo|bar
+	@dots{}
+	suppress (err) foo; bar; foobar; bary*
+	@dots{}
+@end smallexample
+where @var{err} is the type of error (@code{--disable} uses the same),
+@var{foo}, @var{bar} constitue a list of functions.  This will suppress the
+error of type @var{err} in function @var{foo} called from @var{bar}, called
+from @var{foobar}, called by any functions whose name begins with @var{bary}.
+
+@subsection The Options
+@table @samp
+@item -s
+@itemx --silent
+@itemx -q
+@itemx --quiet
+Doesn't print messages (copyright) at the beginning.
+
+@item -h
+@itemx --help
+Displays help.
+
+@item -o=@var{file}
+@itemx --output=@var{file}
+The messages are written into @samp{file} instead of being written to
+the standard output.  If @samp{file} begins with a @samp{+}, the output
+is appended to @samp{file}.  If @samp{file} begins with a @samp{-},
+@samp{file} is overwritten.  If @samp{file} does not begin with a
+@samp{-} or with a @samp{+} the default mode, overwrite, is used.  You
+can set the default mode by setting @samp{file} to @samp{+} or @samp{-}.
+The option @samp{file} can contains metacharacters: @samp{%p} is replaced by
+the pid of the process, which is a number of 6 digits, completed by
+@samp{0} if necessary; @samp{%n} is replaced by the program name and
+@samp{%%} is replaced by a simple @samp{%}.
+
+@item -i=@var{file}
+@itemx --image=@var{file}
+Set the image, the file the symbols are read from.  You can use this
+option if @code{Checker} is not able to find the image.
+
+@item -n
+@itemx --nosymtab
+Do not display symbolic informations, do not use the image file.
+
+@item -a
+@itemx --abort
+Abort just after printing the copyright and the help, if you asked for
+it.  Not really useful.
+
+@item -p
+@itemx --profile
+Display profile at the end. Useful only for debugging or improving
+@code{Checker}.
+
+@item -N=@var{size}
+@itemx --NULLzone=@var{size}
+Set the size of the NULL zone.  @xref{Text and NULL zone}.
+
+@item -d=@var{addr}
+@itemx --disable=@var{addr}
+@itemx -d=@var{addr1-addr2}
+@itemx --disable=@var{addr1-addr2}
+Disable messages produced when the instruction pointer is equal to
+@var{addr}, or when the instruction pointer is in the range
+@var{addr1}-@var{addr2}.  This option is useful to remove messages you know
+addresses: you must use previous messages from the same binary.
+The addresses can be in hexadecimal if they begin with "0x".  To use names,
+@xref{Invoking}.
+
+Imagine you want to disable this message (@pxref{How to Run}):
+@smallexample
+From Checker (pid:00070): (ruh) read uninitialized byte(s) in a block.
+When Reading 1 byte(s) at address 0x1682d, inside the heap (sbrk).
+1 bytes into a block (start: 0x1682c, length: 20, mdesc: 0x0).
+The block was allocated from:
+	pc=0x00005d7b in _malloc() at ../l-malloc/malloc.c:188
+	pc=0x00005dda in malloc() at ../l-malloc/malloc.c:203
+	pc=0x000010ea in main() at example.c:12
+	pc=0x00001079 in __entry() at chkrcrt0.S:1
+Stack frames are:
+	pc=0x00001120 in main() at example.c:17
+	pc=0x00001079 in __entry() at chkrcrt0.S:1
+@end smallexample
+You can do:
+@smallexample
+(csh)> setenv CHECKEROPTS "-d=0x1120"
+@end smallexample
+
+@item -d=@var{type}
+@item --disable=@var{type}
+Disable a type of memory access error.  You can use several @samp{--disable}
+options if you want to disable several types of errors.  The @var{type} is a
+three letters mnemonic, which is always printed in parentheses at the
+beginning of a message.
+
+Here are the types that can be disabled:
+@table @samp
+@item nza
+Null zone addressed
+@item wro
+Write/modify read-only byte(s).
+@item bvh
+Block bounds violation in the heap.
+@item rfb
+Read in a free block.
+@item wfb
+Write/modify a free block.
+@item ruh
+Read uninitialized byte(s) in a block.
+@item rus
+Read uninitialized byte(s) in the stack.
+@item rsz
+Read on a red zone in the stack.
+@item wzs
+Write on a red zone in the stack.
+@item wus
+Modify uninitialized byte(s) in the stack.
+@item mzs
+Modify a red zone in the stack.
+@item nma
+No memory addressed.
+@item bvm
+bounds violation in mapped memory.
+@item apd
+access permission denied in mapped memory.
+@item wrs
+write in a read-only shared memory.
+@item zne
+zone not executable.
+@item oom
+virtual memory exhausted.
+@item mba
+alignment is not a power of 2.
+@item bkc
+brk or sbrk has been called.
+@end table
+
+@item -S
+@itemx --stop
+Stops just before @code{main()}, with @code{kill(getpid(), SIGSTOP)}.  You
+can use @var{SIGCONT} to restart.  This option can be used to debug a daemon:
+when it is stopped, call @code{GDB} and attach the program.
+
+@item -D=@var{when}
+@itemx --detector=@var{when}
+Run the garbage detector when the @var{when} event is true.  It displays all
+leaks.  Currently (V0.7), @var{when} can be
+@table @samp
+@item end
+when the program is exiting.
+@end table
+
+@item -m=@var{behavior}
+@itemx --malloc0=@var{behavior}
+Set the behavior of @code{malloc (0)}, @code{realloc (x, 0)}, @code{calloc (x,
+0)}, @code{calloc (0, x)}, and @code{memalign (x, 0)}.  The behavior can be:
+@table @samp
+@item 0
+@code{malloc (0)} (and co) returns 0, which is the default behavior and the
+ANSI behavior.
+@item 1
+@code{malloc (0)} is internaly replaced by @code{malloc (1)}, so it returns a
+good address.
+@item warning
+@code{malloc (0)} produce a warning when it is called.  But you can specify
+its behavior by using another option
+@item no-warning
+Doesn't produce a warning.
+@end table
+On Linux, to use this feature to its full extent, the preprocessor 
+automatically defines the symbol @var{MALLOC_0_RETURNS_NULL} when it compiles
+your program, since the @file{stdlib.h} file would replace @code{malloc(0)}
+as @code{malloc (1)}.
+
+@item -A
+@itemx --Wmemalign
+When this option is set, @code{Checker} will emit a warning if the alignment
+argument of @code{memalign} is not a power of 2.
+
+@item -v
+@itemx --verbose
+Useful to debug @code{Checker}.  This is a cumulative option.
+
+@item -u=@var{when}
+@itemx --inuse=@var{when}
+Same as @var{--detector}, but displays blocks currently used.
+
+@item --Wsignal=@var{n}
+@itemx --Wno-signal=@var{n}
+Emit (or doesn't emit) a warning when a signal is received.  @var{n} can be
+@table @samp
+@item m@var{xxxx}, where @var{xxxx} is a number.
+If the bit corresponding to the signal number is set, a warning will (won't)
+be emited.
+@item @var{xxxx}, where @var{xxxx} is a number.
+A warning will (won't) be emited for signal number @var{xxxx}.
+@item @var{name}
+A warning will (won't) be emited for signal whose name is @var{name}.  The
+names are @var{HUP}, @var{INT}, @var{QUIT}, @var{ILL}@dots{} (Try @samp{kill
+-l} for the complete list.
+@item all
+A warning will (won't) be emited for all signals.
+@end table
+By default, each signal that can produce a core will emit a warning.
+
+@item --aged-queue=@var{n}
+Set the size of the aged block queue.
+
+@item --leak-size-threshold=@var{n}
+Only families of leak whose size is greater than @var{n} are individually
+displayed.
+
+@item --bytes-per-state=@var{n}
+Set the number of bytes handled by a state in the bitmap.  The value must be
+a power of 2.  Default is 1.
+
+@item --no-signals
+Disable the signal manager.  Used by the maintainer.
+
+@item --Wsbrk
+@item --Wno-sbrk
+Emit a warning if @code{sbrk()} is called.  Using @code{sbrk} and
+@code{malloc} is not a good idea even if the malloc manager of @code{Checker}
+supports both.
+
+@item --Wfree-null
+Emit a warning if the program calls @code{free(NULL)}.
+
+@item --trace
+Trace calls to @code{malloc}, @code{free}@dots{}
+
+@item --warn-once
+When a warning is given, the bad word becomes right so that there will not be
+any more warnings about it.  Not yet available.
+
+@item --annotate
+Annotate the output in order to be read by a filter or another tool.  Not
+yet available.
+@end table
+
+@node Output Messages About Memory Access Error, Output Messages About Malloc, Invoking, Features
+@section Output Messages About Memory Access Error
+@c @xref{Simple Example}
+
+Here is the complete meaning of each memory access error:
+@table @samp
+@item (nza) Null zone addressed.
+The program writes or reads in the NULL zone.  The NULL zone is generally
+accessed by a NULL pointer like this:
+@example
+#include <stdio.h>
+main ()
+@{
+  char *foo = NULL;
+  char bar;
+
+  @dots{};      /* foo is not initialized */
+  bar = *foo;   /* memory access error */
+@}
+@end example
+The size of the NULL zone, which is 4 bytes by default; but this size can be
+changed with the @samp{--NULLzone=size} option.  The message tells you that
+your program will received a signal, usually @code{SIGSEV}.
+
+@item (wro) Write/modify read-only byte(s).
+The program writes or reads and writes in the text segment.  Since the text
+segment contains the code and the constants, it can't be modified (unless
+the binary is @code{OMAGIC}).
+
+@item (bvh) Block bounds violation in the heap.
+The program tries to access a byte which is located before or after a
+block allocated in the heap.  Here is an example:
+@example
+main()
+@{
+  char *foo = malloc(10);
+  foo[10] = 'a';        /* error */
+  foo[-1] = 'b';        /* error */
+  printf("%c\n', foo[12]); /* error */
+@}
+@end example
+
+@item (rfb) Read in a free block.
+The program is not allowed to read inside a free block, since a free block
+is deallocated and can be non-existant.
+
+@item (wfb) Write/modify a free block.
+The program is not allowed to write inside a free block.
+
+@item (ruh) Read uninitialized byte(s) in a block.
+The program is not allowed to read uninitialized values.
+
+@item (rus) Read uninitialized byte(s) in the stack.
+The program is not allowed to read uninitialized values.
+
+@item (rsz) Read on a red zone in the stack.
+@item (wzs) Write on a red zone in the stack.
+@item (mzs) Modify a red zone in the stack.
+The program is not allowed to access the red zones in the stack.  Red
+zones are the space where the PC and the frame pointer are saved when a
+function is called.
+
+@item (wus) Modify uninitialized byte(s) in the stack.
+The program is not allowed to read uninitialized values.
+
+@item (nma) No memory addressed.
+A non mapped page has been addressed.  Of course, non mapped pages are
+between mapped pages.  For example, the zone between the BSS segment and the
+stack is not mapped.  This program demonstrates the error:
+@example
+main ()
+@{
+  char *c;
+  char foo;
+  c = malloc(10);
+  foo = *(c + 0x10000);   /* far enough */
+  printf("The value is %d\n", foo);
+@}
+@end example
+
+@item (bvm) Bounds violation in mapped memory.
+The kernel handles memory regions by page, so the @samp{len} argument of
+@code{mmap} is rounded to the next page.  However, @code{Checker} can detect
+bad access between the end of the region and the end of the page.
+
+@item (apd) Access permission denied in mapped memory.
+The memory access is not allowed by the @samp{prot} argument of @code{mmap}.
+This will generally result in a segmentation violation.
+
+@item (wrs) Write in a read-only shared memory.
+The program is not allowed to write in a shared memory that was mapped
+read-only.  This results in a segmentation violation.
+
+@item (zne) Zone not executable.
+The program is not allowed to execute code in the DATA, BSS segments,
+mmap'ed memory without PROT_EXEC right or in shared memory.
+
+@item (sbv) segment bound violation.
+Your program is going to access an address which is not mapped (ie, neither in
+the stack, bss, data or text segment, nor in a mmaped page).
+@end table
+
+@node Output Messages About Malloc, More Output Messages, Output Messages About Memory Access Error, Features
+@section Output Messages About Malloc
+
+These reports are related to @code{malloc}:
+@table @samp
+@item (mba) alignment is not a power of 2.
+The function @code{memalign} was called with an alignment that is not a
+power of 2.  Only @code{Checker} supports such an extension.  To display
+this message, the option @samp{--Wmemalign} must have been specified.
+
+@item (bkc) brk or sbrk has been called.
+The function @code{brk} or @code{sbrk} has been called.  Most of malloc
+implementation don't allow the user to call directly @code{brk} or
+@code{sbrk}.  To display this message, the option @samp{--Wsbrk} must have
+been specified (this is the default).
+
+@item (fba) @code{free} called with an address not obtained from @code{malloc}.
+@code{free}, @code{realloc} or another function was called with an invalid
+address.  This is illegal.
+
+@item (ffb) @code{free} an already free block.
+You are freeing an already freed block.  This is illegal.
+
+@item (fnl) @code{free} called with a null argument.
+The program has called @code{free(NULL)}.  This is a warning emited only if
+the @samp{--Wfree-null} is set.
+
+@item (sba) @code{sbrk} called with a bad offset.
+The call to @code{sbrk} will deallocate memory allocated by @code{malloc}. 
+You have to know that it is not standard to use @code{malloc} and
+@code{sbrk}.  @code{Checker} allows you to mix these calls: memory allocated
+by @code{sbrk} stays at the end of the block list.  You can allocate memory
+with @code{sbrk}, you can free with @code{sbrk} this memory, but you cannot
+free with @code{sbrk} memory allocated by @code{malloc}.
+
+@item (fbm) @code{free} called before @code{malloc}.
+The function @code{free} was called before the function @code{malloc}.  This
+is too strange.
+
+@item (mna) @code{memalign} called with a null alignment.
+The alignment argument of @code{memalign} cannot be 0.
+@end table
+
+@node More Output Messages, Malloc, Output Messages About Malloc, Features
+@section More Output Messages
+
+These messages are unclassed:
+@table @samp
+@item (oom) Out of memory or virtual memory exhausted.
+The virtual memory is exhausted: @code{malloc} will return 0.  Note that
+this is not an error but only a warning.
+
+@item (ieb) Internal error while checking.
+This means @code{Checker} is buggy.
+
+@item (bbs) Bad @var{bytes_per_state} value.  Use default value.
+The argument of the option @samp{--bytes-per-state} is not a power of 2. 
+@code{Checker} will use a default valuer, 1.
+
+@item (oos) Out of system memory.
+@code{Checker} cannot allocate enough memory for itself.  If this message
+happen too early, this means @code{Checker} is buggy.  Otherwise, you don't
+have enough memory.
+
+@item (brs) Bad red zone state.
+This means @code{Checker} is buggy.
+
+@item (tms) Too many signals catched at the same time.
+@code{Checker} received too many signals and cannot save all.  Some will be
+loose.
+
+@item (ies) Internal error: can't check this syscall.
+This means @code{Checker} cannot handle a syscall.  A little work is needed.
+
+@item (bfd) File descriptor reserved by @code{Checker} is used.
+Your program tries to use a fd reserved.  This fd must have been returned to
+your program.  This means that your program is buggy.
+
+@item (sfd) The system has returned a file descriptor reserved by @code{Checker}.
+This means that either @code{Checker} or your operating system is buggy.
+
+@item (mes) Debugging message for the user.
+This message is printed before the output of a @code{Checker} function
+called by the user.
+
+@item (sig) Signal.
+A signal has been received.  A description follows this message.
+
+@item (bda) Bad option for @code{Checker}.
+Self describing.
+
+@item (gar) Garbage detector results.
+Here are the garbage detector results.
+
+@item (prf) Profil results.
+Profil results follows.  The option @samp{--profile} must have been
+specified.
+
+@item (iei) Internal error: instruction unknown.
+This means @code{Checker} is buggy.
+
+@item (bal) Bad alignment.
+The processor requires alignment when it reads/writes/modifies memory.  For
+example, a halfword datum must be located on a halfword boundary.  If you
+attempt to access misaligned data, @code{Checker} will emit this warning and
+a @code{SIGBUS} will probably be sent by the kernel.
+
+@item (fun) Function warning.
+You use a buggy function such as @code{gets}.  Update your code.
+@end table
+
+@node Malloc, Mmalloc, More Output Messages, Features
+@section Malloc
+@findex malloc
+@findex calloc
+@findex free
+@findex realloc
+@findex cfree
+@findex memalign
+@findex valloc
+I describe here only the particularities of @code{malloc} and co included in
+@code{Checker}, since @code{Checker} uses its own @code{malloc}.  The
+algorithm is based on lists.  These functions handle the heap memory, or in
+short the heap.  This heap is also called the standard heap to avoid any
+confusion with the memory handled by @code{mmalloc}.  (@samp{PTR} stands for
+@samp{void*}).
+
+@table @code
+@item PTR malloc(size_t @var{size})
+The @code{malloc} function allocates @var{size} bytes, 12 bytes for a header
+(used to link the block and to save information, @var{be_red_zone} bytes (4
+bytes by default) for a red zone before the block, @var{af_red_zone} bytes
+(32 bytes by default) for a red zone after the block and 0 to 3 bytes to pad.
+So, each block is aligned to 4 byte boundaries.  The memory occupied by the
+header, the red zones, and the padding bytes is considered a red zone:
+the process cannot access it.  The history of the functions is saved in the
+red zone, after the block.  Each function uses 4 bytes, so by default the
+history can contain up to 7 functions (4 bytes are always put aside for
+marking the end of the history).  If the history is greather than this limit,
+only the last functions are saved.
+
+If @code{malloc} can't allocate memory, it returns 0, and @code{Checker}
+displays a warning.
+
+The action executed by @code{malloc(0)} can be changed by @samp{--malloc0=}
+option.  By default, it returns 0 according to the ANSI specifications.
+
+@item void free(PTR @var{addr})
+The block is not really freed, but it is marked as an aged block.
+@code{Checker} can keep up to 10 aged blocks (this limit can be changed at
+compile time).  Keeping aged blocks is useful to catch reading and writing in
+a freed block.  The history of functions which called @code{free} is saved in
+the block.
+
+If @var{addr} was not returned by @code{malloc} (or @code{calloc} @dots{}),
+or if the block was already freed, @code{Checker} displays a warning and
+doesn't free the block.
+
+@code{free}(0) is always OK.
+
+@item PTR realloc(PTR @var{addr}, size_t @var{size})
+If @var{addr} is 0, a block of size @var{size} is allocated by
+@code{malloc}.  If @var{size} is 0, the block pointed by @var{addr} is freed,
+as freed by @code{free}, and @code{realloc} returns an address given by
+@code{malloc(0)}: if the @samp{--malloc0=0} option was set, it returns 0;
+otherwise, it returns a pointer to a block of size 1.
+
+If @var{addr} and @var{size} both are different from 0, a new block of
+@var{size} bytes is allocated, the data of the old block and the rights are
+copied to the new block, and the old block becomes aged.  If the new block is
+bigger than the old block, the added bytes are only writable: they are not
+initialized.
+
+@item PTR calloc(size_t @var{nmemb}, size_t @var{size})
+The memory is allocated by @code{malloc}, initialized to 0.  All allocated
+bytes can be accessed.
+
+@ignore
+@item void cfree(PTR @var{addr})
+The @code{cfree} function is an alias of @code{free}.
+@end ignore
+
+@item PTR memalign(size_t @var{align}, size_t @var{size})
+The @code{memalign} function allocates @var{size} bytes of memory like
+@code{malloc}.  But the address of the block is aligned to @var{align} bytes.
+Unlike the GNU malloc, @code{Checker} can accept any value of @var{size}, but
+if @var{size} is not a multiple of 4, @code{memalign} multiplies @code{size}
+by 2 or 4.  The memory allocated by @code{memalign} can be freed by
+@code{free}.  If the @samp{--memalign} option is used, a warning is emit if
+@var{align} is not a power of 2.
+
+@code{memalign} is not standard.
+
+@item PTR valloc(size_t @var{size})
+The memory allocated by @code{valloc} can be freed by @code{free}.
+@end table
+
+@node Mmalloc, Functions for Users, Malloc, Features
+@subsection Mmalloc
+@cindex multi-heap
+@cindex mmap-heap
+@findex mmalloc
+@findex mfree
+@findex mrealloc
+@findex mcalloc
+@findex mmemalign
+@findex mvalloc
+Beside the standard heap supported by the standard memory function
+(@code{malloc}, @code{free} and the other one), the multi-heap feature is
+included in @code{Checker}.  The multi-heap allocates memory through
+@code{mmap} whereas the standard heap uses @code{sbrk}.  The multi-heap
+feature is handled through these functions: @code{mmalloc}, @code{mfree},
+@code{mrealloc}, @code{mcalloc}, @code{mmemalign}, @code{mvalloc},
+@code{mmalloc_attach} and @code{mmalloc_attach}.
+
+The multi-heap feature comes from the @code{mmalloc} package provided with
+the @code{GDB} (and @code{GLIBC}?) sources, written by Fred Fish of Cygnus
+Support.  The functions are compatible but you cannot swap the heap file
+between these two implementations: you cannot use an heap from @code{Checker}
+with a program which use the @code{mmalloc} package of Fred Fish.
+
+The main features of multi-heaps are:
+@itemize @bullet
+@item
+Several different heaps can be used at the same time.
+@item
+You can dump and restore a heap.
+@item
+The heap is persistent.
+@end itemize
+
+@xref{Top, , Overview, mmalloc, The GNU mapped-malloc package}, for more
+details.
+
+@node Functions for Users, ,Mmalloc, Features
+@subsection Functions for Users
+@findex __chkr_check_intern
+@findex __chkr_check_mdesc
+@findex __chkr_dump_block
+@findex __chkr_disp_heaps
+@findex __chkr_dump_heap
+@findex __chkr_disp_map
+@findex __chkr_dump_free
+@findex __chkr_disp_shlibs
+@findex __chkr_disp_right
+@findex __chkr_disp_siginfo
+Some functions of @code{Checker} can be called (only) by the user inside the
+debugger.  They are intended to help the user use some additional features of
+@code{Checker}.  These functions begin with @code{__chkr_}, so that you can
+display them in a debugger with @key{TAB}.
+
+@table @code
+@item void __chkr_check_intern (void)
+This function performs internal checks: it mainly tests the consistency of the
+linked lists.  If you get warning when you call it, this means there is a bug
+in @code{Checker}.  @xref{Bugs}
+
+@item void __chkr_check_mdesc (struct mdesc *@var{mdp})
+This function performs internal checks for the heap @var{mdp}.  If @var{mdp}
+is null, the standard heap is checked.
+
+@item void __chkr_dump_block (void *@var{ptr})
+This function displays information about the block pointed by @var{ptr}.
+You get the fields of the header and the history of the block.  This can be
+useful when you are debugging.
+
+@item void __chkr_disp_heaps (void)
+This function display some informations about each heap.
+
+@item void __chkr_dump_heap (struct mdesc *@var{mdp})
+This function displays informations of each block of the heap identified by
+@var{mdp} or of the standard heap if @var{mdp} is nul.  Not highly useful.
+
+@item void __chkr_dump_free (struct mdesc *@var{mdp})
+This function displays the lists of free blocks of the heap identified by
+@var{mdp} or of the standard heap id @var{mdp} is nul.  Not highly useful.
+
+@item void __chkr_dump_block (PTR @var{block})
+This function give information (state, links, and histoy) for the block
+@var{block}.
+
+@item void__chkr_disp_map (void)
+This function displays all segments or regions in the memory.
+
+@item void __chkr_disp_right (PTR @var{ptr}, int @var{len})
+This function displays the rights of each bytes between @var{ptr} and
+@var{ptr} + @var{len}.  The rights are displayed with one or two characters:
+
+@item void __chkr_disp_shlibs (void)
+This function displays all shared libraries used by the program, as well as
+the program.
+@table @bullet
+@item RW
+means readable and writable.
+@item R
+means readable.
+@item W
+means writable.
+@item ---
+means neither readable nore writable.
+@end table
+
+@item void __chkr_disp_siginfo (void)
+This function displays how @code{Checker} handles each signal.
+
+@item void __chkr_evol_detector (void)
+@xref{Garbage Detector}
+
+@item void __chkr_garbage_detector (void)
+@xref{Garbage Detector}
+@end table
+
+@node Troubles, Binaries, Features, Top
+@chapter Troubles
+This section describes known problems that affect users of @code{Checker}.
+@menu
+* Misplaced Errors::            Misplaced warnings of @code{Checker}
+* Bad Writes::                  The consequences of memory writing errors
+* Bad Stack Frames::            One reason of bad histories
+* Signal Problems::             The problem with signals: they are delaied
+* Temporary File::              The temporary file can be not removed
+* Libraries::                   How to use your libraries
+* Bugs::                        How to report the bugs
+@end menu
+
+@node Misplaced Errors, Bad Writes, , Troubles
+@section Misplaced Errors
+@code{Checker} detects all memory access errors, but you can sometimes make
+memory access errors deliberately.  You can ignore errors by using the
+@samp{--disable=} option.
+@menu
+* Alignment in the Structures::
+* Users Pads in Structures::
+* Bit Fields::
+* Compiler Optimizations::
+* Bad Number of Arguments::
+@end menu
+
+@node Alignment in the Structures, Users Pads in Structures, , Misplaced Errors
+@section Alignment in the Structures
+When you declare a structure, each field is automaticaly aligned by the
+compiler.  This can create some bytes of padding like this:
+@example
+struct foo
+@{
+  int bar1;
+  char bar2;
+  double bar3;
+@};
+@end example
+The offset of @var{bar2} is 4 and it uses 1 byte, but the offset of
+@var{bar3} is 8.  So, there are 3 lost bytes.  @code{Checker} doesn't know
+there are 3 lost bytes, so when you write on these bytes, @code{Checker}
+doesn't emit any warning.  But there is another problem: imagine all the
+fields were correctly initialized; if you try to read the entire structure (by
+copying it, by using it through a system call @dots{}), @code{Checker} will
+emit a warning since the pads are not initialized.
+
+This error can be ignored by using @samp{--disable=rus --disable=ruh}
+options.  I think that only a close cooperation between @code{GCC} and
+@code{Checker} can solve this problem.
+
+@node Users Pads in Structures, Bit Fields, Alignment in the Structures, Misplaced Errors
+@section Users Pads in Structures
+Sometimes, the user adds pads in the structures: they are fields that are
+never handled.  The @cite{Xlib} uses a lot of them.  The consequences are
+the same as compilers pads.  @xref{Alignment in the Structures}.  However,
+the compiler doesn't know this field is never used.
+
+@node Bit Fields, Compiler Optimizations, Users Pads in Structures, Misplaced Errors
+@section Bit Fields
+Some machines (particulary RISC machines such as Sparc) cannot directly handle
+bit fields.  They have to use full words.  As a consequence, to write in a
+bit field, the machine reads a word, applies logical masks, and writes the
+word.  If the word was never written, @code{Checker} can detect an error.
+
+@node Compiler Optimizations, Bad Number of Arguments, Bit Fields, Misplaced Errors
+@section Compiler Optimizations
+In order to reduce the code, @code{GCC} can create memory access errors.  With
+@samp{ix86}, I know one error caused by the optimizer.  This program
+demonstrates this problem:
+@example
+#include <stdio.h>
+
+void
+f (double d)
+@{
+   long L;
+
+   printf ("&d = %p, &L = %p\n", &d, &L);
+   L = (long)d; /* line 9: here is the error */
+   printf ("L = %ld\n", L);
+   d -= L;
+@}
+
+int
+main (void)
+@{
+   f (4.5);
+   return 0;
+@}
+@end example
+The code produced for the line 9 is:
+@example
+        .stabd 68,0,8
+        fldl 8(%ebp)
+        fnstcw -8(%ebp)           #
+        movl -8(%ebp),%edx        # not really good.
+        movb $12,%dh
+        movl %edx,-12(%ebp)
+        fldcw -12(%ebp)
+        fistpl -4(%ebp)
+        fldcw -8(%ebp)
+@end example
+The instruction @samp{fnstcw} stores 2 bytes, but the next instruction,
+@samp{movl} reads 4 bytes, which causes a memory access error since 2 of the
+4 bytes were not initialized.  It is not a bug, since only the 2 bytes are
+handled, but it is a little shorter than a correct code such as:
+@example
+        .stabd 68,0,8
+        fldl 8(%ebp)
+        fnstcw -8(%ebp)
+        movw -8(%ebp),%edx      # use 1 byte more
+        movb $12,%dh
+        movw %edx,-12(%ebp)     # use 1 byte more
+        fldcw -12(%ebp)
+        fistpl -4(%ebp)
+        fldcw -8(%ebp)
+@end example
+This problem is now solved with @code{GAS}.  @code{GAS} set the size of
+@code{fnstcw} to 4 bytes except if the @code{fnstcw} was produced by an
+@code{asm()} instruction (these instructions are between @samp{#APP} and
+@samp{#NO_APP}).
+@ignore
+If you want to assemble @file{.S} files, either use
+@code{fstcw} which is always correct instead of @code{fnstcw} or assemble
+with @samp{-real-fnstcw} option.
+@end ignore
+
+@node Bad Number of Arguments, , Compiler Optimizations, Misplaced Errors
+@section Bad Number of Arguments
+In C, you can provide any number of arguments for any function:
+@example
+void
+foo (char *str, int a, int b, int c)
+@{
+  fprintf (stderr, "program: fatal error:");
+  fprintf (stderr, str, a, b, c);
+  exit (1);
+@}
+
+void
+bar (int d)
+@{
+@dots{}
+  if (d != 1)
+    foo ("bad value: %d\n", d);
+@dots{}
+@}
+@end example
+The function @samp{foo} can produce warning if @samp{a} or @samp{b} or
+@samp{c} were not initialized, such as in the function @samp{bar}.  I suggest
+using the facilities provided by @file{stdargs.h}.
+
+@node Bad Writes, Bad Stack Frames, Misplaced Errors, Troubles
+@section Bad Writes
+When @code{Checker} detects a memory write error, it emits a warning and
+executes the bad instruction.  A segmentation violation signal can result
+from this bad instruction, if it writes, for example, to the text segment.
+In these cases, @code{Checker}'s message tells you that your program
+will receive a signal.
+
+However, if the process writes in the red zone after an allocated block,
+the history can be modified (@pxref{Malloc}).  When the history is
+displayed, it can contain a bad line, with a bad PC, a bad function name and
+a bad line number.  @xref{Bad Stack Frames}.  This problem can be solved by
+storing the history in another zone of memory, but it uses more memory.
+
+@node Bad Stack Frames, Signal Problems, Bad Writes, Troubles
+@section Bad Stack Frames
+To call a function, the caller stores on the stack the arguments and the
+instruction pointer (called IP or PC) for the next instruction.  The
+function called stores the old frame pointer and allocates space on the stack
+for its local variables.  The frame pointer is used to access the arguments
+and the local variables.  Thanks to the frame pointers and the PCs stored on
+the stack, it is easy to know the history of the current function. Since
+@code{Checker} needs this history, you can't compile your program with
+@samp{-fomit-frame-pointer}, which aims at using the frame pointer as a
+standard register and using the stack pointer as a frame pointer.  In some
+cases, the frame pointer saved can be corrupted, that is the reason why the
+history can be corrupted too. @xref{Bad Writes}.
+
+@node Signal Problems, Temporary File, Bad Stack Frames, Troubles
+@section Signal Problems
+Signals are synchronous or asynchronous. Asynchronous signals can come
+any time: you can't anticipate them.  So the signal could interrupt
+@code{Checker}, not just your code.  This means that @code{Checker} has
+to be reentrant, because the signal handler's code calls @code{Checker}
+code, too, or signals must be disabled before executing @code{Checker}
+code.  But both ideas are not suitable: if @code{Checker} were
+reentrant or if it disabled and enabled signals, it would be too slow.  So,
+@code{Checker} catches all signals the user wants to catch, and delivers
+the signal immediately if the program was not executing @code{Checker} code.
+Otherwise, @code{Checker} disable all signals, saves all the arguments and
+delivers the signal as soon as the program leaves @code{Checker} code.
+@code{Checker} marks the arguments to the function writable and readable.
+
+@node Temporary File, Libraries, Signal Problems, Troubles
+@section Temporary File
+@code{Checker} needs to read the symbol table of the program to convert the PC
+into a function name, line number and file name.  The symbol table is not read
+from the program each time @code{Checker} needs it, since it would be too
+slow.  The first time @code{Checker} needs the symbol table, @code{Checker}
+converts it into another file, after a little processing.  This temporary
+file is mapped each time @code{Checker} needs the symbol table and is
+removed while the program is exiting.  However, if the program exits
+suddenly, killed by a signal, this file is not removed.  In this case, you
+can remove it manually.  The file is named @file{/tmp/Chkr.xxxxx} where
+@samp{xxxxx} is the pid of the process.
+
+@node Libraries, Bugs, Temporary File, Troubles
+@section Libraries
+@cindex libraries
+@emph{NOTE:} This section concerns only the @code{Linux} users.
+
+If you want to use @code{Checker}, all the code of your program must
+be compiled with @code{Checker}.  The reason is simple: if a part of your
+program were not compiled with @code{Checker}, it would not update the
+bitmaps at each writing or modification.  The code compiled with
+@code{Checker} would consider these areas as uninitialized data, and emit a
+bad warning.
+
+To avoid these bad warnings, each output file compiled with
+@code{Checker} contains a magic flag.  The linker tests this flag for each
+object file and each member of each library.  If there is one file that
+doesn't have this flag, the program will check only accesses in red zones,
+the bad uses of @code{free} and it will not emit a warning when the program
+reads an uninitialized value and when the part not compiled through
+@code{Checker} runs.
+
+Thus, to make full use of @code{Checker}, you need to compile your library
+with @code{Checker}.  But, to avoid using the standard libraries,
+@code{Checker} tries to link only with libraries whose extension is
+@samp{.chkr.a} instead of @samp{.a}, when you use the @samp{-lxxx} option.
+When you have compiled a library, and if you link with it by using the
+@samp{-lxxx} option, you have to rename it.
+
+@node Bugs, , Libraries, Troubles
+@section Bugs
+These messages are clues that @code{Checker} is buggy:
+@itemize @bullet
+@item
+@code{Checker} displays a non-standard message such as
+@samp{len > bitmem.length or len == 0}, or displays a message with
+@samp{internal error}.
+@item
+@code{Checker} exits with a SIGIOT or SIGSEGV signal, without prior warning.
+@item
+@code{Checker} says a system call, a ioctl call or a fcntl call is unknown.
+Sometimes, I have not implemented the code for a system call, since I
+don't know how it works.  Please send me a description of the system call
+(the arguments, their types, which arguments are read or written).
+@item
+The version 0.7 of @code{Checker} (and the previous one) can't handle these
+syscalls: @code{module*}.  The next version will support
+them.
+@end itemize
+
+If you think you have found a bug in @code{Checker}, send me the
+warnings and the output of your program, and how you compile it.  If your
+program is big, a good idea is to find a simpler and shorter example.  If
+you have made a good patch, send it to this address:
+@display
+Tristan C/O gingold@@email.enst.fr
+@end display
+
+@node Binaries, Installing Checker, Troubles, Top
+@chapter Binaries
+When you compile and install @code{Checker}, you actually create a library
+@file{libchecker.o} and some executables that I will describe.
+
+@menu
+* checker::			How to use checker
+* checkergcc::			How to use checkergcc
+* checkerg++::			How to use checkerg++
+* symctl::			How to use symctl
+* genmess::			How to use genmess
+@end menu
+
+@node checker, checkergcc, , Binaries
+@section checker
+
+
+@node checkergcc, checkerg++, checker, Binaries
+@section checkergcc
+@code{checkergcc} is a stub which calls @code{gcc} with an
+additional option: @samp{-B/usr/local/lib/checker/}
+So, @code{checkergcc} will use @file{spec}, @file{as} and @file{ld} of
+@file{/usr/local/lib/checker/} instead of the standard one.  The @samp{-g}
+option is automatically set.  @xref{Libraries} to know what happens to the
+libraries.
+
+Just for your information, the symbols @code{__CHECKER__} and
+@code{MALLOC_0_RETURNS_NULL} are defined when you compile with
+@code{checkergcc}.
+
+For the curious: I preferred to use trampolins such as @code{checkergcc}
+instead of adding an option to GCC.  The trampolins allow
+you to simply change the @samp{CC=gcc} line to @samp{CC=checkergcc} in your
+@file{Makefile} when you want to compile your code with checker.
+
+@node checkerg++, symctl, checkergcc, Binaries
+@section checkerg++
+@code{checkerg++} is equivalent to @code{checkergcc}, but it calls
+@code{g++} instead of @code{gcc}.  @xref{checkergcc} for a full description.
+
+@node symctl, genmess, checkerg++, Binaries
+@section symctl
+@code{symctl} stands for SYMbol ConTroL.  It is used during the compilation
+of @code{Checker}.  This little program, included in the sources, selects
+which symbols are exported and which are not.  If an undefined symbol is not
+exported (to be imported), @code{symctl} produces a warning, which
+means you must define it.
+
+@node genmess, , symctl, Binaries
+@section genmess
+@code{genmess} stands for GENerate MESSages.  It is used during the
+compilation of @code{Checker}.  To be described.
+
+@ignore
+@node setchkrfl, , genmess, Binaries
+@section setchkrfl
+@code{setchkrfl} stands for SET CHecKeR FLag.  It is used during the
+compilation of @code{Checker}.  To be described.
+@end ignore
+
+@node Installing Checker, Internals, Binaries, Top
+@chapter Installing Checker
+Here is the procedure for installing @code{Checker} on a Linux system.
+@enumerate
+@item
+The first step is to build the makefile and identify your system.  If you run
+@file{configure} without specifying your system, @file{configure} tries to
+guess the type of your host.  If you want to compile in a different directory
+from the one containing the source code, go to the directory and run
+@file{configure} with the option @samp{--srcdir=DIR}, where @samp{DIR} is
+the directory that contains the source code.
+Here is an example:
+@example
+./configure i386-linux
+@end example
+
+@item
+You can now build it with @file{make}, just after making the dependencies:
+@example
+make
+@end example
+
+@item
+After becoming root, install @code{Checker}:
+@example
+make install
+@end example
+The files will be installed in @file{/usr/local/lib/checker/} and the two
+executables, @file{checkergcc} and @file{checkerg++} are installed in
+@file{/usr/local/bin/}.
+
+@item
+You now need to install the standard libraries compiled by @code{Checker}.
+They are in the file @file{Checker-libs-Vx.y.tgz}, where @samp{x.y} is the
+current version.
+@example
+cd /
+tar zxvf Checker-libs-Vx.y.tgz
+@end example
+
+@item
+You can optionaly install the X libraries compiled by @code{Checker}:
+@example
+cd /usr/local/lib/checker/
+tar zxvf Checker-Xlibs-Vx.y.tgz
+@end example
+These libraries have not been proofly tested.
+
+@end enumerate
+
+@node Internals, Checker with GCC, Installing Checker, Top
+@chapter Internals
+This is meant to describe @code{Checker} in detail.  This section can be
+useful if you want to know how it works, if you want to port
+@code{Checker}, or if you want to debug it@dots{}
+
+@code{Checker} can be divided into two parts: code insertion and
+functions.  @dfn{Code insertion} aims at inserting code into your program.
+The code inserted has to call functions which check each memory access.  The
+code of @code{Checker} are these functions, which handle the bitmaps, and
+the @code{malloc} and co function.
+
+@menu
+* How to read the sources::
+* Code Insertion::
+* Code of Checker::
+@end menu
+
+@node How to read the sources, Code Insertion, , Internals
+I want @code{Checker} to be portable, so I tried to isolate system dependant
+files.  They are kept in the @file{config/processor/OS/} directory.  Files
+that handle executable formats are in @file{config/obj-formats}. 
+@code{Checker} is developed with the help of the internet community, so it
+is international.  As a consequence, it is multi-language, ie you can select
+your language before compiling it.  At this time, only French and English
+are available (Note that the manual is written in English and no other
+translations exist).  In the source files, string are replaced by macros,
+which are defined by @code{genmess} from @file{.m} files.  @xref{genmess}
+for more information about these files.  I try to keep the macros' name
+readable and enough intuitive.
+
+@node Code Insertion, Code of Checker, How to read the sources, Internals
+@section Code Insertion
+@cindex code insertion
+Each memory access must be checked.  One way is to set each page of the
+process unreadable and unwritable, to catch all SIGSEGV signals, and to
+check the memory access from the information given by the signal.  But,
+this is too slow.  Code insertion is another way: the process contains
+code to check each memory access.  Here is an example:
+@example
+movl   -8(%ebp),%edx
+@end example
+This instruction reads a local variable in a function.  A memory access is
+made, and since the local variable can be uninitialized, it must be checked.
+So, this instruction becomes:
+@example
+pushl  %eax               # save a register
+leal   -8(%ebp),%eax      # move the address to check in this register
+call   chkr_1_6_1_4_chkr  # call the function to check the access
+movl   -8(%ebp),%edx      # do the instruction
+@end example
+The function needs three arguments: the address, how many bytes are written,
+read or both and the rights (read, write or both).  The register contains the
+address, and the function name contains the length and the rights.  The
+function called is not written in C for several reasons:
+@itemize @bullet
+@item
+The function must save all registers, since they must not be changed.
+Futhermore, the function must restore the saved register at the end.
+@item
+The function must be quick: on a i386, about half instructions make memory
+access.  If the function must get its argument through the stack like C does,
+it will be too slow.
+@end itemize
+
+In fact, the function is just a stub to a C function,
+@code{chkr_check_addr}.  The stub must save the registers, push the
+arguments, call the function and finally restore the registers.
+For some instructions, the function called must do something special:
+@itemize @bullet
+@item
+If the instruction pops or pushes bytes into the stack, the bitmap of the
+stack must be changed.
+@item
+If the instruction changes the stack pointer, to reserve space or to clean
+the stack, the bitmap of the stack must be updated.
+@item
+If the instruction does a system call, it must call a stub which checks each
+argument according to the system call.  If the system call is @code{ioctl},
+@code{fcntl}@dots{}, the argument are checked according the request.  Note
+that you must often update the bitmaps after a system call such as
+@code{read}: the bytes read also become readable.
+@item
+If the instruction is @code{call}, the space for the return address is
+considered a red zone.
+@end itemize
+
+Code insertion can be done at several levels.  Each level has advantages and
+disadvantages.
+@menu
+* Code Insertion by GCC::
+* Code Insertion by GAS::
+* Code Insertion before LD::
+* Code Insertion after LD::
+@end menu
+
+@node Code Insertion by GCC, Code Insertion by GAS, , Code Insertion
+@subsection Code Insertion by GCC
+The compiler, @code{GCC}, produces code in assembler from C source.  Since
+@code{GCC} knows what the code means, it can do several optimizations: it can
+suppress checks since it knows the checks were already made, or since the
+memory is always initialized.  It can also enhance the flexibility, by inserting
+red zones between arguments, between static data@dots{}  Last but not the
+least, since @code{GCC} has several targets, code insertion will be done for
+every machine.
+
+However, the C standard library contains files in assembler.  These files are
+not compiled by @code{GCC}, so they do not contain inserted code.
+Furthermore, if the C source contains some @samp{asm()} instructions,
+@code{GCC} is not able to insert code for these instructions.  Besides, I am
+not sure that the code inserted by @code{GCC} can be really optimized for
+every machine.
+
+To conclude, I think @code{GCC} is not able to insert code alone.  But, a
+good idea is a cooperation between @code{GCC} and @code{GAS}.
+
+@node Code Insertion by GAS, Code Insertion before LD, Code Insertion by GCC, Code Insertion
+@subsection Code Insertion by GAS
+@code{GAS}, the GNU assembler assembles the output of @code{GCC} and the
+@file{*.S} files to produce binary object files used by @code{ld}.
+Since each object file is the output of @code{GAS}, if code insertion is
+made by @code{GAS}, it is done for all languages.
+
+Futhermore, it is rather easy to implement code insertion by modifying
+@code{GAS}, since @code{GAS} is rather small and well structured.
+
+However, doing code insertion in @code{GAS} requires describing how to do it
+for each processor.
+
+I choose to do code insertion in @code{GAS} since it was rather easy, and
+since I was not really considering porting @code{Checker}.
+
+@node Code Insertion before LD, Code Insertion after LD, Code Insertion by GAS, Code Insertion
+@subsection Code Insertion before LD
+Doing code insertion before @code{ld} is confortable for the user: he (she)
+needs just to relink the program.  However it is very difficult to do given
+the i386 and the @file{a.out} format, since the code can't be easily
+separated from the constants.  Moreover, it is not portable: you need to do
+this for each processor and for each binary format.  The only advantage is
+that you don't need all the sources: you just need object files.
+
+To do code insertion before LD, we need a better binary format than
+@file{a.out}.
+
+@node Code Insertion after LD, , Code Insertion before LD, Code Insertion
+@subsection Code Insertion after LD
+Doing code insertion after @code{ld} is really comfortable for the user: if
+you want to check for memory access errors, just run @code{Checker} and that's
+all.  But, it is really difficult to implement.
+
+@node Code of Checker, , Code Insertion, Internals
+@section Code of Checker
+All the code of @code{Checker} must be independent: you must @strong{never}
+use a function or a system call defined in the C library, because these
+standard functions are compiled through @code{Checker}.  So, if you use a
+system call or a function, you must provide the sources for @code{Checker}.
+By the way, since it is comfortable to use the same name, after compiling
+the sources and linking them together to create an single object file,
+@file{libchecker.o}, @code{symctl} processes this object file.
+@xref{symctl} for more details.
+
+These protections are the reason why a little library is included with
+@code{Checker}.  It provides a little @code{printf}, not as powerful as the
+genuine @code{printf}, as well as @code{qsort}, @code{getcwd}, @code{getenv}
+and @code{mktemp}.  Other functions, such as system calls and @code{str*}
+are provided in the @file{config/} directory.
+
+If you want to port functions from the library or to write functions, you
+must be very careful: you must not use @code{malloc}.  Use either
+@code{alloca}, which is safe, or @code{sys_malloc}, a simple malloc which can
+be used internaly.
+
+I will describe briefly each part of @code{Checker}.  I will give mostly the
+ideas and the algorithms and not a description line by line, since the code
+is not finished.
+
+@menu
+* Malloc Internals::
+* Garbage Detector Internals::
+* Bitmaps Internals::
+* Symbols Table Internals::
+@end menu
+
+@node Malloc Internals, Garbage Detector Internals, , Code of Checker
+@subsection Malloc Internals
+The data concerning an heap are stored in a structure @code{struct mdesc}.
+This implementation of @code{malloc} is based on a doubly linked list:
+each block of memory has a header, and each header is linked with the next
+one and with the previous one.  Thus, from a header, you can handle all the
+blocks.  The @code{next} field of the last header and the @code{prev} field
+of the first header are null.  The variable @code{_firstblock} points to the
+first header, and @code{_lastblock} points to the last header.  Each header
+has a field, @code{state}, which indicates the status of the block:
+@itemize @bullet
+@item @code{MDBUSY}
+The block is busy: it has been allocated.
+@item @code{MDFREE}
+The block is free: it can be allocated.  If there are more than
+@code{FINAL_FREE_SIZE} free bytes (8 kb by default) at the end of
+the list, the block is given back to the system.
+@item @code{MDAGED}
+The block is aged: it has just been freed but it is not available.  If memory
+access are made to these blocks, @code{Checker} emits a warning.  After
+@code{BLOCK_AGE} (10 by default) calls to @code{free}, the block becomes
+free.
+@item @code{MDINTERN}
+The block is reserved for internal use.  This status is never used.
+@item @code{MDBRK}
+The block has been allocated by @code{brk}.
+@end itemize
+
+Depending on the status, there are fields in the header.  Two other fields
+are used to double-link the aged blocks (@code{_youngerblock} points to the
+youngiest block whereas @code{_olderblock} points to the oldest.  If there
+is no aged block, these variables are null).  Likewise, two other fields are
+used to double-link the freed blocks, according to their sizes: all blocks
+which have the same log of their sizes are linked together
+(@code{_heapinfo[n]} points to headers of free blocks, n is the log of the
+size).  The header for busy blocks contains one field which registers the size
+of the memory asked for by the user and a field used while detecting garbage.
+
+The functions @code{malloc}, @code{free} and @code{memalign} are just stubs,
+which check if their arguments are readable, change the size from 0 to 1 if
+asked, and call @code{_malloc}, @code{_free} and
+@code{_memalign} respectively.  When I use the word @code{malloc}, I mean
+@code{_malloc} and not the stub, which is not really interesting.
+
+The function @code{malloc} begins with checking if the function was already
+called.  If it is the first time the function is used,
+@code{chkr_initialize} is called and a flag is set.  Then the space to
+allocate is computed by adding the size of the red zones and by rounding the
+result, so as to be aligned.  Next, @code{malloc} looks for a big
+enough free block.  Since the free blocks list is ordered by the log of the
+size and by the size in each list, the first suitable block fits the best.
+If the block is too big, it is split.  If no free block was found, a new
+block is created by allocating memory or by using the last block if it is
+free.  Finally, the header is set, the history is saved and the
+permissions are initialized to write-only.
+
+The function @code{free} begins with checking the coherence of the address
+(i.e. the argument).  Then the permissions of the memory are set to
+unreadable and unwritable, and the history is saved.  Finally, the
+block becomes the youngest block and if there are enough aged blocks,
+the oldest block is now processed.  At first, @code{free} tries to
+coalesce the block with the previous one and with the next one.  It is
+done only if the blocks are free.  Then @code{_internal_free} is called.
+This function really releases the block: if the block is the last one
+and if it is big enough, it is immediatly returned to the operating
+system.  Otherwise, it is put into a list of free blocks, according to
+its size.
+
+The function @code{realloc} never reduces the size.  If the user want more
+or less memory, a new block is allocated, the memory and rights are copied,
+and the genuine block becomes aged.
+
+The function @code{calloc} is a stub: after checking its arguments, it calls
+@code{malloc}, initialize the memory and set the rights.
+
+The function @code{memalign} is like @code{malloc}, but some other checks
+are made: the block must be aligned.  If a free block is found, it can be
+divided into 3 parts.
+
+@node Garbage Detector Internals, Bitmaps Internals, Malloc Internals, Code of Checker
+@subsection Garbage Detector Internals.
+When calling @code{__chkr_garbage_detector()}, all the blocks are marked as
+garbage.  Then the data segment and stack are searched for pointers to heap
+blocks.  These blocks are then recursively searched for pointers to other
+heap blocks.  Each time a pointer to a block is found, the block becomes
+either potential garbage or non garbage, according to the pointer: if
+the block's beginning is pointed to, the block is probably not garbage.
+Blocks not found in this search are signaled as garbage.  Finally, blocks
+are gathered according to their history, so blocks allocated with the same
+history are displayed together.
+
+The function @code{__chkr_evol_detector()} does the same search but does
+not report lost blocks that are already reported in a previous
+@code{__chkr_garbage_detector()} or @code{__chkr_evol_detector()}.
+
+@node Bitmaps Internals, Symbols Table Internals, Garbage Detector Internals, Code of Checker
+@subsection Bitmaps Internals
+@cindex bitmaps
+@findex chkr_check_right
+@findex chkr_set_right
+The bitmaps are memory where the permissions of each byte are saved.  Each byte
+uses two bits in the bitmap: one for readable, the other for writable.  Thus
+there is a 25% memory overhead each time you allocate memory.  The
+byte-level permissions could be reduced into word-level permissions (2
+bytes) or long-level permissions (4 bytes).
+
+There are as many bitmaps as segments:  one bitmap for the data segment, one
+for the heap and one for the stack.  However, since the data segment is
+always readable and writable, the data bitmap uses no memory.  The bitmaps
+are located in memory, in a zone allocated by @code{mmap}: after the data
+segment but before the stack.  There are null pages between the bitmaps and
+the stack and the data segment.  Thus, the heap or the stack can grow
+without ereasing the bitmaps and vice versa.  In this way the bitmaps are
+never moved.  The stack bitmap is increased when the stack grows (it is
+detected by the code inserted) and is reduced when the stask shrinks.  This is
+similar for the heap bitmap.
+
+Two importants functions are used to handle the bitmaps:
+@table @code
+@item void chkr_check_addr(const PTR @var{ptr}, int @var{len}, int @var{right})
+This function checks a zone of length @var{len}, starting at @var{ptr}.  If
+the rights of one or more bytes of this zone is not compatible with
+@var{right}, this function emits a warning.  If @var{right} tests for
+writing only (@var{right} is equal to @code{CHKR_WO}, the zone also becomes
+readable.  If you want just test for writing without updating the
+bitmap, you have to use @code{CHKR_TW}.  This function is called by the
+stubs.  @xref{Code Insertion}
+
+@item void chkr_set_right (const PTR @var{ptr}, int @var{len}, int @var{right})
+This function sets the right of a zone of length @var{len}, starting at
+@var{ptr}.
+@end table
+
+Another function, @code{void chkr_disp_right(const void* ptr, int len)}
+displays the right of a zone starting at @var{var}.  The argument @var{len}
+specifies how many lines are displayed; one line corresponds to 8 rights.
+@xref{How to Read the Output}.
+
+@node Symbols Table Internals, , Bitmaps Internals, Code of Checker
+@subsection Symbols Table Internals
+@findex chkr_load_symtab
+@findex chkr_unload_symtab
+When the compiler creates an object file, it adds a symbol table, which can
+be used to translate an address to a symbolic name.  When the option
+@samp{-g} is used more information is added, such as line number.  The
+symbol table is written in the binary file.  @code{Checker} need the symbols
+table to translate addresses into functions names, line numbers and source
+files, so that the history will be human readable.
+
+The symbol table can't be directly accessed, since it is in a file.  So,
+when @code{Checker} needs to use the symbol table, it is read from the file.
+However, to speed things up, the symbol table is compressed (only useful
+symbols are retained) and saved in a temporary file.  This file can be
+quickly mapped into the memory or unmapped.
+
+The symbol table is loaded with @code{chkr_load_symtab} and unloaded with
+@code{chkr_unload_symtab}.  Each time @code{chkr_load_symtab} is called, a
+counter is increased.  The function @code{chkr_unload_symtab} decreases this
+counter and when the value 0 is reached, the symbol table is really
+unloaded.
+
+@node Checker with GCC, Concepts Index, Internals, Top
+@chapter Checker with GCC
+To make @code{Checker} more portable, it can now works with @code{GCC} and
+its new option @samp{-fcheck-memory-usage}.  The adaptation of
+@code{Checker} for @code{GCC} is called @dfn{GCC-Checker}.
+
+@menu
+* Concepts of GCC-Checker::
+* Writing stubs::
+* Porting GCC-Checker::
+@end menu
+
+@node Concepts of GCC-Checker, Writing stubs, , Checker with GCC
+@section Concepts of GCC-Checker
+With the @samp{-fcheck-memory-usage}, @code{GCC} is able to insert code in
+your program to check each memory access.  Normally all your program should
+have inserted code but you perhaps don't have the source of some libraries
+or you don't want to recompile them.  As a consequence, we have created the
+concept of stubs.  A @dfn{stubs} for a function @samp{foo} is a function
+called instead of @samp{foo} and which does something before and after
+calling @code{foo}.  In @code{Checker}, stubs replace the memory access
+check done by the function and call the function.  It can also does other
+check after calling the function, according to the result value.  Here is a
+simple example:
+@example
+size_t
+stub_for_strlen (const char *str)
+@{
+  chkr_check_str (str, CHKR_RO); /* Be sure STR is readable.  */
+  return strlen (str); /* Call the real function.  */
+@}
+@end example
+As a consequence your code is encapsulated within stubs.
+
+@node Writing stubs, Porting GCC-Checker, Concepts of GCC-Checker, Checker with GCC
+@section Writing stubs
+To know what a stub is, @ref{Concepts of GCC-Checker}.
+
+When a program is compiled with @samp{-fcheck-memory-usage}, function names
+are prefixed with @samp{chkr$}.  As a result, stubs are function whose name
+begins with @samp{chkr$}.  The stubs should check each argument (if
+necessary) and should update the bitmap according to the results.  The best
+way to create a stub is to copy its prototype and to add the prefix.  Let's
+go with a simple example:
+@example
+/* The prototype.  */
+size_t strlen (const char *);
+
+/* The stub.  Stage 1.  */
+size_t
+chkr$strlen (const char *str)
+@{
+@}
+@end example
+The incoming argument should be checked with @code{chkr_check_addr} or
+@code{chkr_check_str}.  @ref{Bitmaps Internals}.  In our example, there is
+just one argument, @samp{STR}, which represents a string and is only read. 
+Futhermore, the function @code{strlen} doesn't modify the memory, so there
+is nothing to do according the result.  By the way, you should include
+@file{checker_api.h} to use the @code{Checker} functions.
+@example
+#include "checker_api.h"
+#include <strings.h>
+
+/* The stub.  */
+size_t
+chkr$strlen (const char *str)
+@{
+  chkr_check_str (str, CHKR_RO);
+  return strlen (str);
+@}
+@end example
+Let's see another example:
+@example
+#include "checker_api.h"
+#include <unistd.h>
+
+size_t
+chkr$read (int fd, PTR buf, size_t n)
+@{
+  size_t len;
+  
+  fd_used_by_prog (fd);
+  if (n > 0)
+    chkr_check_addr (buf, n, CHKR_MW);
+  len = read (fd, buf, n);
+  if (len > 0)
+    chkr_set_right (buf, len, CHKR_RW);
+  return len;
+@}
+@end example
+Here, the stub should at first check that the buffer is writable.  It use a
+special right, @samp{CHKR_MW}, which test and mark the zone write-only, so
+that memory not modified by @code{read} will not be readable.  Note that the
+size of the zone is an argument; this is is not a problem but the size must
+not be null.  After the call, the stub marks the memory writable, according
+to the results.
+If an incoming argument is a structure, do not check it globally: check it
+field by field because the structure may contains pads, which could be not
+initialized.
+
+What must be checked?
+@itemize @bullet
+@item incoming pointer argument. 
+If it is used only as an incoming argument, check for being readable.  If it
+is used as an incoming and outcoming arguemnt, check for being readable
+and writable.  If the argument is an aggregate (ie a structure or an union),
+check field one by one, because the aggregate can contain pads.
+
+@c @item incoming structure.  They are generally passed through a pointer.
+
+@item incoming file descriptor.
+Since @code{Checker} uses some file descriptor (to output the messages or to
+read some files), it also checks that your program does not try to use these
+reserved file descriptor.  As a consequence, if you create a stub that
+return or handle directly or not (through a structure such as @samp{FILE})
+a file descriptor, you must inform @code{Checker}.  Some functions are
+provided:
+@table @code
+@findex fd_used_by_prog
+@item int fd_used_by_prog (int @var{fd})
+inform that @var{fd} is a file descriptor given as an incoming argument to
+the stub.
+
+@findex fd_returned_by_system
+@item int fd_returned_by_system (int @var{fd})
+inform that the OS has returned a new file descriptor (generaly through a
+system call such as @code{open}, @code{create}, @code{socket}).
+
+@findex fd_closed 
+@item int fd_closed (int @var{fd})
+inform that @var{fd} has been closed.
+
+@findex fd_duped
+@item int fd_duped (int @var{fdres}, int @var{fdd})
+inform that a new file descriptor was created by duping one.  The genuine
+file descriptor is @var{fdd}.
+
+@end table
+
+@item outcoming pointer.
+If your function return a pointer, you must set the right on the area
+according to its meaning.
+
+@item outcoming structure.
+If your function return a structure, you must also set the rights.  You
+should know that generally structure and union (these are named aggregate)
+are returned through an invisible reference: the caller give to the function
+an address where to store the result.  So you must set the right of this
+area.  The address of the area can be got with the builtin function:
+@example
+void *__builtin_aggregate_incoming_address (void)
+@end example
+If the call is illegal or if the aggregate is returned by value (GCC does
+this for small aggregate), this function returns 0.  Please, always check
+this value.  Please check the fields one by one.
+@end itemize
+
+If your function is based on a well known function (for example
+@samp{my_printf}), refer to the already written stubs.
+
+@node Porting GCC-Checker, , Writing stubs, Checker with GCC
+@section Porting GCC-Checker
+@subsection @file{machine.h}
+
+@subsubsection General Macros
+
+@table @code
+@findex NEED_CHKR_LD_OPTIONS
+@item NEED_CHKR_LD_OPTIONS
+If this macro is defined, @code{Checker} will accept options from the
+compiler.  Very old mechanism, don't use it.
+
+@findex HAVE_SHM
+@item HAVE_SHM
+If defined, supports the shared memory functions.
+
+@findex BIGGEST_ALIGNMENT
+@item BIGGEST_ALIGNMENT
+The biggest alignment on this machine.  It must be convient for each type. 
+This is used by @code{malloc}.
+
+@findex HAVE_ANONYMOUS
+@item HAVE_ANONYMOUS
+If defined, @code{MAP_ANONYMOUS} is available.  Refer to the @code{mmap}
+system call to know if it supports this feature.
+
+@findex NEED_ATEXIT_FOR_CHKR_DO_END
+@item NEED_ATEXIT_FOR_CHKR_DO_END
+Do not define it.
+
+@findex CHECK_INCOMING_ARGS
+@item CHECK_INCOMING_ARGS
+If defined, the user functions such as @code{malloc} will check the incoming
+argument are readable.  Do not define it.
+
+@findex ADD_LD_SO_IN_OBJECTS
+@item ADD_LD_SO_IN_OBJECTS
+See @file{config/obj-formats/elf-libs.h}.
+
+@findex DONT_NEED_EXECUTABLE
+@item DONT_NEED_EXECUTABLE
+If defined, the pathname of the executable will not be searched at the
+initialization.  The pathname is needed to read the symbol table.
+
+@findex DONT_DEFINE_SBRK
+@item DONT_DEFINE_SBRK
+If defined, @code{Checker} will not redefine its own @code{sbrk} function. 
+Define it to avoid an infinite loop, since the new @code{sbrk} calls
+@code{chkr_sbrk} to allocate memory, but on the generic configurations
+@code{chkr_sbrk} calls @code{sbrk}.
+@end table
+
+@subsubsection Stack Macros
+
+@table @code
+@findex FRAMES_TO_FORGET_FOR_DISP_CALL_CHAIN
+@item FRAMES_TO_FORGET_FOR_DISP_CALL_CHAIN
+This is the value of @var{chkr_frames_to_forget} for
+@code{chkr_disp_call_chain}.
+
+@findex FRAMES_TO_FORGET_FOR_FUNCS_SUPRESSED
+@item FRAMES_TO_FORGET_FOR_FUNCS_SUPRESSED
+This is the value of @var{chkr_frames_to_forget} before calling
+@code{same_history}; used in @file{maccess.c}(@code{chkr_access_error}).
+
+@findex FRAMES_TO_FORGET_FOR_ACCESS_ERROR
+@item FRAMES_TO_FORGET_FOR_ACCESS_ERROR
+This is the value of @var{chkr_frames_to_forget} before calling
+@code{chkr_show_frames}; used in @file{maccess.c}(@code{chkr_access_error}).
+
+@findex SET_KNOWN_STACK_LIMIT
+@item SET_KNOWN_STACK_LIMIT
+A C expression which set @var{known_stack_limit} to the current stack
+pointer of the process.
+
+@findex STACK_BASE
+@item STACK_BASE
+A integral number which deternimes where the stack begins.  If the stack
+base can change (I am interesting to know such OS), you can undefined this
+macro.  In this case, the stack base will be computed during the
+initialisation.
+
+@findex STACK_GROWS_DOWNWARD
+@item STACK_GROWS_DOWNWARD
+Define this macro if pushing a word onto the stack moves the stack pointer
+to a smaller address.
+@end table
+
+@subsubsection Pagesize Macros
+@table @code
+@findex CHKR_PAGESIZE
+@item CHKR_PAGESIZE
+A C expression which deternimes the page size.
+
+@findex LOG_PAGESIZE
+@item LOG_PAGESIZE
+The logarithm in base 2 of @code{CHKR_PAGESIZE}.
+
+@findex INIT_PAGESIZE
+@item INIT_PAGESIZE
+If defined, it contains a C expression used to initialize
+@code{CHKR_PAGESIZE}.  If defined, @code{LOG_PAGESIZE} is automaticaly
+initialized.
+@end table
+
+@subsubsection Memory Layout Macros
+
+@table @code
+@findex HIGH_ADDR_HEAP
+@item HIGH_ADDR_HEAP
+An integral number which deternimes the upper limit of the heap.
+
+@findex MM_PROT
+@item MM_PROT
+Define it as @samp{PROT_READ | PROT_WRITE}.
+
+@findex MM_FLAGS
+@item MM_FLAGS
+Define it as @samp{MAP_FIXED | MAP_PRIVATE}.
+
+@findex MM_FILE
+@item MM_FILE
+If @var{HAVE_ANONYMOUS} is defined, define this macro as @code{-1};
+otherwise define this macro as @code{devzero_fd}.
+
+@findex MM_LOW
+@item MM_LOW
+The lower boundary of the memory reserved by @code{Checker}.
+
+@findex MM_HIGH
+@item MM_HIGH
+The upper boundary of the memory reserved by @code{Checker}.
+
+@findex MM_HEAP
+@item MM_HEAP
+The base address for the internal heap.  Should be inside [@code{MM_LOW};
+@code{MM_HIGH}] and is usually equal to @code{MM_LOW}.
+
+@findex MM_STACK
+@item MM_STACK
+The base address of the stack bitmap.  Should be inside [@code{MM_LOW};
+@code{MM_HIGH}].
+
+@findex MM_MEM
+@item MM_MEM
+The base address of the heap bitmap.  Should be inside [@code{MM_LOW};
+@code{MM_HIGH}].
+
+@findex MM_SYM
+@item MM_SYM
+The base address of the symbol table.  Should be inside [@code{MM_LOW};
+@code{MM_HIGH}].
+@end table
+
+@subsubsection Signals Macros
+
+@table @code
+@findex NO_SIGNALS
+@item NO_SIGNALS
+If this macro is defined, @code{Checker} doesn't handle the signals.  As a
+result, the behavior could be undefined if a signal is received.  Define
+only this macro when you are porting the code (to be able to compile).  If
+this macro is defined, the following one are ignored.
+
+@findex NSIGNALS
+@item NSIGNALS
+Number of available signals.
+
+@findex DELAY_SIGNAL_CONDITION
+@item DELAY_SIGNAL_CONDITION
+Condition to delay signals.
+
+@findex SIG_HANDLER_T
+@item SIG_HANDLER_T
+The type of an handler.
+
+@findex OTHER_SIG_HANDLER_ARGS
+@item OTHER_SIG_HANDLER_ARGS
+The arguments of @code{chkr_sig_handler}.  The first argument, the signal
+number is already defined.
+
+@findex BLOCK_SIGNAL_WHEN_RETURN
+@item BLOCK_SIGNAL_WHEN_RETURN(@var{sig})
+A C expression that modifies the handler context in order to block @var{sig}
+at the end of the handler.  Note that @code{sigblock} doesn't work.
+
+@findex SAVE_THIS_SIGNAL
+@item SAVE_THIS_SIGNAL
+Save the received signal, to emit it later.
+
+@findex DECL_FOR_SAVE_THIS_SIGNAL
+@item DECL_FOR_SAVE_THIS_SIGNAL
+A C expression which is a declaration.
+
+@findex SIG_JUMP_TO
+@item SIG_JUMP_TO(@var{func})
+Call the user handler @var{func} with the args of @code{chkr_sig_handler}.
+
+@findex SET_RIGHTS_FOR_HANDLER_ARGS
+@item SET_RIGHTS_FOR_HANDLER_ARGS
+Set the rights for the handler args, so that the user handler would be able
+to access them.
+@end table
+
+@subsection Functions
+
+@table @code
+@findex search_stack
+@item void search_stack (void)
+This function search pointers inside the stack segment.  Used by the garbage
+detector and called from @file{garbage.c}.
+
+@findex search_register
+@item void search_register (void)
+This function search pointers inside registers.  Used by the garbage
+detector and called from @file{garbage.c}.
+
+@findex chkr_save_stack
+@item void chkr_save_stack (PTR *@var{ptr}, int @var{forget}, int @var{num})
+Save the history into @var{ptr}.
+
+@findex chkr_show_frames
+@item void chkr_show_frames (void)
+Display the current history.
+
+@findex chkr_initialize
+@item void chkr_initialize (void)
+Do nothing.
+
+@findex chkr_init_machine
+@item void chkr_init_machine (int *@var{argc}, char *@var{argv}[], char *@var{envp}[])
+Can do what you want.
+
+@end table
+
+@node Concepts Index, Functions Index, Checker with GCC, Top
+@printindex cp
+
+@node Functions Index, , Concepts Index, Top
+@printindex fn
+
+@contents
+@bye

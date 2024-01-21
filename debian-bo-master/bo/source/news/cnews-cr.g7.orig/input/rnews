@@ -1,0 +1,86 @@
+#! /bin/sh
+# Incoming-news spooling.
+# Arguments are options etc., not filenames -- it looks tempting to
+# put "$*" after newsspool, but there are security problems.
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/input:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+# sort out arguments; pretty simple for now
+decompress=
+for dummy
+do
+	case "$1" in
+	-d)	decompress="$2"
+		case "$decompress" in
+		.*)	decompress=	;;
+		*/*)	decompress=	;;
+		esac
+		shift
+		;;
+	--)	shift ; break	;;
+	-*)	echo "$0: unknown option \`$1'" >&2 ; exit 2	;;
+	*)	break	;;
+	esac
+	shift
+done
+if test " $decompress" != " "
+then
+	decompress="$NEWSBIN/decompressors/$decompress"
+	if test ! -r "$decompress"
+	then
+		decompress=
+	fi
+fi
+
+# check space, assuming a pretty large batch (no cheap way to find real size)
+counter=1
+while test " `spacefor 250000 incoming`" -le 0
+do
+	# Warn sysadmin -- he just might be listening and able to act -- and
+	# stall a little bit in hopes that it's transient.
+	if test " $counter" -eq 1
+	then
+		report -u 'news space shortage' <<'!'
+Incoming news will be discarded due to space shortage unless more room
+becomes available within 15 min.
+!
+	fi
+	if test " $counter" -gt 1111		# four tries is plenty
+	then
+		# oh no! -- nothing we can do, really...
+		cat >/dev/null
+		echo incoming news discarded due to space shortage |
+						report -u 'news discarded'
+		exit 1
+	fi
+	if test ! -f $NEWSCTL/rnews.stall
+	then
+		counter="1$counter"
+	else			# avoid repeating the sysadmin warning
+		counter=2
+	fi
+	sleep 300
+done
+
+# spool it
+case "$decompress" in
+'')	newsspool		;;
+*)	$decompress | newsspool	;;
+esac >/tmp/ngripe.$$ 2>&1
+if test ! -s /tmp/ngripe.$$
+then
+	# it worked
+	rm -f /tmp/ngripe.$$
+	exit 0
+fi
+
+# something went wrong
+# there really isn't any way to save the data if newsspool fails,
+# not without causing other problems
+report -u 'newsspool or decompressor failure' </tmp/ngripe.$$
+rm -f /tmp/ngripe.$$
+exit 1

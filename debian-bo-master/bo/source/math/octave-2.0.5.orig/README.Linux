@@ -1,0 +1,163 @@
+Since July 1996, most work on Octave has been done using a Linux
+system, and a number of people who regularly test Octave snapshot
+releases also primarily use Linux systems.
+
+However, I have recently started to receive a significant number of
+reports from people who say that they can't compile or run Octave on
+Linux systems.  In nearly every case, the problem has turned out
+to be that the compilers or libraries have not been installed
+properly.  I suspect that this often results from a botched upgrade,
+or from attempting to install the compilers from the standard source
+distributions.  But in some cases, the cause has been a buggy Linux
+distribution.  Many of these problems go unnoticed because much of the
+software for Linux is written in C, not C++.
+
+Octave compiles, but it won't run
+---------------------------------
+
+If you can compile Octave, but it crashes with a segmentation fault
+right away, you probably have incompatible versions of libc and libg++
+installed, or you have a version of the dynamic loader, ld.so, that is
+incompatible with your versions of the libraries, or both.
+
+On my development system, I am using the following software:
+
+  * Linux kernel 2.0.6
+  * gcc/g++ 2.7.2
+  * g77 0.5.18
+  * libg++/libstdc++ 2.7.1.0
+  * libm 5.0.5
+  * libc 5.2.18
+  * libncurses 3.0
+  * ld.so 1.7.14
+  * binutils 2.6
+
+I know from experience that the versions listed above seem to work
+well together.  But if you have a newer version of the kernel, you may
+need a newer version of the C library.  I don't have time to keep up
+with all the various library versions (life is much too short for
+that), nor do I know which combinations are supposed to work together.
+That sort of information should be clearly stated in the release notes
+for the libraries.  If it is not, please ask the maintainers of the
+libraries to clarify the documentation.
+
+Please note that I am NOT recommending that everyone running Linux and
+using Octave should install the same versions of the libraries and
+compilers that I have.  I am simply saying that the versions listed
+above work for me.  Other version combinations may also work, but I
+don't have time to map out all the possibilities...
+
+Craig Earls <cpearls@ziplink.net> reports that the order of installing
+libc and lig++ is important.  If libg++ is installed *first*, Octave
+will work, but if the libraries are installed in the reverse orfer,
+Octave fails.  The conflict apparently arises because libc and libg++
+shared libraries both use libio, however no one seems to be able to
+provide a clear explanation of exactly what is happening.
+
+Octave won't even compile
+-------------------------
+
+If you can't compile Octave, you should first check to see that your
+compiler and header files are properly installed.  Do you have
+multiple versions of the g++ include files on your system?  Are you
+sure that your copy of g++ is finding the right set?  You can find out
+by compiling a simple C++ program with -v:
+
+bash$ cat foo.cc
+#include <iostream.h>
+int main (void) { cerr << "yo\n"; return 0; }
+
+bash$ g++ -v foo.cc
+gcc -v foo.cc -lg++ -lstdc++ -lm
+Reading specs from /usr/lib/gcc-lib/i486-linux/2.7.2/specs
+gcc version 2.7.2
+ /usr/lib/gcc-lib/i486-linux/2.7.2/cpp -lang-c++ -v -undef ...
+#include "..." search starts here:
+#include <...> search starts here:
+ /usr/lib/g++-include
+ /usr/local/include
+ /usr/i486-linux/include
+ /usr/lib/gcc-lib/i486-linux/2.7.2/include
+ /usr/include
+End of search list.
+...
+
+If the location of the correct set of include files is not listed in
+the search path, then you might be able to fix that with a symbolic
+link.  However, if your version of libg++ was not compiled with your
+current version of gcc, you are likely to run into more trouble.
+
+The linker can't find -lieee
+----------------------------
+
+This can happen because your libraries don't match your version of
+gcc.  Some recent Linux distributions don't include a libieee.a file
+because IEEE support is now the default and the library is no longer
+needed, but the gcc specs file still adds -lieee to the linker command
+if gcc is invoked with the -mieeefp flag.  I believe that you should
+be able to fix this by editing the gcc specs file.  In it, you should
+find something like this:
+
+  %{!shared: %{mieee-fp:-lieee} %{p:-lgmon} %{pg:-lgmon} \
+  %{!ggdb:-lc} %{ggdb:-lg}}
+
+changing it to
+
+  %{!shared: %{p:-lgmon} %{pg:-lgmon} %{!ggdb:-lc} %{ggdb:-lg}}
+
+should keep gcc from adding -lieee to the link command.  You can find
+the location of the specs file by running the command gcc -v.
+
+If you can't edit the gcc specs file for some reason, another solution
+that should work is to create an empty libieee.a file in the Octave
+src directory using the command:
+
+  ar cq libieee.a
+
+NOTE: you should fix this problem (either by editing the specs file or
+by creating the library) *before* running configure and compiling
+Octave.  Otherwise, configure may incorrectly determine that your
+system doesn't have support for some IEEE math functions.
+
+My system doesn't have g77
+--------------------------
+
+A binary release of g77 that should work with gcc 2.7.2 is available
+from sunsite.unc.edu in the directory /pub/Linux/devel/lang/fortran.
+There is also a Debian package for g77.
+
+Problems with g77 on Debian 1.2 systems (and possibly others)
+-------------------------------------------------------------
+
+The location of the compiler binaries has changed, so the g77 0.5.18
+package can not be used without modification.  The problem is that the
+Debian package was built for gcc 2.7.2 and not 2.7.2.1 and the f771
+backend is installed in the wrong directory.
+
+Version 0.5.19 of g77 has just been released.  A fixed Debian package
+may be made available soon.  Until then, you can make things work by
+copying f771 and libf2c.a from /usr/lib/gcc-lib/i486-linux/2.7.2 to
+/usr/lib/gcc-lib/i486-linux/2.7.2.1.
+
+Upgrading your compiler and libraries
+-------------------------------------
+
+Installing libg++ on a Linux system is not as simple as it should be,
+because libg++ shares some basic I/O code with the Linux C library,
+and they must be compatible.  You should get and read the release
+notes for the compiler and libraries.
+
+If you decide to install versions of the libraries that are older (or
+newer) than the ones you already have, you should follow the
+directions in the release notes very carefully.
+
+
+If you have comments or suggestions for this document, please contact
+bug-octave@bevo.che.wisc.edu.
+
+John W. Eaton
+jwe@bevo.che.wisc.edu
+University of Wisconsin-Madison
+Department of Chemical Engineering
+
+Wed Jan 29 13:39:02 1997

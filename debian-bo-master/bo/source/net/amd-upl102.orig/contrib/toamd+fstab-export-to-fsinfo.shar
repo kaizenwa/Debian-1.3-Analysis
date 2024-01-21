@@ -1,0 +1,193 @@
+The shell script 'toamd' fetches the fstab and export file from the
+host and creates the fsinfo file using a perl script.  The perl script
+fstab-export-to-fsinfo prunes away filesystems that are automountable
+(according to the contents of the array @automounts), or that are
+mounted into the /home or /vol filesystems and outputs warning
+comments instead.  The 'fs' definitions and static mounts are written
+out.
+
+It isn't very smart but it plows through clients pretty quickly.
+
+--Case Larsen
+
+
+#! /bin/sh
+# This is a shell archive, meaning:
+# 1. Remove everything above the #! /bin/sh line.
+# 2. Save the resulting text in a file.
+# 3. Execute the file with /bin/sh (not csh) to create the files:
+#	toamd
+#	fstab-export-to-fsinfo
+# This archive created: Wed Jun 10 14:32:57 1992
+export PATH; PATH=/bin:$PATH
+if test -f 'toamd'
+then
+	echo shar: will not over-write existing file "'toamd'"
+else
+cat << \SHAR_EOF > 'toamd'
+#!/bin/csh -x
+
+#$Id: toamd,v 1.6 1992/06/10 21:07:07 clarsen Exp $
+
+# Convert a non-amd client to amd.
+# Converts /etc/fstab and /etc/exports to AMD's fsinfo format.
+#
+# Usage: toamd fully-domainized-hostname
+#
+# LBL hostnames are automatically shortened.
+set lib=/vol/adm/amd
+set path=($path /vol/adm/amd/bin)
+
+set host=$1
+set shorthost=`echo $host|sed -e 's/\.lbl\.gov//g'`;
+
+rcp ${host}:/etc/fstab /tmp/fstab$$
+rcp ${host}:/etc/exports /tmp/exports$$
+
+fstab-export-to-fsinfo $shorthost /tmp/fstab$$ /tmp/exports$$ > $lib/hosts/$host
+
+(cd $lib/hosts; ln -s $host $shorthost)
+SHAR_EOF
+chmod +x 'toamd'
+fi # end of overwriting check
+if test -f 'fstab-export-to-fsinfo'
+then
+	echo shar: will not over-write existing file "'fstab-export-to-fsinfo'"
+else
+cat << \SHAR_EOF > 'fstab-export-to-fsinfo'
+#!/bin/perl
+
+#$Id: fstab-export-to-fsinfo,v 1.2 1992/05/12 16:36:27 clarsen Exp $
+
+#Usage:
+#   fstab-export-to-fsinfo hostname fstab-file export-file
+# Outputs a fsinfo file for the given host.
+
+$host = $ARGV[0];
+
+#Read in existing information
+
+open(FSTAB,$ARGV[1]);
+
+while(<FSTAB>) {
+	#Skip comments
+	if (/^#/) { next; }
+
+	($dev,$mountpoint,$type,$opts,$dumpfreq,$passno) = split(/\s+/,$_);
+
+	push(mounts,$dev);
+	$mountinfo{$dev} = join($;,$mountpoint,$type,$opts,$dumpfreq,$passno);
+}
+close(FSTAB);
+
+if ($#ARGV == 2) {
+	open(EXPORTS,$ARGV[2]);
+	while(<EXPORTS>) {
+		#Skip comments
+		if (/^#/) { next; }
+
+		($path,$opts) = split(/\s+/,$_);
+		$exportinfo{$path} = $opts;
+	}
+	close(EXPORTS);
+}
+
+# Now write out fsinfo file
+
+print "host $host\n";
+
+# First, the local disks
+foreach $dev (@mounts) {
+	($mountpoint,$type,$opts,$dumpfreq,$passno) = split($;,$mountinfo{$dev});
+	if ($type eq "4.2") {
+		$exportent = $exportinfo{$mountpoint};
+# /home mounts are special.
+		if ($mountpoint =~ /^\/home/) {
+			$volname = $mountpoint;
+			$mountpoint = "default";
+		} else {
+			$volname = "";
+		}
+
+		print "
+fs $dev {
+	fstype = $type
+	opts = $opts
+	freq = $dumpfreq
+	passno = $passno
+	mount $mountpoint {";
+
+		if ($exportent ne "") {
+			print "
+		exportfs \"$exportent\"";
+		}
+		if ($volname ne "") {
+			print "
+		volname $volname";
+		}
+		print "
+	}
+}
+";
+	}
+}
+
+# Then, the NFS mounts
+# We also notify when there is a static mount for a potentially automountable
+# filesystem.
+
+@automounts = ("^/x11r4","^/x11r5","^/x11r4_src","^/x11r5_src","^/usr/local","^/usr/local/src","^/licsw","^/graphics","^/fonts");
+$rewrite{"/ux1a"} = "/home/ux1/ux1a";
+$rewrite{"/ux1b"} = "/home/ux1/ux1b";
+$rewrite{"/ux1c"} = "/home/ux1/ux1c";
+$rewrite{"/ux1d"} = "/home/ux1/ux1d";
+$rewrite{"/ux1e"} = "/home/ux1/ux1e";
+$rewrite{"/ux3a"} = "/home/ux3/ux3a";
+$rewrite{"/ux3b"} = "/home/ux3/ux3b";
+$rewrite{"/ux3c"} = "/home/ux3/ux3c";
+$rewrite{"/ux3d"} = "/home/ux3/ux3d";
+
+$warns = "";
+
+foreach $dev (@mounts) {
+	($mountpoint,$type,$opts,$dumpfreq,$passno) = split($;,$mountinfo{$dev});
+	if ($type eq "nfs") {
+		($host,$rfs) = split(/:/,$dev);
+		if (defined($rewrite{$rfs})) {
+			$rfs = $rewrite{$rfs};
+		}
+
+# Ignore automounted filesystems.
+		if ($rfs =~ /^\/home/) {
+			next;
+		} elsif ($rfs =~ /^\/vol/) {
+			next;
+		}
+# Ignore mounts into automounted filesystems, with warning.
+		if (($mountpoint =~ /^\/home/) || ($mountpoint =~ /^\/vol/)) {
+			$warns = $warns . "/* XXXX $rfs from $host is mounted as $mountpoint opts $opts */\n";
+			next;
+		}
+# Ignore potentially automounted filesystems, with warning.
+	        undef $found;
+	        for ($[ .. $#automounts) {
+	                $found = 1, last if $rfs =~ /$automounts[$_]/;
+	        }
+		if (! defined ($found)) {
+			print "mount $rfs from $host as $mountpoint opts $opts\n";
+		} else {
+			$warns = $warns . "/* Verify that $rfs from $host is automounted properly on $mountpoint */\n";
+		}
+	}
+}
+
+if ($warns ne "") {
+	print "/* Warning: */
+$warns";
+}
+
+SHAR_EOF
+chmod +x 'fstab-export-to-fsinfo'
+fi # end of overwriting check
+#	End of shell archive
+exit 0

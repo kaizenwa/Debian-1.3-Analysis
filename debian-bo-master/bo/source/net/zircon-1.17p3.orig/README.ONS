@@ -1,0 +1,121 @@
+		On Conditions in Zircon in 1.16
+
+It is possible in zircon to execute pieces of your own code whenever
+particular messages arrive from the server. This is a brief guide to
+the sorts of things that you can do, though in order to write the 
+handler code you may need to know more about the internals of zircon
+than is pleasant at the moment! 
+
+The Events
+----------
+
+POPUP <channel>
+	This is called when a channel window popups on the
+	screen. This means that the window was iconified and some
+	activity has taken place. I use this to sound a bell when I am
+	msged.
+
+POPDOWN <channel>
+	This is called when a channel has been inactive and its window
+	is being automatically iconified.
+
+MODE <channel> <flag> <optional parameter>
+	Called when mode changes take place
+
+NOTICE <nick!user@host> <message> <channel>
+	Called when a notice arrives.
+
+JOIN <channel> <nick!user@host>
+	Called when someone joins a channel.
+
+NICK <nick!user@host> <new nick>
+	Called when someone changes their nick.
+
+LEAVE <channel> <nick!user@host>
+	Called when somoen leaves a channel.
+
+KICK <channel> <nick!user@host> <kikkers nick> <message>
+	Called when someone is kicked.
+
+QUIT <nick!user@host>
+	Called when someone quits.
+
+INVITE <nick!user@host> <channel>
+	Called when you receive an invitation.
+
+KILL <nick!user@host> <Killer>
+	Called when someone is killed.
+
+TOPIC <channel> <nick!user@host> <new topic>
+	Called when someon changes the topic.
+
+HEAL <server 1> <server 2>
+	Called when a netsplit heals.
+
+SPLIT <server 1> <server 2>
+	Called when there is a netsplit.
+
+USPLIT <server 1> <server 2> <nickname>
+	Called for each affected nick when there is a netsplit.
+
+STARTUP <server> <port>
+	Called when zircon starts a connection to a server.
+
+CLOSE <server> <port>
+	Called when zircon closes the connection to a server.
+
+There are some special Channel options that avoid the use of on
+conditions. You set these up in your .zirconrc file.
+	
+	-ops {<nick!user@host pattern>...}
+	-patterns { {<nick!user@host pattern> <text pattern> <command>}...}
+
+All the patterns are regular expressions and the nick!user@host are all
+matched case insensitive. -ops will automatically op anyone matching one of
+the patterns in the list who joins a channel on which you are an operator.
+-patterns will execute the <command> when anyone macthing the nick pattern
+sends a text that matches the text pattern. There can be as many triples as
+you like in the patterns list - though note the more you have the greater
+the impact on performance! Patterns and ops are on a per channel basis. If
+you want a pattern or auto-op list to apply to all channels, then you can
+give -ops or -patterns to the *default* channel.
+
+At the moment no other events are catered for. You can use the pattern
+matching facilities for Channels to causes actions to place when
+messages sent to the channel match a particular value. If there are
+other things you have a burning desire to handle let me know. N.B. You
+have to understand tcl/tk to write on condition handlers!!
+
+Specifying on conditions
+------------------------
+
+You set up on conditions in your .zirconrc file thus:
+
+	on <EVENT> <list of patterns> <code>
+
+When the EVENT named takes place, zircon matches each of the patterns
+in the list against the values associated with that event. If all the
+patterns match, then the code is executed at global scope. Patterns
+are specified using tcl regular expression syntax. So that you can
+determine what was matched, zircon sets up some global variables
+called onPar0, onPar1 etc. which contain the actual values.
+
+Here are are two very simple on conditions :
+
+	on POPUP {{^[^#&].*}} { exec rplay ring.au & }
+	on POPUP #zircon {exec rplay drip.au &}
+
+The first plays a telephone ringing sound whenever a message or
+notice comes in that is directed to me. Message channels are named for
+the nick of the person sending the message. The pattern excludes all
+channels whose names begin with # or &.
+
+The second condition explicitly matches the channel #zircon and plays
+a different sound when that is matched.
+
+Note that only the first condition that matches is executed. If you
+wish the system to match multiple conditions for an event add the line
+
+	set zircon(multion) 1
+
+to your .zirconrc file.

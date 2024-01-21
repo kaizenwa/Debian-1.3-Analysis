@@ -1,0 +1,119 @@
+#! /bin/sh
+# rmgroup group - delete group
+# subject to $NEWSCTL/controlperm:  four fields per line, first
+# a newsgroup pattern, second an author name (or "any"), third a set of
+# operations ("n" newgroup, "r" rmgroup), and fourth a set of
+# flags ("y" do it, "n" don't, "q" don't report at all, "v" include
+# entire control message in report) (default "nv").
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN:$NEWSPATH; export PATH
+umask $NEWSUMASK
+
+g="$1"
+
+posting=/tmp/rp$$
+hdr=/tmp/rc$$
+
+# get the full article, and its header, into files for inspection
+trap "rm -f $posting $hdr ; trap 0 ; exit 0" 0
+cat >$posting
+canonhdr $posting >$hdr
+
+# who sent it?
+author="`egrep '^From:' $hdr | sed 's/^[^:]*: *//' `"
+authorid="`echo \"$author\" | sed '/.*<\(.*\)>.*/s//\1/
+				   /\([^ ][^ ]*\)  *(.*).*/s//\1/'`"
+
+# was it approved?
+case "`egrep '^Approved:' $hdr`" in
+'')	reject=${reject-'no Approved header'}	;;
+esac
+
+# do we have the group?
+getg="\$1 == \"$g\" { print }"
+got="`awk \"$getg\" $NEWSCTL/active`"
+case "$got" in
+'')	exit 0		;;	# silently ignore unknown groups
+esac
+
+# consult control file, if present
+perms=$NEWSCTL/controlperm
+action=nv
+if test -r $perms
+then
+	newaction=`gngp -a -r "$g" $perms | awk '$3 ~ /r/' |
+		awk '$2 == "any" || $2 == "'"$authorid"'" { print $4 }' |
+		sed -n 1p`
+	case "$newaction" in
+	?*)	action=$newaction	;;
+	esac
+fi
+case "$action" in
+*n*)	reject=${reject-'controlperm file denies permission'}	;;
+esac
+
+# the verdict
+case "$reject" in
+?*)	case "$action" in
+	*q*)	;;
+	*)	(
+			echo "rmgroup: \`$author' tried"
+			echo "to remove newsgroup \`$g'."
+			echo "Request was refused:"
+			echo "	$reject"
+			echo "Use delgroup to do it by hand, if appropriate."
+			case "$action" in
+			*v*)	echo '==='
+				cat $posting
+				echo '==='
+				;;
+			esac
+		) | report 'rejected rmgroup'
+		;;
+	esac
+	exit
+	;;
+esac
+
+# do the job
+awk '$1 != "'"$g"'"' $NEWSCTL/active >$NEWSCTL/active.tmp
+new="`wc -l <$NEWSCTL/active.tmp`"
+new=`expr $new + 1`
+if test " $new" -ne `wc -l <$NEWSCTL/active`
+then
+	fail="active.tmp length is incorrect, something's wrong"
+elif mv $NEWSCTL/active.tmp $NEWSCTL/active
+then
+	awk '$1 != "'"$g"'"' $NEWSCTL/active.times >$NEWSCTL/active.times.t
+	mv $NEWSCTL/active.times.t $NEWSCTL/active.times
+	awk '$1 != "'"$g"'"' $NEWSCTL/newsgroups >$NEWSCTL/newsgroups.tmp
+	mv $NEWSCTL/newsgroups.tmp $NEWSCTL/newsgroups
+	echo "$g" | tr '.' '/' >>$NEWSCTL/dirs.tbd
+else
+	fail='cannot rename active.tmp to active'
+fi
+
+# and report it, if appropriate
+case "$action" in
+*q*)	;;
+*)	(
+		echo "$author said to"
+		echo "remove \`$g'."
+		case "$fail" in
+		'')	echo "This was done."	;;
+		*)	echo "This failed:"
+			echo "	$fail"
+			;;
+		esac
+		case "$action" in
+		*v*)	echo '==='
+			cat $posting
+			echo '==='
+			;;
+		esac
+	) | report "rmgroup $g"
+	;;
+esac

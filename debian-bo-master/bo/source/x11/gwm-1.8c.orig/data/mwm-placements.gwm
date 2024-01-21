@@ -1,0 +1,117 @@
+
+;;File: mwm-placements.gwm -- functions to automatically place mwm windows on screen
+;;Author: colas@mirsa.inria.fr (Colas NAHABOO) -- Bull Research FRANCE
+;;Author: Frederic CHARTON
+;;Author: Glen WHITNEY
+;;Revision: 1.1 -- June 26 1989
+;;Revision: "Mapping closed windows" bug fixed -- 30 November 1992
+;;State: Exp
+;;GWM Version: 1.7l
+
+; PLACEMENTS
+; ==========
+
+(df place-window-in-screen ()
+  (with (x (window-x)
+	 y (window-y)
+	 xe (+ x (window-width))
+         ye (+ y (window-height)))
+    (if (< x 0) (move-window 0 y))
+    (if (< y 0) (move-window x 0))
+    (if (> xe screen-width) (move-window (- screen-width
+					    (window-width)) y))
+    (if (> ye screen-height) (move-window x (- screen-height
+					       (window-height))))))
+
+(defun obscuring-something (windough)
+  (with (result nil window windough myx window-x myy window-y)
+    (for window (list-of-windows)
+	 (if (and (not (= window windough))
+		  (dist-below window-x window-y myx myy tooClose))
+	     (: result t)))
+    result))
+
+(defun dist-below (x1 y1 x2 y2 threshold)
+  (< (+ (square (- x2 x1)) (square (- y2 y1))) (square threshold)))
+(defun square (num)
+  (* num num))
+
+(de mwm-window-placement (flag)
+    (if flag
+	(progn
+	  (if (and (not window-was-on-screen) 
+		   (not window-starts-iconic)
+		   (not window-is-transient-for)
+		   interactivePlacement
+		   (not (and window-user-set-position
+			     (= window-status 'window))))
+	      (progn (: l (current-mouse-position))
+		     (if (member 'placement showFeedback)
+			 (progn
+			   (meter-open-in-place)
+			   (meter-update	(+ "( " (itoa window-x) " , "
+						   (itoa window-y) ")    "
+						   (itoa window-width) " x "
+						   (itoa window-height)))))
+		     (: x (# 0 l))
+		     (: y (# 1 l))
+		     (with (move-meter 1) (move-window x y))
+		     (process-exposes)
+		     (: new-window window)
+		     (with (cursor place-cursor) (move-window))
+		     (if (member 'placement showFeedback) (meter-close))
+		     )
+	    (progn ; else
+;              (if positionIsFrame 
+;		(move-window (+ window-x window-client-x) 
+;			     (+ window-y window-client-y)))
+	      (if positionOnScreen (place-window-in-screen))
+	      (if clientAutoPlace
+		  (with (oldx window-x oldy window-y try t)
+			(while (and (obscuring-something window) try)
+			  (move-window (+ window-x clientAutoXOffset)
+				       (+ window-y clientAutoYOffset))
+			  (if positionOnScreen (place-window-in-screen))
+			  (if (and (= window-x oldx) (= window-y oldy))
+			      {(move-window 0 0) (: try ())})
+			  (: oldx window-x)
+			  (: oldy window-y)))))
+	    )
+	  (map-window))
+      ))
+
+(defun meter-open-in-place ()
+  (with (position (meter 'x 0 'y 0))
+    (meter-open (nth 1 position) (nth 3 position) " ")))
+
+; Icon Placement :
+; --------------
+(defun mwm-icon-placement (flag)
+ (if iconAutoPlace
+    (if flag				; open new window
+	(if (member window (list-of-windows))
+	    (with (thePlace (auto-get-place)
+			    X (# 0 thePlace)
+			    Y (# 1 thePlace)
+			    )
+		  (## 'X window X)
+		  (## 'Y window Y)
+		  (eval (+ '(move-window) (XY-to-xy X Y)))
+		  (set-icon-of-array X Y window)
+		  ))
+	; close managed window
+	(with (X (# 'X window-property) 
+	       Y (# 'Y window-property)
+	      )
+	 (if X (set-icon-of-array X Y ()))
+	)
+    )
+  (with (window window-window)
+   (move-window window-icon (+ window-x window-client-x)
+		(+ window-y window-client-y))
+   )))
+
+
+
+
+	

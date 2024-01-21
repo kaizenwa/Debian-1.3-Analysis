@@ -1,0 +1,155 @@
+/* $Id: Imakefile,v 3.69 1996/05/06 08:48:46 bert Exp $ */
+
+#include "Local.config"
+
+/*
+ * Sound configuration
+ */
+#if defined(NCD_SOUND)
+  AUDIOINC = $(NCDAUDIOINC)
+  AUDIOLIB = $(NCDAUDIOLIB)
+  AUDIOSRC = ncdaudio.c
+  AUDIOOBJ = ncdaudio.o
+  AUDIODEF = -DSOUND
+#else
+#if defined(RPLAY_SOUND)
+  AUDIOINC = $(RPLAYAUDIOINC)
+  AUDIOLIB = $(RPLAYAUDIOLIB)
+  AUDIOSRC = rplayaudio.c
+  AUDIOOBJ = rplayaudio.o
+  AUDIODEF = -DSOUND
+#else
+#if defined(AF_SOUND)
+  AUDIOINC = $(AFAUDIOINC)
+  AUDIOLIB = $(AFAUDIOLIB)
+  AUDIOSRC = afaudio.c
+  AUDIOOBJ = afaudio.o
+  AUDIODEF = -DSOUND
+#else
+#if defined(HP_SOUND)
+  AUDIOINC = $(HPAUDIOINC)
+  AUDIOLIB = $(HPAUDIOLIB)
+  AUDIOSRC = hpaudio.c
+  AUDIOOBJ = hpaudio.o
+  AUDIODEF = -DSOUND
+#else	/* no sound */
+  AUDIOINC =
+  AUDIOLIB =
+  AUDIOSRC =
+  AUDIOOBJ =
+  AUDIODEF =
+#endif /* HP_SOUND */
+#endif /* AF_SOUND */
+#endif /* RPLAY_SOUND */
+#endif /* NCD_SOUND */
+
+
+#ifdef Log
+DEFS_LOG = -DLOG
+#endif
+#ifdef TurnThrust
+DEFS_TURN_THRUST = -DTURN_THRUST
+#endif
+#ifdef Silent
+DEFS_SILENT = -DSILENT
+#endif
+#ifdef ServerSound
+DEFS_SERVER_SOUND = -DSERVER_SOUND
+#endif
+#ifdef Erase
+DEFS_ERASE = -DERASE=1
+#endif
+#ifdef SparcCmapHack
+DEFS_SPARC_CMAP_HACK = -DSPARC_CMAP_HACK
+#endif
+#ifdef MultibufferExtension
+DEFS_MBX = -DMBX
+#endif
+#ifdef Joystick
+DEFS_JOYSTICK = -DJOYSTICK
+#endif
+#ifdef PlockServer
+DEFS_PLOCKSERVER = -DPLOCKSERVER
+#endif
+
+
+/*
+ * Assemble defines and includes.
+ *
+ * The DEFS_OTHER variable can be specified on the make command line like:
+ *
+ *    make DEFS_OTHER=-DENABLE_SOME_HACK
+ *
+ * or in the Local.config file.
+ *
+ */
+DEFINES = -DLOCALGURU=\"$(LOCALGURU)\" -DLIBDIR=\"$(INSTLIBDIR)/\" \
+       -DCONTACTADDRESS=\"$(CONTACTADDRESS)\" \
+       $(DEFS_LOG) $(DEFS_TURN_THRUST) $(DEFS_SILENT) $(DEFS_SERVER_SOUND) \
+       $(DEFS_ERASE) $(DEFS_SPARC_CMAP_HACK) $(DEFS_MBX) $(DEFS_JOYSTICK) \
+       $(DEFS_PLOCKSERVER) $(DEFS_OTHER) $(AUDIODEF)
+INCLUDES = $(AUDIOINC) -I../lib/
+
+
+/*
+ * Do substitutions where necessary
+ */
+MsubTarget(version.h,version.h.msub)
+includes:: version.h
+depend:: includes
+
+
+/*
+ * Server program; xpilots
+ */
+OBJS1 = server.o event.o map.o math.o cmdline.o net.o netserver.o \
+        play.o player.o rules.o update.o collision.o walls.o error.o \
+        frame.o robot.o robotdef.o option.o socklib.o sched.o saudio.o \
+        $(STRCASECMP_OBJ) $(STRDUP_OBJ)
+SRCS1 = server.c event.c map.c math.c cmdline.c net.c netserver.c \
+        play.c player.c rules.c update.c collision.c walls.c error.c \
+        frame.c robot.c robotdef.c option.c socklib.c sched.c saudio.c
+DEPLIBS1 = 
+
+/*
+ * Client program; xpilot
+ */
+OBJS2 = xpilot.o client.o join.o net.o netclient.o paint.o dbuff.o xinit.o \
+        default.o math.o xevent.o syslimit.o error.o socklib.o caudio.o \
+	widget.o configure.o usleep.o record.o texture.o xpmread.o \
+	$(AUDIOOBJ) $(STRDUP_OBJ)
+SRCS2 = xpilot.c client.c join.c net.c netclient.c paint.c dbuff.c xinit.c \
+        default.c math.c xevent.c syslimit.c error.c socklib.c caudio.c \
+	widget.c configure.c usleep.c record.c texture.c xpmread.c \
+	$(AUDIOSRC)
+DEPLIBS2 = $(DEPXLIB)
+
+/*
+ * Playback program; xp-replay
+ */
+OBJS3 = xp-replay.o buttons.o
+SRCS3 = xp-replay.c buttons.c
+DEPLIBS3 = $(DEPXLIB)
+
+
+
+/*
+ * Build the three targets
+ */
+PROGRAMS = xpilot xpilots xp-replay
+
+#if !defined(sgiCCoptions)		/* A hack that should mack everyone */
+					/* that doesn't have XLIBONLY. */
+#if !defined(MultibufferExtension)	/* On the other hand you need the */
+					/* EXTENSIONLIB sometimes, though ;) */
+EXTENSIONLIB = 
+DEPEXTENSIONLIB = 
+#endif /* MultibufferExtension */
+X_LIB = $(XLIB)
+#else
+X_LIB = $(XLIBONLY)
+#endif
+
+ProgramTarget_1(xpilots,$(AUDIOLIB),$(MATHLIB) $(EXTRALIB))
+ProgramTarget_2(xpilot,$(AUDIOLIB),$(X_LIB) $(MATHLIB) $(EXTRALIB))
+ProgramTarget_3(xp-replay,NullParameter,$(X_LIB) $(MATHLIB))

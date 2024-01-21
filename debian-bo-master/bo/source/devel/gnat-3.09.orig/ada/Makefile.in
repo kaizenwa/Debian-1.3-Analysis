@@ -1,0 +1,2054 @@
+# Makefile for GNU Ada Compiler (GNAT).
+#   Copyright (C) 1994, 1995, 1996 Free Software Foundation, Inc.
+
+#This file is part of GNU CC.
+
+#GNU CC is free software; you can redistribute it and/or modify
+#it under the terms of the GNU General Public License as published by
+#the Free Software Foundation; either version 2, or (at your option)
+#any later version.
+
+#GNU CC is distributed in the hope that it will be useful,
+#but WITHOUT ANY WARRANTY; without even the implied warranty of
+#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#GNU General Public License for more details.
+
+#You should have received a copy of the GNU General Public License
+#along with GNU CC; see the file COPYING.  If not, write to
+#the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
+
+# The makefile built from this file lives in the language subdirectory.
+# It's purpose is to provide support for:
+#
+# 1) recursion where necessary, and only then (building .o's), and
+# 2) building and debugging cc1 from the language subdirectory, and
+# 3) nothing else.
+#
+# The parent makefile handles all other chores, with help from the
+# language makefile fragment, of course.
+#
+# The targets for external use are:
+# all, TAGS, ???mostlyclean, ???clean.
+
+# Suppress smart makes who think they know how to automake Yacc files
+.y.c:
+
+# Variables that exist for you to override.
+# See below for how to change them for certain systems.
+
+ALLOCA = 
+# Various ways of specifying flags for compilations:  
+# CFLAGS is for the user to override to, e.g., do a bootstrap with -O2.
+# BOOT_CFLAGS is the value of CFLAGS to pass
+# to the stage2 and stage3 compilations
+# XCFLAGS is used for most compilations but not when using the GCC just built.
+XCFLAGS =
+CFLAGS = -g
+BOOT_CFLAGS = -O $(CFLAGS)
+# These exists to be overridden by the x-* and t-* files, respectively.
+X_CFLAGS =
+T_CFLAGS =
+
+X_CPPFLAGS =
+T_CPPFLAGS =
+
+CC = cc
+BISON = bison
+BISONFLAGS =
+LEX = flex
+LEXFLAGS =
+AR = ar
+AR_FLAGS = rc
+# How to invoke ranlib.
+RANLIB = ranlib
+# Test to use to see whether ranlib exists on the system.
+RANLIB_TEST = [ -f /usr/bin/ranlib -o -f /bin/ranlib ]
+SHELL = /bin/sh
+MAKEINFO = makeinfo
+TEXI2DVI = texi2dvi
+GNATBIND = $(STAGE_PREFIX)gnatbind
+ADA_CFLAGS =
+ADAFLAGS = -gnatpg -gnata
+SOME_ADAFLAGS =-gnata
+GNATLIBFLAGS = -gnatpg
+GNATLIBCFLAGS= -g -O2
+ALL_ADAFLAGS = $(CFLAGS) $(ADA_CFLAGS) $(ADAFLAGS) -I. -I$(srcdir)
+MOST_ADAFLAGS = $(CFLAGS) $(ADA_CFLAGS) $(SOME_ADAFLAGS) -I. -I$(srcdir)
+
+HOST_CC=$(CC)
+HOST_CFLAGS=$(ALL_CFLAGS)
+HOST_CLIB=$(CLIB)
+HOST_LDFLAGS=$(LDFLAGS)
+HOST_CPPFLAGS=$(ALL_CPPFLAGS)
+HOST_ALLOCA=$(ALLOCA)
+HOST_MALLOC=$(MALLOC)
+HOST_OBSTACK=$(OBSTACK)
+
+# Define this as & to perform parallel make on a Sequent.
+# Note that this has some bugs, and it seems currently necessary 
+# to compile all the gen* files first by hand to avoid erroneous results.
+P =
+
+# This is used in the definition of SUBDIR_USE_ALLOCA.
+# ??? Perhaps it would be better if it just looked for *gcc*.
+OLDCC = cc
+
+# This is used instead of ALL_CFLAGS when compiling with GCC_FOR_TARGET.
+# It omits XCFLAGS, and specifies -B./.
+# It also specifies -B$(tooldir)/ to find as and ld for a cross compiler.
+GCC_CFLAGS=$(INTERNAL_CFLAGS) $(X_CFLAGS) $(T_CFLAGS) $(CFLAGS)
+
+# Tools to use when building a cross-compiler.
+# These are used because `configure' appends `cross-make'
+# to the makefile when making a cross-compiler.
+
+# CYGNUS LOCAL: we don't use cross-make.  Instead we use the tools
+# from the build tree, if they are available.
+# program_transform_name and objdir are set by configure.in.
+program_transform_name =
+objdir = .
+
+target= ... `configure' substitutes actual target name here.
+xmake_file= ... `configure' substitutes actual x- file name here.
+tmake_file= ... `configure' substitutes actual t- file name here.
+#version=`sed -e 's/.*\"\([^ \"]*\)[ \"].*/\1/' < $(srcdir)/version.c`
+#mainversion=`sed -e 's/.*\"\([0-9]*\.[0-9]*\).*/\1/' < $(srcdir)/version.c`
+
+# Directory where sources are, from where we are.
+srcdir = .
+
+# Additional system libraries to link with.
+CLIB=
+
+# Change this to a null string if obstacks are installed in the
+# system library.
+OBSTACK=obstack.o
+
+# Choose the real default target.
+ALL=all
+
+# End of variables for you to override.
+
+# Definition of `all' is here so that new rules inserted by sed
+# do not specify the default target.
+all: all.indirect
+
+# This tells GNU Make version 3 not to put all variables in the environment.
+.NOEXPORT:
+
+# sed inserts variable overrides after the following line.
+####target overrides
+####host overrides
+####cross overrides
+####build overrides
+
+# Now figure out from those variables how to compile and link.
+
+
+# Now figure out from those variables how to compile and link.
+
+all.indirect: Makefile ../gnat1
+
+# IN_GCC tells obstack.h that we are using gcc's <stddef.h> file.
+INTERNAL_CFLAGS = $(CROSS) -DIN_GCC
+
+# This is the variable actually used when we compile.
+ALL_CFLAGS = $(INTERNAL_CFLAGS) $(X_CFLAGS) $(T_CFLAGS) $(CFLAGS) $(XCFLAGS)
+
+# Likewise.
+ALL_CPPFLAGS = $(CPPFLAGS) $(X_CPPFLAGS) $(T_CPPFLAGS)
+
+# Even if ALLOCA is set, don't use it if compiling with GCC.
+
+SUBDIR_OBSTACK = `if [ x$(OBSTACK) != x ]; then echo ../$(OBSTACK); else true; fi`
+SUBDIR_USE_ALLOCA = `case "${CC}" in "${OLDCC}") if [ x$(ALLOCA) != x ]; then echo ../$(ALLOCA); else true; fi ;; esac`
+SUBDIR_MALLOC = `if [ x$(MALLOC) != x ]; then echo ../$(MALLOC); else true; fi`
+
+# How to link with both our special library facilities
+# and the system's installed libraries.
+LIBS = $(SUBDIR_OBSTACK) $(SUBDIR_USE_ALLOCA) $(SUBDIR_MALLOC) $(CLIB)
+
+# Specify the directories to be searched for header files.
+# Both . and srcdir are used, in that order,
+# so that tm.h and config.h will be found in the compilation
+# subdirectory rather than in the source directory.
+INCLUDES = -I. -I.. -I$(srcdir) -I$(srcdir)/.. -I$(srcdir)/../config
+INCLUDES_FOR_SUBDIR = -I. -I.. -I../.. -I$$subdir -I$$subdir/.. \
+  -I$$subdir/../config
+
+# Avoid a lot of time thinking about remaking Makefile.in and *.def.
+.SUFFIXES: .in .def
+
+# Say how to compile Ada programs.
+.SUFFIXES: .ada .adb .ads
+
+# Always use -I$(srcdir)/config when compiling.
+.c.o:
+	$(CC) -c $(ALL_CFLAGS) $(ADA_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $<
+.adb.o:
+	$(CC) -c $(ALL_ADAFLAGS) $<
+.ads.o:
+	$(CC) -c $(ALL_ADAFLAGS) $<
+
+# This tells GNU make version 3 not to export all the variables
+# defined in this file into the environment.
+.NOEXPORT:
+
+# Lists of files for various purposes.
+
+
+# Languages-specific object files for Ada.
+# Object files for gnat1 from C sources.
+GNAT1_C_OBJS = b_gnat1.o a-adaint.o a-gettty.o a-gtran3.o a-misc.o a-trans3.o \
+ a-trans4.o a-trans.o a-uintp.o a-argv.o a-raise.o a-init.o
+
+# Object files from Ada sources that are used by gnat1 and gnatf
+
+GNAT_ADA_OBJS = \
+ ada.o a-charac.o a-chlat1.o alloc.o atree.o casing.o checks.o comperr.o     \
+ csets.o cstand.o debug.o debug_a.o einfo.o elists.o errout.o eval_fat.o     \
+ exp_attr.o exp_ch11.o exp_ch13.o exp_ch2.o exp_ch3.o exp_ch4.o exp_ch5.o    \
+ exp_ch6.o exp_ch7.o exp_ch8.o exp_ch9.o exp_code.o exp_dbug.o exp_disp.o    \
+ exp_dist.o exp_fixd.o exp_aggr.o exp_intr.o exp_pakd.o exp_prag.o           \
+ exp_strm.o exp_tss.o exp_util.o expander.o features.o fname.o freeze.o      \
+ frontend.o g-hesora.o gnat.o g-htable.o g-os_lib.o get_targ.o gnatvsn.o     \
+ hostparm.o itypes.o inline.o krunch.o lib.o lib-load.o            \
+ lib-writ.o namet.o nlists.o nmake.o opt.o osint.o output.o par.o   \
+ restrict.o rtsfind.o s-assert.o s-stalib.o s-stoele.o s-tasoli.o \
+ s-taspda.o s-exctab.o\
+ s-wchcnv.o s-wchcon.o s-wchjis.o scans.o scn.o sdefault.o sem.o sem_aggr.o  \
+ sem_attr.o sem_ch10.o sem_ch11.o sem_ch12.o sem_ch13.o sem_ch2.o sem_ch3.o  \
+ sem_ch4.o sem_ch5.o sem_ch6.o sem_ch7.o sem_ch8.o sem_ch9.o sem_disp.o      \
+ sem_case.o sem_dist.o sem_eval.o sem_intr.o sem_maps.o sem_mech.o sem_prag.o \
+ sem_res.o sem_type.o sem_util.o \
+ sinfo-cn.o sinfo.o sinput.o sinput-l.o snames.o sprint.o stand.o stringt.o  \
+ style.o switch.o system.o tbuild.o tree_gen.o tree_io.o treepr.o treeprs.o  \
+ ttypef.o ttypes.o types.o uintp.o uname.o urealp.o usage.o widechar.o
+
+
+# Object files for gnat executables
+GNATF_OBJS =  $(GNAT_ADA_OBJS) gnatfdrv.o xref.o xref_tab.o \
+  a-adaint.o a-gettty.o a-deftar.o a-raise.o a-exit.o a-argv.o\
+  a-init.o a-final.o
+
+GNAT1_ADA_OBJS = $(GNAT_ADA_OBJS) back_end.o gnat1drv.o
+GNAT1_OBJS = $(GNAT1_C_OBJS) $(GNAT1_ADA_OBJS)
+GNATBIND_OBJS = \
+ a-adaint.o ali.o alloc.o bcheck.o binde.o binderr.o bindgen.o bindusg.o\
+ butil.o debug.o fname.o gnat.o g-os_lib.o gnatbind.o gnatvsn.o hostparm.o \
+ krunch.o namet.o opt.o osint.o output.o s-assert.o s-stalib.o \
+ s-stoele.o s-tasoli.o s-taspda.o s-wchcon.o s-wchjis.o \
+ sdefault.o switch.o system.o tree_io.o types.o widechar.o \
+ a-raise.o a-exit.o a-argv.o a-init.o a-final.o s-wchcnv.o s-exctab.o \
+ g-htable.o
+
+GNATLINK_OBJS = ada.o a-adaint.o a-argv.o a-comlin.o a-cstrea.o a-exit.o \
+   a-final.o a-init.o a-raise.o alloc.o debug.o fname.o gnat.o \
+   g-htable.o g-os_lib.o gnatlink.o gnatvsn.o hostparm.o interfac.o \
+   i-cstrea.o krunch.o namet.o s-exctab.o \
+   opt.o osint.o output.o system.o s-parame.o s-assert.o s-stoele.o \
+   s-strops.o s-tasoli.o s-secsta.o s-stalib.o s-taspda.o s-wchcon.o \
+   s-wchcnv.o s-wchjis.o sdefault.o switch.o tree_io.o types.o widechar.o
+
+GNATKR_OBJS = ada.o a-charac.o a-chahan.o a-chlat1.o a-comlin.o \
+  a-finali.o a-string.o a-strmap.o a-stmaco.o a-tags.o g-htable.o gnatkr.o \
+  krunch.o system.o s-bitops.o s-finimp.o s-io.o s-parame.o s-secsta.o \
+  s-stopoo.o \
+  s-stoele.o s-taspda.o s-tasoli.o s-stalib.o s-unstyp.o a-adaint.o \
+  a-raise.o a-exit.o a-argv.o a-cio.o a-init.o a-final.o s-finroo.o \
+  a-except.o a-filico.o  s-strops.o  s-stratt.o a-ioexce.o s-exctab.o
+
+GNATMAKE_OBJS =  a-adaint.o a-argv.o a-raise.o a-exit.o ali.o a-comlin.o \
+ alloc.o binderr.o butil.o csets.o debug.o fname.o g-os_lib.o gnat.o \
+ a-final.o a-init.o gnatmake.o gnatvsn.o hostparm.o krunch.o make.o namet.o \
+ opt.o osint.o output.o s-stalib.o s-wchcon.o s-wchjis.o \
+ s-assert.o s-secsta.o s-stoele.o s-taspda.o s-tasoli.o sdefault.o switch.o \
+ system.o tree_io.o types.o widechar.o s-exctab.o
+
+GNATCMD_OBJS = a-adaint.o a-argv.o a-raise.o a-exit.o a-final.o a-init.o \
+   ada.o a-charac.o a-chahan.o a-comlin.o a-cstrea.o a-except.o a-finali.o \
+   a-filico.o a-ioexce.o a-stream.o a-string.o a-strmap.o a-stmaco.o \
+   a-sysdep.o a-tags.o a-textio.o gnat.o g-os_lib.o gnatcmd.o hostparm.o \
+   interfac.o i-cstrea.o system.o s-assert.o s-bitops.o s-exctab.o \
+   s-ficobl.o s-fileio.o s-finimp.o s-finroo.o s-imgint.o s-imguns.o \
+   s-parame.o s-secsta.o s-stalib.o s-stoele.o s-taspda.o s-stratt.o \
+   s-strops.o s-tasoli.o s-unstyp.o
+
+GNATPREP_OBJS = a-adaint.o a-argv.o a-raise.o a-exit.o a-final.o a-init.o \
+   ada.o a-charac.o a-chahan.o a-comlin.o a-cstrea.o a-except.o a-finali.o \
+   a-filico.o a-ioexce.o a-stream.o a-string.o a-strmap.o a-stmaco.o \
+   a-sysdep.o a-tags.o a-textio.o gnat.o gnatprep.o i-cstrea.o \
+   system.o s-bitops.o s-exctab.o s-ficobl.o s-fileio.o s-finimp.o \
+   s-finroo.o s-imgint.o s-parame.o s-secsta.o s-stalib.o s-stoele.o \
+   s-taspda.o s-stratt.o s-strops.o s-tasoli.o s-unstyp.o 
+
+
+# The runtime library for gnat comprises two directories.  One contains the
+# Ada source files that the compiler (gnat1) needs -- these files are listed
+# by ADA_INCLUDE_SRCS -- and the other contains the object files and their
+# corresponding .ali files for the parts written in Ada, libgnat.a for
+# the parts of the runtime written in C, and libgthreads.a for the pthreads
+# emulation library.  LIBGNAT_OBJS lists the objects that go into libgnat.a,
+# while GNAT_RTL_OBJS lists the object files compiled from Ada sources that
+# go into the directory.  The pthreads emulation is built in the threads
+# subdirectory and copied.
+LIBGNAT_SRCS = a-ada.h a-adaint.c a-adaint.h a-argv.c a-cio.c a-cstrea.c \
+  a-errno.c a-exit.c a-raise.h a-raise.c a-sysdep.c a-time.c a-types.h \
+  io-aux.c a-init.c a-final.c get_regs.s
+
+LIBGNAT_OBJS = a-adaint.o a-argv.o a-cio.o a-cstrea.o a-errno.o a-exit.o \
+  a-raise.o a-sysdep.o a-time.o io-aux.o a-init.o a-final.o
+
+# NOTE ??? - when the -I option for compiling Ada code is made to work,
+#  the library installation will change and there will be a
+#  GNAT_RTL_SRCS.  Right now we count on being able to build GNAT_RTL_OBJS
+#  from ADA_INCLUDE_SRCS.
+
+GNAT_RTL_OLD_OBJS =\
+ a-calcon.o \
+ a-retico.o \
+ s-tasclo.o \
+ s-tasmem.o \
+ s-tastal.o \
+ s-cemasp.o \
+ s-tcmasp.o \
+ i-cpoerr.o \
+ i-cporte.o \
+ i-cpotim.o \
+ i-csthre.o \
+ s-taspri.o \
+ i-cpthre.o \
+ i-csycon.o 
+
+GNAT_RTL_NEW_OBJS =\
+ s-intman.o \
+ s-inmaop.o \
+ s-osinte.o \
+ s-taspri.o \
+ s-taprop.o \
+ s-timope.o 
+
+GNAT_RTL_WIN32_OBJS = win_task-errors.o win_task-synchronization.o \
+  win_task-threads.o win_task.o
+
+GNAT_RTL_COMMON_OBJS =\
+ ada.o      \
+ calendar.o \
+ gnat.o     \
+ interfac.o \
+ ioexcept.o \
+ machcode.o \
+ system.o   \
+ text_io.o  \
+\
+ a-caldel.o \
+ a-calend.o \
+ a-chahan.o \
+ a-charac.o \
+ a-chlat1.o \
+ a-colien.o \
+ a-comlin.o \
+ a-cwila1.o \
+ a-decima.o \
+ a-dynpri.o \
+ a-except.o \
+ a-finali.o \
+ a-filico.o \
+ a-flteio.o \
+ a-fwteio.o \
+ a-interr.o \
+ a-inteio.o \
+ a-ioexce.o \
+ a-iwteio.o \
+ a-lfwtio.o \
+ a-liteio.o \
+ a-liwtio.o \
+ a-lfteio.o \
+ a-llftio.o \
+ a-llfwti.o \
+ a-llitio.o \
+ a-lliwti.o \
+ a-ncelfu.o \
+ a-nlcefu.o \
+ a-nlcoty.o \
+ a-nlelfu.o \
+ a-nllcef.o \
+ a-nllcty.o \
+ a-nllefu.o \
+ a-nscefu.o \
+ a-nscoty.o \
+ a-nselfu.o \
+ a-nucoty.o \
+ a-nuelfu.o \
+ a-nuflra.o \
+ a-numaux.o \
+ a-numeri.o \
+ a-numran.o \
+ a-reatim.o \
+ a-retide.o \
+ a-sfteio.o \
+ a-sfwtio.o \
+ a-siteio.o \
+ a-siwtio.o \
+ a-ssicst.o \
+ a-ssitio.o \
+ a-ssiwti.o \
+ a-stmaco.o \
+ a-strbou.o \
+ a-stream.o \
+ a-strfix.o \
+ a-string.o \
+ a-strmap.o \
+ a-strsea.o \
+ a-strunb.o \
+ a-ststio.o \
+ a-stwibo.o \
+ a-stwifi.o \
+ a-stwima.o \
+ a-stwise.o \
+ a-stwiun.o \
+ a-swmwco.o \
+ a-sytaco.o \
+ a-tags.o   \
+ a-taside.o \
+ a-teioed.o \
+ a-textio.o \
+ a-ticoau.o \
+ a-tideau.o \
+ a-tienau.o \
+ a-tiflau.o \
+ a-tigeau.o \
+ a-tiinau.o \
+ a-timoau.o \
+ a-tiocst.o \
+ a-titest.o \
+ a-witeio.o \
+ a-wtcstr.o \
+ a-wtedit.o \
+ a-wtcoau.o \
+ a-wtdeau.o \
+ a-wtenau.o \
+ a-wtflau.o \
+ a-wtgeau.o \
+ a-wtinau.o \
+ a-wtmoau.o \
+ a-wttest.o \
+\
+ g-busora.o \
+ g-casuti.o \
+ g-hesora.o \
+ g-io.o     \
+ g-io_aux.o \
+ g-os_lib.o \
+ g-htable.o \
+\
+ i-c.o      \
+ i-cexten.o \
+ i-cobol.o  \
+ i-cpp.o    \
+ i-cstrea.o \
+ i-cstrin.o \
+ i-fortra.o \
+ i-pacdec.o \
+\
+ s-addima.o \
+ s-arit64.o \
+ s-asthan.o \
+ s-assert.o \
+ s-bitops.o \
+ s-cconst.o \
+ s-chepoo.o \
+ s-comexc.o \
+ s-debpoo.o \
+ s-auxdec.o \
+ s-direio.o \
+ s-exctab.o \
+ s-errrep.o \
+ s-exnflt.o \
+ s-exngen.o \
+ s-exnint.o \
+ s-exnlfl.o \
+ s-exnlin.o \
+ s-exnllf.o \
+ s-exnlli.o \
+ s-exnsfl.o \
+ s-exnsin.o \
+ s-exnssi.o \
+ s-expflt.o \
+ s-expgen.o \
+ s-expint.o \
+ s-explfl.o \
+ s-explin.o \
+ s-expllf.o \
+ s-explli.o \
+ s-expllu.o \
+ s-expmod.o \
+ s-expsfl.o \
+ s-expsin.o \
+ s-expssi.o \
+ s-expuns.o \
+ s-fatflt.o \
+ s-fatlfl.o \
+ s-fatllf.o \
+ s-fatsfl.o \
+ s-ficobl.o \
+ s-fileio.o \
+ s-finimp.o \
+ s-finroo.o \
+ s-fore.o   \
+ s-imgbiu.o \
+ s-imgboo.o \
+ s-imgcha.o \
+ s-imgdec.o \
+ s-imgint.o \
+ s-imgllb.o \
+ s-imglld.o \
+ s-imglli.o \
+ s-imgllu.o \
+ s-imgllw.o \
+ s-imgrea.o \
+ s-imguns.o \
+ s-imgwch.o \
+ s-imgwiu.o \
+ s-io.o     \
+ s-maccod.o \
+ s-mantis.o \
+ s-pack03.o \
+ s-pack05.o \
+ s-pack06.o \
+ s-pack07.o \
+ s-pack09.o \
+ s-pack10.o \
+ s-pack11.o \
+ s-pack12.o \
+ s-pack13.o \
+ s-pack14.o \
+ s-pack15.o \
+ s-pack17.o \
+ s-pack18.o \
+ s-pack19.o \
+ s-pack20.o \
+ s-pack21.o \
+ s-pack22.o \
+ s-pack23.o \
+ s-pack24.o \
+ s-pack25.o \
+ s-pack26.o \
+ s-pack27.o \
+ s-pack28.o \
+ s-pack29.o \
+ s-pack30.o \
+ s-pack31.o \
+ s-parame.o \
+ s-parint.o \
+ s-pooglo.o \
+ s-pooloc.o \
+ s-poosiz.o \
+ s-powtab.o \
+ s-proinf.o \
+ s-rpc.o    \
+ s-secsta.o \
+ s-sequio.o \
+ s-stalib.o \
+ s-std.o    \
+ s-stoele.o \
+ s-stopoo.o \
+ s-stratt.o \
+ s-strcon.o \
+ s-strequ.o \
+ s-strops.o \
+ s-taenca.o \
+ s-taprob.o \
+ s-tasabo.o \
+ s-tasinf.o \
+ s-tasini.o \
+ s-taskin.o \
+ s-tasoli.o \
+ s-taspda.o \
+ s-tasque.o \
+ s-tasqup.o \
+ s-tasren.o \
+ s-tassta.o \
+ s-tastim.o \
+ s-tasuti.o \
+ s-tataat.o \
+ s-timtyp.o \
+ s-unstyp.o \
+ s-valboo.o \
+ s-valcha.o \
+ s-valdec.o \
+ s-valenu.o \
+ s-valint.o \
+ s-vallld.o \
+ s-vallli.o \
+ s-valllu.o \
+ s-valrea.o \
+ s-valuns.o \
+ s-valuti.o \
+ s-valwch.o \
+ s-vercon.o \
+ s-wchcnv.o \
+ s-wchcon.o \
+ s-wchjis.o \
+ s-wchstw.o \
+ s-wchwts.o \
+ s-widboo.o \
+ s-widcha.o \
+ s-widenu.o \
+ s-widlli.o \
+ s-widllu.o \
+ s-widwch.o \
+ s-wwdcha.o \
+ s-wwdenu.o \
+ s-wwdwch.o \
+\
+ a-intnam.o \
+ s-interr.o 
+
+ADA_INCLUDE_SRCS =\
+ ada.ads calendar.ads directio.ads gnat.ads interfac.ads ioexcept.ads \
+ machcode.ads text_io.ads unchconv.ads unchdeal.ads unchdeal.adb      \
+ sequenio.ads system.ads win_task*.ad? \
+ a-*.ad? g-*.ad? i-*.ad? s-*.ad?
+
+# Files specific to the C interpreter bytecode compiler(s).
+BC_OBJS = ../bc-emit.o ../bc-optab.o
+
+# Language-independent object files.
+# Language-independent object files.
+OBJS = `cat ../stamp-objlist`
+OBJDEPS = ../stamp-objlist
+
+Makefile: $(srcdir)/Makefile.in $(srcdir)/../configure
+	cd ..; $(SHELL) config.status
+
+native: ../gnat1
+
+compiler: ../gnat1
+
+# Needs to be built with CC=gcc
+# Since the RTL should be built with the latest compiler, remove the
+#  stamp target in the parent directory whenever gnat1 is rebuilt
+../gnat1: $(P) $(GNAT1_OBJS) $(OBJDEPS) $(LIBDEPS)
+	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(GNAT1_OBJS) \
+              $(LIBS)
+	rm -f ../stamp-gnatlib2
+
+# ??? adafinal.a is added to ease a bootstrap path problem with generation
+# adafinal routines by the binder. Should be removed after version
+# 3.08 of gnat is out
+
+adafinal.a:
+	echo "adafinal () {}" > adafinal.c
+	gcc -c adafinal.c
+	$(AR) $(AR_FLAGS) adafinal.a adafinal.o
+	-if $(RANLIB_TEST) ; then $(RANLIB) adafinal.a; else true; fi
+
+
+../gnatbind: $(P) b_gnatb.o $(GNATBIND_OBJS) adafinal.a
+	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o $@ b_gnatb.o $(GNATBIND_OBJS)\
+               adafinal.a
+
+../gnatf: $(P) b_gnatf.o $(GNATF_OBJS)
+	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o $@ b_gnatf.o $(GNATF_OBJS)
+
+../gnatlink: $(P) b_gnatl.o $(GNATLINK_OBJS)
+	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o $@ b_gnatl.o $(GNATLINK_OBJS)
+
+../gnatkr: $(P) b_gnatkr.o $(GNATKR_OBJS)
+	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o $@ b_gnatkr.o $(GNATKR_OBJS)
+
+../gnatmake: $(P) b_gnatm.o $(GNATMAKE_OBJS)
+	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o $@ b_gnatm.o $(GNATMAKE_OBJS)
+
+../gnatcmd: $(P) b_gnatc.o $(GNATCMD_OBJS)
+	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o $@ b_gnatc.o $(GNATCMD_OBJS)
+
+../gnatprep: $(P) b_gnatp.o $(GNATPREP_OBJS)
+	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o $@ b_gnatp.o $(GNATPREP_OBJS)
+
+../gnatchp: $(P) gnatchp.o
+	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o $@ gnatchp.o
+
+gnatbl.o: gnatbl.c a-adaint.h
+	$(CC) $(ALL_CFLAGS) $(INCLUDES) \
+	   -c `echo $(srcdir)/gnatbl.c | sed 's,^\./,,'`
+
+../gnatbl: gnatbl.o a-adaint.o
+	$(CC) -o ../gnatbl $(ALL_CFLAGS) $(LDFLAGS) gnatbl.o a-adaint.o
+
+
+../stamp-gnatlib:
+	@if [ ! -f stamp-gnatlib ] ; then \
+	  echo You must first build the GNAT library: make gnatlib; \
+	  false; \
+	else \
+	  true; \
+	fi
+
+install-gnatlib: ../stamp-gnatlib
+	rm -rf $(ADA_RTL_OBJ_DIR)
+	-mkdir $(ADA_RTL_OBJ_DIR)
+	(cd rts; \
+	  for f in *$(objext) *.ali; do \
+	    cp -p $$f $(ADA_RTL_OBJ_DIR)/$$f; \
+	    chmod a-x $(ADA_RTL_OBJ_DIR)/$$f; \
+	  done)
+	(cd rts; \
+	  for f in *.a ; do \
+	    cp -p $$f $(libsubdir)/$$f; \
+	    chmod a-x $(libsubdir)/$$f; \
+	  done)
+	rm -rf $(ADA_INCLUDE_DIR)
+	-mkdir $(ADA_INCLUDE_DIR)
+	(cd rts; \
+	  for f in *.ads *.adb; do \
+	    cp -p $$f $(ADA_INCLUDE_DIR)/$$f; \
+	    chmod a-wx $(ADA_INCLUDE_DIR)/$$f;\
+	  done)
+
+../stamp-gnatlib2:
+	rm -f rts/s-*.ali
+	rm -f rts/s-*.o
+	rm -f rts/a-*.ali
+	rm -f rts/a-*.o
+	rm -f rts/*.ali
+	rm -f rts/*.o
+	touch ../stamp-gnatlib2
+	rm -f ../stamp-gnatlib
+
+# new GNULL Interface;  (first branch of the case)
+   #  1. copy 4xyyy.ad[sb] -->-- a-yyy.ad[sb] 
+   #  2. copy 5xyyy.ad[sb] -->-- s-yyy.ad[sb] 
+   #  3. copy 6xyyy.ad[sb] -->-- i-yyy.ad[sb] 
+   #  4. copy 7zyyy.ad[sb] -->-- z-yyy.ad[sb] 
+# old GNULL Interface;  (second branch of the case)
+   #  1. copy 1xyyy.ad[sb] -->-- a-yyy.ad[sb] 
+   #  2. copy 2xyyy.ad[sb] -->-- s-yyy.ad[sb] 
+   #  3. copy 3xyyy.ad[sb] -->-- i-yyy.ad[sb] 
+
+../stamp-gnatlib1: Makefile
+	rm -rf rts
+	mkdir rts
+	chmod u+w rts
+	(\
+	   case $(target) in \
+		sparc-sun-sunos4*) 	letter=u ;;\
+		sparc-sun-solaris2* |\
+		sparc-sun-sunos5*)	letter=s ;;\
+	        *86*-linux*)		letter=l ;;\
+	        mips-sgi-irix*)		letter=g ;;\
+		hppa*-hp-hpux*)		letter=h ;;\
+		*-*-rtems* | *-rtems)	letter=r ;;\
+		*-go32-msdos | *-go32)	letter=d ;;\
+	        alpha-dec-osf*)		letter=a ;;\
+		ppc-mac-machten)	letter=m ;;\
+		*-*-cygwin32*)		letter=w ;;\
+		*)			letter=n ;;\
+	   esac ; \
+	   \
+	   srcdir1=`cd $(srcdir); pwd`;\
+	   ( \
+	        targdir=`pwd`; \
+		cd $$srcdir1; \
+		for f in $(ADA_INCLUDE_SRCS) $(LIBGNAT_SRCS); do  \
+	      	   ln -s $$srcdir1/$$f $$targdir/rts/$$f > /dev/null 2>&1 ||  \
+	      	   cp -p $$srcdir1/$$f $$targdir/rts/$$f; \
+	   	done; \
+	   ) ; \
+	   cd rts; \
+	   case $(target) in \
+		hppa*-hp-hpux*		|\
+		mips-sgi-irix*		|\
+		*-*-cygwin32*		|\
+		alpha-dec-osf*)		\
+		\
+		   for f in $$srcdir1/[123]$$letter*.ad[sb]; do  \
+		      g=`basename $$f | sed -e "s/^1$$letter/a-/" \
+					    -e "s/^2$$letter/s-/" \
+					    -e "s/^3$$letter/i-/"` ; \
+		      rm -f $$g ; \
+		      ln -s $$f $$g > /dev/null 2>&1 || cp -p $$f $$g ; \
+		   done;; \
+		\
+		sparc-sun-sunos4*      |\
+		sparc-sun-solaris2*    |\
+		sparc-sun-solaris5*    |\
+		ppc-mac-machten        |\
+		*-*-rtems* | *-rtems*  |\
+		*-go32-msdos | *-go32  |\
+		*86*-linux*            |\
+		*) \
+		\
+		   for f in  $(GNAT_RTL_OLD_OBJS); do \
+		      g=`basename $$f | sed -e "s:\..*:.ad\[sb\]:" `; \
+		      rm -f $$g ; \
+		   done; \
+		   \
+		   for f in $$srcdir1/[456]$$letter*.ad[sb]; do  \
+		      g=`basename $$f | sed -e "s/^4$$letter/a-/" \
+					    -e "s/^5$$letter/s-/" \
+					    -e "s/^6$$letter/i-/" ` ; \
+		      rm -f $$g ; \
+		      ln -s $$f $$g > /dev/null 2>&1 || cp -p $$f $$g ; \
+		   done; \
+		\
+		   for f in $$srcdir1/7*.ad[sb]; do  \
+		      g=`basename $$f | sed -e "s/^7\(.\)/\1-/" ` ; \
+		      rm -f $$g ; \
+		      ln -s $$f $$g > /dev/null 2>&1 || cp -p $$g $$g ; \
+		   done;; \
+	   esac ; \
+	   rm -f ../stamp-gnatlib ;  \
+	   touch ../stamp-gnatlib1)
+
+gnatlib-common:
+	(subdir=`cd $(srcdir); pwd`; \
+	 cd rts ; \
+	 $(MAKE)  CC="../../xgcc -B../../" \
+                 INCLUDES="$(INCLUDES_FOR_SUBDIR) -I./../.." \
+                 CFLAGS="$(GNATLIBCFLAGS)" \
+	         -f ../Makefile libgnat.a ; \
+	 $(MAKE)  CC="../../xgcc -B../../" \
+	         ADAFLAGS="$(GNATLIBFLAGS)"\
+                 CFLAGS="$(GNATLIBCFLAGS)" \
+	         -f ../Makefile $(GNAT_RTL_COMMON_OBJS) ; \
+	)
+
+gnatlib: ../stamp-gnatlib1 ../stamp-gnatlib2 gnatlib-common
+	(subdir=`cd $(srcdir); pwd`; \
+	 cd rts ; \
+	 case $(target) in \
+		*-*-cygwin32*) \
+		\
+		 $(MAKE)  CC="../../xgcc -B../../" \
+                        CFLAGS="$(GNATLIBCFLAGS)" \
+	         	ADAFLAGS="$(GNATLIBFLAGS)"\
+	         	-f ../Makefile $(GNAT_RTL_OLD_OBJS) ; \
+		 $(MAKE)  CC="../../xgcc -B../../" \
+                        CFLAGS="$(GNATLIBCFLAGS)" \
+	         	ADAFLAGS="$(GNATLIBFLAGS)"\
+	         	-f ../Makefile $(GNAT_RTL_WIN32_OBJS) ;; \
+		hppa*-hp-hpux*         |\
+		mips-sgi-irix*         |\
+		alpha-dec-osf*)         \
+		\
+		 $(MAKE)  CC="../../xgcc -B../../" \
+	         	ADAFLAGS="$(GNATLIBFLAGS)"\
+                        CFLAGS="$(GNATLIBCFLAGS)" \
+	         	-f ../Makefile $(GNAT_RTL_OLD_OBJS) ;; \
+		sparc-sun-sunos4*      |\
+		sparc-sun-solaris2*    |\
+		sparc-sun-solaris5*    |\
+		ppc-mac-machten        |\
+		*-*-rtems* | *-rtems*  |\
+		*-go32-msdos | *-go32  |\
+                *86*-linux*            |\
+                *)		       \
+                \
+		 $(MAKE)  CC="../../xgcc -B../../" \
+	         	ADAFLAGS="$(GNATLIBFLAGS)"\
+                        CFLAGS="$(GNATLIBCFLAGS)" \
+         	-f ../Makefile $(GNAT_RTL_NEW_OBJS) ;; \
+		\
+	 esac ; \
+	 if [ $$? -eq 0 ]; then touch ../stamp-gnatlib; fi \
+	) 
+
+
+# .s files for cross-building
+gnat-cross: force
+	make $(GNAT1_ADA_OBJS) CC="gcc -Bstage1/" CFLAGS="-S -gnatp" \
+		HOST_CFLAGS= HOST_CC=cc
+
+libgnat.a : $(LIBGNAT_OBJS)
+	-rm -f libgnat.a
+	$(AR) rc libgnat.a $(LIBGNAT_OBJS)
+	-if $(RANLIB_TEST) ; then $(RANLIB) libgnat.a; else true; fi
+	case $(target) in sparc-sun-solaris*) \
+	   $(MAKE) get_regs.o ; \
+	   $(AR) q libgnat.a get_regs.o ; \
+	   if $(RANLIB_TEST) ; then $(RANLIB) libgnat.a; else true; fi ;; \
+	esac ;
+
+
+# Compiling object files from source files.
+
+# Note that dependencies on obstack.h are not written
+# because that file is not part of GCC.
+# Dependencies on gvarargs.h are not written
+# because all that file does, when not compiling with GCC,
+# is include the system varargs.h.
+
+TREE_H = $(srcdir)/../tree.h $(srcdir)/../real.h $(srcdir)/../tree.def \
+	$(srcdir)/../machmode.h $(srcdir)/../machmode.def
+
+# Ada language specific files.
+
+ada_extra_files : treeprs.ads a-einfo.h a-sinfo.h nmake.adb \
+	nmake.ads
+
+b_gnat1.c : $(GNAT1_ADA_OBJS)
+	$(GNATBIND) -I. -I$(srcdir) -o b_gnat1.c -n gnat1drv.ali
+b_gnat1.o : b_gnat1.c
+
+b_gnatf.c : $(GNATF_OBJS)
+	$(GNATBIND) -I. -I$(srcdir) -o b_gnatf.c gnatfdrv.ali
+
+b_gnatf.o : b_gnatf.c
+
+b_gnatb.c : $(GNATBIND_OBJS)
+	$(GNATBIND) -I. -I$(srcdir) -o b_gnatb.c gnatbind.ali
+b_gnatb.o : b_gnatb.c
+
+b_gnatc.c : $(GNATCMD_OBJS)
+	$(GNATBIND) -I. -I$(srcdir) -o b_gnatc.c gnatcmd.ali
+b_gnatc.o : b_gnatc.c
+
+b_gnatkr.c : $(GNATKR_OBJS)
+	$(GNATBIND) -I. -I$(srcdir) -o b_gnatkr.c gnatkr.ali
+
+b_gnatl.c : $(GNATLINK_OBJS)
+	$(GNATBIND) -I. -I$(srcdir) -o b_gnatl.c gnatlink.ali
+
+b_gnatm.c : $(GNATMAKE_OBJS)
+	$(GNATBIND) -I. -I$(srcdir) -o b_gnatm.c gnatmake.ali
+
+b_gnatp.c : $(GNATPREP_OBJS)
+	$(GNATBIND) -I. -I$(srcdir) -o b_gnatp.c gnatprep.ali
+
+b_gnatkr.o : b_gnatkr.c
+
+b_gnatl.o : b_gnatl.c
+
+b_gnatm.o : b_gnatm.c
+
+b_gnatp.o : b_gnatp.c
+
+$(srcdir)/treeprs.ads : treeprs.adt sinfo.ads xtreeprs.spt
+	(cd $(srcdir); spitbol xtreeprs.spt)
+
+$(srcdir)/a-einfo.h : einfo.ads einfo.adb xeinfo.spt
+	(cd $(srcdir); spitbol xeinfo.spt)
+
+$(srcdir)/a-sinfo.h : sinfo.ads xsinfo.spt
+	(cd $(srcdir); spitbol xsinfo.spt)
+
+$(srcdir)/nmake.adb : nmake.adt sinfo.ads xnmake.spt
+	(cd $(srcdir); spitbol xnmake.spt -b)
+
+$(srcdir)/nmake.ads :  nmake.adt sinfo.ads xnmake.spt
+	(cd $(srcdir); spitbol xnmake.spt -s)
+
+mkttypef.o : mkttypef.c ../hconfig.h $(srcdir)/../machmode.h \
+  $(srcdir)/../real.h
+	$(HOST_CC) -c $(HOST_CFLAGS) $(HOST_CPPFLAGS) $(INCLUDES) $(srcdir)/mkttypef.c
+
+mkttypef : mkttypef.o $(LIBDEPS)
+	$(HOST_CC) $(HOST_CFLAGS) $(HOST_LDFLAGS) -o $@ \
+	 mkttypef.o $(HOST_LIBS)
+
+ttypef.ads: stamp-ttypef; @true
+stamp-ttypef : ttypef.adt mkttypef $(srcdir)/../move-if-change
+	./mkttypef $(srcdir)/ttypef.adt > tmp-ttypef.ads
+	$(srcdir)/../move-if-change tmp-ttypef.ads ttypef.ads
+	touch stamp-ttypef
+
+ADA_INCLUDE_DIR = $(prefix)/adainclude
+ADA_RTL_OBJ_DIR = $(libsubdir)/adalib
+
+# Note: the strings below do not make sense for Ada strings in the OS/2
+#  case.  This is ignored for now since the OS/2 version doesn't use
+#  these -- there are no default locations.
+sdefault.adb: stamp-sdefault ; @true
+stamp-sdefault : $(srcdir)/../version.c $(srcdir)/../move-if-change \
+ Makefile
+	echo "package body Sdefault is" >tmp-sdefault.adb
+	echo "   S1 : aliased constant String := \"$(ADA_INCLUDE_DIR)/\";" >>tmp-sdefault.adb
+	echo "   S2 : aliased constant String := \"$(ADA_RTL_OBJ_DIR)/\";" >>tmp-sdefault.adb
+	echo "   S3 : aliased constant String := \"$(target)/\";" >>tmp-sdefault.adb
+	echo "   function Include_Dir_Default_Name return String_Ptr is" >>tmp-sdefault.adb
+	echo "   begin" >>tmp-sdefault.adb
+	echo "      return new String'(S1);" >>tmp-sdefault.adb
+	echo "   end Include_Dir_Default_Name;" >>tmp-sdefault.adb
+	echo "   function Object_Dir_Default_Name return String_Ptr is" >>tmp-sdefault.adb
+	echo "   begin" >>tmp-sdefault.adb
+	echo "      return new String'(S2);" >>tmp-sdefault.adb
+	echo "   end Object_Dir_Default_Name;" >>tmp-sdefault.adb
+	echo "   function Target_Name return String_Ptr is" >>tmp-sdefault.adb
+	echo "   begin" >>tmp-sdefault.adb
+	echo "      return new String'(S3);" >>tmp-sdefault.adb
+	echo "   end Target_Name;" >>tmp-sdefault.adb
+	echo "end Sdefault;" >> tmp-sdefault.adb
+	$(srcdir)/../move-if-change tmp-sdefault.adb sdefault.adb
+	touch stamp-sdefault
+
+A_MISC_H = a-misc.h a-tree.def
+
+# special compiles for sdefault without -gnatg, to avoid long line error
+
+sdefault.o : sdefault.ads sdefault.adb types.ads unchdeal.ads 
+	$(CC) -c $(MOST_ADAFLAGS) -O2 sdefault.adb
+
+# force debugging information on a-raise.o so that it is always
+# possible to set conditional breakpoints on exceptions
+
+a-raise.o   : a-raise.c a-ada.h a-types.h a-raise.h
+	$(CC) -c -g $(ALL_CFLAGS) $(ADA_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $<
+
+io-aux.o    : io-aux.c
+a-adaint.o  : a-adaint.h a-adaint.c
+a-argv.o    : a-argv.c
+a-cio.o     : a-cio.c 
+a-deftar.o  : a-deftar.c
+a-errno.o   : a-errno.c
+a-exit.o    : a-exit.c
+a-final.o   : a-final.c
+a-init.o    : a-init.c
+a-sysdep.o  : a-sysdep.c
+
+a-gettty.o : $(CONFIG_H) a-ada.h a-types.h a-gettty.c
+
+a-gtran3.o : $(CONFIG_H) $(TREE_H) $(srcdir)/../flags.h \
+   $(srcdir)/../obstack.h $(srcdir)/../convert.h a-ada.h a-types.h a-atree.h \
+   a-nlists.h a-elists.h a-uintp.h a-sinfo.h a-einfo.h a-snames.h a-namet.h \
+   a-string.h a-trans.h a-trans3.h a-trans4.h a-gtran3.h $(A_MISC_H) \
+   a-rtree.h a-gtran3.c 
+
+a-misc.o : $(CONFIG_H) $(TREE_H) $(RTL_H) $(srcdir)/../expr.h \
+   ../insn-codes.h ../insn-flags.h ../insn-config.h $(srcdir)/../recog.h \
+   a-ada.h a-types.h a-atree.h a-nlists.h a-elists.h a-sinfo.h \
+   a-einfo.h a-namet.h a-string.h a-uintp.h a-gtran3.h a-trans.h a-trans3.h \
+   a-trans4.h $(A_MISC_H) a-rtree.h $(srcdir)/../flags.h  a-misc.c
+
+a-trans3.o : $(CONFIG_H) $(TREE_H) $(srcdir)/../flags.h \
+   $(srcdir)/../defaults.h a-ada.h a-types.h a-atree.h a-nlists.h a-elists.h \
+   a-sinfo.h a-einfo.h a-namet.h a-string.h a-uintp.h a-trans.h a-gtran3.h \
+   a-trans3.h a-trans4.h $(A_MISC_H) a-rtree.h $(srcdir)/../convert.h \
+   a-trans3.c
+
+a-trans4.o : $(CONFIG_H) $(TREE_H) $(srcdir)/../flags.h a-ada.h a-types.h \
+   a-atree.h a-nlists.h a-elists.h a-sinfo.h a-einfo.h a-namet.h a-snames.h \
+   a-string.h a-uintp.h a-gtran3.h a-trans.h a-trans3.h a-trans4.h \
+   $(A_MISC_H) a-trans4.c
+
+a-trans.o : $(CONFIG_H) $(TREE_H) $(srcdir)/../flags.h a-ada.h a-types.h \
+   a-atree.h a-nlists.h a-elists.h a-uintp.h a-sinfo.h a-einfo.h a-namet.h \
+   a-snames.h a-string.h a-urealp.h a-trans.h a-trans3.h a-gtran3.h \
+   a-trans4.h $(A_MISC_H) a-rtree.h a-trans.c
+
+a-uintp.o : $(CONFIG_H) $(TREE_H) a-ada.h a-types.h a-atree.h \
+   a-nlists.h a-elists.h a-sinfo.h a-einfo.h a-namet.h a-string.h \
+   a-uintp.h a-uintp.c
+
+gnatchp.o : $(CONFIG_H) gnatchp.c
+
+# GNAT DEPENDENCIES
+# regular dependencies
+a-chahan.o : ada.ads a-charac.ads a-chahan.ads a-chahan.adb a-chlat1.ads \
+   a-string.ads a-strmap.ads a-stmaco.ads system.ads s-exctab.ads \
+   s-secsta.ads s-stalib.ads s-stoele.ads s-unstyp.ads unchconv.ads 
+
+a-charac.o : ada.ads a-charac.ads 
+
+a-chlat1.o : ada.ads a-charac.ads a-chlat1.ads 
+
+a-comlin.o : ada.ads a-comlin.ads a-comlin.adb system.ads s-secsta.ads \
+   s-stoele.ads 
+
+a-except.o : ada.ads a-except.ads a-except.adb a-ioexce.ads a-stream.ads \
+   a-tags.ads system.ads s-exctab.ads s-secsta.ads s-stalib.ads \
+   s-stoele.ads s-stratt.ads s-strops.ads s-taspda.ads s-unstyp.ads \
+   unchconv.ads 
+
+a-filico.o : ada.ads a-finali.ads a-filico.ads a-filico.adb a-stream.ads \
+   a-tags.ads system.ads s-exctab.ads s-finimp.ads s-finroo.ads \
+   s-secsta.ads s-stalib.ads s-stoele.ads s-stratt.ads s-unstyp.ads \
+   unchconv.ads 
+
+a-finali.o : ada.ads a-finali.ads a-finali.adb a-stream.ads a-tags.ads \
+   system.ads s-exctab.ads s-finimp.ads s-finroo.ads s-secsta.ads \
+   s-stalib.ads s-stoele.ads s-stratt.ads s-unstyp.ads unchconv.ads 
+
+a-ioexce.o : ada.ads a-ioexce.ads system.ads s-exctab.ads s-stalib.ads \
+   unchconv.ads 
+
+a-stmaco.o : ada.ads a-charac.ads a-chlat1.ads a-string.ads a-strmap.ads \
+   a-stmaco.ads system.ads s-exctab.ads s-stalib.ads s-unstyp.ads \
+   unchconv.ads 
+
+a-stream.o : ada.ads a-stream.ads a-tags.ads system.ads s-exctab.ads \
+   s-stalib.ads s-stoele.ads unchconv.ads 
+
+a-string.o : ada.ads a-string.ads system.ads s-exctab.ads s-stalib.ads \
+   unchconv.ads 
+
+a-strmap.o : ada.ads a-charac.ads a-chlat1.ads a-string.ads a-strmap.ads \
+   a-strmap.adb system.ads s-bitops.ads s-exctab.ads s-secsta.ads \
+   s-stalib.ads s-stoele.ads s-unstyp.ads unchconv.ads 
+
+a-tags.o : ada.ads a-tags.ads a-tags.adb gnat.ads g-htable.ads \
+   g-htable.adb system.ads s-exctab.ads s-secsta.ads s-stalib.ads \
+   s-stoele.ads unchconv.ads 
+
+a-textio.o : ada.ads a-finali.ads a-filico.ads a-ioexce.ads a-stream.ads \
+   a-tags.ads a-textio.ads a-textio.adb interfac.ads i-cstrea.ads \
+   system.ads s-exctab.ads s-ficobl.ads s-fileio.ads s-finimp.ads \
+   s-finroo.ads s-parame.ads s-secsta.ads s-stalib.ads s-stoele.ads \
+   s-stratt.ads s-unstyp.ads unchconv.ads unchdeal.ads 
+
+ada.o : ada.ads 
+
+ali.o : ali.ads ali.adb binderr.ads butil.ads debug.ads gnat.ads \
+   g-os_lib.ads hostparm.ads namet.ads opt.ads osint.ads output.ads \
+   system.ads s-assert.ads s-exctab.ads s-stalib.ads s-wchcon.ads \
+   table.ads table.adb tree_io.ads types.ads unchconv.ads unchdeal.ads 
+
+alloc.o : alloc.ads 
+
+atree.o : alloc.ads atree.ads atree.adb casing.ads debug.ads einfo.ads \
+   elists.ads gnat.ads g-os_lib.ads hostparm.ads nlists.ads opt.ads \
+   output.ads sinfo.ads sinput.ads snames.ads system.ads s-assert.ads \
+   s-exctab.ads s-stalib.ads s-wchcon.ads table.ads table.adb tree_io.ads \
+   types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+back_end.o : alloc.ads atree.ads back_end.ads back_end.adb casing.ads \
+   einfo.ads elists.ads hostparm.ads lib.ads namet.ads nlists.ads \
+   sinfo.ads sinput.ads snames.ads stringt.ads system.ads s-exctab.ads \
+   s-stalib.ads table.ads types.ads uintp.ads unchconv.ads unchdeal.ads \
+   urealp.ads 
+
+bcheck.o : ali.ads bcheck.ads bcheck.adb binderr.ads gnat.ads g-os_lib.ads \
+   hostparm.ads namet.ads opt.ads osint.ads system.ads s-exctab.ads \
+   s-stalib.ads s-tasoli.ads s-wchcon.ads table.ads types.ads unchconv.ads \
+   unchdeal.ads 
+
+binde.o : ali.ads binde.ads binde.adb binderr.ads butil.ads debug.ads \
+   gnat.ads g-os_lib.ads hostparm.ads namet.ads opt.ads output.ads \
+   system.ads s-assert.ads s-exctab.ads s-stalib.ads s-wchcon.ads \
+   table.ads table.adb tree_io.ads types.ads unchconv.ads unchdeal.ads 
+
+binderr.o : binderr.ads binderr.adb butil.ads gnat.ads g-os_lib.ads \
+   hostparm.ads namet.ads opt.ads osint.ads output.ads system.ads \
+   s-exctab.ads s-stalib.ads s-wchcon.ads table.ads types.ads unchconv.ads \
+   unchdeal.ads 
+
+bindgen.o : ali.ads binde.ads bindgen.ads bindgen.adb gnat.ads \
+   g-os_lib.ads hostparm.ads namet.ads opt.ads osint.ads sdefault.ads \
+   system.ads s-exctab.ads s-stalib.ads s-wchcon.ads table.ads types.ads \
+   unchconv.ads unchdeal.ads 
+
+bindusg.o : bindusg.ads bindusg.adb gnat.ads g-os_lib.ads osint.ads \
+   output.ads system.ads s-exctab.ads s-stalib.ads table.ads types.ads \
+   unchconv.ads unchdeal.ads 
+
+butil.o : butil.ads butil.adb gnat.ads g-os_lib.ads hostparm.ads namet.ads \
+   output.ads system.ads s-exctab.ads s-stalib.ads table.ads types.ads \
+   unchconv.ads unchdeal.ads 
+
+casing.o : alloc.ads casing.ads casing.adb csets.ads hostparm.ads \
+   namet.ads opt.ads sinput.ads system.ads s-exctab.ads s-stalib.ads \
+   s-wchcon.ads table.ads types.ads unchconv.ads unchdeal.ads widechar.ads 
+
+checks.o : alloc.ads atree.ads checks.ads checks.adb einfo.ads elists.ads \
+   errout.ads exp_ch2.ads exp_util.ads expander.ads get_targ.ads gnat.ads \
+   g-os_lib.ads hostparm.ads namet.ads nlists.ads nmake.ads opt.ads \
+   output.ads rtsfind.ads sem.ads sem_eval.ads sem_res.ads sem_util.ads \
+   sinfo.ads snames.ads stand.ads system.ads s-assert.ads s-exctab.ads \
+   s-stalib.ads s-wchcon.ads table.ads tbuild.ads ttypes.ads types.ads \
+   uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+comperr.o : alloc.ads atree.ads casing.ads comperr.ads comperr.adb \
+   debug.ads einfo.ads errout.ads gnat.ads g-os_lib.ads gnatvsn.ads \
+   osint.ads output.ads sdefault.ads sinfo.ads sinput.ads snames.ads \
+   sprint.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads table.ads \
+   treepr.ads types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+csets.o : csets.ads csets.adb hostparm.ads opt.ads system.ads s-exctab.ads \
+   s-stalib.ads s-wchcon.ads types.ads unchconv.ads unchdeal.ads 
+
+cstand.o : alloc.ads atree.ads csets.ads cstand.ads cstand.adb debug.ads \
+   einfo.ads get_targ.ads gnat.ads g-os_lib.ads gnatvsn.ads hostparm.ads \
+   namet.ads nlists.ads nmake.ads opt.ads output.ads sem_mech.ads \
+   sem_util.ads sinfo.ads snames.ads stand.ads system.ads s-assert.ads \
+   s-exctab.ads s-stalib.ads s-wchcon.ads table.ads tbuild.ads ttypef.ads \
+   ttypes.ads types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+debug.o : debug.ads debug.adb system.ads s-exctab.ads s-stalib.ads \
+   types.ads unchconv.ads unchdeal.ads 
+
+debug_a.o : alloc.ads atree.ads casing.ads debug.ads debug_a.ads \
+   debug_a.adb einfo.ads gnat.ads g-os_lib.ads output.ads sinfo.ads \
+   sinput.ads snames.ads system.ads s-exctab.ads s-stalib.ads table.ads \
+   types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+einfo.o : alloc.ads atree.ads einfo.ads einfo.adb gnat.ads g-os_lib.ads \
+   hostparm.ads namet.ads nlists.ads output.ads sinfo.ads snames.ads \
+   stand.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads table.ads \
+   types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+elists.o : alloc.ads debug.ads elists.ads elists.adb gnat.ads g-os_lib.ads \
+   hostparm.ads opt.ads output.ads system.ads s-assert.ads s-exctab.ads \
+   s-stalib.ads s-wchcon.ads table.ads table.adb tree_io.ads types.ads \
+   unchconv.ads unchdeal.ads 
+
+errout.o : alloc.ads atree.ads casing.ads csets.ads debug.ads einfo.ads \
+   errout.ads errout.adb expander.ads fname.ads gnat.ads g-os_lib.ads \
+   hostparm.ads lib.ads namet.ads opt.ads output.ads scans.ads \
+   sem_util.ads sinfo.ads sinput.ads snames.ads stand.ads system.ads \
+   s-assert.ads s-exctab.ads s-stalib.ads s-wchcon.ads table.ads table.adb \
+   tree_io.ads types.ads uintp.ads uname.ads unchconv.ads unchdeal.ads \
+   urealp.ads 
+
+eval_fat.o : eval_fat.ads eval_fat.adb hostparm.ads namet.ads stand.ads \
+   system.ads s-assert.ads s-exctab.ads s-stalib.ads table.ads ttypef.ads \
+   types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+exp_aggr.o : alloc.ads atree.ads checks.ads einfo.ads elists.ads \
+   exp_aggr.ads exp_aggr.adb exp_ch3.ads exp_ch7.ads exp_util.ads \
+   hostparm.ads itypes.ads namet.ads nlists.ads nmake.ads opt.ads \
+   rtsfind.ads sem.ads sem_ch3.ads sem_eval.ads sem_res.ads sem_util.ads \
+   sinfo.ads snames.ads stand.ads system.ads s-assert.ads s-exctab.ads \
+   s-stalib.ads s-wchcon.ads table.ads tbuild.ads types.ads uintp.ads \
+   unchconv.ads unchdeal.ads urealp.ads 
+
+exp_attr.o : alloc.ads atree.ads checks.ads einfo.ads exp_attr.ads \
+   exp_attr.adb exp_ch2.ads exp_ch9.ads exp_strm.ads exp_tss.ads \
+   exp_util.ads get_targ.ads gnat.ads g-os_lib.ads hostparm.ads itypes.ads \
+   namet.ads nlists.ads nmake.ads opt.ads output.ads rtsfind.ads sem.ads \
+   sem_ch8.ads sem_eval.ads sem_res.ads sem_util.ads sinfo.ads snames.ads \
+   stand.ads stringt.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   s-wchcon.ads table.ads tbuild.ads ttypes.ads types.ads uintp.ads \
+   uname.ads unchconv.ads unchdeal.ads urealp.ads 
+
+exp_ch11.o : alloc.ads atree.ads einfo.ads exp_ch11.ads exp_ch11.adb \
+   exp_ch7.ads exp_util.ads hostparm.ads namet.ads nlists.ads nmake.ads \
+   opt.ads rtsfind.ads sem.ads sem_res.ads sem_util.ads sinfo.ads \
+   snames.ads stand.ads system.ads s-exctab.ads s-stalib.ads s-wchcon.ads \
+   table.ads tbuild.ads types.ads uintp.ads unchconv.ads unchdeal.ads \
+   urealp.ads 
+
+exp_ch13.o : alloc.ads atree.ads einfo.ads exp_ch13.ads exp_ch13.adb \
+   exp_ch3.ads exp_ch6.ads exp_tss.ads exp_util.ads hostparm.ads namet.ads \
+   nlists.ads nmake.ads opt.ads rtsfind.ads sem.ads sem_ch7.ads \
+   sem_ch8.ads sem_eval.ads sem_res.ads sem_util.ads sinfo.ads snames.ads \
+   stand.ads system.ads s-exctab.ads s-stalib.ads s-wchcon.ads table.ads \
+   tbuild.ads types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+exp_ch2.o : alloc.ads atree.ads einfo.ads elists.ads exp_ch2.ads \
+   exp_ch2.adb hostparm.ads nlists.ads nmake.ads opt.ads sem.ads \
+   sem_res.ads sem_util.ads sinfo.ads snames.ads system.ads s-exctab.ads \
+   s-stalib.ads s-wchcon.ads table.ads tbuild.ads types.ads uintp.ads \
+   unchconv.ads unchdeal.ads urealp.ads 
+
+exp_ch3.o : alloc.ads atree.ads checks.ads einfo.ads elists.ads \
+   exp_aggr.ads exp_ch3.ads exp_ch3.adb exp_ch4.ads exp_ch7.ads \
+   exp_ch9.ads exp_dbug.ads exp_disp.ads exp_dist.ads exp_pakd.ads \
+   exp_strm.ads exp_tss.ads exp_util.ads expander.ads freeze.ads \
+   get_targ.ads gnat.ads g-os_lib.ads hostparm.ads namet.ads nlists.ads \
+   nmake.ads opt.ads output.ads rtsfind.ads sem.ads sem_ch13.ads \
+   sem_ch3.ads sem_ch8.ads sem_eval.ads sem_mech.ads sem_res.ads \
+   sem_util.ads sinfo.ads snames.ads stand.ads system.ads s-assert.ads \
+   s-exctab.ads s-stalib.ads s-wchcon.ads table.ads tbuild.ads ttypes.ads \
+   types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+exp_ch4.o : alloc.ads atree.ads checks.ads einfo.ads elists.ads \
+   exp_ch3.ads exp_ch4.ads exp_ch4.adb exp_ch7.ads exp_ch9.ads \
+   exp_disp.ads exp_fixd.ads exp_pakd.ads exp_tss.ads exp_util.ads \
+   freeze.ads get_targ.ads gnat.ads g-os_lib.ads hostparm.ads itypes.ads \
+   namet.ads nlists.ads nmake.ads opt.ads output.ads rtsfind.ads sem.ads \
+   sem_ch13.ads sem_ch3.ads sem_dist.ads sem_eval.ads sem_res.ads \
+   sem_type.ads sem_util.ads sinfo.ads sinfo-cn.ads snames.ads stand.ads \
+   system.ads s-assert.ads s-exctab.ads s-stalib.ads s-wchcon.ads \
+   table.ads tbuild.ads ttypes.ads types.ads uintp.ads unchconv.ads \
+   unchdeal.ads urealp.ads 
+
+exp_ch5.o : alloc.ads atree.ads checks.ads einfo.ads exp_ch2.ads \
+   exp_ch5.ads exp_ch5.adb exp_ch7.ads exp_pakd.ads exp_util.ads \
+   hostparm.ads itypes.ads namet.ads nlists.ads nmake.ads opt.ads \
+   rtsfind.ads sem.ads sem_ch13.ads sem_res.ads sem_util.ads sinfo.ads \
+   snames.ads stand.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   s-wchcon.ads table.ads tbuild.ads types.ads uintp.ads unchconv.ads \
+   unchdeal.ads urealp.ads 
+
+exp_ch6.o : alloc.ads atree.ads casing.ads checks.ads einfo.ads elists.ads \
+   errout.ads exp_ch2.ads exp_ch6.ads exp_ch6.adb exp_ch7.ads exp_ch9.ads \
+   exp_disp.ads exp_intr.ads exp_pakd.ads exp_tss.ads exp_util.ads \
+   expander.ads freeze.ads gnat.ads g-os_lib.ads hostparm.ads inline.ads \
+   lib.ads lib-writ.ads namet.ads nlists.ads nmake.ads opt.ads output.ads \
+   rtsfind.ads sem.ads sem_ch13.ads sem_ch6.ads sem_ch8.ads sem_disp.ads \
+   sem_res.ads sem_util.ads sinfo.ads snames.ads stand.ads system.ads \
+   s-assert.ads s-exctab.ads s-stalib.ads s-wchcon.ads table.ads \
+   tbuild.ads types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+exp_ch7.o : alloc.ads atree.ads debug.ads einfo.ads exp_ch7.ads \
+   exp_ch7.adb exp_ch9.ads exp_tss.ads exp_util.ads expander.ads \
+   freeze.ads gnat.ads g-os_lib.ads hostparm.ads namet.ads nlists.ads \
+   nmake.ads opt.ads output.ads rtsfind.ads sem.ads sem_ch3.ads \
+   sem_ch8.ads sem_eval.ads sem_res.ads sem_util.ads sinfo.ads snames.ads \
+   stand.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   s-wchcon.ads table.ads tbuild.ads types.ads uintp.ads unchconv.ads \
+   unchdeal.ads urealp.ads 
+
+exp_ch8.o : alloc.ads atree.ads einfo.ads exp_ch6.ads exp_ch8.ads \
+   exp_ch8.adb exp_util.ads itypes.ads nlists.ads nmake.ads rtsfind.ads \
+   sem_util.ads sinfo.ads snames.ads system.ads s-exctab.ads s-stalib.ads \
+   table.ads tbuild.ads types.ads uintp.ads unchconv.ads unchdeal.ads \
+   urealp.ads 
+
+exp_ch9.o : alloc.ads atree.ads einfo.ads elists.ads exp_ch3.ads \
+   exp_ch6.ads exp_ch9.ads exp_ch9.adb exp_tss.ads exp_util.ads \
+   expander.ads freeze.ads gnat.ads g-os_lib.ads hostparm.ads namet.ads \
+   nlists.ads nmake.ads opt.ads output.ads rtsfind.ads sem.ads \
+   sem_ch11.ads sem_ch13.ads sem_ch3.ads sem_ch5.ads sem_ch6.ads \
+   sem_ch8.ads sem_util.ads sinfo.ads snames.ads stand.ads system.ads \
+   s-assert.ads s-exctab.ads s-stalib.ads s-wchcon.ads table.ads \
+   tbuild.ads types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+exp_code.o : alloc.ads atree.ads einfo.ads errout.ads exp_code.ads \
+   exp_code.adb hostparm.ads namet.ads nlists.ads nmake.ads rtsfind.ads \
+   sem_eval.ads sem_util.ads sinfo.ads snames.ads stringt.ads system.ads \
+   s-assert.ads s-exctab.ads s-stalib.ads table.ads tbuild.ads types.ads \
+   uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+exp_dbug.o : alloc.ads atree.ads debug.ads einfo.ads exp_dbug.ads \
+   exp_dbug.adb exp_util.ads gnat.ads g-os_lib.ads hostparm.ads namet.ads \
+   nlists.ads nmake.ads output.ads rtsfind.ads sem_eval.ads sinfo.ads \
+   snames.ads system.ads s-exctab.ads s-stalib.ads table.ads tbuild.ads \
+   types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+exp_disp.o : alloc.ads atree.ads checks.ads einfo.ads elists.ads \
+   errout.ads exp_disp.ads exp_disp.adb exp_tss.ads exp_util.ads \
+   expander.ads hostparm.ads itypes.ads namet.ads nlists.ads nmake.ads \
+   opt.ads rtsfind.ads sem.ads sem_disp.ads sem_res.ads sem_util.ads \
+   sinfo.ads snames.ads stand.ads system.ads s-assert.ads s-exctab.ads \
+   s-stalib.ads s-wchcon.ads table.ads tbuild.ads types.ads uintp.ads \
+   unchconv.ads unchdeal.ads urealp.ads 
+
+exp_dist.o : alloc.ads atree.ads casing.ads einfo.ads exp_dist.ads \
+   exp_dist.adb exp_tss.ads fname.ads get_targ.ads gnat.ads g-os_lib.ads \
+   hostparm.ads lib.ads lib-load.ads namet.ads nlists.ads nmake.ads \
+   opt.ads output.ads rtsfind.ads sem.ads sem_dist.ads sem_util.ads \
+   sinfo.ads snames.ads sprint.ads stand.ads stringt.ads system.ads \
+   s-exctab.ads s-stalib.ads s-wchcon.ads table.ads tbuild.ads ttypes.ads \
+   types.ads uintp.ads uname.ads unchconv.ads unchdeal.ads urealp.ads 
+
+exp_fixd.o : alloc.ads atree.ads einfo.ads exp_fixd.ads exp_fixd.adb \
+   exp_util.ads gnat.ads g-os_lib.ads hostparm.ads namet.ads nlists.ads \
+   nmake.ads opt.ads output.ads rtsfind.ads sem.ads sem_res.ads \
+   sem_util.ads sinfo.ads snames.ads stand.ads system.ads s-assert.ads \
+   s-exctab.ads s-stalib.ads s-wchcon.ads table.ads tbuild.ads treepr.ads \
+   types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+exp_intr.o : alloc.ads atree.ads einfo.ads exp_ch4.ads exp_ch7.ads \
+   exp_code.ads exp_fixd.ads exp_intr.ads exp_intr.adb exp_util.ads \
+   hostparm.ads namet.ads nlists.ads nmake.ads opt.ads rtsfind.ads sem.ads \
+   sem_eval.ads sem_res.ads sem_util.ads sinfo.ads snames.ads stand.ads \
+   stringt.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   s-wchcon.ads table.ads tbuild.ads types.ads uintp.ads unchconv.ads \
+   unchdeal.ads urealp.ads 
+
+exp_pakd.o : alloc.ads atree.ads debug.ads einfo.ads exp_ch4.ads \
+   exp_pakd.ads exp_pakd.adb exp_util.ads freeze.ads get_targ.ads gnat.ads \
+   g-os_lib.ads hostparm.ads itypes.ads namet.ads nlists.ads nmake.ads \
+   opt.ads output.ads rtsfind.ads sem.ads sem_ch13.ads sem_ch8.ads \
+   sem_eval.ads sem_res.ads sem_util.ads sinfo.ads snames.ads stand.ads \
+   system.ads s-assert.ads s-exctab.ads s-stalib.ads s-wchcon.ads \
+   table.ads tbuild.ads ttypes.ads types.ads uintp.ads unchconv.ads \
+   unchdeal.ads urealp.ads 
+
+exp_prag.o : alloc.ads atree.ads casing.ads einfo.ads exp_prag.ads \
+   exp_prag.adb exp_tss.ads exp_util.ads hostparm.ads lib.ads namet.ads \
+   nlists.ads nmake.ads opt.ads rtsfind.ads sem.ads sem_eval.ads \
+   sem_util.ads sinfo.ads sinput.ads snames.ads stand.ads stringt.ads \
+   system.ads s-exctab.ads s-stalib.ads s-wchcon.ads table.ads tbuild.ads \
+   types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+exp_strm.o : alloc.ads atree.ads casing.ads einfo.ads exp_strm.ads \
+   exp_strm.adb exp_util.ads get_targ.ads hostparm.ads lib.ads \
+   lib-writ.ads namet.ads nlists.ads nmake.ads rtsfind.ads sem_eval.ads \
+   sinfo.ads snames.ads stand.ads system.ads s-assert.ads s-exctab.ads \
+   s-stalib.ads table.ads tbuild.ads ttypes.ads types.ads uintp.ads \
+   unchconv.ads unchdeal.ads urealp.ads 
+
+exp_tss.o : alloc.ads atree.ads casing.ads einfo.ads elists.ads \
+   exp_tss.ads exp_tss.adb exp_util.ads gnat.ads g-os_lib.ads hostparm.ads \
+   lib.ads namet.ads nlists.ads nmake.ads opt.ads output.ads rtsfind.ads \
+   sem.ads sem_util.ads sinfo.ads snames.ads system.ads s-assert.ads \
+   s-exctab.ads s-stalib.ads s-wchcon.ads table.ads types.ads uintp.ads \
+   unchconv.ads unchdeal.ads urealp.ads 
+
+exp_util.o : alloc.ads atree.ads casing.ads einfo.ads elists.ads \
+   exp_ch7.ads exp_util.ads exp_util.adb expander.ads get_targ.ads \
+   gnat.ads g-os_lib.ads hostparm.ads itypes.ads lib.ads lib-writ.ads \
+   namet.ads nlists.ads nmake.ads opt.ads output.ads rtsfind.ads sem.ads \
+   sem_eval.ads sem_res.ads sem_util.ads sinfo.ads snames.ads stand.ads \
+   system.ads s-assert.ads s-exctab.ads s-stalib.ads s-wchcon.ads \
+   table.ads tbuild.ads ttypes.ads types.ads uintp.ads unchconv.ads \
+   unchdeal.ads urealp.ads 
+
+expander.o : alloc.ads atree.ads debug.ads debug_a.ads einfo.ads \
+   errout.ads exp_aggr.ads exp_attr.ads exp_ch11.ads exp_ch13.ads \
+   exp_ch2.ads exp_ch3.ads exp_ch4.ads exp_ch5.ads exp_ch6.ads exp_ch7.ads \
+   exp_ch8.ads exp_ch9.ads exp_prag.ads expander.ads expander.adb gnat.ads \
+   g-os_lib.ads hostparm.ads opt.ads output.ads sem.ads sem_util.ads \
+   sinfo.ads snames.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   s-wchcon.ads table.ads table.adb tree_io.ads types.ads uintp.ads \
+   unchconv.ads unchdeal.ads urealp.ads 
+
+features.o : alloc.ads casing.ads csets.ads debug.ads features.ads \
+   features.adb gnat.ads g-hesora.ads g-os_lib.ads hostparm.ads lib.ads \
+   namet.ads opt.ads output.ads sinput.ads system.ads s-assert.ads \
+   s-exctab.ads s-stalib.ads s-wchcon.ads table.ads table.adb tree_io.ads \
+   types.ads uname.ads unchconv.ads unchdeal.ads 
+
+fname.o : alloc.ads debug.ads fname.ads fname.adb gnat.ads g-htable.ads \
+   g-htable.adb g-os_lib.ads hostparm.ads krunch.ads namet.ads opt.ads \
+   output.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   s-wchcon.ads table.ads table.adb tree_io.ads types.ads unchconv.ads \
+   unchdeal.ads widechar.ads 
+
+freeze.o : alloc.ads atree.ads debug.ads einfo.ads elists.ads errout.ads \
+   exp_pakd.ads exp_util.ads expander.ads freeze.ads freeze.adb \
+   get_targ.ads gnat.ads g-os_lib.ads hostparm.ads itypes.ads namet.ads \
+   nlists.ads nmake.ads opt.ads output.ads rtsfind.ads sem.ads \
+   sem_ch13.ads sem_ch3.ads sem_ch6.ads sem_ch7.ads sem_ch8.ads \
+   sem_eval.ads sem_mech.ads sem_res.ads sem_util.ads sinfo.ads snames.ads \
+   stand.ads system.ads s-exctab.ads s-stalib.ads s-wchcon.ads table.ads \
+   tbuild.ads ttypes.ads types.ads uintp.ads unchconv.ads unchdeal.ads \
+   urealp.ads 
+
+frontend.o : alloc.ads atree.ads casing.ads cstand.ads debug.ads einfo.ads \
+   elists.ads errout.ads fname.ads frontend.ads frontend.adb gnat.ads \
+   g-os_lib.ads hostparm.ads inline.ads lib.ads lib-load.ads namet.ads \
+   nlists.ads opt.ads output.ads par.ads rtsfind.ads scn.ads sem.ads \
+   sem_ch8.ads sinfo.ads sinput.ads snames.ads sprint.ads system.ads \
+   s-exctab.ads s-stalib.ads s-wchcon.ads table.ads treepr.ads types.ads \
+   uintp.ads unchconv.ads unchdeal.ads urealp.ads usage.ads 
+
+g-hesora.o : gnat.ads g-hesora.ads g-hesora.adb 
+
+g-htable.o : gnat.ads g-htable.ads g-htable.adb 
+
+g-os_lib.o : gnat.ads g-os_lib.ads g-os_lib.adb system.ads unchconv.ads 
+
+get_targ.o : get_targ.ads get_targ.adb system.ads s-assert.ads \
+   s-exctab.ads s-stalib.ads types.ads unchconv.ads unchdeal.ads 
+
+gnat.o : gnat.ads 
+
+gnat1drv.o : alloc.ads atree.ads back_end.ads casing.ads comperr.ads \
+   csets.ads debug.ads einfo.ads elists.ads errout.ads features.ads \
+   fname.ads frontend.ads gnat.ads g-os_lib.ads gnat1drv.ads gnat1drv.adb \
+   gnatvsn.ads hostparm.ads inline.ads lib.ads lib-writ.ads namet.ads \
+   nlists.ads opt.ads osint.ads output.ads par.ads sem.ads sinfo.ads \
+   sinput.ads sinput-l.ads snames.ads sprint.ads stringt.ads system.ads \
+   s-assert.ads s-exctab.ads s-stalib.ads s-tasoli.ads s-wchcon.ads \
+   table.ads tree_gen.ads treepr.ads types.ads uintp.ads uname.ads \
+   unchconv.ads unchdeal.ads urealp.ads usage.ads 
+
+gnatbind.o : ali.ads bcheck.ads binde.ads binderr.ads bindgen.ads \
+   bindusg.ads butil.ads gnat.ads g-os_lib.ads gnatbind.ads gnatbind.adb \
+   gnatvsn.ads hostparm.ads namet.ads opt.ads osint.ads output.ads \
+   switch.ads system.ads s-exctab.ads s-stalib.ads s-tasoli.ads \
+   s-wchcon.ads table.ads types.ads unchconv.ads unchdeal.ads 
+
+gnatcmd.o : ada.ads a-charac.ads a-chahan.ads a-comlin.ads a-finali.ads \
+   a-filico.ads a-ioexce.ads a-stream.ads a-tags.ads a-textio.ads gnat.ads \
+   g-os_lib.ads gnatcmd.ads gnatcmd.adb hostparm.ads system.ads \
+   s-assert.ads s-exctab.ads s-ficobl.ads s-finimp.ads s-finroo.ads \
+   s-parame.ads s-secsta.ads s-stalib.ads s-stoele.ads s-stratt.ads \
+   s-strops.ads s-tasoli.ads s-unstyp.ads unchconv.ads 
+
+gnatfdrv.o : alloc.ads casing.ads comperr.ads csets.ads debug.ads \
+   errout.ads features.ads frontend.ads gnat.ads g-os_lib.ads gnatfdrv.ads \
+   gnatfdrv.adb gnatvsn.ads hostparm.ads lib.ads namet.ads opt.ads \
+   osint.ads output.ads par.ads sem_type.ads snames.ads sprint.ads \
+   stringt.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   s-tasoli.ads s-wchcon.ads table.ads treepr.ads types.ads uintp.ads \
+   unchconv.ads unchdeal.ads urealp.ads usage.ads xref.ads 
+
+gnatkr.o : ada.ads a-charac.ads a-chahan.ads a-comlin.ads gnatkr.ads \
+   gnatkr.adb krunch.ads system.ads s-exctab.ads s-io.ads s-secsta.ads \
+   s-stalib.ads s-stoele.ads s-tasoli.ads unchconv.ads 
+
+gnatlink.o : ada.ads a-comlin.ads debug.ads gnat.ads g-os_lib.ads \
+   gnatlink.ads gnatlink.adb gnatvsn.ads hostparm.ads interfac.ads \
+   i-cstrea.ads opt.ads osint.ads output.ads system.ads s-assert.ads \
+   s-exctab.ads s-secsta.ads s-stalib.ads s-stoele.ads s-strops.ads \
+   s-tasoli.ads s-wchcon.ads table.ads table.adb tree_io.ads types.ads \
+   unchconv.ads unchdeal.ads 
+
+gnatmake.o : gnat.ads g-os_lib.ads gnatmake.ads gnatmake.adb make.ads \
+   system.ads s-exctab.ads s-stalib.ads types.ads unchconv.ads \
+   unchdeal.ads 
+
+gnatprep.o : ada.ads a-charac.ads a-chahan.ads a-comlin.ads a-finali.ads \
+   a-filico.ads a-ioexce.ads a-stream.ads a-tags.ads a-textio.ads gnat.ads \
+   g-hesorg.ads g-hesorg.adb gnatprep.ads gnatprep.adb system.ads \
+   s-exctab.ads s-ficobl.ads s-finimp.ads s-finroo.ads s-imgint.ads \
+   s-parame.ads s-secsta.ads s-stalib.ads s-stoele.ads s-stratt.ads \
+   s-strops.ads s-tasoli.ads s-unstyp.ads unchconv.ads 
+
+gnatvsn.o : gnatvsn.ads 
+
+hostparm.o : hostparm.ads 
+
+i-cstrea.o : interfac.ads i-cstrea.ads i-cstrea.adb system.ads \
+   unchconv.ads 
+
+inline.o : alloc.ads atree.ads casing.ads debug.ads einfo.ads elists.ads \
+   errout.ads exp_ch7.ads expander.ads gnat.ads g-os_lib.ads hostparm.ads \
+   inline.ads inline.adb lib.ads namet.ads opt.ads output.ads sem_ch10.ads \
+   sem_ch12.ads sem_ch8.ads sem_util.ads sinfo.ads snames.ads stand.ads \
+   system.ads s-assert.ads s-exctab.ads s-stalib.ads s-wchcon.ads \
+   table.ads table.adb tree_io.ads types.ads uintp.ads uname.ads \
+   unchconv.ads unchdeal.ads urealp.ads 
+
+interfac.o : interfac.ads 
+
+itypes.o : alloc.ads atree.ads debug.ads einfo.ads exp_util.ads gnat.ads \
+   g-os_lib.ads hostparm.ads itypes.ads itypes.adb namet.ads nlists.ads \
+   nmake.ads opt.ads output.ads rtsfind.ads sem_util.ads sinfo.ads \
+   snames.ads stand.ads system.ads s-exctab.ads s-stalib.ads s-wchcon.ads \
+   table.ads table.adb tree_io.ads types.ads uintp.ads unchconv.ads \
+   unchdeal.ads urealp.ads 
+
+krunch.o : hostparm.ads krunch.ads krunch.adb 
+
+lib-load.o : alloc.ads atree.ads casing.ads debug.ads einfo.ads errout.ads \
+   fname.ads gnat.ads g-os_lib.ads lib.ads lib-load.ads lib-load.adb \
+   osint.ads output.ads par.ads restrict.ads scn.ads sinfo.ads sinput.ads \
+   sinput-l.ads snames.ads system.ads s-exctab.ads s-stalib.ads table.ads \
+   types.ads uintp.ads uname.ads unchconv.ads unchdeal.ads urealp.ads 
+
+lib-writ.o : alloc.ads atree.ads casing.ads einfo.ads fname.ads gnat.ads \
+   g-os_lib.ads gnatvsn.ads hostparm.ads lib.ads lib-writ.ads lib-writ.adb \
+   namet.ads nlists.ads opt.ads osint.ads output.ads sinfo.ads sinput.ads \
+   snames.ads stringt.ads system.ads s-exctab.ads s-stalib.ads \
+   s-wchcon.ads table.ads types.ads uintp.ads uname.ads unchconv.ads \
+   unchdeal.ads urealp.ads 
+
+lib.o : alloc.ads atree.ads casing.ads debug.ads einfo.ads fname.ads \
+   gnat.ads g-hesora.ads g-os_lib.ads hostparm.ads lib.ads lib.adb \
+   lib-list.adb lib-sort.adb namet.ads opt.ads output.ads sinfo.ads \
+   sinput.ads snames.ads stand.ads stringt.ads system.ads s-assert.ads \
+   s-exctab.ads s-stalib.ads s-wchcon.ads table.ads table.adb tree_io.ads \
+   types.ads uintp.ads uname.ads unchconv.ads unchdeal.ads urealp.ads 
+
+make.o : ada.ads a-comlin.ads ali.ads csets.ads debug.ads fname.ads \
+   gnat.ads g-os_lib.ads gnatvsn.ads hostparm.ads make.ads make.adb \
+   namet.ads opt.ads osint.ads output.ads switch.ads system.ads \
+   s-assert.ads s-exctab.ads s-secsta.ads s-stalib.ads s-stoele.ads \
+   s-tasoli.ads s-wchcon.ads table.ads table.adb tree_io.ads types.ads \
+   unchconv.ads unchdeal.ads 
+
+namet.o : alloc.ads debug.ads gnat.ads g-os_lib.ads hostparm.ads namet.ads \
+   namet.adb opt.ads output.ads system.ads s-assert.ads s-exctab.ads \
+   s-stalib.ads s-wchcon.ads table.ads table.adb tree_io.ads types.ads \
+   unchconv.ads unchdeal.ads widechar.ads 
+
+nlists.o : alloc.ads atree.ads debug.ads einfo.ads gnat.ads g-os_lib.ads \
+   hostparm.ads nlists.ads nlists.adb opt.ads output.ads sinfo.ads \
+   snames.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   s-wchcon.ads table.ads table.adb tree_io.ads types.ads uintp.ads \
+   unchconv.ads unchdeal.ads urealp.ads 
+
+nmake.o : alloc.ads atree.ads einfo.ads hostparm.ads namet.ads nlists.ads \
+   nmake.ads nmake.adb sinfo.ads snames.ads stand.ads system.ads \
+   s-exctab.ads s-stalib.ads table.ads types.ads uintp.ads unchconv.ads \
+   unchdeal.ads urealp.ads 
+
+opt.o : gnat.ads g-os_lib.ads hostparm.ads namet.ads opt.ads opt.adb \
+   system.ads s-exctab.ads s-stalib.ads s-wchcon.ads table.ads tree_io.ads \
+   types.ads unchconv.ads unchdeal.ads 
+
+osint.o : debug.ads gnat.ads g-htable.ads g-htable.adb g-os_lib.ads \
+   hostparm.ads namet.ads opt.ads osint.ads osint.adb output.ads \
+   sdefault.ads switch.ads system.ads s-assert.ads s-exctab.ads \
+   s-stalib.ads s-wchcon.ads table.ads table.adb tree_io.ads types.ads \
+   unchconv.ads unchdeal.ads 
+
+output.o : gnat.ads g-os_lib.ads hostparm.ads output.ads output.adb \
+   system.ads s-exctab.ads s-stalib.ads types.ads unchconv.ads \
+   unchdeal.ads 
+
+par.o : alloc.ads atree.ads casing.ads csets.ads debug.ads einfo.ads \
+   elists.ads errout.ads features.ads fname.ads gnat.ads g-os_lib.ads \
+   hostparm.ads lib.ads lib-load.ads namet.ads nlists.ads nmake.ads \
+   opt.ads osint.ads output.ads par.ads par.adb par-ch10.adb par-ch11.adb \
+   par-ch12.adb par-ch13.adb par-ch2.adb par-ch3.adb par-ch4.adb \
+   par-ch5.adb par-ch6.adb par-ch7.adb par-ch8.adb par-ch9.adb \
+   par-endh.adb par-labl.adb par-load.adb par-prag.adb par-sync.adb \
+   par-tchk.adb par-util.adb scans.ads scn.ads sem_dist.ads sem_prag.ads \
+   sinfo.ads sinfo-cn.ads sinput.ads sinput-l.ads snames.ads stringt.ads \
+   style.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   s-tasoli.ads s-wchcon.ads table.ads table.adb tbuild.ads tree_io.ads \
+   types.ads uintp.ads uname.ads unchconv.ads unchdeal.ads urealp.ads 
+
+restrict.o : alloc.ads atree.ads casing.ads einfo.ads errout.ads \
+   exp_util.ads fname.ads gnat.ads g-os_lib.ads hostparm.ads namet.ads \
+   nlists.ads nmake.ads opt.ads output.ads restrict.ads restrict.adb \
+   rtsfind.ads sem.ads sinfo.ads snames.ads stand.ads system.ads \
+   s-exctab.ads s-stalib.ads s-wchcon.ads table.ads tbuild.ads types.ads \
+   uintp.ads uname.ads unchconv.ads unchdeal.ads urealp.ads 
+
+rtsfind.o : alloc.ads atree.ads casing.ads csets.ads einfo.ads fname.ads \
+   gnat.ads g-os_lib.ads hostparm.ads lib.ads lib-load.ads namet.ads \
+   nlists.ads nmake.ads opt.ads output.ads rtsfind.ads rtsfind.adb sem.ads \
+   sem_util.ads sinfo.ads snames.ads stand.ads system.ads s-assert.ads \
+   s-exctab.ads s-stalib.ads s-wchcon.ads table.ads tbuild.ads types.ads \
+   uintp.ads uname.ads unchconv.ads unchdeal.ads urealp.ads 
+
+s-assert.o : system.ads s-assert.ads s-assert.adb s-exctab.ads \
+   s-stalib.ads s-taspda.ads unchconv.ads 
+
+s-bitops.o : system.ads s-bitops.ads s-bitops.adb s-unstyp.ads \
+   unchconv.ads 
+
+s-exctab.o : gnat.ads g-htable.ads g-htable.adb system.ads s-exctab.ads \
+   s-exctab.adb s-stalib.ads unchconv.ads 
+
+s-ficobl.o : ada.ads a-finali.ads a-filico.ads a-stream.ads a-tags.ads \
+   system.ads s-exctab.ads s-ficobl.ads s-finimp.ads s-finroo.ads \
+   s-secsta.ads s-stalib.ads s-stoele.ads s-stratt.ads s-unstyp.ads \
+   unchconv.ads 
+
+s-fileio.o : ada.ads a-finali.ads a-filico.ads a-ioexce.ads a-stream.ads \
+   a-tags.ads interfac.ads i-cstrea.ads system.ads s-exctab.ads \
+   s-ficobl.ads s-fileio.ads s-fileio.adb s-finimp.ads s-finroo.ads \
+   s-secsta.ads s-stalib.ads s-stoele.ads s-stratt.ads s-tasoli.ads \
+   s-unstyp.ads unchconv.ads unchdeal.ads 
+
+s-finimp.o : ada.ads a-except.ads a-stream.ads a-tags.ads a-unccon.ads \
+   system.ads s-exctab.ads s-finimp.ads s-finimp.adb s-finroo.ads \
+   s-secsta.ads s-stalib.ads s-stoele.ads s-stratt.ads s-strops.ads \
+   s-tasoli.ads s-unstyp.ads unchconv.ads 
+
+s-finroo.o : ada.ads a-stream.ads a-tags.ads system.ads s-exctab.ads \
+   s-finroo.ads s-finroo.adb s-secsta.ads s-stalib.ads s-stoele.ads \
+   s-stratt.ads s-unstyp.ads unchconv.ads 
+
+s-imgint.o : system.ads s-imgint.ads s-imgint.adb s-secsta.ads \
+   s-stoele.ads 
+
+s-imguns.o : system.ads s-imguns.ads s-imguns.adb s-secsta.ads \
+   s-stoele.ads s-unstyp.ads 
+
+s-io.o : system.ads s-io.ads s-io.adb 
+
+s-parame.o : system.ads s-parame.ads s-parame.adb 
+
+s-secsta.o : system.ads s-secsta.ads s-secsta.adb s-stoele.ads \
+   s-taspda.ads s-tasoli.ads unchconv.ads unchdeal.ads 
+
+s-stalib.o : system.ads s-stalib.ads s-stalib.adb s-taspda.ads \
+   s-tasoli.ads unchconv.ads 
+
+s-stoele.o : system.ads s-stoele.ads s-stoele.adb unchconv.ads 
+
+s-stopoo.o : ada.ads a-finali.ads a-stream.ads a-tags.ads system.ads \
+   s-exctab.ads s-finimp.ads s-finroo.ads s-secsta.ads s-stalib.ads \
+   s-stoele.ads s-stopoo.ads s-stratt.ads s-unstyp.ads unchconv.ads 
+
+s-stratt.o : ada.ads a-ioexce.ads a-stream.ads a-tags.ads system.ads \
+   s-exctab.ads s-stalib.ads s-stoele.ads s-stratt.ads s-stratt.adb \
+   s-unstyp.ads unchconv.ads 
+
+s-strops.o : system.ads s-secsta.ads s-stoele.ads s-strops.ads \
+   s-strops.adb 
+
+s-tasoli.o : system.ads s-stalib.ads s-taspda.ads s-tasoli.ads \
+   s-tasoli.adb unchconv.ads 
+
+s-taspda.o : system.ads s-stalib.ads s-taspda.ads s-taspda.adb \
+   s-tasoli.ads unchconv.ads unchdeal.ads 
+
+s-unstyp.o : system.ads s-unstyp.ads 
+
+s-wchcnv.o : system.ads s-wchcnv.ads s-wchcnv.adb s-wchcon.ads \
+   s-wchjis.ads 
+
+s-wchcon.o : system.ads s-wchcon.ads 
+
+s-wchjis.o : system.ads s-wchjis.ads s-wchjis.adb 
+
+scans.o : scans.ads scans.adb system.ads s-exctab.ads s-stalib.ads \
+   types.ads unchconv.ads unchdeal.ads 
+
+scn.o : alloc.ads atree.ads casing.ads csets.ads debug.ads einfo.ads \
+   errout.ads features.ads gnat.ads g-os_lib.ads hostparm.ads lib.ads \
+   namet.ads opt.ads output.ads scans.ads scn.ads scn.adb scn-nlit.adb \
+   scn-slit.adb sinfo.ads sinput.ads snames.ads stringt.ads style.ads \
+   system.ads s-assert.ads s-exctab.ads s-stalib.ads s-wchcon.ads \
+   table.ads types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads \
+   widechar.ads 
+
+sem.o : alloc.ads atree.ads casing.ads comperr.ads debug.ads debug_a.ads \
+   einfo.ads errout.ads expander.ads features.ads fname.ads gnat.ads \
+   g-os_lib.ads hostparm.ads itypes.ads lib.ads lib-load.ads namet.ads \
+   nlists.ads opt.ads output.ads par.ads restrict.ads scans.ads scn.ads \
+   sem.ads sem.adb sem_attr.ads sem_ch10.ads sem_ch11.ads sem_ch12.ads \
+   sem_ch13.ads sem_ch2.ads sem_ch3.ads sem_ch4.ads sem_ch5.ads \
+   sem_ch6.ads sem_ch7.ads sem_ch8.ads sem_ch9.ads sem_prag.ads \
+   sem_util.ads sinfo.ads sinput.ads sinput-l.ads snames.ads stand.ads \
+   system.ads s-assert.ads s-exctab.ads s-stalib.ads s-wchcon.ads \
+   table.ads table.adb tree_io.ads types.ads uintp.ads uname.ads \
+   unchconv.ads unchdeal.ads urealp.ads 
+
+sem_aggr.o : alloc.ads atree.ads checks.ads einfo.ads elists.ads \
+   errout.ads exp_util.ads expander.ads features.ads freeze.ads \
+   hostparm.ads itypes.ads namet.ads nlists.ads nmake.ads opt.ads \
+   rtsfind.ads sem.ads sem_aggr.ads sem_aggr.adb sem_case.ads sem_ch3.ads \
+   sem_eval.ads sem_res.ads sem_type.ads sem_util.ads sinfo.ads snames.ads \
+   stand.ads stringt.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   s-wchcon.ads table.ads tbuild.ads types.ads uintp.ads unchconv.ads \
+   unchdeal.ads urealp.ads 
+
+sem_attr.o : ada.ads a-charac.ads a-chlat1.ads alloc.ads atree.ads \
+   casing.ads checks.ads debug.ads einfo.ads errout.ads eval_fat.ads \
+   exp_tss.ads exp_util.ads features.ads fname.ads freeze.ads get_targ.ads \
+   gnat.ads g-os_lib.ads hostparm.ads lib.ads lib-load.ads namet.ads \
+   nlists.ads nmake.ads opt.ads output.ads restrict.ads rtsfind.ads \
+   sem.ads sem_attr.ads sem_attr.adb sem_ch13.ads sem_ch6.ads sem_ch8.ads \
+   sem_dist.ads sem_eval.ads sem_res.ads sem_type.ads sem_util.ads \
+   sinfo.ads sinput.ads snames.ads stand.ads stringt.ads system.ads \
+   s-assert.ads s-exctab.ads s-stalib.ads s-tasoli.ads s-wchcon.ads \
+   table.ads table.adb tbuild.ads tree_io.ads ttypef.ads ttypes.ads \
+   types.ads uintp.ads uname.ads unchconv.ads unchdeal.ads urealp.ads \
+   widechar.ads 
+
+sem_case.o : alloc.ads atree.ads einfo.ads errout.ads gnat.ads \
+   g-hesora.ads g-os_lib.ads hostparm.ads namet.ads nlists.ads opt.ads \
+   output.ads sem.ads sem_case.ads sem_case.adb sem_eval.ads sem_res.ads \
+   sem_type.ads sem_util.ads sinfo.ads snames.ads stand.ads system.ads \
+   s-assert.ads s-exctab.ads s-stalib.ads s-wchcon.ads table.ads types.ads \
+   uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+sem_ch10.o : alloc.ads atree.ads casing.ads debug.ads einfo.ads errout.ads \
+   exp_dist.ads expander.ads fname.ads gnat.ads g-os_lib.ads hostparm.ads \
+   lib.ads lib-load.ads lib-writ.ads namet.ads nlists.ads nmake.ads \
+   opt.ads output.ads restrict.ads sem.ads sem_ch10.ads sem_ch10.adb \
+   sem_ch6.ads sem_ch7.ads sem_ch8.ads sem_dist.ads sem_prag.ads \
+   sem_util.ads sinfo.ads sinfo-cn.ads sinput.ads snames.ads stand.ads \
+   stringt.ads system.ads s-exctab.ads s-stalib.ads s-wchcon.ads table.ads \
+   tbuild.ads types.ads uintp.ads uname.ads unchconv.ads unchdeal.ads \
+   urealp.ads 
+
+sem_ch11.o : alloc.ads atree.ads casing.ads einfo.ads errout.ads \
+   features.ads hostparm.ads lib.ads namet.ads nlists.ads nmake.ads \
+   opt.ads restrict.ads rtsfind.ads sem.ads sem_ch11.ads sem_ch11.adb \
+   sem_ch5.ads sem_ch8.ads sem_dist.ads sem_res.ads sem_util.ads sinfo.ads \
+   snames.ads stand.ads system.ads s-exctab.ads s-stalib.ads s-wchcon.ads \
+   table.ads tbuild.ads types.ads uintp.ads uname.ads unchconv.ads \
+   unchdeal.ads urealp.ads 
+
+sem_ch12.o : alloc.ads atree.ads casing.ads debug.ads einfo.ads elists.ads \
+   errout.ads exp_ch7.ads expander.ads features.ads freeze.ads gnat.ads \
+   g-htable.ads g-htable.adb g-os_lib.ads hostparm.ads inline.ads lib.ads \
+   lib-load.ads namet.ads nlists.ads nmake.ads opt.ads output.ads \
+   rtsfind.ads sem.ads sem_ch10.ads sem_ch12.ads sem_ch12.adb sem_ch13.ads \
+   sem_ch3.ads sem_ch6.ads sem_ch7.ads sem_ch8.ads sem_dist.ads \
+   sem_eval.ads sem_res.ads sem_type.ads sem_util.ads sinfo.ads \
+   sinfo-cn.ads sinput.ads sinput-l.ads snames.ads stand.ads stringt.ads \
+   system.ads s-assert.ads s-exctab.ads s-stalib.ads s-tasoli.ads \
+   s-wchcon.ads table.ads table.adb tbuild.ads tree_io.ads types.ads \
+   uintp.ads uname.ads unchconv.ads unchdeal.ads urealp.ads 
+
+sem_ch13.o : alloc.ads atree.ads casing.ads einfo.ads errout.ads \
+   exp_tss.ads exp_util.ads features.ads freeze.ads get_targ.ads gnat.ads \
+   g-os_lib.ads hostparm.ads itypes.ads lib.ads namet.ads nlists.ads \
+   nmake.ads opt.ads output.ads rtsfind.ads sem.ads sem_ch13.ads \
+   sem_ch13.adb sem_ch3.ads sem_ch8.ads sem_eval.ads sem_res.ads \
+   sem_type.ads sem_util.ads sinfo.ads sinput.ads snames.ads stand.ads \
+   system.ads s-assert.ads s-exctab.ads s-stalib.ads s-wchcon.ads \
+   table.ads tbuild.ads ttypes.ads types.ads uintp.ads unchconv.ads \
+   unchdeal.ads urealp.ads 
+
+sem_ch2.o : alloc.ads atree.ads einfo.ads hostparm.ads namet.ads opt.ads \
+   sem_ch2.ads sem_ch2.adb sinfo.ads snames.ads stand.ads system.ads \
+   s-exctab.ads s-stalib.ads s-wchcon.ads table.ads types.ads uintp.ads \
+   unchconv.ads unchdeal.ads urealp.ads 
+
+sem_ch3.o : alloc.ads atree.ads casing.ads checks.ads debug.ads einfo.ads \
+   elists.ads errout.ads exp_ch3.ads exp_dist.ads exp_util.ads \
+   expander.ads features.ads freeze.ads get_targ.ads gnat.ads g-hesora.ads \
+   g-os_lib.ads hostparm.ads itypes.ads lib.ads namet.ads nlists.ads \
+   nmake.ads opt.ads output.ads restrict.ads rtsfind.ads sem.ads \
+   sem_case.ads sem_case.adb sem_ch13.ads sem_ch3.ads sem_ch3.adb \
+   sem_ch6.ads sem_ch7.ads sem_ch8.ads sem_disp.ads sem_dist.ads \
+   sem_eval.ads sem_mech.ads sem_res.ads sem_type.ads sem_util.ads \
+   sinfo.ads snames.ads stand.ads system.ads s-assert.ads s-exctab.ads \
+   s-stalib.ads s-wchcon.ads table.ads tbuild.ads treepr.ads ttypes.ads \
+   types.ads uintp.ads uname.ads unchconv.ads unchdeal.ads urealp.ads 
+
+sem_ch4.o : alloc.ads atree.ads debug.ads einfo.ads errout.ads exp_ch4.ads \
+   exp_util.ads expander.ads gnat.ads g-os_lib.ads hostparm.ads itypes.ads \
+   namet.ads nlists.ads nmake.ads opt.ads output.ads restrict.ads \
+   rtsfind.ads sem.ads sem_ch3.ads sem_ch4.ads sem_ch4.adb sem_ch8.ads \
+   sem_dist.ads sem_eval.ads sem_res.ads sem_type.ads sem_util.ads \
+   sinfo.ads sinfo-cn.ads snames.ads stand.ads system.ads s-assert.ads \
+   s-exctab.ads s-stalib.ads s-wchcon.ads table.ads tbuild.ads types.ads \
+   uintp.ads uname.ads unchconv.ads unchdeal.ads urealp.ads 
+
+sem_ch5.o : alloc.ads atree.ads checks.ads einfo.ads errout.ads \
+   exp_ch7.ads expander.ads gnat.ads g-hesora.ads g-os_lib.ads \
+   hostparm.ads itypes.ads namet.ads nlists.ads nmake.ads opt.ads \
+   output.ads sem.ads sem_case.ads sem_case.adb sem_ch3.ads sem_ch5.ads \
+   sem_ch5.adb sem_ch8.ads sem_disp.ads sem_eval.ads sem_res.ads \
+   sem_type.ads sem_util.ads sinfo.ads snames.ads stand.ads system.ads \
+   s-assert.ads s-exctab.ads s-stalib.ads s-wchcon.ads table.ads \
+   tbuild.ads types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+sem_ch6.o : alloc.ads atree.ads casing.ads checks.ads debug.ads einfo.ads \
+   elists.ads errout.ads exp_ch7.ads exp_util.ads expander.ads freeze.ads \
+   gnat.ads g-os_lib.ads hostparm.ads lib.ads namet.ads nlists.ads \
+   nmake.ads opt.ads output.ads rtsfind.ads sem.ads sem_ch12.ads \
+   sem_ch3.ads sem_ch4.ads sem_ch6.ads sem_ch6.adb sem_ch8.ads \
+   sem_disp.ads sem_dist.ads sem_eval.ads sem_mech.ads sem_prag.ads \
+   sem_res.ads sem_type.ads sem_util.ads sinfo.ads sinfo-cn.ads sinput.ads \
+   snames.ads stand.ads stringt.ads style.ads system.ads s-exctab.ads \
+   s-stalib.ads s-wchcon.ads table.ads tbuild.ads types.ads uintp.ads \
+   unchconv.ads unchdeal.ads urealp.ads 
+
+sem_ch7.o : alloc.ads atree.ads casing.ads debug.ads einfo.ads elists.ads \
+   errout.ads expander.ads features.ads gnat.ads g-os_lib.ads hostparm.ads \
+   itypes.ads lib.ads namet.ads nlists.ads nmake.ads opt.ads output.ads \
+   sem.ads sem_ch12.ads sem_ch13.ads sem_ch3.ads sem_ch7.ads sem_ch7.adb \
+   sem_ch8.ads sem_dist.ads sem_util.ads sinfo.ads sinput.ads snames.ads \
+   stand.ads system.ads s-exctab.ads s-stalib.ads s-wchcon.ads table.ads \
+   tbuild.ads types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+sem_ch8.o : alloc.ads atree.ads casing.ads debug.ads einfo.ads elists.ads \
+   errout.ads exp_util.ads expander.ads features.ads fname.ads freeze.ads \
+   gnat.ads g-os_lib.ads hostparm.ads lib.ads lib-load.ads namet.ads \
+   nlists.ads nmake.ads opt.ads output.ads restrict.ads rtsfind.ads \
+   sem.ads sem_attr.ads sem_ch2.ads sem_ch3.ads sem_ch4.ads sem_ch5.ads \
+   sem_ch6.ads sem_ch8.ads sem_ch8.adb sem_dist.ads sem_res.ads \
+   sem_type.ads sem_util.ads sinfo.ads sinfo-cn.ads snames.ads stand.ads \
+   system.ads s-assert.ads s-exctab.ads s-stalib.ads s-wchcon.ads \
+   table.ads table.adb tbuild.ads tree_io.ads treepr.ads types.ads \
+   uintp.ads uname.ads unchconv.ads unchdeal.ads urealp.ads 
+
+sem_ch9.o : alloc.ads atree.ads checks.ads einfo.ads elists.ads errout.ads \
+   exp_ch7.ads exp_ch9.ads features.ads get_targ.ads gnat.ads g-os_lib.ads \
+   hostparm.ads itypes.ads namet.ads nlists.ads nmake.ads opt.ads \
+   output.ads restrict.ads rtsfind.ads sem.ads sem_ch3.ads sem_ch4.ads \
+   sem_ch5.ads sem_ch6.ads sem_ch8.ads sem_ch9.ads sem_ch9.adb \
+   sem_dist.ads sem_eval.ads sem_res.ads sem_type.ads sem_util.ads \
+   sinfo.ads snames.ads stand.ads system.ads s-assert.ads s-exctab.ads \
+   s-stalib.ads s-wchcon.ads table.ads tbuild.ads ttypes.ads types.ads \
+   uintp.ads uname.ads unchconv.ads unchdeal.ads urealp.ads 
+
+sem_disp.o : alloc.ads atree.ads debug.ads einfo.ads elists.ads errout.ads \
+   exp_disp.ads gnat.ads g-os_lib.ads nlists.ads output.ads sem_ch6.ads \
+   sem_disp.ads sem_disp.adb sem_eval.ads sem_util.ads sinfo.ads \
+   snames.ads system.ads s-exctab.ads s-stalib.ads table.ads types.ads \
+   uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+sem_dist.o : alloc.ads atree.ads casing.ads einfo.ads elists.ads \
+   errout.ads exp_dist.ads exp_tss.ads fname.ads gnat.ads g-os_lib.ads \
+   hostparm.ads lib.ads lib-load.ads namet.ads nlists.ads nmake.ads \
+   opt.ads osint.ads output.ads rtsfind.ads sem.ads sem_ch7.ads \
+   sem_dist.ads sem_dist.adb sem_prag.ads sem_res.ads sem_util.ads \
+   sinfo.ads snames.ads sprint.ads stand.ads stringt.ads system.ads \
+   s-exctab.ads s-stalib.ads s-wchcon.ads table.ads tbuild.ads types.ads \
+   uintp.ads uname.ads unchconv.ads unchdeal.ads urealp.ads 
+
+sem_eval.o : alloc.ads atree.ads checks.ads einfo.ads elists.ads \
+   errout.ads exp_util.ads gnat.ads g-os_lib.ads hostparm.ads namet.ads \
+   nlists.ads nmake.ads opt.ads output.ads rtsfind.ads sem.ads \
+   sem_dist.ads sem_eval.ads sem_eval.adb sem_res.ads sem_type.ads \
+   sem_util.ads sinfo.ads snames.ads stand.ads stringt.ads system.ads \
+   s-assert.ads s-exctab.ads s-stalib.ads s-wchcon.ads table.ads \
+   tbuild.ads types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+sem_intr.o : alloc.ads atree.ads casing.ads debug.ads einfo.ads errout.ads \
+   fname.ads hostparm.ads lib.ads namet.ads sem_ch13.ads sem_eval.ads \
+   sem_intr.ads sem_intr.adb sem_util.ads sinfo.ads snames.ads stand.ads \
+   stringt.ads system.ads s-exctab.ads s-stalib.ads table.ads types.ads \
+   uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+sem_maps.o : alloc.ads atree.ads debug.ads einfo.ads gnat.ads g-os_lib.ads \
+   hostparm.ads namet.ads opt.ads output.ads sem_maps.ads sem_maps.adb \
+   sinfo.ads snames.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   s-wchcon.ads table.ads table.adb tree_io.ads types.ads uintp.ads \
+   unchconv.ads unchdeal.ads urealp.ads 
+
+sem_mech.o : alloc.ads atree.ads einfo.ads hostparm.ads opt.ads sem.ads \
+   sem_mech.ads sem_mech.adb sinfo.ads snames.ads system.ads s-exctab.ads \
+   s-stalib.ads s-wchcon.ads table.ads types.ads uintp.ads unchconv.ads \
+   unchdeal.ads urealp.ads 
+
+sem_prag.o : alloc.ads atree.ads casing.ads csets.ads debug.ads einfo.ads \
+   elists.ads errout.ads exp_util.ads expander.ads features.ads fname.ads \
+   get_targ.ads gnat.ads g-os_lib.ads hostparm.ads lib.ads lib-writ.ads \
+   namet.ads nlists.ads nmake.ads opt.ads output.ads restrict.ads \
+   rtsfind.ads sem.ads sem_ch13.ads sem_ch8.ads sem_disp.ads sem_dist.ads \
+   sem_eval.ads sem_intr.ads sem_mech.ads sem_prag.ads sem_prag.adb \
+   sem_res.ads sem_util.ads sinfo.ads sinput.ads snames.ads stand.ads \
+   stringt.ads system.ads s-exctab.ads s-stalib.ads s-tasoli.ads \
+   s-wchcon.ads table.ads tbuild.ads ttypes.ads types.ads uintp.ads \
+   uname.ads unchconv.ads unchdeal.ads urealp.ads 
+
+sem_res.o : alloc.ads atree.ads checks.ads debug.ads debug_a.ads einfo.ads \
+   errout.ads exp_ch7.ads exp_util.ads expander.ads features.ads \
+   freeze.ads gnat.ads g-os_lib.ads hostparm.ads itypes.ads namet.ads \
+   nlists.ads nmake.ads opt.ads output.ads restrict.ads rtsfind.ads \
+   sem.ads sem_aggr.ads sem_attr.ads sem_ch13.ads sem_ch4.ads sem_ch6.ads \
+   sem_ch8.ads sem_disp.ads sem_dist.ads sem_eval.ads sem_intr.ads \
+   sem_res.ads sem_res.adb sem_type.ads sem_util.ads sinfo.ads snames.ads \
+   stand.ads stringt.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   s-wchcon.ads table.ads tbuild.ads types.ads uintp.ads uname.ads \
+   unchconv.ads unchdeal.ads urealp.ads 
+
+sem_type.o : alloc.ads atree.ads debug.ads einfo.ads errout.ads gnat.ads \
+   g-os_lib.ads hostparm.ads namet.ads opt.ads output.ads sem_ch6.ads \
+   sem_ch8.ads sem_type.ads sem_type.adb sem_util.ads sinfo.ads snames.ads \
+   stand.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   s-wchcon.ads table.ads table.adb tree_io.ads types.ads uintp.ads \
+   unchconv.ads unchdeal.ads urealp.ads 
+
+sem_util.o : alloc.ads atree.ads casing.ads checks.ads debug.ads einfo.ads \
+   elists.ads errout.ads exp_util.ads expander.ads gnat.ads g-os_lib.ads \
+   hostparm.ads itypes.ads lib.ads namet.ads nlists.ads nmake.ads opt.ads \
+   output.ads rtsfind.ads scans.ads scn.ads sem.ads sem_ch8.ads \
+   sem_eval.ads sem_prag.ads sem_res.ads sem_type.ads sem_util.ads \
+   sem_util.adb sinfo.ads sinput.ads snames.ads stand.ads stringt.ads \
+   style.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   s-wchcon.ads table.ads tbuild.ads types.ads uintp.ads unchconv.ads \
+   unchdeal.ads urealp.ads 
+
+sinfo-cn.o : alloc.ads atree.ads einfo.ads sinfo.ads sinfo-cn.ads \
+   sinfo-cn.adb snames.ads system.ads s-exctab.ads s-stalib.ads table.ads \
+   types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+sinfo.o : alloc.ads atree.ads einfo.ads sinfo.ads sinfo.adb snames.ads \
+   system.ads s-assert.ads s-exctab.ads s-stalib.ads table.ads types.ads \
+   uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+sinput-l.o : alloc.ads atree.ads casing.ads debug.ads einfo.ads gnat.ads \
+   g-os_lib.ads hostparm.ads namet.ads opt.ads osint.ads output.ads \
+   scans.ads sinfo.ads sinput.ads sinput-l.ads sinput-l.adb snames.ads \
+   system.ads s-assert.ads s-exctab.ads s-stalib.ads s-wchcon.ads \
+   table.ads types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+sinput.o : alloc.ads casing.ads debug.ads gnat.ads g-os_lib.ads \
+   hostparm.ads namet.ads opt.ads output.ads scans.ads sinput.ads \
+   sinput.adb system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   s-wchcon.ads table.ads table.adb tree_io.ads types.ads unchconv.ads \
+   unchdeal.ads 
+
+snames.o : hostparm.ads namet.ads snames.ads snames.adb system.ads \
+   s-assert.ads s-exctab.ads s-stalib.ads table.ads types.ads unchconv.ads \
+   unchdeal.ads 
+
+sprint.o : alloc.ads atree.ads casing.ads debug.ads einfo.ads gnat.ads \
+   g-os_lib.ads hostparm.ads itypes.ads lib.ads namet.ads nlists.ads \
+   output.ads rtsfind.ads sem_util.ads sinfo.ads snames.ads sprint.ads \
+   sprint.adb stand.ads stringt.ads system.ads s-assert.ads s-exctab.ads \
+   s-stalib.ads table.ads types.ads uintp.ads uname.ads unchconv.ads \
+   unchdeal.ads urealp.ads 
+
+stand.o : gnat.ads g-os_lib.ads hostparm.ads namet.ads stand.ads stand.adb \
+   system.ads s-exctab.ads s-stalib.ads table.ads tree_io.ads types.ads \
+   unchconv.ads unchdeal.ads 
+
+stringt.o : alloc.ads debug.ads gnat.ads g-os_lib.ads hostparm.ads \
+   namet.ads opt.ads output.ads stringt.ads stringt.adb system.ads \
+   s-assert.ads s-exctab.ads s-stalib.ads s-wchcon.ads table.ads table.adb \
+   tree_io.ads types.ads unchconv.ads unchdeal.ads 
+
+style.o : alloc.ads atree.ads casing.ads csets.ads einfo.ads errout.ads \
+   gnat.ads g-os_lib.ads hostparm.ads namet.ads output.ads scans.ads \
+   scn.ads sinfo.ads sinput.ads snames.ads style.ads style.adb system.ads \
+   s-exctab.ads s-stalib.ads table.ads types.ads uintp.ads unchconv.ads \
+   unchdeal.ads urealp.ads 
+
+switch.o : debug.ads gnat.ads g-os_lib.ads hostparm.ads opt.ads osint.ads \
+   output.ads switch.ads switch.adb system.ads s-exctab.ads s-stalib.ads \
+   s-tasoli.ads s-wchcon.ads table.ads types.ads unchconv.ads unchdeal.ads 
+
+system.o : system.ads 
+
+tbuild.o : alloc.ads atree.ads casing.ads einfo.ads errout.ads gnat.ads \
+   g-os_lib.ads hostparm.ads lib.ads lib-writ.ads namet.ads nlists.ads \
+   nmake.ads output.ads sinfo.ads snames.ads stand.ads system.ads \
+   s-assert.ads s-exctab.ads s-stalib.ads table.ads tbuild.ads tbuild.adb \
+   types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+tree_gen.o : alloc.ads atree.ads casing.ads einfo.ads elists.ads fname.ads \
+   gnat.ads g-os_lib.ads hostparm.ads lib.ads namet.ads nlists.ads opt.ads \
+   osint.ads sinfo.ads sinput.ads snames.ads stand.ads stringt.ads \
+   system.ads s-exctab.ads s-stalib.ads s-wchcon.ads table.ads \
+   tree_gen.ads tree_gen.adb types.ads uintp.ads unchconv.ads unchdeal.ads \
+   urealp.ads 
+
+tree_io.o : debug.ads gnat.ads g-os_lib.ads output.ads system.ads \
+   s-exctab.ads s-stalib.ads s-tasoli.ads tree_io.ads tree_io.adb \
+   types.ads unchconv.ads unchdeal.ads 
+
+treepr.o : alloc.ads atree.ads casing.ads comperr.ads csets.ads debug.ads \
+   einfo.ads elists.ads gnat.ads g-os_lib.ads hostparm.ads itypes.ads \
+   lib.ads namet.ads nlists.ads output.ads sem_mech.ads sem_util.ads \
+   sinfo.ads sinput.ads snames.ads stand.ads stringt.ads system.ads \
+   s-assert.ads s-exctab.ads s-stalib.ads table.ads treepr.ads treepr.adb \
+   treeprs.ads types.ads uintp.ads uname.ads unchconv.ads unchdeal.ads \
+   urealp.ads 
+
+treeprs.o : sinfo.ads system.ads s-exctab.ads s-stalib.ads treeprs.ads \
+   types.ads uintp.ads unchconv.ads unchdeal.ads urealp.ads 
+
+ttypef.o : ttypef.ads 
+
+ttypes.o : get_targ.ads system.ads s-exctab.ads s-stalib.ads ttypes.ads \
+   types.ads unchconv.ads unchdeal.ads 
+
+types.o : system.ads s-exctab.ads s-stalib.ads types.ads types.adb \
+   unchconv.ads unchdeal.ads 
+
+uintp.o : alloc.ads debug.ads gnat.ads g-os_lib.ads hostparm.ads namet.ads \
+   opt.ads output.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   s-wchcon.ads table.ads table.adb tree_io.ads types.ads uintp.ads \
+   uintp.adb unchconv.ads unchdeal.ads 
+
+uname.o : alloc.ads atree.ads casing.ads einfo.ads gnat.ads g-os_lib.ads \
+   hostparm.ads lib.ads namet.ads nlists.ads output.ads sinfo.ads \
+   sinput.ads snames.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   table.ads types.ads uintp.ads uname.ads uname.adb unchconv.ads \
+   unchdeal.ads urealp.ads 
+
+urealp.o : alloc.ads debug.ads gnat.ads g-os_lib.ads hostparm.ads opt.ads \
+   output.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   s-wchcon.ads table.ads table.adb tree_io.ads types.ads uintp.ads \
+   unchconv.ads unchdeal.ads urealp.ads urealp.adb 
+
+usage.o : gnat.ads g-os_lib.ads osint.ads output.ads system.ads \
+   s-exctab.ads s-stalib.ads s-wchcon.ads table.ads types.ads unchconv.ads \
+   unchdeal.ads usage.ads usage.adb 
+
+widechar.o : hostparm.ads opt.ads system.ads s-exctab.ads s-stalib.ads \
+   s-tasoli.ads s-wchcnv.ads s-wchcnv.adb s-wchcon.ads s-wchjis.ads \
+   types.ads unchconv.ads unchdeal.ads widechar.ads widechar.adb 
+
+xref.o : alloc.ads atree.ads casing.ads einfo.ads elists.ads gnat.ads \
+   g-os_lib.ads hostparm.ads lib.ads namet.ads nlists.ads opt.ads \
+   osint.ads output.ads sinfo.ads sinput.ads snames.ads sprint.ads \
+   stand.ads system.ads s-assert.ads s-exctab.ads s-stalib.ads \
+   s-wchcon.ads table.ads types.ads uintp.ads unchconv.ads unchdeal.ads \
+   urealp.ads xref.ads xref.adb xref_tab.ads 
+
+xref_tab.o : alloc.ads atree.ads casing.ads csets.ads einfo.ads errout.ads \
+   gnat.ads g-os_lib.ads gnatvsn.ads hostparm.ads lib.ads namet.ads \
+   osint.ads sinfo.ads sinput.ads snames.ads stand.ads system.ads \
+   s-assert.ads s-exctab.ads s-stalib.ads table.ads types.ads uintp.ads \
+   unchconv.ads unchdeal.ads urealp.ads xref_tab.ads xref_tab.adb 
+
+# end of regular dependencies
+
+#In GNU Make, ignore whether `stage*' exists.
+.PHONY: stage1 stage2 stage3 stage4 clean realclean TAGS bootstrap
+.PHONY: risky-stage1 risky-stage2 risky-stage3 risky-stage4
+
+force:
+

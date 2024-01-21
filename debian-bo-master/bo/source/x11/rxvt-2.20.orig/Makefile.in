@@ -1,0 +1,92 @@
+# ./Makefile.in			-*- Makefile -*-
+@MCOMMON@
+basedir = $(srcdir)
+etcdir  = $(basedir)/etc
+thisdir = ./
+
+first_rule: all
+dummy:
+
+subdirs = src doc rclock src/graphics
+
+DIST_ETC = etc/XTerm.ad etc/color etc/xterm.tcap etc/xterm.ti etc/xmkdir
+
+DIST =	INSTALL Make.common.in Makefile.in config.h.in configure\
+	configure.in install.sh
+
+#-------------------------------------------------------------------------
+
+all allbin alldoc tags clean:
+	@for I in ${subdirs}; do (cd $$I; ${MAKE} $@ || exit 1); done
+
+#
+# entry points for other programs
+#
+rxvt:
+	(cd src; ${MAKE})
+
+clock:
+	(cd rclock; ${MAKE})
+
+graphics qplot:
+	(cd src/graphics; ${MAKE} qplot)
+
+#-------------------------------------------------------------------------
+
+configure: configure.in
+	cd $(srcdir); autoconf --localdir=$(srcdir) $(srcdir)/configure.in > configure
+	chmod 755 configure
+
+# acconfig.h
+config.h.in: configure.in
+	cd $(srcdir); autoheader
+
+install: installdirs
+	@for I in $(subdirs); do (cd $$I; $(MAKE) DESTDIR=$(DESTDIR) $@ || exit 1); done
+
+installdirs:
+	$(etcdir)/xmkdir $(DESTDIR)$(bindir)
+	$(etcdir)/xmkdir $(DESTDIR)$(mandir)
+
+Makefiles:
+	$(SHELL) config.status
+
+config.status:
+	if test -x config.status; then config.status --recheck; \
+	else $(SHELL) configure; fi
+
+realclean:
+	$(RMF) *~ config.cache
+	@for I in ${subdirs}; do (cd $$I; ${MAKE} $@ || exit 1); done
+
+# distclean goal is for making a clean source tree, but if you have run
+# configure from a different directory, then doesn't destroy all your
+# hardly compiled and linked stuff. That's why there is always $(srcdir)/
+# In that case most of those commands do nothing, except cleaning *~
+# and cleaning source links.
+distclean:
+	(cd $(srcdir); $(RMF) *~ config.cache config.h config.log config.status)
+	@for I in $(subdirs); do (cd $$I; $(MAKE) $@ || exit 1); done
+	(cd $(srcdir); $(RMF) Makefile Make.common)
+
+distdirs:
+	mkdir ../$(VERNAME);
+	mkdir ../$(VERNAME)/etc;
+	@for I in $(subdirs); do (cd $$I; $(MAKE) $@ || exit 1); done
+
+distcopy:
+	$(CP) $(DIST) ../$(VERNAME);
+	$(CP) $(DIST_ETC) ../$(VERNAME)/etc;
+	@for I in $(subdirs); do (cd $$I; $(MAKE) $@ || exit 1); done
+
+distrib: configure config.h.in distdirs distcopy
+
+../$(VERNAME).tar.gz:
+	(cd ..; tar cvf - $(VERNAME) | gzip -f9 > $(VERNAME).tar.gz)
+
+tar.gz:  ../$(VERNAME).tar.gz
+
+uuencode: tar.gz
+	uuencode ../$(VERNAME).tar.gz $(VERNAME).tar.gz > ../$(VERNAME).tgz.uu
+
+# ------------------------------------------------------------------------

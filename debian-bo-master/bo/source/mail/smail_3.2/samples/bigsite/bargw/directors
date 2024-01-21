@@ -1,0 +1,177 @@
+#ident "@(#) directors,v 1.2 1990/10/24 05:19:59 tron Exp"
+
+# See smail(5) for a complete description of the contents of this
+# file.
+
+# aliasinclude - expand ":include:filename" addresses produced by alias files
+#
+# This entry and the next one are pretty much boiler-plate.  Reasons
+# for making significant changes are few.  The sole purpose of these
+# is to match and expand addresses of the form:
+#
+#	:include:pathname
+#
+# which may occur in alias files or mailing-list/forward files
+# (produced by any director with a driver of forwardfile).
+aliasinclude:
+	driver = aliasinclude,		# use this special-case driver
+	nobody;				# associate nobody user with addresses
+					#  when mild permission violations
+					#  are encountered
+
+	copysecure,			# get permissions from alias director
+	copyowners,			# get owners from alias director
+
+# forwardinclude - expand ":include:filename" addrs produced by forward files
+forwardinclude:
+	driver = forwardinclude,	# use this special-case driver
+	nobody;
+
+	copysecure,			# get perms from forwarding director
+	copyowners,			# get owners from forwarding director
+
+# aliases - search for alias expansions stored in a database
+#
+# This is the standard aliases file.  It is used for generic things,
+# like mapping root, postmaster, MAILER-DAEMON and uucp to site
+# admins, creating some small system alias expansions, and such.  In
+# this site configuration, the aliases file is used mostly for
+# machine-specific aliasing/forwarding information.  Global forwarding
+# information should be put in the "forward" database.
+aliases:
+	driver = aliasfile,		# general-purpose aliasing director
+	-nobody,			# all addresses are associated
+					# with nobody by default, so setting
+					# this is not useful.
+	owner = owner-$user;		# problems go to an owner address
+
+	file = /usr/lib/aliases,
+	modemask = 002,
+	proto = dbm,			# use dbm(3X) library for access
+
+# forward - search for expansions stored in a forwarding database
+#
+# This is the subdomain-wide user forwarding database.  Entries are
+# maintained here for current or past users, to forward their mail to
+# their preferred mail-reading machine.  The forward database is
+# shipped around the TCP/IP network as changes are made, to keep the
+# network consistent.
+forward:
+	driver = aliasfile,		# general-purpose aliasing director
+	-nobody,			# all addresses are associated
+					# with nobody by default, so setting
+					# this is not useful.
+	owner = real-$user;		# problems go to an owner address
+
+	file = /usr/lib/smail/forward,
+	modemask = 002,
+	proto = dbm,			# use dbm(3X) library for access
+
+# dotforward - expand .forward files in user home directories
+#
+# For users that have an entry in the "forward" database, a ".forward"
+# file is only used if it is on the "home" machine, as identified in
+# the forward database.  If used, it is treated as a list of addresses
+# to which mail should be delivered, rather than (or in addition to)
+# the user identified in the local address.
+dotforward:
+	driver = forwardfile,		# general-purpose forwarding director
+	owner = Postmaster,		# problems go to the site mail admin
+	nobody,
+	sender_okay;			# sender never removed from expansion
+
+	file = ~/.forward,		# .forward file in home directories
+	checkowner,			# the user can own this file
+	owners = root,			# or root can own the file
+	modemask = 002,			# it should not be globally writable
+	caution = daemon:root,		# don't run things as root or daemon
+	# be extra carefull of remotely accessible home directories
+	unsecure = "~uucp:~nuucp:/tmp:/usr/tmp"
+
+# forwardto - expand a "Forward to " in user mailbox files
+#
+# This emulates the V6/V7/System-V forwarding mechanism which uses a
+# line of forward addresses stored at the beginning of user mailbox files
+# prefixed with the string "Forward to "
+forwardto:
+	driver = forwardfile,
+	owner = Postmaster, nobody, sender_okay;
+
+	file = /usr/mail/${lc:user},	# point at user mailbox files
+	forwardto,			# enable "Forward to " function
+	checkowner,			# the user can own this file
+	owners = root,			# or root can own the file
+	modemask = 0002,		# under System V, group mail can write
+	caution = daemon:root		# don't run things as root or daemon
+
+# user - match users on the local host with delivery to their mailboxes
+user:	driver = user;			# driver to match usernames
+
+	transport = local		# local transport goes to mailboxes
+
+# real_user - match usernames when prefixed with the string "real-"
+#
+# This is useful for allowing an address which explicitly delivers to a
+# user's mailbox file.  For example, errors in a .forward file expansion
+# could be delivered here, or forwarding loops between multiple machines
+# can be resolved by using a real-username address.  Also, users that
+# wish to use mail as a means of transferring data to a machine that
+# is not their "home" machine can mail to real-login-name@remote.host.
+real_user:
+	driver = user;
+
+	transport = local,
+	prefix = "real-"		# for example, match real-root
+
+# lists - expand mailing lists stored in a list directory
+#
+# mailing lists can be created simply by creating a file in the
+# /usr/lib/smail/lists directory.
+lists:	driver = forwardfile,
+	caution,			# flag all addresses with caution
+	nobody,				# and then associate the nobody user
+	owner = owner-$user;		# system V sites may wish to use
+					# o-$user, as owner-$user may be
+					# too long for a 14-char filename.
+
+	# map the name of the mailing list to lower case
+	file = lists/${lc:user}		# lists is under $smail_lib_dir
+
+# owners - expand mailing lists stored in a list owner directory
+#
+# mailing lists owner lists can be created simply by creating a file
+# in the /usr/lib/smail/lists/owner directory.  Mailing list owners
+# are sent locally generated errors dealing with a mailing list of the
+# same name.  To create an owner list for a mailing list, create a
+# file with the name of the list in /usr/lib/smail/lists/owner.  This
+# will create a list address of owner-listname, as is used by the
+# "lists" director above.
+owners:	driver = forwardfile,
+	caution,			# flag all addresses with caution
+	nobody,				# and then associate the nobody user
+	owner = postmaster;		# system V sites may wish to use
+					# o-$user, as owner-$user may be
+					# too long for a 14-char filename.
+
+	# map the name of the mailing list to lower case
+	prefix = "owner-",
+	file = lists/owner/${lc:user}	# lists is under $smail_lib_dir
+
+# request - expand mailing lists stored in a list request directory
+#
+# mailing lists request lists can be created simply by creating a file
+# in the /usr/lib/smail/lists/request directory.  Request addresses
+# are typically used as a standard address for queries about a mailing
+# list.  For example, requests for additions or deletions to a list
+# will generally be sent to "list-request", which should be set up to
+# forward to the appropriate person or persons.
+request: driver = forwardfile,
+	caution,			# flag all addresses with caution
+	nobody,				# and then associate the nobody user
+	owner = postmaster;		# system V sites may wish to use
+					# o-$user, as owner-$user may be
+					# too long for a 14-char filename.
+
+	# map the name of the mailing list to lower case
+	suffix = "-request",
+	file = lists/request/${lc:user}	# lists is under $smail_lib_dir

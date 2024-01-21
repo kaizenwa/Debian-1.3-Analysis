@@ -1,0 +1,226 @@
+.\" Hey, Emacs! This is an -*- nroff -*- source file.
+.\" Copyright (c) 1997 Manoj Srivastava <srivasta@debian.org>
+.\"
+.\" This is free documentation; you can redistribute it and/or
+.\" modify it under the terms of the GNU General Public License as
+.\" published by the Free Software Foundation; either version 2 of
+.\" the License, or (at your option) any later version.
+.\"
+.\" The GNU General Public License's references to "object code"
+.\" and "executables" are to be interpreted as the output of any
+.\" document formatting or typesetting system, including
+.\" intermediate and printed output.
+.\"
+.\" This manual is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public
+.\" License along with this manual; if not, write to the Free
+.\" Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139,
+.\" USA.
+.\"
+.TH MAKE\-KPKG 8 "Jan 7 1997" "Debian" "Debian GNU/Linux manual"
+.SH NAME
+make\-kpkg \- build Debian kernel packages from Linux kernel sources
+.SH SYNOPSIS
+.B make\-kpkg
+.I [options]
+\&[target [target ...]]
+.SH DESCRIPTION
+This manual page explains the Debian
+.B "make\-kpkg"
+utility, which is used to create the kernel related 
+Debian 
+packages. This utility needs to be run from a top level 
+Linux
+kernel source directory.
+.SH OPTIONS
+.B \-\-help
+Print out a usage message.
+.TP
+.BR \-\-revision " number"
+Sets the Debian revision number for the packages produced to the argument
+.BR number.
+This has certain constraints: it may contain only
+alphanumerics and the characters + . (full stop, and plus) and must
+contain a digit.
+.BR  NOTE:
+No hyphens allowed. (Look at Chapter 5 of the Programmers manual for details)
+.TP
+.BR \-\-pgpsign " name"
+Set the string used to sign the 
+.B changes 
+file for any external modules in 
+.IR /usr/src/modules/
+using PGP. This option will override the builtin default and the site
+wide customizations stored in the file 
+.IR /etc/kernel-pkg.conf.
+.TP
+.B \-\-targets
+Prints out a list of known targets. See the Section
+.B Targets 
+below.
+.TP
+.B \-\-noexec
+Pass a 
+.B \-n
+option to the 
+.I make
+process so that commands are merely printed to the screen but not actually
+executed. This is very useful for debugging.
+.TP
+.B \-\-zimage
+Makes a zImage kernel rather than a bzImage kernel (the default).
+Useful for people having problems with bzImage kernels. 
+.TP
+.B \-\-bzimage
+Makes a bzImage kernel. Useful for people who want a bzImage kernel on
+sites where the default is zImage kernels. 
+.PP
+The options maybe shortened to the smallest unique string, and may
+be entered with either a \- or a \-\- prefix, and you may use a space
+or an = symbol between an option string and a value.
+.SH TARGETS
+.TP
+.B clean
+Cleans the kernel source directory of all files created by target
+.B build,
+and runs a make distclean. (Please look at a Linux kernel Makefile for 
+details).
+Please note that although we take care of the list of current kernel 
+configuration contained in the file
+.I .config,
+the file 
+.I include/linux/autoconf.h
+is not preserved.
+.TP
+.B buildpackage
+This target runs the targets 
+.B clean, 
+and
+.B binary,
+and produces the complete package using 
+.B dpkg-buildpackage
+.TP
+.B binary
+This target produces all three 
+Debian
+kernel packages by running the targets
+.B kernel_source, kernel_headers
+and
+.B kernel_image.
+.TP
+.B kernel_source
+This target produces a debianised package of the 
+Linux
+kernel sources. The package produced also has scripts called at install 
+and delete times that manage the symbolic link
+.I /usr/src/linux
+and ensure that the link is pointed at the latest source/header package on
+the system.
+.TP
+.B kernel_headers
+This target produces a 
+Debian
+package containing the header files included in the 
+Linux
+kernel. The package produced also has scripts called at install 
+and delete times that manage the symbolic link
+.I /usr/src/linux
+and ensure that the link is pointed at the latest source/header package on
+the system.
+.TP
+.B kernel_image
+This target produces a 
+Debian
+package of the 
+Linux
+kernel source image, and any modules configured in the kernel configuration
+file
+.I .config.
+If there is no 
+.I .config
+file in the kernel source directory, a default configuration is provided
+similar to the one used to create the 
+.B Debian
+boot\-floppies.  The package produced updates the 
+.I /boot/psdatabase
+file at install time, it also update symbolic links in the root directory
+to point to the new kernel image in
+.I /boot.
+It also offers to run the 
+Linux
+loader, 
+.I LILO,
+creating a configuration file for 
+.I LILO
+if needed.  It also offers to put the new kernel on a floppy, formatting 
+the floppy if needed.  On deletion, the package checks the version of
+the kernel running, and refuses to delete a running kernel.
+.TP
+.B build
+This target, used by target
+.B kernel_image
+above, compiles the 
+Linux
+kernel image.
+.TP
+.B modules
+This target allows you to build all add-on modules and packages that are
+very dependent on the precise kernel version they are compiled for at the
+same time you build your kernel image.  This target expects to find the 
+modules or packages under /usr/src/modules, and, for all such directories,
+changes to /usr/src/modules/x, and runs the 
+.B kdist
+rule in the local 
+.I debian.rules
+file. This target should create the 
+.B Debian
+module package(s), and may also produce a compressed tar file, and a
+compressed diff file, with
+.I md5sums
+recorded in a changes file using
+.B dpkg-genchanges.
+The file is signed by the same identity that would be used to sign the
+kernel packages.
+.TP
+.B modules_config
+This target allows you to configure all packages under
+.B /usr/src/modules.
+.TP
+.B modules_image
+This target allows you to build all packages under
+.B /usr/src/modules,
+but does not create the source or diff files, and does not create and sign
+a changes file.
+.SH FILES
+Apart from the runtime options, the 
+.I debian.rules
+file run by
+.B make\-kpkg
+also looks for site\-wide defaults in the file 
+.I /etc/kernel-pkg.conf.
+The default configuration allows there to be a site wide override for
+the full name and email address of the person responsible for maintaining 
+the kernel packages on the site, but the 
+.I /etc/kernel-pkg.conf
+file is actually a 
+Makefile
+snippet, and any legal make directives may be included in there. 
+.B Note:
+Caution is urged with this file, since you can totally change the way that the 
+make is run by suitable editing this file. Please look at
+.I /usr/doc/kernel-package/Problems.gz
+for a list of known problems while compiling kernel images.
+.SH "SEE ALSO"
+.BR kernel-pkg.conf (5),
+.BR dpkg-deb (1),
+.BR dpkg-source (1),
+.BR make (1),
+.BR The Programmers manual, 
+.B The GNU Make manual.
+.SH AUTHOR
+This manual page was written Manoj Srivastava <srivasta@debian.org>,
+for the Debian GNU/Linux system.

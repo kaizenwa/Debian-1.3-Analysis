@@ -1,0 +1,659 @@
+A Definition of a Protocol for asynchronous File Transfer for the Internet
+--------------------------------------------------------------------------
+
+		    and a UNIX Reference Implementation
+		    -----------------------------------
+
+
+
+			      Ulli Horlacher
+
+			      Allmandring 30
+
+		    Rechenzentrum Universität Stuttgart
+
+		       framstag@rus.uni-stuttgart.de
+
+
+Abstract
+--------
+
+SAFT (Simple Asynchronous File Transfer) is a new Internet protocol for
+sending files and messages asynchronously.  This is useful, because you don't 
+have to log on to the receiving site to do it.  You simply tell the
+sendfile program a file name and where to send it:
+"sendfile your_file user@somedomain" (Of course there are options).
+
+The package includes: A sendfile client (which sends files), a sendmsg
+client (which sends messages), a receive client (which copies files from
+the local sendfile spool to the recipient's current directory) and a
+sendfiled server (which receives files and messages and stores them in the
+local sendfile spool).
+
+
+More information about asynchronous file transfer and comparison with 
+---------------------------------------------------------------------
+existing services
+-----------------
+
+With asynchronous file transfer, files are transmitted from a sender to
+a recipient, without the latter having to take an active part.  Among
+familiar Internet services, e-mail is an asynchronous service, while ftp 
+represents a synchronous service.
+
+Asynchronous file transfer effectively has not existed until now on the 
+Internet.  If a user A wanted to send a file to a user B, he has been 
+forced to use the following less than ideal procedures:
+
+- ftp [13] to the recipient's account
+
+  To do this, A must know the password of B's account. If A and B are not
+  identical, this method is out of question for obvious security reasons.
+  Even if A and B are the same person, doing a transfer this way requires 
+  the password to be sent unencrypted via the Internet, which will be
+  readable by the "bad guys".
+
+- ftp via anonymous ftp
+
+  To do this, A must "put" the file to the anonymous ftp server.  Then he 
+  must inform B via e-mail, that there is a file to pick up.  This can
+  only be done if the ftp server allows anonymous write access, in which
+  case received files can be read or modified by other anonymous users prior
+  to pickup.  Also, using this method requires most files to be transferred 
+  twice. 
+
+- sending via e-mail
+
+  To do this, A must send B the file as an e-mail.  However, according to
+  RFC 822 an e-mail may only contain characters from the NVT-ASCII
+  character set (a printable subset of the regular 7 bit ASCII character
+  set).  Thus the file transfer is restricted to English text documents
+  ("Foreign" language texts contain 8 or even 16 bit wide characters, like
+  German umlauts). To send more interesting documents, you have to encode
+  the file appropriately, so that it will contain only NVT-ASCII
+  characters during transmission.  For encoding you can use uuencode or
+  MIME [16], but these are complicated to use, and do not support all file
+  attributes.  They also inevitably enlarge the file size, which isn't
+  helpful, since many mailing systems limit e-mails to as little as 100
+  kilobytes.
+
+File Transfer in Bitnet
+-----------------------
+
+In Bitnet there is an asynchronous file transfer service, which was the model
+for our new Internet service.  We are making improvements though.
+
+If you look closely at the Bitnet services, you will find that they are
+all based on asynchronous file transfers; however, Bitnet allows only file
+names to contain 8 Bytes, with another 8 Bytes for file name extensions
+(IBM-internal restrictions).  Records must be not longer that 80 Bytes and
+the character set is EBCDIC or 7 bit ASCII.
+
+
+The SIFT/UFT Protocol
+---------------------
+
+There is an "experimental" Internet protocol for asynchronous file sending.  
+However, SIFT/UFT (Sender-Initiated/Unsolicited File Transfer) protocol, RFC
+1440 [15] has serious problems and inconsistencies.
+
+The deficiencies of RFC 1440 are:
+
+- the character set of the protocol is not defined
+
+- the character sets of the files are not defined
+
+- only VM file types are supported
+
+- the date format is not defined
+
+- a string "EOF" in the file terminates the transfer
+
+- the return codes from the server are not defined
+
+- there aren't many SIFT/UFT servers on the Internet
+
+
+The SAFT Protocol
+-----------------
+
+The protocol we propose is named Simple Asynchronous File Transfer, 
+or SAFT.
+
+Essential attributes are:
+
+- Independence
+
+  SAFT should be available on all operating systems in the Internet and 
+  not be bound to a particular operating system.
+
+- Simplicity
+
+  SAFT should be an easily comprehensible protocol on an ASCII basis 
+  which can be debugged via telnet to the server port.
+
+- Extensibility
+
+  There should not be limits on later extension. A bad example perhaps
+  is the 7 bit limitation of smtp / RFC 822.
+
+Sending short asynchronous messages has been added to SAFT as a by-product. 
+Such messages are defined as one line text strings, which normally would 
+be written to the recipient's terminal.  An example use might be, 
+"Frams, The file I sent you called sendfile_tricks is a .dvi file."
+
+SAFT is a client/server protocol.  The SAFT client (typically as a user
+program) sends files or messages via Internet to a SAFT server which
+accepts them and delivers them to a local recipient, or saves them in a
+special spool area.  The one line messages, however, will not be spooled
+but will either be immediately displayed or dismissed. Recipients can pick
+up the received files when convenient with the SAFT receive client.  This
+works similarly to Internet mail, so users will be immediately comfortable
+with it.  Actually, the receive client and the spool mechanism are not
+part of the SAFT protocol but are mentioned here as an example how to deal
+with incoming files. SAFT only defines the pure transfer protocol.
+
+SAFT supports the following file attributes:
+
+- File name in Unicode [19] of any length
+
+
+- Time stamp
+
+  Specification by ISO-8601 [7] (UTC full date & time)
+
+
+- File type binary
+
+  Byte stream without any format
+
+
+- File type source
+
+  File consists of lines of any length with CR/LF (ASCII 13, ASCII 10) as
+  an end of line (EOL) mark
+
+
+- File type text
+
+  Like file type source but the attribute CHARSET (see below) is evaluated
+
+
+- Name of the character set
+
+  Specification by RFC 1345 [14]
+
+
+- Operating system specific attributes
+
+
+These attributes can be freely introduced by the author of the first SAFT
+implementation for a specific operating system, but should be announced
+to the maintainer of the SAFT protocol (see author's address at the front
+page of this document).  Compatibility is principally guaranteed only among
+client and server of the same operating system, of course.
+
+SAFT can transfer files in compressed mode using the gzip algorithm.  This
+does not represent a file attribute but a transfer attribute.  This
+happens transparently for the sender and the recipient, so they don't have
+to deal with it. The compression has been introduced to save net
+bandwidth. As a rule, the bottle neck of a file transfer is the capacity
+of the network and not the performance of the local CPU.
+
+SAFT uses tcp as transport layer and tcp port 487, which has been
+registered by the IANA [21]. The SAFT client connects to this port at the
+host of the SAFT server.
+
+The client/server communication is divided into two parts: the actual
+communication protocol and the file which has to be transfered as a
+structureless "data-stream" (stream of octetts = bytes of 8 bit). This is
+the only true restriction of SAFT: the smallest transfer unit is an octet
+and machines with other byte configurations are not supported. But,
+generally such machines belong to history.
+
+The communication protocol conforms to NVT (network virtual telnet) [13],
+using 7 bit ASCII without any control codes and CR/LF (ASCII 13, ASCII 10)
+as EOL (end of line) mark.  HT (ASCII 9) is valid, too, but one should
+avoid it.
+
+A command from the client consists of a single text line, which contains a
+command token and on demand one or more parameters, each separated with a
+whitespace.  A whitespace is a non-null string of SPACE (ASCII 32) or HT
+(ASCII 9) in any order.  If possible a whitespace should be a single SPACE.
+
+The following commands are defined:
+
+- FROM <sender> [<real name>]
+
+  Sender login name and optionally real name.
+
+
+- TO <recipient>		
+
+  Recipient login name.
+
+
+- FILE <name>	
+
+  Name of the file which is to be transferred.
+
+
+- DATE <date>		
+
+  Time stamp of the file in UTC ISO-8601 format (YYYY:MM:DD hh:mm:ss).
+
+
+- TYPE BINARY|SOURCE|TEXT [COMPRESSED[=GZIP]|CRYPTED[=PGP]]
+
+  File type and transfer encoding. So far, for compressing only the gzip
+  algorithm is allowed and for encrypting only pgp. Therefore these
+  keywords are optional.
+
+
+- CHARSET <name>	
+
+  Name of the character set of a text file as defined by RFC 1345
+  (&charset entry). Alias names are not allowed. If possible one should
+  use ISO_8859-1:1987.
+
+
+- SIGN <signature>
+
+  A digital signature corresponding to FILE. So far, only pgp armor
+  signatures are supported.
+
+
+- ATTR <attribute-string>	
+
+  Operating system specific file attribute extension (depends on the
+  implementation).
+
+
+- MSG <message>		
+
+  A one line text message, which shall be written directly onto the
+  recipient's terminal.
+
+
+- DEL		
+
+  The file which has been transferred before will be deleted.
+  
+
+- RESEND		
+
+  After a preceding link failure the file will be sent again.
+
+  The first string (string delimiter is a whitespace) in the reply from
+  the server contains the number of bytes which have already been
+  transferred: <transmitted>
+
+
+- SIZE <size> <size uncompressed>	
+
+  Size of the file in bytes.  The first parameter is the number of bytes
+  which really have to be transferred; the second parameter is the file
+  size after decompressing.  The last one is for information purposes for a
+  receive client.
+
+
+- DATA		
+
+  After this command <size> - <transmitted> bytes of the file are sent as
+  a contiguous stream of octets.
+
+
+- QUIT		
+
+  End of session.
+
+
+The command tokens may be written in upper or lower case or even in mixed
+case. FROM, from or FrOm are equal.  If possible the command tokens should
+be written in upper case.
+
+<sender>, <real name>, <recipient>, <name> and <message> are strings
+encoded with UTF-7 [20].  If possible one should only use NVT-ASCII or ISO
+Latin-1 characters [14].  UTF-7 defines a reversible encoding of Unicode
+strings to strings of the mbase64 character set, which itself is a subset
+of NVT-ASCII.  Unicode is *the* 16 bit character set which will be the
+successor of all current 8 bit character sets. For more details see [14].
+
+To transfer a file, at least the commands FROM, TO, FILE and SIZE have to
+be specified.  DATA then starts the actual transfer.  The other commands are
+optional.  In general, the order of the commands does not matter.  Exceptions
+from this rule are ( Format: <command> : <commands which precede> ):
+
+- MSG :     FROM, TO 
+
+- DEL :	    FROM, TO, FILE
+
+- DATA :    FROM, TO, FILE, SIZE 
+
+- RESEND :  FROM, TO, FILE, SIZE, DATE 
+
+
+On every command from the client the server responds with a so called
+"reply-message", which has the following format (notation is in EBNF):
+
+reply-message	=	{reply-line} reply-end
+
+reply-line	=	reply-code "-" text
+
+reply-end	=	reply-code " " text
+
+reply-code	=	digit digit digit 
+
+digit	=	"0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+
+text	=	char {char} CR LF
+
+char	=	<one character from the NVT-ASCII character set>
+
+
+CR is ASCII 13, LF is ASCII 10.  The first digit of the reply-code
+determines the category of the reply-message:
+
+- 2 stands for: command successfully executed 
+
+- 3 stands for: more data/information is needed
+
+- 4 stands for: a fatal error has occurred and the connection will be terminated
+
+- 5 stands for: other error, which can be corrected with further commands
+
+
+The following "reply-messages" are defined:
+
+- 200 Command ok..
+
+- 201 File has been correctly received.
+
+- 202 Command not implemented, superfluous at this site.
+
+- 205 Non-ASCII character in command line ignored.
+
+- 214 <help-text>
+
+- 220 <hostname> SAFT server (sendfiled <version> on <OS>) ready.
+
+- 221 Goodbye.
+
+- 230 <number> Bytes already received.
+
+- 302 Header ok, send data.
+
+- 410 Spool directory does not exist.
+
+- 411 Can't create user spool directory.
+
+- 412 Can't write to user spool directory.
+
+- 415 TCP error: received too few data.
+
+- 421 Service not available.
+
+- 451 Requested action aborted: local error in processing.
+
+- 452 Insufficient storage space.
+
+- 453 Insufficient system resources.
+
+- 500 Syntax error, command unrecognized.
+
+- 501 Syntax error in parameters or arguments.
+
+- 502 Command not implemented.
+
+- 503 Bad sequence of commands.
+
+- 504 Command not implemented for that parameter.
+
+- 505 Missing argument.
+
+- 510 This SAFT-server can only receive messages. Send files to xx@yy
+
+- 511 This SAFT-server can only receive files.
+
+- 520 User unknown.
+
+- 521 User is not allowed to receive files or messages.
+
+- 522 User cannot receive messages.
+
+- 523 You are not allowed to send to this user.
+
+- 530 User cannot receive messages.
+
+- 531 This file has been already received.
+
+- 599 Unknown error.
+
+
+Only the 3 digit reply-codes are reserved, the texts behind can be changed
+at your pleasure as long as they conform to the meaning of the message.
+Exceptions are the texts of the reply codes 220 and 230: 
+220 must contain the string "SAFT" and 230 must contain the number of
+bytes which have already been transferred as first string.
+
+
+Examples
+--------
+
+Examples of SAFT sessions using a direct telnet connection to the server
+port:
+
+
+> telnet linux saft
+
+Trying 129.69.58.50...
+
+Connected to linux.rus.uni-stuttgart.de.
+
+Escape character is '^]'.
+
+220 linux.rus.uni-stuttgart.de SAFT server (sendfiled 1.4 on Linux) ready.
+
+FROM gaga
+
+200 Command ok.
+
+TO framstag
+
+200 Command ok.
+
+FILE blubb
+
+200 Command ok.
+
+SIZE 5 5
+
+200 Command ok.
+
+DATA
+
+302 Header ok, send data.
+
+ABC
+
+201 File has been correctly received.
+
+QUIT
+
+221 Goodbye.
+
+Connection closed by foreign host.
+
+> telnet linux saft
+
+Trying 129.69.58.50...
+
+Connected to linux.rus.uni-stuttgart.de.
+
+Escape character is '^]'.
+
+220 linux.rus.uni-stuttgart.de SAFT server (sendfiled 1.4 on Linux) ready.
+
+HELP
+
+214-The following commands are recognized:
+
+214-  FROM <sender> [<real name>]
+
+214-  TO <recipient>
+
+214-  FILE <name>
+
+214-  SIZE <size to transfer> <size uncompressed>
+
+214-  TYPE BINARY|SOURCE|TEXT [COMPRESSED|CRYPTED]
+
+214-  SIGN <pgp signature>
+
+214-  DATE <ISO-8601 date string>
+
+214-  CHARSET <RFC-1345 character set name>
+
+214-  ATTR TAR|EXE|NONE
+
+214-  MSG <message>
+
+214-  DEL
+
+214-  RESEND
+
+214-  DATA
+
+214-  QUIT
+
+214-All argument strings have to be UTF-7 encoded.
+
+214 You must specify at least FROM, TO, FILE, SIZE and DATA to send a file.
+
+FROM gaga
+
+200 Command ok.
+
+TO dengibtsnicht
+
+520 User unknown.
+
+TO framstag
+
+200 Command ok.
+
+MSG huhu!
+
+530 User cannot receive messages.
+
+TYPE TEXT
+
+200 Command ok.
+
+FILE x1
+
+200 Command ok.
+
+SIZE 6 6
+
+200 Command ok.
+
+abcd
+
+500 Syntax error, command unrecognized.
+
+DATA
+
+302 Header ok, send data.
+
+abcd
+
+201 File has been correctly received.
+
+FILE x2
+
+200 Command ok.
+
+SIZE 3 3
+
+200 Command ok.
+
+SIZE 5 5
+
+200 Command ok.
+
+DATA
+
+302 Header ok, send data.
+
+123
+
+201 File has been correctly received.
+
+QUIT
+
+221 Goodbye.
+
+Connection closed by foreign host.
+
+
+(Note the difference between the number of bytes in the SIZE and DATA commands.
+Telnet transfers a line with CR LF as EOL mark.  Such bytes count, too.)
+
+Information and literature list
+===============================
+
+[1] Andrew Tanenbaum: Computer Networks
+
+[2] Bettina Reimer, Paul Müller: Kommunikationssysteme auf der Basis des
+    ISO-Referenzmodells
+
+[3] Kernighan, Ritchie: Programmieren in C
+
+[4] Jürgen Gulbins: UNIX
+
+[5] W. R. Stevens: Advanced Programming in the UNIX Environment
+
+[6] W. R. Stevens: UNIX Network Programming
+
+[7] ISO-8601 - International Time and Date Representing
+
+[8] C-FAQ-list in news.answers
+
+[9] Umlaute-FAQ in de.comp.standards
+
+[10] internationalization/programming-faq in news.answers
+
+[11] mail/mime-faq in news.answers
+
+[12] http://www.ics.uci.edu/pub/ietf/http/draft-ietf-http-v10-spec-00.txt
+
+[13] RFC 859 - ftp 
+
+[14] RFC 1345 - Character Mnemonics & Character Sets
+
+[15] RFC 1440 - SIFT/UFT: Sender-Initiated/Unsolicited File Transfer
+
+[16] RFC 1521 - MIME
+
+[17] RFC 1522 - MIME
+
+[18] RFC 1543 - Instructions to RFC Authors
+
+[19] RFC 1641 - Using Unicode with MIME
+
+[20] RFC 1642 - UTF-7
+
+[21] RFC 1700 - Assigned Numbers
+
+
+Still missing from this document:
+
+- rationale section
+
+- programmer's documentation of the programs of the sendfile package 
+
+- a nice postscript version
+
+You can find that which is missing in the German version, doku.ps
+I'm translating the missing parts as fast as I can.

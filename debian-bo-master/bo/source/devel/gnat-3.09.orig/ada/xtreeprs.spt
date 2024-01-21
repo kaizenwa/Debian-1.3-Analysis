@@ -1,0 +1,240 @@
+*-----------------------------------------------------------------------------
+*-                                                                          --
+*-                                 G N A T                                  --
+*-                                                                          --
+*-                           COMPILER  UTILITIES                            --
+*-                                                                          --
+*-                             X T R E E P R S                              --
+*-                                                                          --
+*-                            $Revision: 1.28 $                             --
+*-                                                                          --
+*-     Copyright (C) 1992,1993,1994,1995 Free Software Foundation, Inc.     --
+*-                                                                          --
+*- GNAT is free software;  you can  redistribute it  and/or modify it under --
+*- terms of the  GNU General Public License as published  by the Free Soft- --
+*- ware  Foundation;  either version 2,  or (at your option) any later ver- --
+*- sion.  GNAT is distributed in the hope that it will be useful, but WITH- --
+*- OUT ANY WARRANTY;  without even the  implied warranty of MERCHANTABILITY --
+*- or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License --
+*- for  more details.  You should have  received  a copy of the GNU General --
+*- Public License  distributed with GNAT;  see file COPYING.  If not, write --
+*- to  the Free Software Foundation,  59 Temple Place - Suite 330,  Boston, --
+*- MA 02111-1307, USA.                                                      --
+*-                                                                          --
+*- GNAT was originally developed  by the GNAT team at  New York University. --
+*- It is now maintained by Ada Core Technologies Inc (http://www.gnat.com). --
+*-                                                                          --
+*-----------------------------------------------------------------------------
+
+* Program to construct the spec of the Treeprs package
+*
+*   Input files:
+*
+*      sinfo.ads     Spec of Sinfo package
+*      treeprs.adt   Template for Treeprs package
+*
+*   Output files:
+*
+*      treeprs.ads   Spec of Treeprs package
+*
+* Note: this program assumes that sinfo.ads has passed the error checks which
+* are carried out by the csinfo utility, so it does not duplicate these checks
+*
+* An optional argument allows the specification of an output file name to
+* override the default treeprs.ads file name for the generated output file.
+
+        "$Revision: 1.28 $" "$Rev" "ision: " break(' ') $ treeprsrev
+
+        lineno = 0
+        &stlimit = -1
+        input(.ins,1,'sinfo.ads')
+        input(.int,2,'treeprs.adt')
+
+        arg = trim(host(1))
+        arg = ident(arg, "0") trim(host(0))
+        (ident(arg) output(.outs,3,'treeprs.ads'))
+        (differ(arg) output(.outs,3,arg))
+
+        &anchor = 1
+        names = array(300)
+        positions = array(300)
+        count = 0
+        curpos = 1
+        wsp = span(' ' char(9))
+        strings = table(300)
+
+
+* Special fields table. The following fields are not included in the string
+* table constructed by xtreeprs, since they are specially handled in treeprs.
+* This means that these field definitions are completely ignored.
+
+        special = table(20)
+        special<'Analyzed'> = 1
+        special<'Cannot_Be_Constant'> = 1
+        special<'Chars'> = 1
+        special<'Comes_From_Source'> = 1
+        special<'Error_Posted'> = 1
+        special<'Etype'> = 1
+        special<'Has_No_Side_Effects'> = 1
+        special<'Is_Controlling_Actual'> = 1
+        special<'Is_Overloaded'> = 1
+        special<'Is_Static_Expression'> = 1
+        special<'Left_Opnd'> = 1
+        special<'Must_Check_Expr'> = 1
+        special<'No_Overflow_Expr'> = 1
+        special<'Paren_Count'> = 1
+        special<'Raises_Constraint_Error'> = 1
+        special<'Right_Opnd'> = 1
+
+        F_Field1       = '#'
+        F_Field2       = '$'
+        F_Field3       = '%'
+        F_Field4       = '&'
+        F_Field5       = "'"
+        F_Flag1        = "("
+        F_Flag2        = ")"
+        F_Flag3        = '*'
+        F_Flag4        = '+'
+        F_Flag5        = ','
+        F_Flag6        = '-'
+        F_Flag7        = '.'
+        F_Flag8        = '/'
+        F_Flag9        = '0'
+        F_Flag10       = '1'
+        F_Flag11       = '2'
+        F_Flag12       = '3'
+        F_Flag13       = '4'
+        F_Flag14       = '5'
+        F_Flag15       = '6'
+        F_Flag16       = '7'
+        F_Flag17       = '8'
+        F_Flag18       = '9'
+
+* Get sinfo rev
+
+slp     line = ins
+        line breakx('$') '$Rev' 'ision: ' break(' ') $ sinforev :f(slp)
+
+* Copy initial part of template to spec
+
+lp1     line = int                              :f(err)
+
+        line breakx('$') '$Rev' 'ision: ' break(' ') $ temprev :f(lp1a)
+
+        outs =
+.        '--                Generated by xtreeprs revision '
+.        treeprsrev ' using'
+.        '                 --'
+
+        outs =
+.        '--                         sinfo.ads revision ' sinforev
+.        '                          --'
+
+        outs =
+.        '--                        treeprs.adt revision ' temprev
+.        '                          --'     :(lp1)
+
+* Skip lines describing the template
+
+lp1a    line '--  This file is a template'      :f(lp1c)
+
+lp1b    line = trim(int)                        :f(err)
+        differ(line)                            :s(lp1b)
+
+lp1c    line 'package'                          :s(p1)
+        line breakx('T') $ a 'T e m p l a t e' =
+.            a '    S p e c    '
+        outs = line                             :(lp1)
+
+p1      outs = line
+
+* Copy rest of comments up to template insert point to spec
+
+lp2x    line = int                              :f(err)
+        line '!!TEMPLATE INSERTION POINT'       :s(start)
+        outs = line                             :(lp2x)
+
+* Here we are doing the actual insertions
+
+start   outs = '   Pchars : constant String :='
+
+lp      line = trim(ins)                :f(err)
+        lineno = lineno + 1
+        line wsp 'type Node_Kind'       :s(outc)
+
+        line wsp '--  N_' rem $ node    :f(lp)
+        node break(' ,.')               :s(lp)
+
+        outstring = node ' '
+
+lp2     line = trim(ins)        :f(err)
+        ident(line)             :s(stringout)
+        line span(' ') '--  ' break(' ') $ synonym ' (' break(')') $ field
+.                                       :f(lp2)
+        synonym 'plus'                  :s(lp2)
+        differ(special<synonym>)        :s(lp2)
+        field break('-') $ field
+
+        ffield = field
+
+        field 'Flag'            :s(nxta)
+        field rtab(1) $ a = 'Field'
+
+nxta    field = 'F_' field
+        field = $field
+        terminal = ident(field) "line " lineno " has unrecognized field name "
+.       ffield
+
+nnn2    outstring = outstring field synonym :(lp2)
+
+stringout
+        strings<node> = outstring           :(lp)
+
+outc    line = trim(ins)                    :f(err)
+        line wsp 'N_' break(',)') $ syn
+.       len(1) $ term                       :f(outc)
+
+        s = strings<syn>
+        s break(' ') $ node ' ' =
+        count = count + 1
+        names<count> = syn
+        positions<count> = curpos
+        curpos = curpos + size(s)
+
+        outs = '      --  ' node
+
+        ident(term,')')                     :s(outx)
+
+        prefix = '      '
+
+outcl   sp = 79 - 4 - size(prefix)
+        le(size(s),sp)                      :s(outcl2)
+        s len(sp) $ s1 =
+        outs = prefix '"' s1 '" &'
+        prefix =  '         '               :(outcl)
+
+outcl2  outs = prefix '"' s '" &'            :(outc)
+
+outx    sp = 79 - 4 - size(prefix)
+        le(size(s),sp)                      :s(outx2)
+        s len(sp) $ s1 =
+        outs = prefix '"' s1 '" &'
+        prefix =  '         '               :(outx)
+
+outx2   outs = '      "' s '";'
+        outs =
+        outs = '   type Pchar_Pos_Array is array (Node_Kind) of Positive;'
+        outs = "   Pchar_Pos : constant Pchar_Pos_Array := "
+.                          "Pchar_Pos_Array'("
+        m = 0
+
+outxl   eq(m = m + 1,count) :s(last)
+        name = rpad('N_' names<m>,40)
+        outs = "      " name ' => ' positions<m> ',' :(outxl)
+
+last    name = rpad('N_' names<m>,40)
+        outs = "      " name ' => ' positions<m> ');'
+
+vle     outs =
+        outs = "end Treeprs;"
+end

@@ -1,0 +1,32 @@
+#!/bin/sh
+# This script will munge the output of "make -n install" into a Bourne
+# shell installer script.  It is useful for simplyfing the top level
+# Makefiles of multi-directory binary distributions.  Originally written
+# for the Linux procps suite by Charles Blake (cblake@bbn.com)
+
+# pattern to recognize the absolute paths that make spits out for
+# conversion into relative paths to make the script location independent.
+PKG_DIR_PAT='procps-[0-9][^/]\+\/'
+
+SCRIPT="${1:-do_install}"
+
+exec > $SCRIPT
+
+cat << EOF
+#!/bin/sh -x
+# This is a mkinstall automatically generated installer script.
+# There may be some inefficiencies involving subshells doing nothing
+# and there may be other time consuming building rules to exclude, but it
+# works for most things and subshells are cheap.
+
+set() { : ; }   # stub out set so that command echoing can't be turned off
+
+EOF
+
+make -n install                                       |
+    sed -e 's/^.ake.*ntering dir.*`\(.*\).$/(cd \1/g' \
+        -e 's/^.ake.*eaving dir.*$/)/g'               \
+        -e "s/\/[^ ]*\/$PKG_DIR_PAT//g"               |
+    egrep -v '^cc|^gcc|^CC|^g++|^ar|^make'
+
+chmod 755 $SCRIPT

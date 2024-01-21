@@ -1,0 +1,112 @@
+#!/usr/bin/wish -f
+# Copyright 1993 Yggdrasil Computing, Incorporated
+# You may copy this file according to the terms and conditions of version 2
+# of the GNU General Public License as published by the Free Software
+# Foundation.
+
+frame .h
+label .h.info -bitmap info -bg pink
+message .h.message -width 400 -bg pink -text \
+	{Peripheral Device Page configuration.}
+
+pack .h.info .h.message -padx 10 -side left
+pack .h -pady 10
+
+message .message2 -width 400 -bg red -fg white -justify center -text \
+	{Warning - Enter the same number of hex-digits under\
+	Vendor Data as was read in by the program. Even if\
+	you are allowed to edit Vendor Data, you should not\
+	change it except when you definitely know (that is\
+	you have the required device specific docs) the\
+	target device. Otherwise anything (even configuring\
+	the device to permanent unusability) is possible!}
+
+pack .message2
+
+source /usr/lib/scsi/generic
+
+proc read_page { device option } {
+    global text_list
+    global switch
+    set line {}
+    exec /usr/bin/scsiinfo -X $switch $option $device > /tmp/cachepage 2> /dev/null
+    if {[catch {set file [open /tmp/cachepage r]}] == 1} return;
+    gets $file line
+    gets $file asciidesc
+    close $file
+    exec rm /tmp/cachepage
+
+    .ident.text delete 1.0 end
+    .ident.text insert end [lindex $line 0]
+
+    .vendor.text delete 1.0 end
+    .vendor.text insert end [string range [lindex $line 1] 1 end]
+
+    .identasc.text delete 1.0
+    .identasc.text insert end "$asciidesc"
+}
+
+proc read_modifiable { device } {
+    global button_list
+    global text_list
+    global switch
+    set line {}
+    exec /usr/bin/scsiinfo -X -m $switch $device > /tmp/cachepage
+    if {[catch {set file [open /tmp/cachepage r]}] == 1} return;
+    gets $file line
+    close $file
+    exec rm /tmp/cachepage
+
+    if { [ string compare [lindex $line 0] "0" ] == 0} \
+      then { .ident.text configure -state disabled } \
+      else { .ident.text configure -background white }
+
+    set vendor [string range [lindex $line 1] 1 end]
+    append vendor 0
+
+    if { [ expr { $vendor } ] == 0  } \
+      then { .vendor.text configure -state disabled } \
+      else { .vendor.text configure -background white }
+
+    .identasc.text configure -state disabled
+}
+
+proc write_page { device option } {
+    global button_list
+    global text_list
+    global switch
+    set lineno 0
+    set r3  [concat -X $switch -R $device]
+
+    set r3 [concat $r3 [.ident.text get 1.0 end]]
+    set r3 [concat $r3 @[.vendor.text get 1.0 end]]
+
+
+    set file [open /tmp/wrscsi w]
+    puts $file "/usr/bin/scsiinfo $r3"
+    close $file
+    exec sh < /tmp/wrscsi
+    exec rm /tmp/wrscsi
+}
+
+
+
+# Here we set the bits that depend upon the menu we are in
+set button_list {  }
+set text_list { ident identasc vendor }
+
+set text_descriptions {"Interface Identifier " "Interface Identifier (ASCII) " "Vendor Data "}
+
+set switch {-p}
+set label_width 25
+set text_width 40
+
+frame .f1
+
+generate_textboxes
+
+pack .ident .identasc .vendor -in .f1 -pady 10 -anchor w
+pack .f1 -side left -padx 3m -pady 3m
+
+read_page $argv "-X"
+read_modifiable $argv

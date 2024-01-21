@@ -1,0 +1,438 @@
+#ident	"@(#)smail:RELEASE-3_2:INSTALL,v 1.7 1996/06/14 19:00:13 woods Exp"
+
+INITIAL UNPACKING
+
+After you've unpacked the source (and thus been able to read this far in
+this file), we strongly recommend you begin by first checking the entire
+distribution into some form of source code control system.  We heartily
+recommend the use of CVS, as it offers what is called "vendor branch
+support" thus making it trivial to merge local changes with new "vendor"
+releases of a product.  It will also make it far easier for you to
+submit accurate patches to the smail developer(s) (see below for
+information about submitting patches).
+
+To check this release of smail into CVS (assuming you alread have CVS
+installed and a default repository created) you might do something like
+this:
+
+    cvs import -I ! -m 'Smail Version 3.2 Distribution' smail SMAIL SMAIL-3_2
+
+If you don't have CVS, but are familiar with RCS, or SCCS, you can also
+use those tools to track any local changes you might make during the
+course of installation and configuration of smail.
+
+If you do you CVS, you should not run "make depend", or if you do you
+should not check in the changed Makefiles.  If you wish to / need to
+make local changes to the Makefiles, you should do so in a freshly
+checked out working directory, and *not* run "make depend", but rather
+run "make clobber" between builds.  Once you've verified and checked in
+your changes, you may then run "make depend" to speed subsequent builds,
+but remember *not* to check in the Makefiles with the dependencies.
+
+
+CONFIGURATION
+
+We recommend that you read through the various manual pages before
+setting up and installing smail.  To generate the manual pages, change to
+the man directory and type "make".  This will generate manual pages for
+the default smail configuration.  Detailed information on smail can be
+found in the manual pages smail(5) and smail(8), with further details on
+the specific configuration files in the other section 5 manual pages..
+
+All run-time configuration files are optional, and the smail program
+itself creates anything that it absolutely needs.  Thus in the
+simplest example, the installation procedure is simply to setup the
+base internal configuration and type the various make commands.
+
+The only file that you must edit is conf/EDITME, which drives the
+compilation process for the smail binary and the several accompanying
+utilities.  This file describes the locations of various files and
+directories, enables or disables various capabilities, and points to a
+file describing your architecture and operating system.  It should be
+copied from the source file conf/EDITME-dist, or from one of the small
+example files (conf/EDITME-*) if one happens to nearly match your
+system.  Note that if you generated the smail manual pages, the
+conf/EDITME file will have already been created for you, though you
+should still review and edit it or replace it with one of the other
+simple examples.
+
+Future patches to smail will be applied to conf/EDITME-dist (and the
+examples) and it will be your responsibility to make sure that these
+changes are reflected in conf/EDITME, as needed.  (This is one place
+where source code control tools such as RCS, or SCCS might be most
+useful.  CVS keeps track of the entire project, of course.)
+
+The full conf/EDITME-dist mentions just about every compilation and
+installation option available in smail.  It appears to be very large and
+complex at first glance.  However you'll see some tiny sample
+configurations in other files named conf/EDITME-*.  These files are
+actual working configurations used for production systems.  In general
+the configuration system is set up in such a way that if you define only
+the compiler flags (CPPFLAGS, CFLAGS, LDFLAGS, etc.), and set the
+OS_TYPE, smail will build and install as if it were to be the native
+vendor-supplied mailer for the system, and will attempt to mimic (and
+thus replace) a sendmail installation in terms of the command-line
+interface and standard supplementary files such as the aliases table.
+
+Some sites may also need to create (or fix) an operating system
+description file.  To do this, change to the conf/os directory and copy
+the file "template" to a name descriptive of your operating system.
+Then edit the copy as appropriate.  The basename of this file can then
+be used as a value for the OS_TYPE variable in the conf/EDITME file.  If
+you create a new operating system description file, please mail it to us
+so that we may add it to the distribution.
+
+A simple way to test smail is to set the variable TEST_BASE in the
+conf/EDITME file to a test installation directory.  A "make install"
+will create a tree under this directory, with all of the smail binaries
+and utilities.  Smail can then be tested in this directory without
+affecting the operation of any other mailers currently working on your
+system, including a previous installation of smail itself.
+
+If you're trying to debug an EDITME file, or an OS_TYPE file, you can
+simply generate defs.* files in the conf directory by running the
+following command from within the conf directory:
+
+	  ROOT=.. sh lib/mkdefs.sh
+
+
+BUILDING AND INSTALLATION
+
+NOTE:  You should probably do a test build install before installing
+       smail onto a live system.  To do this, setup the TEST_BASE
+       variable as described above, and go through the steps in this
+       section.  Then, to install on to a live system, comment out
+       TEST_BASE in the conf/EDITME file and perform these steps again.
+       The second time around, it will not be necessary to build the
+       makefile dependencies.
+
+When everything is setup, you may optionally create the Makefile
+dependencies for your system and configuration.  To do this, type:
+
+	make -k depend 2>&1 | tee mkdep.out
+
+If you are a C shell or tcsh user (poor you!), try:
+
+	make -k depend |& tee mkdep.out
+
+at the top of the smail source tree.  Scan the output produced by for
+any errors.  In particular, watch out for missing include files.  If any
+messages about missing include files are generated, please send us mail
+describing your operating system and the name of the include file which
+was not found (you should also enclose your conf/EDITME file, and any
+conf/os file you might have modified and be using for the failed build.
+Please tell us of any similarly named include files which DO exist,
+which may be used instead.  Building the dependencies takes 34 seconds
+on an unloaded Amdahl 5890, about 6 and a half minutes on a Sun-3/280,
+and can it take up to half an hour or more on smaller machines.
+
+WARNING:  If you do not run "make depend", you should be aware that
+you'll likely have to run "make clobber" if you change anything between
+builds to ensure everything is properly up to date.  This applies
+especially to changes in the conf/EDITME file.
+
+When the dependencies have been generated, build the binaries, utilities
+and localized manual pages with the command:
+
+	make 2>&1 | tee mk.out
+
+or for those stuck on csh:
+
+	make |& tee mk.out
+
+This may take a while.  The complete build takes 1 minute and 30 seconds
+on an unloaded Amdahl 5890 (with optimizing turned on), about 4 minutes
+on a P120 w/ PCI SCSI running NetBSD-1.1A, and about 15 minutes in ./src
+on a Sun-3/280 with -g, or 32 minutes from the root with -O [SunOS-4.1
+/usr/5bin/cc].  A 16MB Sun3/260 running NetBSD-1.1-P2 takes about 55
+minutes with the source on NFS.  When building on a Symmetric-S/375 you
+can go off and do something else for a while, and check on it every ten
+minutes or so.  Even a 468dx66 PCI machine running NetBSD-1.1 can take a
+long time (75 min) if it has only 4Mb RAM and a cheap 500Mb IDE drive.
+The build takes about 2 hours on Fortune 32:16.
+
+
+If any errors were encountered, please mail them to us.  Please send a
+complete copy of the mk.out file, and a copy of your conf/EDITME file
+along with a "patch" (i.e. context diff) of any changes you've made to
+the official distribution sources.  In particular if you wrote your own
+operating system configuration file, please send that, too.  If you have
+any comments, or if you have your own fixes, please send those as well.
+
+When smail builds correctly, install it by typing:
+
+	make install
+
+To install the manual pages as well, type:
+
+	make installman
+
+WARNING:  If you had installed the manual pages for a previous
+development release of smail (i.e. one which included routers.5,
+transports.5, config.5, etc.), you should remove these old manual pages
+from the destination directory.  These manual pages have been renamed to
+have the prefix "smail" as part of their names.
+
+These commands may be typed in any individual directory, as well, to
+build or install within a limited context.  Most make command at any
+level within the tree will descend to lower levels within the source
+hierarchy and execute the same make command.
+
+The following additional make commands can be useful:
+
+	make clean	- to clear out make intermediate files.
+	make clobber	- to clean intermediate and target files.
+	make local_depend
+			- make dependencies in the local makefile but do
+			  not descend into subdirectories.
+
+
+GENERAL COMPILATION NOTES
+
+On ISC's Interactive UNIX (aka 386/ix), and probably on other systems as
+well, if you don't use an ANSI C compiler you will get the following
+messages while compiling:
+
+	../../util/dbm_compat.h: 13: bad include syntax
+	../../util/dbm_compat.h: 22: bad include syntax
+
+Ignore these messages.  They result from an #ifdef'd out:
+
+	#include DBM_INCLUDE
+
+where the C compiler does not allow macros to name include files.  This
+doesn't cause any problems when compiling on Interactive, beyond the
+generation of the above messages.  If your compiler really bombs out,
+remove the offending lines from util/dbm_compat.h.
+
+Smail now makes use of some C data types which may not be defined in the
+standard system headers on some older systems.  These include "time_t",
+"off_t", "size_t", and the like.  If you get compiler errors related to
+definitions or declarations related to these data types, you may be able
+to work around the problem by adding appropriate #define statements in
+the MISC_DEFINES clause of your conf/EDITME file.  Please see the
+instructions in conf/EDITME-dist to see how the syntax for this usage
+might work, and consult your system manuals for the appropriate basic
+types to substitute for these standard types.
+
+
+SYSTEM-SPECIFIC CAVEATS
+
+ *  There have been reports that some versions of sed(1) [in particular
+    the one supplied with HP/UX 9.x and possibly earlier HP/UX versions
+    too] cannot handle the number of expressions in the defs.sed files
+    produced by the mkdefs script.  The easy work-around is to install a
+    more capable version of sed that doesn't trip over this limit, such
+    as the GNU Sed.  No other fixes are expected or desired as this
+    problem will hopefully be moot with the intended conversion to GNU
+    Autoconf.
+
+ *  On MIPS systems, and possibily on other dual-universe systems, be sure
+    to set the BSD and System V timezones to the same value.  For MIPS
+    systems, the System V timezone is in /etc/TIMEZONE.  The timezone value
+    used by BSD routines is stored in the kernel and is set by the date
+    command.  For example, if you are in the Pacific timezone, set
+    /etc/TIMEZONE to:
+
+	TZ=PST8PDT
+	export TZ
+
+    and set the kernel timezone with:
+
+	date -t 480
+
+    At least one user was surprised to find smail using a different timezone
+    than some other commands.
+
+
+CREATING CONFIGURATION FILES
+
+If you have need of a more complex configuration than can be provided
+with the internal defaults, read over the manual pages carefully.  We
+believe that the process of writing files is reasonably straightforward,
+though if you have any questions, or if you dispute this claim, please
+send mail to the smail3-users list mentioned in the README.  Sample
+configuration files can be found in the directory samples [WARNING:
+these files are very much out of date].  The complete current
+configuration can be displayed with the command "smail -v -bP ALL".  Of
+course if you run this command without any config files, it will display
+the default compiled in configuration.
+
+
+SMAIL ON THE INTERNET (VERY IMPORTANT FOR INTERNET USERS)
+
+Users on the Internet should configure smail to use the Domain Name
+Service for routing on the Internet.  To use the DNS, you will have to
+have the bind resolver library, and you will have to tell smail that you
+have it.  For some systems, these are configured into smail by default.
+For other systems, you will need to configure in the bind router driver
+by modifying the EDITME file.  This involves adding the setting:
+
+	DRIVER_CONFIGURATION=arpa-network
+
+and adding "BIND" to the HAVE list.  See the EDITME file in the conf
+directory for more details.
+
+
+SMAIL WITH SYSTEM V RELEASE 2&3 AND SUNOS-4
+
+SunOS-4 and System V Release 2&3 systems typically have a /bin/mail
+program that both delivers mail and reads mail.  Smail provides a
+replacement for the /bin/mail program, in pd/binmail, that uses the old
+/bin/mail for reading mail, and smail for delivering mail.  To use the
+replacement /bin/mail, you will need to define the LMAIL variable in
+conf/EDITME.  See conf/EDITME for more instructions.
+
+The System V mailx utility will need to be updated to know how to find
+smail.  Presuming that smail is installed as /usr/lib/sendmail, you
+will need to add the following line to the file /usr/lib/mailx/mailx.rc:
+
+	set sendmail=/usr/lib/sendmail
+
+The SunOS-4 Mail utility already has this defined.
+
+In any case you should ensure that /usr/lib/sendmail is included in
+conf/EDITME as either the value for SMAIL_NAME, or is included in the
+OTHER_SMAIL_NAMES setting.  For example on SunOS-4:
+
+	OTHER_SMAIL_NAMES=/usr/lib/sendmail:/usr/ucb/mailq
+
+
+SMAIL AND SCO UNIX
+
+Smail under SCO UNIX should be installed as both /bin/mail and
+/usr/lib/mail/execmail.  To do this, set OTHER_SMAIL_NAMES in the
+conf/EDITME file to "/bin/rmail:/usr/lib/mail/execmail".  You will also
+need to use the /bin/mail replacement in pd/binmail, just as in System
+V.  Some newer SCO UNIX systems also have a /usr/bin/rmail, as a link to
+/usr/bin/mailx.  This link should be deleted.
+
+Some versions of SCO UNIX store mail messages in /usr/spool/mail,
+while others use /usr/mail, like System V.  If your system uses
+/usr/spool/mail, you will need to add the following line to the
+conf/EDITME file:
+
+	MAILBOX_DIR=/usr/spool/mail
+
+Current SCO releases use MMDF mailbox file formats.  Many users prefer
+to use public domain mail readers, such as elm or mush, that can be
+configured to use regular UNIX mailbox files.  Users that wish to be
+compatible with the MMDF mailbox file format must create a transports
+file that configures a prefix of "\1\1\1\1" to insert before each
+message stored in mailbox files.  Copy the file
+samples/generic/transports to the /usr/lib/smail directory, and modify
+it as suggested at the top of the file.
+
+The SCO MMDF version of mailx supplies its own From: line using a
+hostname taken from an MMDF configuration file.  I have no idea why
+they decided it was a good idea to hard-code the hostname in a
+configuration file, but they did.  Thus, if you change your hostname,
+your From: lines won't change until you change the MMDF configuration
+file.  To correct the From: line change the MLDOMAIN and MLNAME
+definitions in /usr/mmdf/mmdftailor.
+
+To get the MMDF-ified SCO to call smail from /bin/mail and mailx,
+add the line:
+
+	set execmail
+
+to the file /usr/lib/mail/mailrc.
+
+
+SMAIL AND SYSTEM V RELEASE 4
+
+On many SVR4 implementations the mailbox file format defines a
+Content-Length field that indicates the length of each message, in
+bytes.  This obviates the need for inserting "> before lines beginning
+with "From " (and indeed, there are some problems with the AT&T-supplied
+version of mailx concerning message splitting, if you don't use the
+Content-Length header).  Smail can be configured to generated
+Content-Length fields (and Content-Type fields).  However, the
+compiled-in transports cannot do this.  To configure generation of these
+fields, copy the file samples/generic/transports to the /usr/lib/smail
+directory, and modify it as suggested at the top of the file.
+
+In SVR4 the uux command is given message grades by using long names,
+which differs from older versions of HoneyDanBer UUCP, where message
+grades were a single character.  Smail does not support these longer
+names.  Fortunately, you can configure SVR4 to support single
+character message grades.  To make SVR4 compatible with smail, add the
+following lines to your /etc/uucp/Grades file:
+
+9	9	Any	User	Any
+A	A	Any	User	Any
+C	C	Any	User	Any
+a	a	Any	User	Any
+n	n	Any	User	Any
+
+This list is sufficient for the default list of Precedence header
+field values supported by smail.
+
+It is possible to configure an SVR4 system to call smail by replacing
+the file /etc/mail/mailsurr with the line:
+
+	'(.+)'	'(.+)'	'< /usr/local/smail/bin/smail -em -i \\2'
+
+This works, but it has the annoying side effect of invoking smail
+multiple times for each address given as an argument to /bin/mail or
+/bin/rmail.  It is preferable to replace /bin/rmail with smail, and to
+replace /bin/mail with the mail program supplied in pd/binmail.
+
+To configure SVR4 to use smail for handling SMTP, move the file
+/etc/rc2.d/S88smtpd to /etc/rc2.d/no-S88smtpd, move the file
+/etc/rc0.d/K74smtpd to /etc/rc0.d/no-S74smtpd, and then add a new file
+/etc/rc2.d/S88smail containing:
+
+	/usr/lib/sendmail -bd -q30m
+
+Then, kill any existing smtpd program and start smail by executing the
+above command.
+
+To convert an SVR4.2 system create the same file above, remove the
+smtpd entry in /etc/inetd.conf, then execute the following commands:
+
+	sacadm -k -p inetd
+	sacadm -s -p inetd
+	/usr/lib/sendmail -bd -q30m
+
+
+SMAIL AND 4.3BSD OR ULTRIX
+
+Some versions of Ultrix, plus stock 4.3BSD, have had problems in with
+some shell scripts supplied with smail.  We have made some attempts to
+simplify the offending shell scripts to avoid problems.  However, if
+errors are still encountered with /bin/sh, then use a different shell,
+such as ksh, zsh, pdksh, or bash, by compiling and installing smail with
+commands like:
+
+	make SHELL=/bin/ksh depend
+	make SHELL=/bin/ksh all
+	make SHELL=/bin/ksh install
+
+Some problems have also been reported with /bin/sh on Xenix.  I don't
+know if there is an alternate shell available on Xenix.  However,
+pdksh should compile and run there.  I realize that it seems absurd
+that regular /bin/sh cannot be used on some systems.  Hopefully the
+specific problems encountered can be found and remedied for future
+releases.
+
+
+RFC1413 SUPPORT
+
+Smail contains support for RFC1413 identification of incoming SMTP/TCP
+traffic.  This allows tracking of who sent mail within a trusting
+community.  (By "trusting community", we mean that if you don't trust
+root on the sending system then you cannot trust the RFC1413 ident
+info supplied by the sending system.)
+
+The support is via the libident library, which is not part of the
+smail package.  libident, currently at version 0.18 (October 5, 1995),
+is available from a number of sites (use archie) or from the master
+site by anonymous FTP from ftp.lysator.liu.se in /pub/ident/libs
+This site also has information about RFC1413, servers for RFC1413 and
+all sorts of other ident related goodies.
+
+When you have the library code, you must compile it, and put the library
+somewhere where it will be seen by the linker (or use the "-I" and "-L"
+switches in EDITME for CFLAGS and LDFLAGS respectively).  Change EDITME
+to define "RFC1413" in the HAVE lines and add "-libident" to the LIBS.

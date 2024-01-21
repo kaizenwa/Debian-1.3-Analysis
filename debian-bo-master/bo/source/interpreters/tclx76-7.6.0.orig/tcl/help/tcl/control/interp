@@ -1,0 +1,376 @@
+NAME
+       interp - Create and manipulate Tcl interpreters
+
+SYNOPSIS
+       interp option ?arg arg ...?
+
+DESCRIPTION
+       This  command  makes it possible to create one or more new
+       Tcl interpreters that co-exist with  the  creating  inter-
+       preter  in the same application.  The creating interpreter
+       is called the master and the new interpreter is  called  a
+       slave.  A master can create any number of slaves, and each
+       slave can itself create additional slaves for which it  is
+       master, resulting in a hierarchy of interpreters.
+
+       Each  interpreter  is  independent from the others: it has
+       its own name space for commands,  procedures,  and  global
+       variables.   A  master  interpreter may create connections
+       between its slaves and itself using a mechanism called  an
+       alias.   An  alias  is  a  command  in a slave interpreter
+       which, when invoked, causes a command to be invoked in its
+       master  interpreter  or in another slave interpreter.  The
+       only other connections between  interpreters  are  through
+       environment  variables  (the env variable), which are nor-
+       mally shared among all interpreters  in  the  application.
+       Note  that  the  name  space  for files (such as the names
+       returned by the open command) is no longer shared  between
+       interpreters.  Explicit  commands  are  provided  to share
+       files and to transfer references to open  files  from  one
+       interpreter to another.
+
+       The  interp  command also provides support for safe inter-
+       preters.  A safe interpreter is a  slave  whose  functions
+       have  been  greatly restricted, so that it is safe to exe-
+       cute untrusted scripts without fear of them damaging other
+       interpreters  or  the application's environment. For exam-
+       ple, all IO channel creation commands and subprocess  cre-
+       ation  commands  are  removed from safe interpreters.  See
+       SAFE INTERPRETERS below for more information on what  fea-
+       tures are present in a safe interpreter.  The alias mecha-
+       nism can be used for protected communication (analogous to
+       a kernel call) between a slave interpreter and its master.
+
+       A qualified interpreter name is a proper  Tcl  lists  con-
+       taining a subset of its ancestors in the interpreter hier-
+       archy, terminated by the string naming the interpreter  in
+       its  immediate  master.  Interpreter names are relative to
+       the interpreter in which they are used. For example, if  a
+       is  a  slave of the current interpreter and it has a slave
+       a1, which in turn has a slave a11, the qualified  name  of
+       a11 in a is the list {a1 a11}.
+
+       The  interp  command,  described  below, accepts qualified
+       interpreter names as arguments; the interpreter  in  which
+       the  command  is being evaluated can always be referred to
+       as {} (the empty list or string). Note that it is impossi-
+       ble to refer to a master (ancestor) interpreter by name in
+       a slave interpreter except through aliases. Also, there is
+       no  global name by which one can refer to the first inter-
+       preter created in an application.  Both  restrictions  are
+       motivated by safety concerns.
+
+       The  interp command is used to create, delete, and manipu-
+       late slave interpreters, and to share or transfer channels
+       between  interpreters.   It can have any of several forms,
+       depending on the option argument:
+
+       interp alias srcPath srcCmd
+              Returns a Tcl list whose elements are the targetCmd
+              and  args  associated  with  the alias named srcCmd
+              (all of these are the  values  specified  when  the
+              alias  was  created; it is possible that the actual
+              source command in the slave is different from  src-
+              Cmd if it was renamed).
+
+       interp alias srcPath srcCmd {}
+              Deletes  the  alias  for srcCmd in the slave inter-
+              preter identified by srcPath.  srcCmd refers to the
+              name  under  which  the  alias was created;  if the
+              source command has been renamed, the  renamed  com-
+              mand will be deleted.
+
+       interp alias srcPath srcCmd targetPath targetCmd ?arg arg
+              ...?
+              This command creates an alias between one slave and
+              another (see the alias slave command below for cre-
+              ating aliases between a slave and its master).   In
+              this  command, either of the slave interpreters may
+              be anywhere in the hierarchy of interpreters  under
+              the  interpreter invoking the command.  SrcPath and
+              srcCmd identify the source of the  alias.   SrcPath
+              is  a  Tcl  list whose elements select a particular
+              interpreter.  For example, ``a  b''  identifies  an
+              interpreter  b,  which is a slave of interpreter a,
+              which is a slave of the invoking  interpreter.   An
+              empty  list  specifies the interpreter invoking the
+              command.  srcCmd gives the name of a  new  command,
+              which  will  be  created in the source interpreter.
+              TargetPath and targetCmd specify  a  target  inter-
+              preter  and command, and the arg arguments, if any,
+              specify additional arguments to targetCmd which are
+              prepended to any arguments specified in the invoca-
+              tion of srcCmd.  TargetCmd may be undefined at  the
+              time  of  this call, or it may already exist; it is
+              not created by this command.   The  alias  arranges
+              for  the  given target command to be invoked in the
+              target interpreter whenever the given  source  com-
+              mand  is  invoked  in  the source interpreter.  See
+              ALIAS INVOCATION below for more details.
+
+       interp aliases ?path?
+              This command returns a Tcl list of the names of all
+              the  source  commands  for  aliases  defined in the
+              interpreter identified by path.
+
+       interp create ?-safe? ?--? ?path?
+              Creates a slave interpreter identified by path  and
+              a  new command, called a slave command. The name of
+              the slave command is the last  component  of  path.
+              The new slave interpreter and the slave command are
+              created in the interpreter identified by  the  path
+              obtained  by removing the last component from path.
+              For example, if path is ``a b c'' then a new  slave
+              interpreter  and slave command named ``c'' are cre-
+              ated in the interpreter identified by the path  ``a
+              b''.   The  slave command may be used to manipulate
+              the new interpreter as described below. If path  is
+              omitted,  Tcl  creates  a  unique  name of the form
+              interpx, where x is an integer, and uses it for the
+              interpreter  and  the  slave  command. If the -safe
+              switch is specified (or if the  master  interpreter
+              is  a  safe interpreter), the new slave interpreter
+              will be created as a safe interpreter with  limited
+              functionality; otherwise the slave will include the
+              full set of Tcl built-in  commands  and  variables.
+              The  --  switch  can  be  used  to  mark the end of
+              switches;  it may be needed if path is  an  unusual
+              value  such  as -safe. The result of the command is
+              the name of the new  interpreter.  The  name  of  a
+              slave  interpreter  must  be  unique  among all the
+              slaves for its master;  an error occurs if a  slave
+              interpreter  by  the  given  name already exists in
+              this master.
+
+       interp delete ?path ...?
+              Deletes zero or  more  interpreters  given  by  the
+              optional  path arguments, and for each interpreter,
+              it  also  deletes  its  slaves.  The  command  also
+              deletes  the  slave  command  for  each interpreter
+              deleted.  For each path argument, if no interpreter
+              by that name exists, the command raises an error.
+
+       interp eval path arg ?arg ...?
+              This  command concatenates all of the arg arguments
+              in the same fashion as  the  concat  command,  then
+              evaluates  the  resulting string as a Tcl script in
+              the  slave  interpreter  identified  by  path.  The
+              result of this evaluation (including error informa-
+              tion such as the errorInfo and errorCode variables,
+              if  an  error  occurs)  is returned to the invoking
+              interpreter.
+       interp exists path
+              Returns  1 if a slave interpreter by the  specified
+              path exists in this master, 0 otherwise. If path is
+              omitted, the invoking interpreter is used.
+
+       interp issafe ?path?
+              Returns 1 if  the  interpreter  identified  by  the
+              specified path is safe, 0 otherwise.
+
+       interp share srcPath channelId destPath
+              Causes  the  IO  channel identified by channelId to
+              become shared between the interpreter identified by
+              srcPath and the interpreter identified by destPath.
+              Both interpreters have the same permissions on  the
+              IO  channel.   Both  interpreters  must close it to
+              close the underlying IO channel; IO channels acces-
+              sible  in  an  interpreter are automatically closed
+              when an interpreter is destroyed.
+
+       interp slaves ?path?
+              Returns a Tcl list of the names of  all  the  slave
+              interpreters  associated with the interpreter iden-
+              tified by path. If path is  omitted,  the  invoking
+              interpreter is used.
+
+       interp target path alias
+              Returns  a  Tcl  list  describing the target inter-
+              preter for an alias. The alias is specified with an
+              interpreter  path  and source command name, just as
+              in interp alias  above.  The  name  of  the  target
+              interpreter  is  returned  as  an interpreter path,
+              relative to the invoking interpreter.  If the  tar-
+              get  interpreter  for  the  alias  is  the invoking
+              interpreter then an empty list is returned. If  the
+              target  interpreter for the alias is not the invok-
+              ing interpreter or one of its descendants  then  an
+              error  is  generated.   The target command does not
+              have to be defined at the time of this  invocation.
+
+       interp transfer srcPath channelId destPath
+              Causes  the  IO  channel identified by channelId to
+              become available in the interpreter  identified  by
+              destPath and unavailable in the interpreter identi-
+              fied by srcPath.
+
+SLAVE COMMAND
+       For each slave interpreter created with  the  interp  com-
+       mand,  a  new  Tcl command is created in the master inter-
+       preter with the same name as  the  new  interpreter.  This
+       command  may  be  used to invoke various operations on the
+       interpreter.  It has the following general form:
+              slave command ?arg arg ...?
+       Slave is the name of the interpreter, and command and  the
+       args  determine  the  exact  behavior of the command.  The
+       valid forms of this command are:
+
+       slave aliases
+              Returns a Tcl list whose elements are the names  of
+              all  the  aliases in slave.  The names returned are
+              the srcCmd values used when the aliases  were  cre-
+              ated  (which  may  not  be  the same as the current
+              names of the commands, if they have been  renamed).
+
+       slave alias srcCmd
+              Returns a Tcl list whose elements are the targetCmd
+              and args associated with  the  alias  named  srcCmd
+              (all  of  these  are  the values specified when the
+              alias was created; it is possible that  the  actual
+              source  command in the slave is different from src-
+              Cmd if it was renamed).
+
+       slave alias srcCmd {}
+              Deletes the alias for srcCmd in  the  slave  inter-
+              preter.   srcCmd refers to the name under which the
+              alias was created;  if the source command has  been
+              renamed, the renamed command will be deleted.
+
+       slave alias srcCmd targetCmd ?arg ..?
+              Creates  an  alias  such  that  whenever  srcCmd is
+              invoked in slave, targetCmd is invoked in the  mas-
+              ter.  The arg arguments will be passed to targetCmd
+              as additional arguments, prepended before any argu-
+              ments  passed  in  the  invocation  of srcCmd.  See
+              ALIAS INVOCATION below for details.
+
+       slave eval arg ?arg ..?
+              This command concatenates all of the arg  arguments
+              in  the  same  fashion  as the concat command, then
+              evaluates the resulting string as a Tcl  script  in
+              slave.   The  result  of this evaluation (including
+              error information such as the errorInfo and  error-
+              Code  variables, if an error occurs) is returned to
+              the invoking interpreter.
+
+       slave issafe
+              Returns  1 if the slave interpreter is safe, 0 oth-
+              erwise.
+
+
+ALIAS INVOCATION
+       The alias mechanism has been carefully designed so that it
+       can be used safely when an untrusted script  is  executing
+       in  a  safe slave and the target of the alias is a trusted
+       master.  The most important thing in  guaranteeing  safety
+       is to ensure that information passed from the slave to the
+       master is never evaluated or substituted  in  the  master;
+       if  this  were to occur, it would enable an evil script in
+       the slave to invoke arbitrary  functions  in  the  master,
+       which would compromise security.
+
+       When  the  source  for  an  alias  is invoked in the slave
+       interpreter, the usual  Tcl  substitutions  are  performed
+       when  parsing  that command.  These substitutions are car-
+       ried out in the source interpreter just as they  would  be
+       for  any  other  command invoked in that interpreter.  The
+       command procedure for the source command takes  its  argu-
+       ments  and merges them with the targetCmd and args for the
+       alias to create a new array of arguments.  If the words of
+       srcCmd  were ``srcCmd arg1 arg2 ... argN'', the new set of
+       words will be ``targetCmd arg arg ... arg  arg1  arg2  ...
+       argN'',  where  targetCmd and args are the values supplied
+       when the alias was created.  TargetCmd  is  then  used  to
+       locate  a command procedure in the target interpreter, and
+       that command procedure is invoked  with  the  new  set  of
+       arguments.   An  error occurs if there is no command named
+       targetCmd in the target interpreter.  No  additional  sub-
+       stitutions are performed on the words:  the target command
+       procedure is invoked directly, without going  through  the
+       normal  Tcl  evaluation mechanism.  Substitutions are thus
+       performed on each word exactly once:  targetCmd  and  args
+       were substituted when parsing the command that created the
+       alias, and arg1 - argN are substituted  when  the  alias's
+       source command is parsed in the source interpreter.
+
+       When  writing  the  targetCmds  for aliases in safe inter-
+       preters, it is very important that the arguments  to  that
+       command  never  be  evaluated  or  substituted, since this
+       would provide an escape mechanism whereby the slave inter-
+       preter  could  execute arbitrary code in the master.  This
+       in turn would compromise the security of the system.
+
+
+SAFE INTERPRETERS
+       A safe interpreter is one with  restricted  functionality,
+       so  that  is safe to execute an arbitrary script from your
+       worst enemy without  fear  of  that  script  damaging  the
+       enclosing  application or the rest of your computing envi-
+       ronment.  In order to make an  interpreter  safe,  certain
+       commands  and  variables are removed from the interpreter.
+       For example, commands to create files on disk are removed,
+       and the exec command is removed, since it could be used to
+       cause damage  through  subprocesses.   Limited  access  to
+       these  facilities  can be provided, by creating aliases to
+       the master interpreter which check their  arguments  care-
+       fully  and  provide  restricted access to a safe subset of
+       facilities.  For example, file creation might  be  allowed
+       in  a  particular  subdirectory  and subprocess invocation
+       might be allowed for a carefully selected and fixed set of
+       programs.
+
+       A  safe  interpreter  is  created  by specifying the -safe
+       switch to the interp  create  command.   Furthermore,  any
+       slave created by a safe interpreter will also be safe.
+
+       A  safe  interpreter is created with exactly the following
+       set of built-in commands:
+
+              after       append      array       break
+              case        catch       clock       close
+              concat      continue    eof         error
+              eval        expr        fblocked    fileevent
+              flush       for         foreach     format
+              gets        global      history     if
+              incr        info        interp      join
+              lappend     lindex      linsert     list
+              llength     lower       lrange      lreplace
+              lsearch     lsort       package     pid
+              proc        puts        read        rename
+              return      scan        seek        set
+              split       string      subst       switch
+              tell        trace       unset       update
+              uplevel     upvar       vwait       while
+
+       All commands not on this list are removed by interp create
+       when it creates a safe interpreter.  These commands can be
+       recreated later as Tcl procedures or aliases.
+
+       In addition, the env variable is not  present  in  a  safe
+       interpreter, so it cannot share environment variables with
+       other interpreters. The  env  variable  poses  a  security
+       risk,  because users can store sensitive information in an
+       environment variable. For example, the PGP  manual  recom-
+       mends  storing  the PGP private key protection password in
+       the environment variable  PGPPASS.  Making  this  variable
+       available  to  untrusted  code  executing in a safe inter-
+       preter would incur a security risk.
+
+       If extensions are loaded into a safe interpreter, they may
+       also  restrict their own functionality to eliminate unsafe
+       commands. For a discussion of management of extensions for
+       safety see the manual entries for the package and load Tcl
+       commands.
+
+CREDITS
+       This mechanism is based on the Safe-Tcl  prototype  imple-
+       mented by Nathaniel Borenstein and Marshall Rose.
+
+
+SEE ALSO
+       load(n), package(n) Tcl_CreateSlave(3)
+
+
+KEYWORDS
+       alias,  master interpreter, safe interpreter, slave inter-
+       preter

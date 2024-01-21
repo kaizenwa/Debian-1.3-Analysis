@@ -1,0 +1,157 @@
+
+       ********************** FUN WITH FISH *********************
+
+There are lots of programs for lots of platforms to make fish swim in the
+background of your screen.  This is a modification of an old one called
+xfish (also called Xaquarium), that I have added more features to.
+
+To not confuse you (or confuse you more) I will call this modified xfish
+"xfishtank". ['A rose by any other name...' and all that]
+
+
+How is this different?  I started with you basic xfish, and I kept the
+bubbles (actually I re-wrote some of the bubble code, but it LOOKS the same).
+I changed the rest of the code to allow any number of multicolored fish to
+swim around.  Each fish can have up to 255 colors, but on startup the program
+takes all the colors from all the fish, and squeezes them down to all fit
+into the default colormap as best it can.  Any fish can be any size in
+width and height.  To make them look more like they are swimming, fish are
+animated (Very simple 2 frame animation) [I got this idea from watching
+the AfterDark fish on the Mac].  Fish CANNOT swim over each other, they
+will turn around if they are about to collide.  I had a version that
+had fish swiming over each other, it was WAY to slow to be something to run
+on your background while working, so I deleted it.
+
+xfishtank -help to see the command line options.
+
+
+       ********************** NEW FUN WITH FISH *********************
+
+Since the original version, I have received various comments and bug fixes.
+This version I know runs on SGIs running 4.0, Sparcs running 4.1, 
+Decstations running 4.1, and RS6000s running 3.1.  However, there were mongo
+memory leaks in the X server distributed with the RS6000, so I had to compile
+the X11R5 server and use that.
+
+As you add more fish (especially very colorful fish) the total color use set
+becomes quite large (greater than 255).  I added 2 new options to help you
+deal with this.  By default xfishtank would find the total color use set
+for all the fish you requested, and then start allocating out of the default
+colormap until it filled up, it would then match the rest of the colors to
+whatever colors it could get.  This first come first serve color allocation
+can give really bad results for large color sets.  I added the -m option
+to allow you to specify that the program should cut the color use set down
+to the number you specify with the -m option before starting to allocate
+out of the default colormap.  The algorithm used by -m is considerably better
+than first come first serve.  Also, having xfishtank use ALL the available
+cells in the default colormap can be bad.  The -C options lets you limit how
+many cells xfishtank will take out of the default colormap.
+In the first come first serve senario colors are allocated for the fish,
+in the order of appearance in the FishList file, and then from the backgound
+picture if one exists.
+
+Finally, due to popular demand, I put back in my clipmask code.  By setting
+the -d option (for Do clipping), xfishtank will swim its fish over whatever
+you already have on your root window.  WARNING:  This will slow down your
+machine!  The reason I took this code out originally was it slowed my 
+machine down too much for me to comfortably work.  But if you think you have
+a really spiffy fast workstation, go ahead and give it a try.
+
+If you use the -d option and notice some flicker (which I expect you will),
+this is because xfishtank is just doing an XClearArea, and letting the root
+redraw its background.  If you know what you want your background picture to
+be, use -p <image_file> instead of -d.  The image_file needs to be a gif
+image.  Since xfishtank now knows what your background is, xfishtank with
+the -p option should have much less flicker.  However, it suffers the
+disadvantage that you can't change the background picture without restarting
+xfishtank.
+
+The intrepid explorer of the source code will notice that there are some
+options not described in xfishtank -help.  In particular -o -and -D.  These
+options aren't described because they were stuff I was fussing with and couldn't
+get to work.  I left them in on this release so that if someone else wanted
+to try and get them to work, they could see what I had already tried.  The -o
+option lets fish try and swim on top of each other.  It looks ugly no matter
+how I do it, if you can fix it, great.  -D is a special option that is only
+active if you have also specified -d and -p.  Normally you never want to specify
+both -d and -p because it doesn't make the animation any better, and it
+slightly messes up fish to bubble intersections.  However, if you specify
+-d -D -o -p you will get as close as I could get to proper fish intersections.
+And when you see how crumby these are, and how slow it makes your machine
+you will know why I gave up.
+
+Ok, I'll fess up, I'm lying, I did actually get good fish to fish intersections
+but only by writing a completely different version of xfishtank that has
+each fish be a shaped override-redirect window, that moves itself, and changes
+its shape-mask to animate.  This looks REALLY COOL, but grinds any and all
+X servers to a complete standstill.
+
+
+       ********************** NEW FISH PICTURES *********************
+
+This release contains a grand total of 29 fish!  These fish were carefully
+created through lots of hard work, and the help of many many people who
+sent me pictures of fish, non-copyrighted gifs of fish, and allowed me to
+borrow their scanners.  I'm not going to try and name them all here, there
+are lots of you, and I'm afraid I may miss someone.  You all know who you are,
+and you have my heartfelt thanks, I couldn't have done this without you.
+
+
+       ********************** TROUBLE WITH FISH *********************
+
+There is a scarcity of good fish pictures in the world, and they are all
+protected by lawyers.  Here is the solution I propose.
+
+Any of you with talent can edit up any pictures you want, somehow get them
+into GIF format, and import them into your xfishtank.  The program
+"giftofish" that I am supplying here takes as input any 2 GIF files,
+and creates a xfishtank header file for that fish.  The 2 files must have
+the same width and height, and must both have the same background color.
+The pictures are assumed to be the two frames of an animated fish swiming right.
+Put this new header file into your fishmaps directory, edit the FishList
+file to add the prefix of that header file, and increment the total fishcount
+on the first line of that file.  Now recompile xfishtank, and your new fish
+will be used.  Also, the program fishtogif will extract the two gifs from
+any fish header file so you can touch up what you already have.
+
+Other fish sources:
+	The AfterDark fish on the Mac are beautiful.  If you
+have already shelled out the money to Berkely Systems Software to buy those
+fish, and you also want to see them on your UNIX box, here is what you do.
+If you can transfer the Mac fish files to UNIX, run the "gofish" program 
+supplied here, it will write out the fish into two intermediate files.
+The files will look strange, they are my own format, just feed them to the
+giftofish program (which understands that format), and it will create a
+fish header file for you.
+	OpenWindows 3.0 comes with some fish pictures.  If you have purchased
+Openwindows, and want to use those pictures, the program "rasttofish" 
+supplied here will read one of their sun raster fish pictures, and produce
+a xfishtank header file for it.  Note, the Openwindows fish are only one
+frame, so the won't be animated.
+	There is apparently a PC Windows program with some swimming fish.
+The individual fish are stored in .fsh files.  The program pcfshtofish
+will turn one of these .fsh files into an xfishtank header file.
+
+
+            ********************** THANKS *********************
+
+A really big thanks to well over 100 wonderful people who after downloading
+the last version of xfishtank took the time to send me such pleasant,
+complimentary, and supportive e-mail.  This version was never planned, but
+all of you have made me feel better about writing this code than anything
+that any employer has ever paid me for.
+
+
+As usual, mail any problems, questions, complaints, reccommendations, and
+cookies to me.
+
+Eric Bina
+508 E. Michigan, #35
+Urbana, IL 61801
+
+ebina@ncsa.uiuc.edu
+
+(217)344-9101
+Work(217)244-6133
+
+

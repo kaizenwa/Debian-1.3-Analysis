@@ -1,0 +1,45 @@
+#!/usr/bin/make -f
+#
+# Debian rules for building a Debian package
+# Version 1.5
+#
+# These rules have been specifically designed NOT to require root to
+# run them. At any time root privileges are required, the command to be
+# executed will be made obvious and root's password will be prompted for.
+# Of course, root may still run this and no password will be required.
+#
+# Robert Leslie <rob@mars.org>
+
+PKG =	maelstrom
+VER =	1.4.3-L2.0.4
+DEB =	1
+BLD =	debian/.build
+TMP =	debian/.tmp
+ARC =	$(shell dpkg --print-architecture)
+
+build :: $(BLD)
+
+binary :: $(BLD)
+	su -c 'exec ./debian/binary $(PKG) $(VER)-$(DEB) $(ARC) $(TMP)'
+	dpkg --build $(TMP) && dpkg-name -o -s .. $(TMP).deb
+
+$(BLD):
+	make
+	touch $(BLD)
+
+clean ::
+	test ! -d $(TMP) || su -c 'rm -rf $(TMP)'
+	rm -f $(BLD)
+	make clean
+	rm -f Maelstrom Maelstrom_sound test-asyncio macres
+
+source ::
+	test ! -f $(BLD) || make -f debian/rules clean
+	cd .. && tar cf - $(PKG)-$(VER) |  \
+	    gzip -9f > $(PKG)_$(VER)-$(DEB).tar.gz
+
+diff ::
+	test ! -f $(BLD) || make -f debian/rules clean
+	test -d ../$(PKG)-$(VER).orig
+	cd .. && diff -cNr $(PKG)-$(VER).orig $(PKG)-$(VER) |  \
+	    gzip -9f > $(PKG)_$(VER)-$(DEB).diff.gz

@@ -1,0 +1,81 @@
+#! /usr/bin/make -f
+#
+# To make the distributed dpkg archive, the ``Debianized'' source package
+# and the context diff to the original package, type `./debian.rules dist'.
+# Make sure that `debian.rules' is executable before the final distribution
+# is made.
+#
+# Invoke each target with `./debian.rules <target>'.  All targets should be
+# invoked with the package root as the current directory.
+
+p = ical
+v = 2.0p2
+d = 2
+a = $(shell dpkg --print-architecture)
+
+build:
+# Builds the binary package.
+	./configure --prefix=/usr
+	make 
+	strip ical
+	touch stamp-build
+
+clean:
+# Undoes the effect of `make -f debian.rules build'.
+	-make distclean
+	rm -f stamp-build
+	rm -rf debian-tmp
+
+binary:
+# Makes a binary package.
+	test -f stamp-build || make -f debian.rules build
+	rm -rf debian-tmp
+	install -d debian-tmp
+	#
+	install -d debian-tmp/usr
+	make prefix=debian-tmp/usr install
+	#
+	install -d debian-tmp/usr/doc/copyright
+	install -m 644 COPYRIGHT debian-tmp/usr/doc/copyright/$(p)
+	install -d debian-tmp/usr/doc/$(p)
+	install -m 644 ANNOUNCE debian-tmp/usr/doc/$(p)
+	install -m 644 CHANGES.html debian-tmp/usr/doc/$(p)
+	install -m 644 README debian-tmp/usr/doc/$(p)
+	install -m 644 TODO debian-tmp/usr/doc/$(p)
+	gzip -9f debian-tmp/usr/doc/$(p)/*
+	#
+	install -d debian-tmp/DEBIAN
+	sed -e 's/PpP/$(p)/' -e 's/VvV/$(v)/' -e 's/DdD/$(d)/' \
+	  -e 's/AaA/$(a)/' debian.control > debian-tmp/DEBIAN/control
+	chmod -R g-sw debian-tmp
+	chown -R root.root debian-tmp
+	dpkg --build debian-tmp
+	dpkg-name -o -s .. debian-tmp.deb
+
+source:
+# Makes a source package.
+	-test -f stamp-build && make -f debian.rules clean
+	( cd .. && \
+	  tar cf $(p)_$(v)-$(d).tar $(p)-$(v) && \
+	  gzip -9f $(p)_$(v)-$(d).tar )
+
+diff:
+# Makes a context diff.
+	-test -f stamp-build && make -f debian.rules clean
+	test -d ../$(p)-$(v).orig || \
+	  ( echo "Original not available in ../$(p)-$(v).orig." ; false )
+	( cd .. && \
+	  ( diff -uNr $(p)-$(v).orig $(p)-$(v) > $(p)_$(v)-$(d).diff; \
+	    [ $$? = 1 ] ) && \
+	  gzip -9f $(p)_$(v)-$(d).diff )
+
+FILES = $(p)_$(v)-$(d).{tar.gz,diff.gz} $(p)_$(v)-$(d)_$(a).deb
+
+changes:
+# Prepares the checksums and changes files.
+	cd .. && dchanges -n -e -p ce=$(p)-$(v)/debian.changes \
+	  p=extra $(FILES)
+
+dist: binary source diff changes
+# Prepares the package for distribution.
+

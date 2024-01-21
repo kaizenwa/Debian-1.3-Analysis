@@ -1,0 +1,57 @@
+#! /usr/bin/perl -w
+
+# Copyright (c) 1997 University of Cambridge.
+# See the file NOTICE for conditions of use and distribution.
+
+# This is a perl script which extracts from an Exim log all entries
+# for all messages that have an entry that matches a given pattern.
+# If *any* entry for a particular message matches the pattern, *all*
+# entries for that message are displayed.
+
+# There must be one argument, which is the pattern. Subsequent arguments
+# are the files to scan; if none, the standard input is read.
+
+# Extract the pattern and make sure any relevant characters are quoted if
+# the -l flag is given.
+
+shift @ARGV if ($literal = ($#ARGV >= 0 && $ARGV[0] eq "-l"));
+
+die "usage: exigrep [-l] <pattern> [<log file>]...\n" if ($#ARGV < 0);
+
+$pattern = shift @ARGV;
+$pattern =~ s/\W/\\$&/g if $literal;
+
+# Loop reading the input. We buffer up information on a per-message basis.
+# It is done this way rather than reading the input twice in order that the
+# input can be a pipe. Program defensively against short lines finding
+# their way into the log.
+
+while (<>)
+  {
+  next if length($_) < 20;
+  $id = substr($_, 20, 16);
+  next if $id !~ /\w{6}\-\w{6}\-\w{2}/;
+  $saved{$id} = '' unless defined($saved{$id});
+
+  # Save up the data for this message in case it becomes interesting later.
+  $saved{$id} .= $_;
+
+  # Are we interested in this id ?
+  $id_list{$id} = 1 if /$pattern/io;
+
+  # See if this is a completion for some message. If it is interesting,
+  # print it, but in any event, throw away what was saved.
+
+  if (/Completed$/)
+    {
+    delete $id_list{$id}, print "$saved{$id}\n" if $id_list{$id};
+    delete $saved{$id};
+    }
+  }
+
+# Print the unCompleted data
+
+foreach $key (keys %id_list)
+  { print "+++ $key not completed +++\n$saved{$key}\n"; }
+
+# End of exigrep

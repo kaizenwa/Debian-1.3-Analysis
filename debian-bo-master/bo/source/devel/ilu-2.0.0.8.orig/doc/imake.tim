@@ -1,0 +1,274 @@
+@setfilename ilu-c++.info
+@settitle Using Imake with ILU
+@ifclear largerdoc
+@titlepage
+@title Using Imake with ILU
+@author Bill Janssen @code{<janssen@@parc.xerox.com>}
+@sp
+@today{}
+@sp
+Copyright @copyright{} 1994 Xerox Corporation@*
+All Rights Reserved.
+@end titlepage
+@ifinfo
+@node Top, ,(dir),(dir)
+@top Using Imake with ILU
+@end ifinfo
+@end ifclear
+
+@system{ILU} uses the @program{imake} system from the @system{X Window System} distribution.
+@program{imake} provides a parameterized way of constructing @file{Makefile}s automatically
+from @file{Imakefile}s.  The @file{Imakefile}s contain macros which are expanded to regular @file{Makefile}
+rules when the program @program{imake} is run.
+
+@section Creating @file{Makefile}s from @file{Imakefile}s
+@cindex Using imake
+
+The program @program{ilumkmf}
+@pindex ilumkmf
+is supplied with the @system{ILU} system.
+When run, it will use the @file{Imakefile} in your current working
+directory as input, and produce the corresponding @file{Makefile},
+again in the current working directory:
+
+@transcript
+% @userinput{cd myilu}
+% @userinput{ls}
+Imakefile foo.isl fooProg.cc
+% @userinput{ilumkmf}
+% @userinput{ls}
+Imakefile Makefile foo.isl fooProg.cc
+%
+@end transcript
+
+@section @language{ANSI C} Usage
+
+A typical @file{Imakefile} for an ANSI C @system{ILU} application would look like:
+
+@codeexample
+NormalObjectRule()  /* this rule defines the .c -> .o step */
+
+InterfaceTarget(foo.isl)
+ILUCTarget(foo.h foo-surrogate.c foo-common.c foo-true.c, foo.isl)
+
+DepObjectTarget(programComponent1.o, foo.h somethingElse.h)
+ObjectTarget(programComponent2.o)
+
+CProgramTarget(program, programComponent1.o programComponent2.o foo-surrogate.o foo-common.o,,)
+@end codeexample
+
+@subsection @language{ANSI C} @system{ILU} @program{imake} Macros
+
+The variable @var{LOCAL_INCLUDES}
+@vindex LOCAL_INCLUDES
+is a list of include
+file locations to be included when compiling.
+
+The variable @var{ANSI_C_COMMAND}
+@vindex ANSI_C_COMMAND
+defines the particular
+command invoked for compiling @language{ANSI C} on your system.  If you
+wish to use a different @language{ANSI C} compiler, override the default
+command by redefining this value in your @file{Imakefile}.  Note that it may also be
+necessary to build a version of the @system{ILU} @language{ANSI C} library,
+@file{@metavar{ILUHOME}/lib/libilu-c.a}, to use with this compiler.
+
+@macro{NormalObjectRule()}
+@findex NormalObjectRule (imake)
+defines a number of suffix rules, in particular
+the one to go from @file{.c} files to @file{.o} files in your environment.
+
+@macro{InterfaceTarget(@parm{ISL-file})}
+@findex InterfaceTarget (imake)
+defines a number of rules
+about the @file{.isl} file @parm{ISL-file}.  You should have one of these
+in your @file{Imakefile} for every interface you use.
+
+@macro{ILUCTarget(@parm{generated-files}, @parm{ISL-file})}
+@findex ILUCTarget (imake)
+defines
+which ANSI C files are generated from the @file{isl} file and may therefore by
+re-generated at will, and when the @file{.isl} file changes.  Generally, for
+an interface called @interface{foo}, the generated files will be
+@file{foo-surrogate.c}, @file{foo-true.c}, @file{foo-common.c}, and @file{foo.h}.
+
+@macro{ObjectTarget(@parm{object-file})}
+@findex ObjectTarget (imake)
+simply states that the
+specified @parm{object-file} should be built.
+
+@macro{DepObjectTarget(@parm{object-file}, @parm{dependencies})}
+@findex DepObjectTarget (imake)
+says
+that the specified @parm{object-file} should be built, and that it
+depends on the files specified in @parm{dependencies}, which is a list
+of file names separated by spaces.  Whenever something in the @parm{dependencies}
+list changes, the @parm{object-file} will be re-built.
+
+@macro{CProgramTarget(@parm{program-name}, @parm{objects}, @parm{dep-libraries}, @parm{non-dep-libraries})}
+@findex CProgramTarget (imake)
+defines a program called @parm{program-name} that is dependent on
+the object files defined in @parm{objects}, and the libraries specified in
+@parm{dep-libraries}, so that it will be re-built if anything changes
+in those two groups.  It will also be linked with libraries specified in
+@parm{non-dep-libraries}, but will not be re-built if they change.  Note that
+the @system{ILU} @language{ANSI C} libraries are not automatically included
+by this command, but may be specified as part of the program by specifying them
+as part of either @macro{dep-libraries} or @macro{non-dep-libraries}.
+
+@macro{ILUCProgramTarget(@parm{program-name}, @parm{objects}, @parm{dep-libraries}, @parm{non-dep-libraries})}
+@findex ILUCProgramTarget (imake)
+defines a program called @parm{program-name} that is dependent on
+the object files defined in @parm{objects}, and the libraries specified in
+@parm{dep-libraries}, and the normal @system{ILU} @language{ANSI C} libraries,
+so that it will be re-built if anything changes
+in those three groups, all of which will be linked into the program @parm{program-name}.
+It will also be linked with libraries specified in
+@parm{non-dep-libraries}, but will not be re-built if they change.
+This differs from @macro{CProgramTarget} in that the @system{ILU} libraries
+are automatically included.
+
+@section @language{C++} Usage
+
+A typical @file{Imakefile} for a C++ application and @system{ILU} would look like:
+
+@codeexample
+LOCALINCLUDES = -I$(ILUHOME)/include
+ILULIBS = $(ILUHOME)/lib/libilu-c++.a $(ILUHOME)/lib/libilu.a
+
+NormalObjectRule()  /* this rule defines the .cc -> .o step */
+
+InterfaceTarget(foo.isl)
+ILUCPlusPlusTarget(foo.H foo.cc foo-server-stubs.cc, foo.isl)
+
+DepObjectTarget(programComponent1.o, foo.H somethingElse.H)
+ObjectTarget(programComponent2.o)
+
+CPlusPlusProgramTarget(program, programComponent1.o programComponent2.o foo.o, $(ILULIBS),)
+@end codeexample
+
+@subsection @language{C++} @system{ILU} @program{imake} Macros
+
+The variable @var{LOCAL_INCLUDES}
+@vindex LOCAL_INCLUDES
+is a list of include
+file locations to be included when compiling.  @code{-I$(ILUHOME)/include}
+should always be on this list for compiling @system{ILU} applications.
+
+The variable @var{CPLUSPLUS_COMMAND}
+@vindex CPLUSPLUS_COMMAND
+defines the particular
+command invoked for compiling @language{C++} on your system.  If you
+wish to use a different @language{C++}, override the default
+command by redefining this value.  Note that it will also be
+necessary to build a version of @system{ILU} @language{C++} library,
+@file{@metavar{ILUHOME}/lib/libilu-c++.a}, to use with this compiler.
+
+@macro{NormalObjectRule()}
+@findex NormalObjectRule (imake)
+defines a number of suffix rules, in particular
+the one to go from @file{.cc} files to @file{.o} files in your environment.
+
+@macro{InterfaceTarget(@parm{ISL-file})}
+@findex InterfaceTarget (imake)
+defines a number of rules
+about the @file{.isl} file @parm{ISL-file}.  You should have one of these
+in your @file{Imakefile} for every interface you use.
+
+@macro{ILUCPlusPlusTarget(@parm{generated-files}, @parm{ISL-file})}
+@findex ILUCPlusPlusTarget (imake)
+defines
+which C++ files are generated from the @file{isl} file and may therefore by
+re-generated at will, and when the @file{.isl} file changes.  Generally, for
+an interface called @interface{foo}, the generated files will be
+@file{foo.cc}, @file{foo.H}, and @file{foo-server-stubs.cc}.
+
+@macro{ObjectTarget(@parm{object-file})}
+@findex ObjectTarget (imake)
+simply states that the
+specified @parm{object-file} should be built.
+
+@macro{DepObjectTarget(@parm{object-file}, @parm{dependencies})}
+@findex DepObjectTarget (imake)
+says
+that the specified @parm{object-file} should be built, and that it
+depends on the files specified in @parm{dependencies}, which is a list
+of file names separated by spaces.  Whenever something in the @parm{dependencies}
+list changes, the @parm{object-file} will be re-built.
+
+@macro{CPlusPlusProgramTarget(@parm{program-name}, @parm{objects}, @parm{dep-libraries}, @parm{non-dep-libraries})}
+@findex CPlusPlusProgramTarget (imake)
+defines a program called @parm{program-name} that is dependent on
+the object files defined in @parm{objects}, and the libraries specified in
+@parm{dep-libraries}, so that it will be re-built if anything changes
+in those two groups.  It will also be linked with libraries specified in
+@parm{non-dep-libraries}, but will not be re-built if they change.
+Note that
+the @system{ILU} @language{ANSI C} libraries are not automatically included
+by this command, but may be specified as part of the program by specifying them
+as part of either @macro{dep-libraries} or @macro{non-dep-libraries}.
+
+@macro{ILUCPlusPlusProgramTarget(@parm{program-name}, @parm{objects}, @parm{dep-libraries}, @parm{non-dep-libraries})}
+@findex ILUCPlusPlusProgramTarget (imake)
+defines a program called @parm{program-name} that is dependent on
+the object files defined in @parm{objects}, and the libraries specified in
+@parm{dep-libraries}, and the normal @system{ILU} @language{ANSI C} libraries,
+so that it will be re-built if anything changes
+in those three groups, all of which will be linked into the program @parm{program-name}.
+It will also be linked with libraries specified in
+@parm{non-dep-libraries}, but will not be re-built if they change.
+This differs from @macro{CProgramTarget} in that the @system{ILU} libraries
+are automatically included.
+
+@section @language{Modula-3} Usage
+
+A typical @file{Imakefile} for a @language{Modula-3} application and @system{ILU} would look like:
+
+@codeexample
+LOCALM3FLAGS = -D$(ILUHOME)/include -L$(ILUHOME)/lib
+
+InterfaceTarget(foo.isl)
+ILUM3Target(IluM3Files(foo), foo.isl)
+M3LibraryTarget(libfoo.a, IluM3Files(foo), -lilu-m3)
+M3ProgramTarget(FooM3Server, FooM3Server.m3 libfoo.a, -lilu-m3 -lilu)
+M3ProgramTarget(FooM3Client, FooM3Client.m3 libfoo.a, -lilu-m3 -lilu)
+@end codeexample
+
+@subsection @language{Modula-3} @system{ILU} @program{imake} Macros
+
+The variable @var{LOCALM3FLAGS}
+@vindex LOCALM3FLAGS
+is a list of extra arguments to be passed to the @command{m3} command when compiling.  @code{-D$(ILUHOME)/include} and @code{-L$(ILUHOME)/lib}
+should always be on this list for compiling @system{ILU} applications.
+
+The variable @var{M3_COMMAND}
+@vindex M3_COMMAND
+defines the particular
+command invoked for compiling @language{Modula-3} on your system.  If you
+wish to use a different @language{Modula-3}, override the default
+command by redefining this value.  Note that it will also be
+necessary to build a version of @system{ILU} @language{Modula-3} library,
+@file{@metavar{ILUHOME}/lib/libilu-m3.a}, to use with this compiler.
+
+@macro{IluM3Files(@parm{base})}
+@findex IluM3Files (imake)
+expands to the series of filenames generated by the @language{Modula-3} stubber from @file{@metavar{base}.isl}: @file{@metavar{base}.i3 @metavar{base}_x.i3 @metavar{base}_y.m3 @metavar{base}_c.m3 @metavar{base}_s.m3}.
+
+@macro{ILUM3Target(@parm{generated-files}, @parm{ISL-file})}
+@findex ILUM3Target (imake)
+declares that files @parm{generated-files} are generated from the @file{isl} file and may therefore by
+re-generated at will, and should be when the @file{.isl} file changes.
+
+@macro{M3LibraryTarget(@parm{library-name}, @parm{parts}, @parm{non-dep-libraries})}
+@findex M3LibraryTarget (imake)
+defines a library called @parm{library-name} that is built from @parm{parts} and @parm{non-dep-libraries}; it will be re-built if anything among the @parm{parts} changes.  The @parm{library-name} should be the name of the @file{.a} file, including the ``.a''.
+
+@macro{M3ProgramTarget(@parm{program-name}, @parm{parts}, @parm{non-dep-libraries})}
+@findex M3ProgramTarget (imake)
+defines a program called @parm{program-name} that is built from @parm{parts} and @parm{non-dep-libraries}; it will be re-built if anything among the @parm{parts} changes.
+
+@ifclear largerdoc
+@page
+@section Index
+@printindex cp
+@end ifclear

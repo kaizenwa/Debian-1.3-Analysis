@@ -1,0 +1,237 @@
+NET accounting for Linux
+========================
+
+Short description
+-----------------
+This package logs network traffic. It provides a daemon (nacctd) that 
+logs all traffic passing the machine it runs on (similiar to what tcpdump
+does).
+
+Capability is provided to associate traffic to slip/ppp users in case you run
+a slip/ppp server.
+
+Why would you want to use this?
+-------------------------------
+
+- You are providing IP to customers and want to charge them based on the
+  traffic they generate.
+- You are a statistics freak and want to see how much of your network traffic
+  is for NetNews, FTP, WWW etc.
+
+Usage/Installation
+------------------
+1) go to source directory
+   [e.g.: cd src]
+2) do a "make"
+   you must have your kernel sources installed properly to do this
+   [e.g.: make]
+3) copy naccttab.sample to /etc/naccttab
+   this is the config file
+   [e.g.: cp naccttab.sample /etc]
+4) tune the options in naccttab to your needs
+   the sample file is heavily documented so this should be easy
+5) install nacctd in /usr/sbin or whereever you like
+   [e.g.: cp nacctd /usr/sbin]
+6) start nacctd
+   [e.g.: /usr/sbin/nacctd]
+7) subscribe to the net-acct-announce mailing list if you intend to use this on
+   a regular basis (see below)
+
+You can control nacctd with signals.
+Here is what the signals do (one might call this abuse of signals ;-):
+
+SIGINT		ends daemon
+SIGTERM		ends daemon
+SIGUSR1		increases debugging level
+SIGUSR2		turns off debugging
+SIGWINCH	prints some kind of version id
+SIGTSTP		disables writing to file
+SIGCONT		enables writing to file
+
+The last two (TSTP and CONT) are useful for an automated archival of the
+logfiles without terminating the daemon. Just send a SIGTSTP before moving
+the logfile and send a SIGCONT when you are done.
+
+Output
+------
+The level of detail of output is now configurable. At maximum detail you'll
+get a logfile with lines like this:
+
+Sample line:
+
+786476591   6   193.98.158.1   119   192.76.152.9   2072   3 5370 eth0	unknown
+
+1: time in seconds since 1.1.1970 (standard unix way of giving time)
+2: ip protocol, you can look this up in /etc/protocols
+   1 is icmp, 6 is tcp, 17 is udp
+3: source ip address
+4: soure port, you can look this up in /etc/services, if it's a wellknown
+   port
+5: destination ip address
+6: destination port
+7: packets count
+8: size of data
+9: device over which the packet was received/sent
+10: associated user in case of a slip/ppp link
+   this will always be "unknown" for ethernet devices and such
+
+All of the fields 2 to 10 can be switched off. This will reduce the amount of
+log entries generated.
+
+Please note that for forwarded packets there will be one line for EACH
+interface the packet passed. So if you are running this on your slip-server
+you will get all the traffic over the slip interfaces TWICE, once for the sl*
+devices and once for the eth* device. The same goes for ppp and generally for
+all forwarded traffic.  You can specify with 'notdev' entries, which
+interfaces you dont want to see in the log.
+
+The enclosed perl script will make the output more readable.
+Please note that this script is merely an example. It will only work
+if you disable only field 7. I you come up with something better or
+just something different please let me know, so I can distribute it with
+the next version in a contrib-directory.
+
+Association of traffic with slip/ppp users
+---------------------------------------
+
+From version 0.4 on there is a mechanism provided to deal with all
+kinds of ip-number -> user assignment. 
+I'll explain it with an example.
+Say you are an internet provider, you are giving away slip-access
+with adresses dynamically assigned from your class-C net 193.97.238.0
+You want to associate the generated traffic with the respective
+slip-user so you can charge them. Your dialin host has the
+address 193.97.238.3 and your mail/ftp-server has the adress 193.97.238.1.
+To get the desired information you will have to add these lines
+to your naccttab:
+
+dynamicnet 193.97.238.0 255.255.255.0
+
+This tells nacctd that the addresses on this network should be looked up.
+You don't want to have your dialin host and your mail-server looked up,
+so you specify:
+
+exclude-name-lookup     193.97.238.1	255.255.255.255
+exclude-name-lookup     193.97.238.3	255.255.255.255
+
+You can specify whole networks to be excluded from name-lookup in case
+you have your network subnetted. In this example we specify two single
+hosts (netmask 255.255.255.255).
+
+Then you have to specify the directory where the files for each address
+will be put:
+
+dynamicip /var/run
+ 
+This tells nacctd that it should expect a file with the name identical
+to the address. Its contents are the name of the slip/ppp user.
+So you will have to modify your slip.login and slip.logout scripts.
+Here are two examples:
+
+-------------------- SLIP.LOGIN --------------------
+#!/bin/sh -
+# generic login file for a slip line.  sliplogin invokes this with
+# the parameters:
+#      1        2         3        4          5         6        7     8-n
+#   slipunit ttyspeed   pid     loginname local-addr remote-addr mask opt-args
+#
+/sbin/ifconfig $1 $5 pointopoint $6 mtu 1500 -trailers up
+/sbin/route add $6 $1
+/sbin/arp -s $6 00:xx:xx:xx:xx:xx pub
+echo $4 > /var/run/$6 # this is for nacctd
+exit 0
+-------------------- SLIP.LOGIN --------------------
+
+-------------------- SLIP.LOGOUT --------------------
+#!/bin/sh -
+#
+#               slip.logout
+#
+/sbin/ifconfig $1 down
+/sbin/route del $5
+/sbin/arp -d $5
+rm /var/run/$5 # this is for nacctd
+exit 0
+-------------------- SLIP.LOGOUT --------------------
+
+If you use ppp or another slip package you will have to
+come up with something similiar.
+
+If you have any further questions about this please ask me.
+I know this documentation is bad - I'd really apreciate someone
+writing something better.
+
+
+Mailing lists
+-------------
+There are two mailing lists related to this package.
+One is for discussion and questions, the other one is
+an announcement-only list for the announcement of new
+versions and important bug fixes.
+Mail majordomo@pythia.lunetix.de for more info.
+
+To subscribe to the announcement list
+send mail to majordomo@pythia.lunetix.de with
+a body of "subscribe net-acct-announce".
+You should really consider this if you are using this
+package. The list is very low volume, so you won't get
+swamped with mail.
+
+To subscribe to the discussion list
+send mail to majordomo@pythia.lunetix.de with
+a body of "subscribe net-acct". There has not been much
+discussion going on in the last time, so don't worry if you
+don't receive any messages after subscribing.
+
+Notes
+-----
+The daemon itself has proven to be very stable on
+our machine, we use this for over half a year now.
+
+I've got one report of the daemon vanishing without any notice. If anyone
+has made similiar experiences please email me, as I'd like to track this down,
+but I can't reproduce it on our machines.
+
+I'm also interested in suggestions for features that could
+be added.
+Things I know are missing:
+
+ - a reasonable back end to evaluate the data
+
+   What do you expect from a back end?
+   Any ideas here are appreciated.
+
+Bug reports
+-------------
+As this is alpha software it most likely contains some bugs.
+To do an actually useful bug report please send me the following information
+- your setup 
+  - hardware (ethercard etc.)
+  - software (kernel, libc, etc.)
+  - network layout
+- what you did and what happened
+- relevant parts of a debugging output file with debuglevel set to at least
+  1023. If you can't find the relevant parts, please ask me before mailing
+  huge files.
+- anything else you think is useful to trace down the bug
+
+If you did look at the source and actually found something that looks like
+a bug, don't bother to send just a short notice. I know this myself,
+often I fix a small bug in other packages and then I'm just too lazy to
+make a full-scale bug report.
+
+I'm interested in any suggestions on how to improve this software,
+please mail them to me.
+
+If anyone volunteers to write better documentation or to improve this
+readme (maybe fix all the bad english) I'd be very happy to hear from
+you.
+
+------------------------------------------------------------
+
+Please send any comments, bug-reports, patches, flames, postcards to me.
+
+Ulrich Callmeier (uc@brian.lunetix.de)
+
+------------------------------------------------------------
+

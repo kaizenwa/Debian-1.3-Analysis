@@ -1,0 +1,215 @@
+.\" Copyright 1993 Giorgio Ciucci (giorgio@crcc.it)
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\"
+.\" Modified Sun Nov 28 17:06:19 1993, Rik Faith (faith@cs.unc.edu)
+.\"          with material from Luigi P. Bai (lpb@softint.com)
+.\" Portions Copyright 1993 Luigi P. Bai
+.\"
+.\" Traduction 16/10/1996 par Christophe Blaess (ccb@club-internet.fr)
+.\"
+.TH SHMOP 2 "16 Octobre 1996" Linux "Manuel du programmeur Linux"
+.SH NOM
+shmop \- Operations sur la memoire partagee.
+.SH SYNOPSIS
+.nf
+.B
+# include <sys/types.h>
+.B
+# include <sys/ipc.h>
+.B
+# include <sys/shm.h>
+.fi
+.sp
+.BI "char *shmat ( int " shmid ,
+.BI "char *" shmaddr ,
+.BI "int " shmflg " )"
+.sp
+.BI "int shmdt ( char *" shmaddr ")"
+.SH DESCRIPTION
+La fonction
+.B shmat
+attache le segment de memoire partagee identifie par
+.B shmid
+au segment de donnees du processus appelant.
+L'adresse d'attachement est indiquee par
+.I shmaddr
+avec les criteres suivants :
+.IP
+Si
+.I shmaddr
+vaut
+.BR 0 ,
+le systeme essaye de trouver une zone libre dans l'intervalle 1 \- 1.5Go
+en commencant par l'adresse la plus haute et en descendant jusqu'a
+trouver l'emplacement adequat.
+.IP
+Si
+.I shmaddr
+n'est pas nulle
+et si
+.B SHM_RND
+est indique dans
+.IR shmflg ,
+l'attachement a lieu a l'adresse 
+.I shmaddr
+arrondie au multiple inferieur de
+.BR SHMLBA .
+Si
+.B SHM_RND
+n'est pas indique
+.I shmaddr
+doit etre alignee sur une frontiere de page, et l'attachement
+a lieu a cette adresse.
+.PP
+Si
+.B SHM_RDONLY
+est indique dans
+.IR shmflg ,
+le segment est attache en lecture seulement, et le processus
+doit disposer de la permission de lecture dessus.
+Sinon le segment est attache en lecture et ecriture et
+le processus doit disposer des deux permissions d'acces.
+Il n'y a pas de notion d'ecriture seule pour les
+segments de memoire partagee.
+.PP
+La valeur
+.B brk
+du processus appelant n'est pas alteree par l'attachement.
+
+Le segment est automatiquement detache quand le processus
+se termine. Le meme segment peut etre attache a la fois
+en lecture seule et en lecture/ecriture. Il peut egalement
+etre attache en plusieurs endroits de l'espace d'adressage
+du processus.
+.PP
+Si 
+.B shmat
+reussit, les membres de la structre
+.B shmid_ds
+associee a segment de memoire partagee sont mis a jour ainsi :
+.IP
+.B shm_atime
+correspond a l'heure actuelle.
+.IP
+.B shm_lpid
+contient le PID de l'appelant.
+.IP
+.B shm_nattch
+est incremente de 1
+.PP
+Notez que l'attachement reussit meme si le segment de memoire est
+marque pour destruction.
+.PP
+La fonction
+.B shmdt
+detache le segment de memoire partagee situe a l'adresse indiquee par
+.IR shmaddr .
+Le segment doit etre presentement attache, et l'adresse
+.I shmaddr
+doit etre celle renvoyee precedement par
+.BR shmat.
+.PP
+Quand
+.B shmdt
+reussit, les membres de la structure
+.B shmid_ds
+associee au segment de memoire partagee sont mis a jour ainsi :
+.IP
+.B shm_dtime
+correspond a l'heure actuelle.
+.IP
+.B shm_lpid
+contient le PID de l'appelant.
+.IP
+.B shm_nattch
+est decremente de 1. S'il devient nul, et si le
+segment est marque pour destruction, il est
+effectivement detruit.
+.PP
+La region occupee de l'espace d'adressage du processus est
+liberee.
+.PP
+.SH "AUTRES APPELS SYSTEMES"
+.TP
+.B fork()
+Apres un
+.B fork()
+le fils herite des segments de memoire partagee.
+.TP
+.B exec()
+Apres un
+.B exec()
+tous les segments de memoire partagee sont detaches (pas detruits).
+.TP
+.B exit()
+Lors d'un
+.B exit()
+tous les segments de memoire partagee sont detaches (pas detruits).
+.PP
+.SH "VALEUR RENVOYEE"
+Les deux fonctions renvoient
+.B \-1
+si elles echouent, auquel cas
+.B errno
+contient le code d'erreur.
+Sinon
+.B shmat
+renvoie l'adresse d'attachement du segment de memoire partagee, et
+.B shmdt
+renvoie
+.BR 0 .
+.SH ERREURS
+.BR shmat :
+.TP 11
+.B EACCES
+L'appelant n'a pas les permissions d'acces necessaires pour l'attachement.
+.TP
+.B EINVAL
+.I shmid
+est invalide,
+.I shmaddr
+est mal alignee ou l'attachement a echoue sur
+.BR brk .
+.TP
+.B ENOMEM
+Pas assez de memoire pour le systeme.
+.PP
+.BR shmdt :
+.TP
+.BR EINVAL .
+Pas de segment attache a l'adresse
+.IR shmaddr.
+.SH NOTES
+Au cours d'un
+.BR fork (2)
+le fils herite de tous les segments attaches.
+.PP
+Les segments sont detaches durant un
+.BR exec (2)
+.PP
+.PP
+Il n'y a pas de limite au nombre de segments de memoire attaches
+par processus.
+.SH "VOIR AUSSI"
+.BR ipc (5),
+.BR shmctl (2),
+.BR shmget (2).

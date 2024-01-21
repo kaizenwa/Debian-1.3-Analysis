@@ -1,0 +1,126 @@
+#! /bin/sh
+#
+# dsetup-tz: Debian Linux timezone setup utility (0.93)
+#
+# Copyright (C) 1994, 1995 Debian Association, Inc.
+#
+#   This program is free software; you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation; either version 2 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program; if not, write to the Free Software
+#   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+root=/target
+
+dir=$root/usr/lib/zoneinfo
+tz=
+
+cd $dir
+
+done=0
+until [ $done = 1 ]
+do
+  echo '[H[J[1m'
+  echo -n "Timezone setup... "
+  echo '[0;10m'
+  echo "(Current directory: $dir)"
+  cat << EOF
+
+Please select the appropriate location in the world in which you
+live.  A name followed by a slash (/) indicates that this option
+leads to further options, such as specific sections of a country.
+
+You may enter \`..' to go up a level.
+
+---------------------------------------------------------------------------
+EOF
+
+  ls -F $dir
+
+  cat << EOF
+---------------------------------------------------------------------------
+EOF
+
+  echo
+  echo -n "Which? "
+  read input
+
+  if [ $input = "localtime" -o $input = "posixrules" ]
+  then
+    continue
+  fi
+  if [ -d $input ]
+  then
+    if [ $input = ".." ]
+    then
+      if [ $dir = "$root/usr/lib/zoneinfo" ]
+      then
+        continue
+      fi
+    fi
+    cd $input
+    dir=`pwd`
+  elif [ -f $dir/$input ]
+  then
+    tz="$dir/$input"
+    done=1
+  else
+    echo
+    echo "\`$input' does not exist; try again."
+    echo
+    sleep 1
+  fi
+done
+
+rm -f $root/etc/localtime /etc/localtime /etc/posixrules
+cp $tz $root/etc/localtime
+ln -s $tz /etc/localtime
+ln -s $tz /etc/posixrules
+
+while true
+do
+  echo
+  echo "Unix system clocks are generally set to GMT (also known as Universal"
+  echo "Time) and use time zone files to convert this value into local time."
+  echo "If you want your new Debian Linux system to use GMT rather than"
+  echo "local time, you should answer \`y' to the following question.  If you"
+  echo "want the clock to continue to run on local time, answer \`n'."
+  echo
+  echo "NOTE: If this system previously ran MS-DOS, the clock is probably set"
+  echo "to local time.  If you want your new Debian Linux system to use"
+  echo "GMT, answer \`y' to the following question and reset the clock after"
+  echo "you have Debian Linux installed."
+  echo
+  echo -n "According to the system, the time is "
+  date
+  echo
+  echo -n "Is your system clock set to GMT (y/n) [y]? "
+  read input
+  if [ $input = "n" ]
+  then
+    GMT=""
+    sed s:^GMT=\"-u\":GMT=\"\": /target/etc/init.d/boot > /tmp/boot
+    mv /tmp/boot $root/etc/init.d/boot && \
+      chmod 755 $root/etc/init.d/boot
+    break
+  elif [ $input = "y" ]
+  then
+    GMT="-u"
+    break
+  elif [ -z "$input" ]
+  then
+    GMT="-u"
+    break
+  else
+    echo
+    echo "Please answer \`y' or \`n'."
+  fi 2>/dev/null
+done

@@ -1,0 +1,439 @@
+
+
+
+
+1   Introduction
+
+
+This is the user manual for the RSPF daemon. With this you will hopefully
+be able to setup and understand what the daemon is doing.
+   A daemon is like a server which is used by the Linux operating system
+to talk to some other system. They usually have something to do with net-
+working but don't have to be. This daemon implements the Radio Shortest
+Path First (RSPF) protocol version 2.2, as specified in Fred Goldstein's
+Specification.
+   The implementation of RSPF v2.2 is the result of my Computer Systems
+Engineering Thesis or final year project.  It has taken approximately 15
+weeks to code and test. I expect that there will be still some bugs left and
+would welcome any comments from users.
+   Release 0.02 was the result of this thesis and was the first version of the
+RSPF daemon that I have sent onto the FTP sites.  I took aboard all the
+comments that everyone said and worked on release 0.03, which is what this
+manual was written for.
+
+
+
+2   Features
+
+
+This program has many more features that the RSPF in NOS. Some of these
+are mentioned in the specification, some are interpretations of it and others
+are extensions. A brief list of the features are;
+
+
+   fflRuns as a daemon runs on a Linux platform using the AX.25 code in
+     kernel.
+
+
+   fflManipulates the Linux routing table
+
+
+   fflYou can query the daemon by telnetting to port 9006 and using some
+     simple commands.
+
+
+   fflForwards any new routing bulletin information onto all ports
+
+
+   fflIf a received routing bulletin is older than one we hold, we send our
+     newer information onto the port we heard the old one.
+
+
+   fflWhen a new RSPF router is discovered, send full routing bulletin.
+
+
+   fflUses node groups to reduce routing traffic
+
+
+   fflImplements different horizons for different types of links
+
+
+
+                                  1
+
+
+
+
+   fflMany more configurable values using a configuration file.
+
+
+   fflIf you send a HUP signal to the program it re-reads the configuration
+     file.
+
+
+   fflReporting of errors or warnings to syslog
+
+
+   fflAdheres to RSPF v2.2 specification as much as possible.
+
+
+   fflCode is licensed under GNU General Public License
+
+
+   fflTentative adjacencies are now ping-ed on the correct port, not the
+     default one.
+
+
+
+3   Compatibility between 2.1 and 2.2
+
+
+When making the program, I have tried to make sure that it will understand
+RSPF v2.1 packets. To this end, I have tested the program with TNOS 1.11
+which runs the v2.1 code, as do almost all xNOS's.
+   There is not much difference between the 2.1 and 2.2 packets.  Unfor-
+tunately a v2.1 router will ignore any packet that has a v2.2 identification.
+You can optionally set the version number used by the program to 2.1 so it
+is not ignored.
+
+
+
+4   Installation
+
+
+To install the program you first will need the tgz (tar and gzip'ed) file.
+This is available from ftp.ucsd.edu /hamradio/packet/tcpip/linux or from
+sunsite.unc.edu /pub/Linux/apps/ham.  Of course, it should be available
+from any site that mirrors either of these.
+   Untar the file in a directory such as /usr/src with
+   tar xvfz rspfd-1.0.tgz.
+   You should then have a directory called rspfd-0.03 with some files in it.
+   Change directory to rspfd-0.03 and read the README.  That file will
+hold any last-minute information about the program, until I can update this
+file. You now have a choice of either using the files I have compiled or using
+your own.
+   To use my files just type 'make install'.
+   To recompile the program, type 'make' and then 'make install'.
+   Note, you'll have to be root before you install the program.
+
+
+
+                                  2
+
+
+
+
+   This will then put the files in /usr/local/etc. If you want to put these
+files somewhere else then you will have to change the Makefile and change
+the CONFIG_FILE entry in src/rspfd.h.
+   Next is to change the configuration file to suit your site. The parameters
+are explained in the next section. The most important parameters to change
+are the interface ones.
+   In addition, it is unlikely that your system will know what the RSPF
+protocol is, so you will have to edit your /etc/protocols file, add a line that
+has rspf 73 RSPF #Radio Shortest Path First.
+   This will mean that it knows about the protocol called RSPF. If you do
+not do this, the program won't be able to transmit and will give an unknown
+protocol error.
+   You will also have to ensure you have routes for the broadcast addresses.
+This is a bit of a pain, but I cannot see any simple way around it.  Make
+sure you use the -host flag when setting the route.
+
+
+
+5   Configuration File
+
+
+RSPFd uses a configuration file to set a lot of its parameters. It also uses
+this file to work out which interfaces to use. The default pathname for the
+file is /usr/local/etc/rspfd.conf.
+   The following parameters are used in the configuration file.  Note that
+they all must be in lowercase and of the format <option>=<value>.
+
+
+#  Any line beginning with the hash (#) symbol is teated as a comment.
+
+
+rrhtimer  Number of seconds between Router-Router Hellos (RRH).
+
+
+sustimeout  An adjacency becomes suspect if we have not heard from it in
+     this amount of time in seconds.
+
+
+pingtimer  This is the amount of time the daemon waits after sending a
+     ping to a suspect or tentative adjacency before sending another one.
+
+
+suspings  The number of pings attempted on a tentative or suspect adja-
+     cency.
+
+
+reasmtimeout   The number of seconds to wait after receiving a routing
+     bulletin fragment before considering the following fragment has been
+     lost.
+
+
+
+                                  3
+
+
+
+
+bulltimer  Number of seconds between sending full routing bulletins (not
+     including bulletins that are send due to new routers).
+
+
+bulltimeout  Number of seconds before a routing bulletin's sequence num-
+     ber is considered invalid. This is so when a router crashes and forgets
+     its sequence number you don't ignore it's routing updates as old for a
+     long time.
+
+
+linkhorizon  The horizon that is given to adjacent routers. This should be
+     a large value such as 32 to be sent far.
+
+
+grouphorizon   The horizon given to node group advertise-ments.  This
+     should be similar to link horizon.
+
+
+localhorizon  The horizon given to adjacent non-routers that are in one of
+     the local node groups.  This should be small as it is only to resolve
+     which router out of a few will service specific nodes in the node group.
+
+
+portablehorizon   The horizon given to adjacent non-routers that are not
+     in a node-group. This should be similar to link horizon.
+
+
+   In addition, there is a parameter to specify which interfaces to use. The
+format of these lines are 'rspfiface=<dev> <cost>'.  Dev is the name of
+the device, same as what you would use in ifconfig. Cost is the cost of all
+adjacencies on that interface.  This value should be ideally determined by
+the network as a whole and agreed upon.
+   One way to work out a good set of values to use is this way.  255 is
+infinity, so you think of a set of links that for all intents and purposes are
+unreachable. Perhaps 4 jumps at 1200bd could be considered to be unlikely
+to succeed. So that means you could make the cost of a 1200bd port be 64
+(approximately 255/4). For other speeds you can either do a similar thing
+or some other way.  We generally consider a port of double speed should
+have half the cost, so use 16 for 4800 and 8 for 9600.  All Ethernet, SLIP
+links etc are considered to have cost 1. Whatever method you use is up to
+you.  Remember that 255 is 'infinity' and lower cost means it is a 'better'
+interface.
+   The node groups are also added into the configuration file and have the
+format of 'nodegroup=<address> <bits> <port> [<cost>]'. The address
+is the IP address of the nodegroup in dotted-decimal format. The bits are
+the number of significant bits. Port is the port or interface you want to add
+a route to.  The cost is optional and is the cost of the node group.  If the
+
+
+
+                                  4
+
+
+
+
+cost is not specified, then the port cost is used. Put the node group entries
+after you have specified the interfaces.
+
+
+
+6   Starting RSPFd
+
+
+To start the RSPF daemon, it is just a matter of typing 'rspfd' at the
+shell prompt.  I would suggest that you put a line in your /etc/rc.local or
+/etc/rc.net to start the daemon up every time you boot.
+   There will be a line in the syslog (usually /usr/adm/messages) stating
+when the program has started.  Any errors that the daemon gets will also
+be put into the syslog.
+   There is only one flag in the current version of RSPFd which is the debug
+flag '-d'. This sends a lot of junk to the screen which is probably only useful
+for those that want to debug my code.
+
+
+
+7   Interaction of v2.2 with v2.1
+
+
+There are some slight but significant differences with RSPF v2.2 to RSPF
+v2.1.  The daemon will correctly (as far as I can tell) decode v2.1 packets
+and add them to the link-state table.  However when sending out newer
+link-state information it will be in v2.2 format.
+   When running alpha tests, it was discovered that something in the rout-
+ing update envelopes would make NOS systems crash if you dummied the
+newer packets with a v2.1 version number. v2.1 does not handle the horizons
+correctly. A horizon is a property of a link-state, not a link (or interface) as
+different adjacencies on the same interface can have different horizons.
+   For this reason, do not dummy the version number of the outgoing RSPF
+packets to v2.1 so that other systems can receive them.  Bad things will
+happen to those systems, and their link-state table will get some pretty
+weird entries.
+   There also appears to be a problem in v2.1 with handling partial routing
+updates. I cannot nail down the behavior, but it seems that it treats partial
+updates as full updates.
+
+
+
+8   RSPF Client
+
+
+As the daemon itself does not have very much to say, there may be a need
+to work out what the daemon has in its tables. In release 0.02, there was a
+
+
+
+                                  5
+
+
+
+
+special UDP client but now it uses TCP and so the standard telnet program
+can be used.  The port for this is 9006 which offers no significance (other
+than the first four digits of my student number) and can be changed by
+modifying the source code.
+   The following commands are recognised by the daemon and are not case
+sensitive.
+
+
+adjs Gives a list of the current adjacencies to this router. Adjacencies that
+     have sent a RRH have a sequence number and Lastheard entry. This
+     is last time the station heard a RRH, not last time the remote station
+     was heard.
+
+
+groups  Show the list of node groups. This are only the local ones as node
+     groups from remote routers are shown by the links command.
+
+
+help Gives a list of the available commands.
+
+
+ifaces Shows the interfaces that RSPF has been configured, the cost of that
+     interface and how many adjacencies we have for it.
+
+
+links Displays the link-state table that is used by the SPF algorithm. Most
+     fields are obvious but the sequence number is the number of the bul-
+     letin that sent that link-state.  All sequence numbers should be the
+     same for the same source address. The local routers links do not ap-
+     pear in this table.
+
+
+quit Closes the connection to the server.
+
+
+routes The routes that we have added to the kernel routing table.  This
+     should generally agree with the entries in the routing table with the
+     D (Dynamic) flag set.
+
+
+routers This will show you the routers that we have heard bulletins from.
+     This means they do not have to adjacent but just we have received a
+     bulletin.
+
+
+stats Dumps a whole lot of statistics about the daemon. Mostly used for
+     debugging purposes.
+
+
+   The server will also reply back with the hostname of the host it sits on,
+to make sure you're talking to the correct one when you connect.
+   There is currently no security on this information.  Anyone that has
+telnet can interrogate any server. This was done so that people can debug a
+
+
+
+                                  6
+
+
+
+
+network, if the problem is not on their router. If there is enough demand, I
+can put some simple security in, but as the information cannot be changed,
+I cannot see any reason for it.
+
+
+
+9   How it works
+
+
+The RSPF daemon is a reasonably complex program, so I cannot really go
+into details. If you want to know, read the RSPF v2.2 spec and look at the
+source code. I can, however, give an overview of how it works.
+
+
+
+9.1   Adjacencies
+
+
+One thing a new router has to do is meet its neighbors.  It can do this in
+two ways.
+   The first is by hearing a RSPF packet from someone.  It will decode
+this information and then make the adjacency tentative. Next is to hear an
+ARP request or reply. It uses the sender's address in both cases to make a
+tentative adjacency. In both cases the adjacency is tentative only if we don't
+already have it. The system will attempt to ping the adjacency a number
+of times. If it replies, it is a OK adjacency, if not it is removed.
+   One of the problems with pinging tentative adjacencies is that the rout-
+ing table shouldn't already have this adjacency. What happens is if the table
+doesn't have an entry for the adjacency, it adds one, pings, then removes it.
+This allows only the daemon to try to reach an adjacency.
+   If an OK adjacency is not heard from a certain amount of time, it is
+marked as suspect and attempted to be pinged.  If it doesn't reply, it is
+removed and a partial routing update is sent, notifying others that that
+link-state has gone.
+   At regular intervals, the daemon sends RRH's and full routing updates.
+These can be configured in the configuration file.
+
+
+
+9.2   Routing Bulletins
+
+
+On reception of a routing envelope fragment, the daemon will go through
+all the routing bulletins.  Received routing bulletins that have the same
+sequence number are discarded.  Ones with higher ones update the link-
+state table and are forwarded onto all interfaces. Ones with lower numbers
+are rejected and a bulletin for that reporting router is sent on the interface.
+
+
+
+                                  7
+
+
+
+
+   Something that is different to the old version is the use of sequence
+numbers. What happens is that if you receive a routing bulletin originated
+from you and it has a higher sequence number, you increment your internal
+counters to that number. This is so that stations that crash can get back to
+the correct sequence number.
+   Also note that sequence numbers are NOT modulus.  In other words
+0xffff (-1) is bigger than 1. What happens is that if a station reaches 0xffff
+in the sequence counter, it sends no more routing updates until a certain
+time, when all the nodes have 'forgotten' it.  It then starts up again with
+sequence number 1.
+   Sequence number 0 means a poll.
+
+
+
+10    Getting in contact with me
+
+
+I am always eager to hear how people are going with this program and
+appreciate comments, both positive and negative, about it so that I can
+hopefully make a better daemon. Almost all the additional features of the
+daemon from 0.02 have been due to user comments. To contact me, you can
+use the following methods.
+   My Internet address is csmall@acacia.itd.uts.edu.au, for amateur
+radio operators, you may be able to get me on vk2xlz@gonzo.vk2xlz.ampr.org
+or if you're really desperate on VK2XLZ@VK2XSB.NSW.AUS.OC using the stan-
+dard MBL/RLI amateur radio BBSes. Unfortunately due to my finished of
+my undergraduate course, I'm likely to lose my Internet access soon.
+
+
+
+                                  8

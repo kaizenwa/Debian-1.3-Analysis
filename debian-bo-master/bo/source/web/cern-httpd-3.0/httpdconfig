@@ -1,0 +1,1060 @@
+#!/usr/bin/perl
+#
+# 	$Id: httpdconfig,v 1.8 1996/08/11 22:21:23 steveg Exp $	
+
+#########################
+# httpdconfig - configuration script for Debian GNU/Linux httpd package
+#
+# Written by Ted Hajek <tedhajek@boombox.micro.umn.edu>
+#  29 Aug 1994 to 16 Oct 1994 (how's that for productivity?)
+#
+# This script was originally the postinstallation script for the httpd
+# package.  However, because of a problem in the dpkg installation utility,
+# I've opted to install this script so that it can be run at any time.
+#
+# This script only performs very simple configuration of the httpd server;
+# in particular, it only will set up a standalone server.  Perhaps later,
+# I'll set this up so that it can also configure a server running under inetd.
+# It also avoids setting up things like proxy servers.  These functions
+# are left for the advanced user (in other words, more advanced than me).
+#
+# The script sets the following options:
+#
+#   Port              The port at which httpd accepts connections
+#   AccessLog         Should server access be logged?
+#   ErrorLog          Should errors be logged?
+# NOTE: in the current version, those are set to the default, and the user must
+#       edit the file to change them.
+#
+#   UserDir           Should users have public html directories under their homes?
+#                     If so, what should the directories be named?
+#   Pass /*           Default directory for html documents.
+#                     Directory is created if nonexistent.
+#                     A sample Welcome.html file is generated in the directory if
+#                       one doesn't already exist
+#                     The user has the opportunity to set up a group to maintain the
+#                       hierarchy; the directory is made SGID that group if the user
+#                       chooses so chooses.
+#
+#
+# Here's the deal:  The httpd package won't install a configuration file.
+# If one already exists, we won't do anything unless we're given the
+# option `--force'.
+#
+# Then, the script will ask the user about the above variables and
+# create a configuration file.
+#
+# If the user forced replacement of an existing script, the existing
+# script will be saved as `httpd.conf.old'.  If `httpd.conf.old' exists,
+# the existing script will be saved as `httpd.conf.old-#', where # is the
+# PID of the httpdconfig process.
+#
+# It also mentions:
+#      Exec         The location of scripts executed by the server.
+#      DOCS         How to obtain the documentation for the server.
+#
+# It then warns the user that they are running a server that allows remote
+# access to documents on their machine (no, really?) and, upon confirmation,
+# puts a stanza in rc.misc to start the server.
+##############################
+
+# flush after every write or print.  Clears up bug number 415.
+$| = 1;
+
+#######################################################
+# GLOBAL CONSTANTS (not really constants, actually...)
+#                  (but I won't touch 'em, really!)
+#######################################################
+
+$conf_file = "/etc/cern-httpd.conf";	# Where is the config file?
+$default_port = 80;		# Default port on which to run 
+# $default_nogroup_gid = 65534;	# Need this when getting new GID's
+# $default_access_logging = "no";	# Should we log access?
+# $default_error_logging = "no";	# should we log errors?
+$default_user_dir = "public_html"; # Where should users' docs be stored?
+$default_doc_location = "/home/httpd-data"; # Where should docs be stored
+$default_use_doc_maint_group = "yes"; # Should we use a doc maint. group?
+$default_doc_maint_group = "www-data"; # What should we name it?
+$default_dir_mode = 755;	# Use this mode when we're making directories
+
+
+########################################
+# Housekeeping...
+#######################################
+
+##
+## Better make sure that EUID = 0...
+##
+die "You must be root to run this script." if ($> != 0);
+
+#####################################
+# process command line args
+####################################
+
+$force = 0;			# don't force update of existing config file
+
+$no_of_args = $#ARGV + 1;
+if ($no_of_args > 1) {
+    &usage;
+    exit;
+} elsif ($no_of_args == 1) {
+    if ($ARGV[0] eq "--version") {
+	&version;
+	exit;
+    } elsif ($ARGV[0] eq "--force") {
+	$force = 1;
+    } else {
+	&usage;
+	exit;
+    }
+}
+
+#################################
+# look for existing configuration file
+################################
+##  Check for existing /etc/cern-httpd.conf file.
+##    - if one doesn't exist, we go ahead.
+##    - if one exists and user hasn't specified --force, we bail out.
+if (-f "${conf_file}") {
+    if ($force) {
+	if (-f "${conf_file}.old") {
+	    $backup_file = "${conf_file}.old-$$";
+	} else {
+	    $backup_file = "${conf_file}.old";
+	}
+	print "Moving existing `${conf_file}' to `$backup_file'... ";
+	rename ("${conf_file}", $backup_file);
+	print "Done.\n";
+    } else {
+	print "You have an existing `${conf_file}' file.\n";
+	print "  (no action taken)\n";
+	print "Use `httpdconfig --force' to backup and replace it.\n";
+	exit (0);
+    }
+}
+
+#####################
+## make sure the server is dead
+#####################
+system("start-stop-daemon --stop --quiet --oknodo --exec /usr/sbin/cern-httpd");
+
+###############################################################
+## if we've made it this far, /etc/cern-httpd.conf is safe to modify.
+## Gather some information...
+###############################################################
+
+# welcome the user
+&welcome;
+&pause;
+# get the port number
+$port = &get_port;
+# check whether or not user wants access and error logging enabled
+##
+## now, user gets logging whether or not they want it :-)
+##
+# $access_logging = &check_access_logging;
+# $error_logging = &check_error_logging;
+# check whether or not users should have a public html directory.
+# if so, what should it be called?
+$user_dir = &get_user_dir;
+# find out the root of the tree of served files
+$doc_location = &get_and_create_doc_location;
+# Ask user if they want to use an HTML document maintenance group
+$use_doc_maint_group = &check_doc_maint_group;
+
+# OK.  We have all the necessary information.  Here it is:
+#   $port                  port at which httpd will listen
+#   $user_dir              users' public html directories (or "none")
+#   $doc_location          the root directory for served documents.
+#   $use_doc_maint_group   should change ownership of the WWW tree to this group?
+#
+# Furthermore, we're sure that the group for document maintenance exists, provided
+# the user wants one.  Good.  
+
+#################################
+# CONFIGURE HTTPD
+#################################
+
+# Now, we must:
+#    - Create the /etc/cern-httpd.conf file to reflect the changes
+#    - change group ownership of the $doc_location directory
+#    - Set the GID bit on the $doc_location directory
+#    - put a sample Welcome.html file in the $doc_location directory
+#      if one doesn't already exist
+#    - put stanza in /etc/rc.misc to start daemon
+#    - set up things to cycle logfiles
+# Also, we'll tell the user how to get docs on the server and tell them
+# where server scripts can be found.
+
+
+##
+## Configuration file:
+##
+# First, we'll hack the configuration file.
+print "Creating configuration file...";
+
+# write the default configuration to "/tmp/cern-httd.conf"
+# NOTE -- since this script contains the full text of the configuration file,
+#   if the format is superceded in future versions of httpd, we'll have
+#   to change the script to reflect such changes.
+&seed_tmp_with_default_config;
+open (SEED, "/tmp/cern-httpd.conf");
+
+# open the new configuration file for writing:
+open (CONFIG, ">${conf_file}");
+
+# Tell where this came from
+print CONFIG "# This file was automatically generated by the postinstallation script.\n";
+print CONFIG "#\n";
+
+# loop through the original conf file
+while (<SEED>) {
+    if (/^Port/) {
+	print CONFIG "Port\t$port\n";
+    } elsif (/^UserDir/) {
+	if ($user_dir eq "none") {
+	    print CONFIG "# UserDir\t$default_user_dir\n";
+	} else {
+	    print CONFIG "UserDir\t$user_dir\n";
+	}
+    } elsif (/^Pass/) {
+	print CONFIG "Pass\t/*\t$doc_location/*\n";
+    } else {
+	print CONFIG $_;
+    }
+}
+
+close SEED;
+close CONFIG;
+
+print "Done.\n";
+
+##
+## add sample Welcome file
+##
+# we only want to do this if there already doesn't exist a Welcome.html file.
+if (! (-f "$doc_location/Welcome.html" or -f "$doc_location/index.html"
+       or -f "$doc_location/Index.html")) {
+    print "Putting sample Welcome.html file in `$doc_location'... ";
+    &insert_sample_welcome_file;
+    print "Done.\n";
+}
+
+
+##
+## deal with document maintainance group
+##
+if ($use_doc_maint_group eq "yes") {
+    print "Changing ownership and mode of things in $doc_location...";
+    ($name, $passwd, $gid, $members) = getgrnam($default_doc_maint_group);
+
+    # do this for the files and directories in $doc_location
+    open (FIND, "find $doc_location -print |") || die "Couldn't run find: $!\n";
+
+    while ($filename = <FIND>) {
+	chop $filename;
+	chown (0, $gid, $filename);
+	if (-d $filename) {
+	    chmod (02775, $filename); # directories should be SGID
+	} else {
+	    chmod (0664, $filename); # files should be group-writeable
+	}
+    }
+
+    close (FIND);
+
+    print "Done.\n";
+}
+
+
+##
+## link the startup and shutdown script into the
+## appropriate directories
+##
+system("update-rc.d cern-httpd defaults >/dev/null");
+
+# start the server
+system("start-stop-daemon --start --quiet --oknodo --exec /usr/sbin/cern-httpd");
+
+##
+## Check for the remnants of pre rev-5 log files
+##
+&clean_up_old;
+
+##
+## Say goodbye, now...
+##
+&exit_message;
+&pause;
+
+exit (0);
+
+
+####################################################
+####################################################
+# END MAIN PROGRAM -- BEGIN SUBROUTINES
+####################################################
+####################################################
+# These are in alphabetical order
+
+
+##########################################
+## check_access_logging
+##########################################
+# See if user wants access logging enabled
+#
+sub check_access_logging {
+    local ($answer);
+
+    &print_heading ("Access Logging");
+
+    print "Do you want the server to log all server access?  If so, \n";
+    print "a line will be generated in the log each time anyone accesses\n";
+    print "a file from your server.\n";
+    print "\n";
+    print "If you choose 'no', the server can still log errors; you will\n";
+    print "be asked about that momentarily.\n";
+    print "\n";
+    print "By default, the server will not log access.  If you type anything\n";
+    print "beginning with a 'y' below, the server *will* log access.\n";
+    print "\n";
+
+    &print_prompt("Access logging", $default_access_logging);
+    chop ($answer = <STDIN>);
+
+    if ($answer =~ /^[Yy]/) {
+	$answer = "yes";
+    } else {
+	$answer = $default_access_logging;
+    }
+
+    return $answer;
+}
+
+
+
+
+#####################################
+## check_doc_maint_group
+#####################################
+# Find out if the user wants to use the 'www-data' group to give users
+# the appropriate permissions to edit the served document tree.
+sub check_doc_maint_group {
+    local ($answer);
+    local ($name, $passwd, $gid, $members);
+    local ($doc_maint_group_num);
+
+    &print_heading ("Use a group for WWW document tree maintainers");
+
+    # check for the group 'www-data'
+    ($name, $passwd, $gid, $members) = getgrnam($default_doc_maint_group);
+
+    if ($name) {		# The group already exists.
+	print "I noticed that you already have a group called $default_doc_maint_group.\n";
+	print "Would you like me to change the group ownership of the WWW document tree\n";
+	print "to this group and flag the tree so that any subdirectories created under\n";
+	print "it belong to the group?\n";
+	print "\n";
+	print "The directory and any future subdirectories will also, by default, be\n";
+	print "writeable by this group.\n";
+	print "\n";
+	print "You can change membership in the group by editing the file '/etc/group'\n";
+	print "or by using the command 'adduser user www-data', where 'user' is the \n";
+	print "name of an existing user.\n";
+	print "\n";
+
+	&print_prompt ("Use document maintenance group?", $default_use_doc_maint_group);
+	chop ($answer = <STDIN>);
+
+	if ($answer =~ /^[Yy]/) {
+	    $answer = "yes";
+	} elsif (! $answer) {
+	    $answer = $default_use_doc_maint_group;
+	} else {
+	    $answer = "no";
+	}
+    } else {			# The group doesn't exist
+	print "Would you like to create a group called $default_doc_maint_group?\n";
+	print "After I create the group, I will change the ownership of the WWW\n";
+	print "document tree to this group and flag the root of the tree so that any\n";
+	print "subdirectories created under the tree will be automatically owned\n";
+	print "by the group.\n";
+	print "\n";
+	print "Furthermore, the group will be given write permission to the WWW\n";
+	print "document tree.\n";
+	print "\n";
+
+	&print_prompt ("Create document maintenance group?", $default_use_doc_maint_group);
+	chop ($answer = <STDIN>);
+
+	if ($answer =~ /^[Yy]/) {
+	    $answer = "yes";
+	} elsif (! $answer) {
+	    $answer = $default_use_doc_maint_group;
+	} else {
+	    $answer = "no";
+	}
+	
+	# create group if user wants to set things up this way:
+	if ($answer eq "yes") {
+	    print "Creating group $default_doc_maint_group... ";
+	    system ("addgroup --quiet --force-badname $default_doc_maint_group");
+	    print "done.\n";
+	}
+    }
+
+    return ($answer);
+}
+
+
+#################################
+## check_error_logging
+#################################
+# See if user wants access logging enabled
+#
+sub check_error_logging {
+    local ($answer);
+
+    &print_heading ("Error Logging");
+
+    print "Do you want the server to log errors?\n";
+    print "\n";
+    print "By default, the server will not log errors.  If you type anything\n";
+    print "beginning with a 'y' below, the server *will* log errors.\n";
+    print "\n";
+
+    &print_prompt("Error logging", $default_error_logging);
+    chop ($answer = <STDIN>);
+
+    if ($answer =~ /^[Yy]/) {
+	$answer = "yes";
+    } else {
+	$answer = $default_error_logging;
+    }
+
+    return $answer;
+}
+
+#####################################
+## clean_up_old
+#####################################
+# offer to clean up old log files
+#
+sub clean_up_old {
+
+    opendir(LOGDIR, "/var/log");
+    while ( $fname = readdir(LOGDIR) ) {
+	if ( $fname =~ /^httpd.*\.log.*/ ) {
+	    @flist = (@flist, "/var/log/" . $fname);
+	}
+    }
+    closedir(LOGDIR);
+
+    opendir(RUNDIR, "/var/run");
+    while ( $fname = readdir(RUNDIR) ) {
+	if ( $fname =~ /^httpd.pid/ ) {
+	    @flist = (@flist, "/var/run/".$fname);
+	}
+    }
+    closedir(RUNDIR);
+
+    if ( defined(@flist)) {
+	printf "The following files are probably the remnants of an old\n";
+	printf "version of cern-httpd that did not properly clean up after\n";
+	printf "itself:\n\n";
+	foreach (@flist) {printf "$_\n"}
+	printf "\nRemove them now? [Y]: ";
+	chop ($answer = <STDIN>) ;
+	if ($answer =~ /^[Yy]/) {
+	    $rmnow = "yes";
+	} elsif (! $answer) {
+	    $rmnow = "yes";
+	} else {
+	    $rmnow = "no";
+	}
+
+	if ("$rmnow" eq "yes") {
+	    printf "Removing files\n";
+	    unlink(@flist) ;
+	}
+    }
+}
+
+	
+#####################################
+## exit_message
+#####################################
+# say goodbye, tell the user what we've done
+sub exit_message {
+    print <<DONE1
+
+
+------ Configuration complete. -------
+
+Your http daemon is ready-to-go; the server has been restarted.
+At that point, anyone will be able to retrieve documents from your
+machine.  As such, you should review the setup and make sure that it
+works with your overall security strategy.
+DONE1
+    ;
+    if ( -f "$doc_location/Welcome.html" ) {
+	print <<DONE2
+There is a sample file called `Welcome.html' in your document
+directory that will serve as a `home page' for your server until you
+get a chance to edit your own.  It contains a link to the httpd docs
+and to Debian GNU/Linux bug reports.  Please populate the Web with
+lots of groovy things.
+DONE2
+;
+    }
+}
+
+
+######################################
+## get_and_create_doc_location
+######################################
+# Get the directory name that represents the root
+# of the tree of served files.
+#
+# This also creates the directory in question.
+#
+sub get_and_create_doc_location {
+    local ($answer, $dir_create);
+
+    &print_heading ("Root of Document Tree");
+
+    print "Please specify the complete name of the directory in which\n";
+    print "all the body of documents served will reside.\n";
+    print "\n";
+    print "If the directory you specify does not exist, it will be created\n";
+    print "for you.  The default directory is \"$default_doc_location\".\n";
+    print "\n";
+
+    # LOOP:
+    # get directory name from user.
+    #
+    # if the user leaves this one blank, make sure the default directory
+    # exists and return it.
+    #
+    # make sure the answer begins with a slash and doesn't contain
+    # double-dots.
+    #
+    # then, check if the directory exists.  If so, we're fine.  Return
+    # the directory.
+    #
+    # finally, try to create the directory.  If it works, return it.
+    # otherwise, try again.
+    while (1) {
+	&print_prompt ("Document directory", $default_doc_location);
+	chop ($answer = <STDIN>);	# get answer from user
+	$answer =~ s/\s+//g;	# strip spaces
+
+	# if it's blank, create the default; immediately return.
+	if (! $answer) {
+	    &mktree ($default_doc_location) if (! -d $default_doc_location);
+	    if (-d $default_doc_location) {
+		return ($default_doc_location);
+	    } else {
+		die "Yipes! I couldn't create the default directory.";
+	    }
+	}
+	
+	if (! ($answer =~ m%^/%)) {
+	    print "The document directory must be specified by an absolute path.\n";
+	    print "In other words, it must begin with a slash.\n";
+	    next;
+	} elsif ($answer =~ /\.\./) {
+	    print "You shouldn't have double-dots (..) in your path.\n";
+	    next;
+	}
+
+	# chop trailing slash if it exists:
+	chop ($answer) if ($answer =~ m%/$%);
+
+	# if directory exists, it's OK.  Return the answer.
+	return ($answer) if (-d $answer);
+
+	# otherwise, we'll try to create the directory.
+	# use another subroutine; this might be useful elsewhere.
+	&mktree ($answer);
+	if (-d $answer) {
+	    return $answer;
+	} else {
+	    print "I couldn't create that directory.  Try again...\n";
+	}
+    }
+}
+
+
+
+########################################
+## get_new_group_num
+########################################
+# Subroutine to generate a unique, unused group number.
+# we'll add one to the largest group number, unless the largest number
+# is that used for "nogroup" (65534).
+#
+# in that case, we'll add one to the second-largest group number.
+#
+sub get_new_group_num {
+    local ($new_num, $largest, $second_largest);
+    local ($name, $passwd, $gid, $members);
+    local (@gid_list);
+
+    $largest = 0;
+    $second_largest = 0;
+
+    # reset iteration through the group file
+    setgrent;
+
+    # now iterate through the thing.
+    # put each GID into an array entry
+    while (($name, $passwd, $gid, $members) = getgrent) {
+	push (@gid_list, $gid);
+    }
+
+    # OK, we're done looking through the group file.
+    endgrent;
+
+    # sort the gid's numerically and find the largest:
+    # we want the second largest as well in case the largest == GID(nogroup).
+    sub numerically { $a <=> $b; }
+    foreach $gid (sort numerically @gid_list) {
+	if ($gid > $largest) {
+	    $second_largest = $largest;
+	    $largest = $gid;
+	}
+    }
+
+    # now, generate the GID for the new group.
+    if ($largest == $default_nogroup_gid) {
+	$new_num = $second_largest + 1;
+    } else {
+	$new_num = $largest + 1;
+    }
+
+    return ($new_num);
+}
+	    
+
+
+####################################
+## get_num
+####################################
+# get a number from the user
+#
+sub get_num {
+    local ($prompt, $default) = @_;
+    local ($num);
+
+    # loop until we have a valid number
+    while (1) {
+	&print_prompt ($prompt, $default);
+	chop ($num = <STDIN>);
+
+	# if they hit enter, use default
+	if ($num eq "") {
+	    $num = $default;
+	    last;
+	}
+
+	# check if num consists of all digits
+	if ($num =~ /^\d+$/) {
+	    last;
+	}
+
+	print "Hmm... that doesn't look like a number.\n";
+	print "Please try again...\n\n";
+    }
+
+    return ($num);
+}
+
+
+#################################
+## get_port
+#################################
+# Get the port number
+#
+sub get_port {
+    local ($answer);
+
+    &print_heading ("Port Selection");
+    
+    print "Please choose a port on which httpd will listen for requests.\n";
+    print "The default port, 80, is the standard location for HTTP daemons.\n";
+    print "You can, however, choose another port if you wish.\n";
+    print "\n";
+    print "If you choose a port number lower than 1024, you need to be root\n";
+    print "to start the server.  This is the normal mode of operation.\n";
+    print "\n";
+    print "This option can be overridden on the command line.\n";
+    print "\n\n";
+    
+    $answer = &get_num ("Port", $default_port);
+
+    return ($answer);
+}
+    
+
+
+######################################
+## get_user_dir
+######################################
+# Get the directory name for user's public html files
+#
+sub get_user_dir {
+    local ($answer, $good_dir);
+
+    &print_heading ("Users' Public HTML Directories");
+
+    print "Httpd affords each user the opportunity to create a subdirectory\n";
+    print "of their home directory in which they can place HTML files.\n";
+    print "Then, when someone tries to grab the URL\n";
+    print "  http://your.machine/~user/file.html\n";
+    print "They get the file 'file.html' from the public HTML directory of 'user'.\n";
+    print "\n";
+    print "Here, you specify the name of the subdirectory in which users can place\n";
+    print "HTML files they wish to share with the world.  By default, this will be:\n";
+    print "  public_html\n";
+    print "However, you can make it whatever you wish.  It's a good idea to restrict\n";
+    print "yourself to letters of the alphabet and dashes or underscores, but I'm\n";
+    print "not going to force you to follow this guideline.\n";
+    print "\n";
+    print "If you don't want users to be able to share HTML files with the world,\n";
+    print "specify 'none' as the directory name.\n";
+    print "\n";
+
+    &print_prompt("Users' public HTML directory", $default_user_dir);
+    chop ($answer = <STDIN>);	# get value from user
+    $answer =~ s/\s+//g;	# strip spaces
+
+    return $answer if ($answer eq "none");
+    return $default_user_dir if (! $answer);
+
+    # make sure that there are no slashes
+    # and that we can create such a directory:
+    #
+    # perhaps this is a particularly ugly way to do this...
+    #
+    # we try to create the directory under /tmp after making sure
+    # that there are no slashes or double-dots in the path.
+    # loop until we have a good directory.
+    while (1) {
+	print "Trying to create directory /tmp/$answer ... \n";
+	if ($answer =~ m#/# || $answer =~ /\.\./) {
+	    print "You shouldn't have slashes or double-dots in the users' subdirectory.\n";
+	    $good_dir = 0;
+	} else {
+	    mkdir ("/tmp/$answer", 0644);
+	    if (-d "/tmp/$answer") {
+		$good_dir = 1;
+		rmdir ("/tmp/$answer");	# clean up after ourselves...
+	    } else {
+		$good_dir = 0;
+	    }
+	}
+
+	if ($good_dir) {
+	    print "OK.\n";
+	    last;
+	} 
+	print "failed.\n";
+	print "Try again... Remember, this is the name of a subdirectory.\n";
+	&print_prompt("Users' public HTML directory", $default_user_dir);
+	chop ($answer = <STDIN>);	# get value from user
+	$answer =~ s/\s+//g;	# strip spaces
+
+
+	return $answer if ($answer eq "none");
+	return $default_user_dir if (! $answer);
+    }
+
+    return $answer;
+}
+    
+
+
+#####################################
+# insert_sample_welcome_file
+#####################################
+# put a sample Welcome.html file in $doc_location
+#
+sub insert_sample_welcome_file {
+    open (WELCOME, ">$doc_location/Welcome.html");
+    print WELCOME <<END_WELCOME;
+<HTML>
+<HEAD>
+<TITLE>Debian GNU/Linux System</TITLE>
+</HEAD>
+
+<BODY>
+
+<H1>Howdy!</H1>
+
+Here are a couple of interesting things you should check out:
+
+<H2>CERN Hypertext Daemon Manual</H2>
+
+The <A HREF="http://www.w3.org/hypertext/WWW/Daemon/Status.html">CERN HTTPD Installation and
+Administration Manual</A> contains instructions for the care and feeding of 
+httpd. 
+       
+<H2>Debian GNU/Linux Information</H2>
+
+The <A HREF="http://www.debian.org/">
+Debian GNU/Linux</A> WWW site has a great deal of information, including
+hypertext versions of the manual and info pages for Debian.
+
+<H2>Debian GNU/Linux Bug Report Logs</H2>
+
+Think you've found a bug?  Check one of these locations to see if
+someone else has already discovered it:
+
+<UL>
+  <LI> Debian bugs at the
+       <A HREF="http://www.cl.cam.ac.uk/users/iwj10/debian-bugs/">
+       University of Cambridge</A>.
+  <LI> US Mirror of 
+       <A HREF="http://www.debian.org/Bugs/">
+       Debian Bugs</A>.
+</UL>
+
+Enjoy browsing!
+</BODY>
+</HTML>
+END_WELCOME
+    
+    close (WELCOME);
+}
+
+
+
+#####################################
+## mktree
+#####################################
+# given a path, create the directory specified, creating all leading
+# directories if necessary.  If successful, return 1, otherwise, return 0.
+sub mktree {
+    local ($requested_path) = @_;
+    local (@path);
+    local ($done, $attempt);
+
+    # chop off any trailing slash.
+    chop ($requested_path) if ($requested_path =~ m%/$%);
+    # get rid of leading slash
+    $requested_path =~ s@^/(.+)$@$1@;
+
+    # split the path elements into an array
+    @path = split(/\//, $requested_path);
+
+    # this'll hold the parts of the path that have already been
+    # created.  For example, if we are creating
+    #   /usr/local/lib/httpd_data
+    # the variable $done will hold
+    #   /usr/local
+    # after we're sure that /usr and /usr/local exist.
+    $done = "";
+
+    # while there are still path elements, create the next.
+    while (@path) {
+	$attempt = shift(@path);
+	mkdir("$done/$attempt", $default_dir_mode);
+	if (-d "$done/$attempt") {
+	    $done = "$done/$attempt";
+	} else {
+	    return 0;
+	}
+    }
+
+    return 1;
+}
+
+
+###########################################
+## pause
+###########################################
+sub pause {
+    local ($discard);
+   
+    print "Press [enter] to continue: ";
+    $discard = <STDIN>;
+}
+
+
+
+#########################################
+## print_heading
+#########################################
+# print a simple heading
+#
+sub print_heading {
+    local ($head) = @_;
+
+    print "\n";
+    print "                 ------ $head ------\n";
+    print "\n";
+}
+
+
+
+####################################
+## print_prompt
+####################################
+# print a simple prompt
+#
+sub print_prompt {
+    local ($prompt, $default) = @_;
+
+    print "$prompt [$default]: ";
+}
+
+
+##############################################
+## seed_tmp_with_default_config
+##############################################
+# creates file /tmp/cern-httpd.conf, which will be
+# munged into /etc/cern-httpd.conf by this script.
+sub seed_tmp_with_default_config {
+    open (SEED, ">/tmp/cern-httpd.conf") || die "Couldn't open temp file: $!";
+
+    print SEED <<END_SEED;
+#
+#	Sample configuration file for cern_httpd for running it
+#	as a normal HTTP server.
+#
+# See:
+#	<http://www.w3.org/hypertext/WWW/Daemon/User/Config/Overview.html>
+#
+# for more information.
+#
+# Written by:
+#	Ari Luotonen  April 1994  <luotonen\@dxcern.cern.ch>
+#
+# Minimally Hacked for Debian GNU/Linux by:
+#	Ted Hajek    Aprli 1995    <tedhajek\@boombox.micro.umn.edu>
+
+#
+#	Set this to point to the directory where you unpacked this
+#	distribution, or wherever you want httpd to have its "home"
+#
+ServerRoot	/usr/lib/cern-httpd
+
+#
+#	The default port for HTTP is 80; if you are not root you have
+#	to use a port above 1024; good defaults are 8000, 8001, 8080
+#
+Port	80
+
+#
+#	General setup; on some systems, like HP, nobody is defined so
+#	that setuid() fails; in those cases use a different user id.
+#
+UserId	nobody
+GroupId	nogroup
+
+#
+#	Logging; if you want logging uncomment these lines and specify
+#	locations for your access and error logs
+#
+AccessLog	/var/log/cern-httpd.log
+ErrorLog	/var/log/cern-httpd-error.log
+LogFormat	Common
+LogTime		LocalTime
+
+#
+#	User-supported directories under ~/(UserDir)
+#
+UserDir	public_html
+
+#
+#	Scripts; URLs starting with /cgi-bin/ will be understood as
+#	script calls in the directory /your/script/directory
+#
+Exec	/cgi-bin/*	/usr/lib/cern-httpd/cgi-bin/*
+
+#
+#	URL translation rules; default location of documents.
+#
+Pass	/*	/home/httpd-data/*
+END_SEED
+
+    close (SEED);
+}
+
+
+
+############################################
+## usage
+############################################
+# prints usage message
+#
+sub usage {
+    print STDERR "httpdconfig - http daemon configuration script\n";
+    print STDERR "\n";
+    print STDERR "usage: httpdconfig [option]\n";
+    print STDERR "\n";
+    print STDERR "valid options:\n";
+    print STDERR "  --force      Force httpdconfig to replace existing httpd.conf file\n";
+    print STDERR "  --help       Display this message\n";
+    print STDERR "  --version    Display version and copyright information\n";
+}
+
+
+
+############################################
+## version
+############################################
+# prints version and copyright information
+#
+sub version {
+    print STDERR "httpdconfig - http daemon configuration script\n";
+    print STDERR " version $Id: httpdconfig,v 1.8 1996/08/11 22:21:23 steveg Exp $	\n"; # this should grab RCS version number?
+    print STDERR "\n";
+    print STDERR "Copyright (C) 1994 by Ted Hajek <tedhajek\@boombox.micro.umn.edu>\n";
+    print STDERR "\n";
+    print STDERR "This program is free software; you can redistribute it and/or modify\n";
+    print STDERR "it under the terms of the GNU General Public License as published by\n";
+    print STDERR "the Free Software Foundation; either version 2 of the License, or\n";
+    print STDERR "(at your option) any later version.\n";
+    print STDERR "\n";
+    print STDERR "This program is distributed in the hope that it will be useful,\n";
+    print STDERR "but WITHOUT ANY WARRANTY; without even the implied warranty of\n";
+    print STDERR "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n";
+    print STDERR "GNU General Public License in the file `/usr/doc/copyright/GPL'.\n";
+}
+
+
+
+#######################################
+## welcome
+#######################################
+# Welcome the nice user
+#
+sub welcome {
+    &print_heading ("cern-httpd configuration");
+    print "\n";
+    print "Welcome to post-installation configuration of the CERN httpd.\n";
+    print "Answering these questions will allow you to configure the daemon\n";
+    print "to provide simple HTTP service on a port of your choice. You may\n";
+    print "change the resulting configuration by running /usr/sbin/httpdconfig,\n";
+    print "or by editing /etc/cern-httpd.conf\n";
+
+    print "\n";
+    print "The CERN httpd can provide much more complex service than that initiated by\n";
+    print "this script.  If you are interested, look at the sample configuration files\n";
+    print "in the directory:\n";
+    print "  /usr/doc/examples\n";
+    print "\n";
+    print "Actually, you should probably look at the documentation regardless of\n";
+    print "the complexity of your HTTP service.  After all, by running this server,\n";
+    print "you're allowing others to anonymously access files on your machine.\n";
+    print "\n";
+    print "The documentation for the CERN httpd is available, surprisingly enough,\n";
+    print "on the Web.  Point your favorite WWW client to the following URL:\n";
+    print "  http://www.w3.org/httpd/\n";
+    print "\n";
+}
+
+
+

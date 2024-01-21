@@ -1,0 +1,473 @@
+#
+# makefile.linux for SAOimage	# Linux i486 workstations
+# 19-oct-95  unofficial 1.15 version for Doug Mink          Peter Teuben
+#
+# Caveats:	-imtool flag needed
+#               -
+#
+# To build:
+#	% make (or `make all')	# build libs/program as necessary
+#
+# The full "make install" both installs SAOimage in Unix and sets up for
+# communications with IRAF:
+#	% make install
+#	(or `make install SAOBINDIR="/ourown/local/bindir"')
+#
+# Partial installs may also be used:
+#	% make install_saobin	# just install binary (can add SAOBINDIR)
+#	% make install_saoman	# just install manual page
+#	% make install_fifo	# just install IRAF fifo's
+#	% make install_imtoolrc	# just install IRAF imtoolrc file
+#
+# Other options:
+#	% make clean		# clean up object & miscellaneous other files
+#	% make tar		# make saoimage.tar in CWD
+#	% make -s pipe		# create tarfile on stdout for piping
+#	% make tape		# create tarfile on /dev/nrxt8
+#
+# Make macros (parameters) that can be specified on command line:
+#	SAOBINDIR		# Destination directory for SAOimage program
+#	SAOMANDIR		# Destination directory for on-line manpage
+#	ARCFILE			# Disk archive file name (used with make tar)
+#	TAPEDEV			# Tape archive device name (used with make tape)
+#
+#  May 6, 1991
+
+# Installation directories and filenames: edit as necessary or supply on the
+# command line.  If the location of the default imtoolrc file is changed by
+# modifying either IMTRCDIR or IMTOOLRC, irafenv.c should be recompiled.
+# (The include file hfiles/imtool.h has an ifdef to detect the value of
+# FBCONFIG_2, which is set to the value of IMTOOLRC in the definition of
+# the CFLAGS macro below.)
+
+SAOBINDIR = $(ROOT)/usr/local/bin/
+SAOMANDIR = $(ROOT)/usr/man/manl/
+IMTRCDIR  = $(ROOT)/usr/local/lib/
+
+IMTOOLRC  = $(IMTRCDIR)imtoolrc
+FIFO_I    = $(ROOT)/dev/imt1i
+FIFO_O    = $(ROOT)/dev/imt1o
+FIFO_LN   = $(ROOT)/dev/imt1
+
+# Compiler specification.
+CC = cc
+# Uncomment these two lines to compile with gcc (add any optimizers you wish).
+#CC = gcc -finline-functions -fdelayed-branch -fstrength-reduce
+#  Delayed branches could win big on RISC: many inner loops have branches
+#  Most loops have already been designed with strength reduction
+#TARGET_ARCH =
+
+# IFLAGS: image reading code to be built into SAOimage.
+#   -DFITS - reads array files with FITS headers
+#   -DOIF - reads IRAF .imh/(.pix) files with detached headers
+#   -DIMTOOL - include code to support imtool interactions with IRAF
+# Imtool interaction is enabled by default.  The consequences of this are
+# that warning messages about missing fifos are displayed when SAOimage is
+# fired up on a system where the fifos are absent.  Other than this, the
+# standalone operation is unhindered.
+
+IFLAGS = -DFITS -DOIF -DIMTOOL
+
+# MFLAGS: machine or library specific code.
+#   -DSUN - SunOS temp file name, IEEE floating point debug, and Sun keyboard
+#   -DLSB - byte swap for FITS (VAX and DECstations)
+#   -DSYSV - substitutes for getdtablesize() and setrlimit() not widely known
+#   -DPSCRIPT - hard copy output to a PostScript printer (else no hardcopy)
+#   -DMIRIAD - extras
+
+# -DSUN seems to work for linux, including keyboard
+MFLAGS = -DLSB -DSUN -DPSCRIPT -DQUIT -DMIRIAD
+
+# OFLAGS: compiler optimization/debug options.
+
+#OFLAGS = -g -DDEBUG
+OFLAGS = -O
+
+# ADFLAGS: architecture-dependent floating point flags, etc.
+
+ADFLAGS =
+
+# Libraries that move about or may require special specification.
+#
+# SAOimage requires the standard libX11.a library; if this is not in the
+# usual link search path, i.e., it is not in /usr/lib, it may be necessary
+# to specify its path fully in XLIB.
+
+XLIB = -lX11
+#XLIB = /usr/openwin/lib/libX11.a	# ATTENTION: OpenWindows users...
+#F77LIB = -lF77 -lI77 -lU77
+F77LIB = -lf2c
+#LDFLAGS = -Bstatic
+
+# END OF INSTALLATION DEPENDENT SETUP. ========================================
+# It should not be necessary to edit anything below this line.
+
+ARCH   = linux
+LINT   = lint -b
+MKNOD  = /etc/mknod
+MV     = mv -f
+RANLIB = ranlib
+RM     = rm -f
+SHELL  = /bin/sh
+
+CFLAGS = $(OFLAGS) $(ADFLAGS) $(MFLAGS) $(IFLAGS) -DFBCONFIG_2=\"$(IMTOOLRC)\"
+
+# SAOimage libraries that live in subdirectories with their own makefiles.
+# This definition must be kept in correspondence with the DEPLIBS target.
+
+DEPLIBS=btnlib/libbtn.a
+
+LIBS = -lm $(DEPLIBS) $(XLIB)
+
+HFILES = \
+	hfiles/buffer.h		hfiles/cgraph.h		hfiles/cmdparse.h \
+	hfiles/color.h		hfiles/colormap.h	hfiles/constant.h \
+	hfiles/control.h	hfiles/coord.h		hfiles/cursor.h \
+	hfiles/define.h		hfiles/edit.h		hfiles/extern.h	\
+	hfiles/histeq.h		hfiles/image.h		hfiles/imtool.h \
+	hfiles/magnify.h	hfiles/region.h		hfiles/rtcmd.h \
+	hfiles/scale.h		hfiles/struct.h 	hfiles/window.h \
+	hfiles/wcs.h		hfiles/fitshead.h
+
+DEFILES = \
+	defs/btnbox.def		defs/cgraph.def		defs/circle.def \
+	defs/color.def		defs/colorbox.def	defs/colormap.def \
+	defs/control.def	defs/cursor.def		defs/desktop.def \
+	defs/dispbox.def	defs/dither.def		defs/graphbox.def \
+	defs/image.def		defs/magnibox.def	defs/magnify.def \
+	defs/magnify.def	defs/mouse.def		defs/panbox.def
+
+SRCS =	cmddisp.c	cmdimage.c	cmdnew.c	cmdparse.c \
+	clralloc.c	clrctrl.c	clrhard.c	clrinit.c \
+	clrmap.c	clrmenu.c	clrread.c	clrsetup.c \
+	clrvary.c \
+	crdinvrt.c	crdrot.c	crdset.c	crdsynth.c \
+	crdtemp.c	crdtrans.c \
+	csranli.c	csrarea.c	csrcoord.c	csrctrl.c \
+	csrdraw.c	csrgrab.c	csrmove.c	csrpoly1.c \
+	csrpoly2.c	csrpoly3.c	csrsave.c	csrshape.c \
+	csrslct.c 	csrtext.o \
+	ctrlcntn.c	ctrldisk.c	ctrlfile.c	ctrlgc.c \
+	ctrlmbox.c	ctrlpipe.c	ctrlsckt.c \
+	dispblnk.c	dispbtmp.c	dispdfse.c	dispdthr.c \
+	display.c	disppsct.c	disppxmp.c \
+	editctrl.c	editdraw.c	editemcs.c	editinit.c \
+	editline.c	editrdrw.c \
+	grphbar.c	grphbtmp.c	grphctrl.c	grphdraw.c \
+	grphgrab.c	grphinit.c	grphlbl.c	grphline.c \
+	grphmove.c	grpholap.c	grphpos.c	grphtext.c \
+	histdist.c	histeql.c	histlist.c	histmap.c \
+	histscan.c	histzero.c \
+	imgcheck.c	imgflip.c	imglogo.c	imgnew.c \
+	imgparam.c	imgread.c	imgrot.c	imgtrans.c \
+	irafcrd.c	irafdisp.c	irafenv.c	iraffdbk.c \
+	irafimtl.c	irafio.c	irafpipe.c \
+	mainbffr.c	mainevnt.c	maininit.c	mainkey.c \
+	mainslct.c	mainutil.c \
+	menuctrl.c	menuinit.c \
+	mgfyctrl.c	mgfydraw.c	mgfyinit.c	mgfymark.c \
+	mgfytabl.c	mgfyval.c \
+	pancopy.c	pancrsr.c	panctrl.c	panimage.c \
+	panwndw.c \
+	readarr.c	readfith.c	readfits.c	readint.c \
+	readiraf.c	readreal.c \
+	rgnanli.c	rgnctrl.c	rgndraw.c	rgndrop.c \
+	rgnmake.c	rgnread.c	rgntoken.c	rgnwpros.c \
+	rgnwrite.c \
+	rtcmd.c		rtio.c \
+	sclctrl.c	sclmap.c \
+	wndwadj.c	wndwconf.c	wndwcre.c	wndwinit.c \
+	wndwmaus.c \
+	wcs.c		worldpos.c	platepos.c	wcscon.c \
+ 	prntcurs.c	iraf2fits.c	hget.c		hput.c \
+	prntcent.c
+
+OBJS =	clralloc.o	clrctrl.o	clrhard.o	clrinit.o \
+	clrmap.o	clrmenu.o	clrread.o	clrsetup.o \
+	clrvary.o \
+	cmddisp.o	cmdimage.o	cmdnew.o	cmdparse.o \
+	crdinvrt.o	crdrot.o	crdset.o	crdsynth.o \
+	crdtemp.o	crdtrans.o \
+	csranli.o	csrarea.o	csrcoord.o	csrctrl.o \
+	csrdraw.o	csrgrab.o	csrmove.o	csrpoly1.o \
+	csrpoly2.o	csrpoly3.o	csrsave.o	csrshape.o \
+	csrslct.o 	csrtext.o \
+	ctrlcntn.o	ctrldisk.o	ctrlfile.o	ctrlgc.o \
+	ctrlmbox.o	ctrlpipe.o	ctrlsckt.o \
+	dispblnk.o	dispbtmp.o	dispdfse.o	dispdthr.o \
+	display.o	disppsct.o	disppxmp.o \
+	editctrl.o	editdraw.o	editemcs.o	editinit.o \
+	editline.o	editrdrw.o \
+	grphbar.o	grphbtmp.o	grphctrl.o	grphdraw.o \
+	grphgrab.o	grphinit.o	grphlbl.o	grphline.o \
+	grphmove.o	grpholap.o	grphpos.o	grphtext.o \
+	histdist.o	histeql.o	histlist.o	histmap.o \
+	histscan.o	histzero.o \
+	imgcheck.o	imgflip.o	imglogo.o	imgnew.o \
+	imgparam.o	imgread.o	imgrot.o	imgtrans.o \
+	irafcrd.o	irafdisp.o	irafenv.o	iraffdbk.o \
+	irafimtl.o	irafio.o	irafpipe.o \
+	mainbffr.o	mainevnt.o	maininit.o	mainkey.o \
+	mainslct.o	mainutil.o \
+	menuctrl.o	menuinit.o	menupanl.o \
+	mgfyctrl.o	mgfydraw.o	mgfyinit.o	mgfymark.o \
+	mgfytabl.o	mgfyval.o \
+	pancopy.o	pancrsr.o	panctrl.o	panimage.o \
+	panwndw.o \
+	readarr.o	readfith.o	readfits.o	readint.o \
+	readiraf.o	readreal.o \
+	rgnanli.o	rgnctrl.o	rgndraw.o	rgndrop.o \
+	rgnmake.o	rgnread.o	rgntoken.o	rgnwpros.o \
+	rgnwrite.o \
+	sclctrl.o	sclmap.o \
+	wndwadj.o	wndwconf.o	wndwcre.o	wndwinit.o \
+	wndwmaus.o \
+	wcs.o		worldpos.o	platepos.o	wcscon.o \
+ 	prntcurs.o	iraf2fits.o	hget.o		hput.o \
+	prntcent.o
+
+MANPAGE = doc/saoimage.man
+
+PROGRAM = saoimage
+
+all:
+	$(MAKE) $(PROGRAM)
+
+$(PROGRAM):	$(DEPLIBS) $(OBJS)
+	@echo Building $(PROGRAM) for architecture $(ARCH).
+	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) -o $(PROGRAM) $(LIBS)
+
+$(DEPLIBS):
+	@echo Building $(DEPLIBS)...
+	cd btnlib; $(MAKE) CFLAGS="-c $(OFLAGS) $(ADFLAGS) $(MFLAGS)" CC=$(CC)
+
+lint:
+	$(LINT) -DDEBUG $(MFLAGS) $(IFLAGS) $(SRCS)
+
+clean:
+	cd btnlib; $(MAKE) clean
+	$(RM) a.out core spool $(PROGRAM) *.o *.bak $(DEPLIBS)
+
+
+# SAOimage installation.
+
+install: install_saobin install_saoman install_fifo install_imtoolrc
+
+# Install SAOimage executable.
+install_saobin: $(PROGRAM)
+	for f in $(SAOBINDIR)$(PROGRAM); do $(RM) $$f; cp $(PROGRAM) $$f; done
+
+# Install SAOimage manpage.  Note that this assumes that man can process the
+# raw source file (with *roff -man directives) to display manual pages.  If
+# this is not the case, it may be necessary to run catman or some such program
+# in order for the manpage to be accessible on-line.
+
+install_saoman: $(MANPAGE)
+	for f in $(SAOMANDIR)$(PROGRAM).l; do $(RM) $$f; cp $(MANPAGE) $$f; done
+
+# Install named pipes and create symbolic link if necessary; *must be root*.
+install_fifo:
+	for f in $(FIFO_I) $(FIFO_O); do \
+		(if [ ! -f $$f ]; then \
+		    $(MKNOD) $$f p; chmod 777 $$f; \
+		fi;) done;
+	for f in $(FIFO_LN); do \
+		(if [ ! -f $$f ]; then \
+		echo OKK; ln -s $(FIFO_O) $(FIFO_LN); fi;) done
+
+# Install imtoolrc file if necessary; current hardwired location may change...
+# Note that VAX systems (BSD, Ultrix, VMS) do not have fifos.
+
+install_imtoolrc:
+	for f in $(IMTOOLRC); do \
+		(if [ -f $$f ]; then \
+		$(MV) $(IMTOOLRC) $(IMTOOLRC).OLD; fi; \
+		cp imtoolrc $(IMTOOLRC);); done
+
+
+# Automated archive bundling.
+
+ARCFILE = saoimage.tar
+TAPEDEV = /dev/nrxt8
+
+tar:
+	tar cfv $(ARCFILE) makefile makefile.* \
+	$(SRCS) $(HFILES) $(DEFILES) \
+	imtoolrc *.txt doc/* make.* vms/* \
+	btnlib/*.c btnlib/*.h btnlib/readme btnlib/make.* btnlib/makefile \
+	btnlib/tool/*.c btnlib/tool/*.h btnlib/tool/makefile \
+	panel/*.c panel/*.h panel/*.mnu panel/makefile
+
+pipe:
+	$(MAKE) ARCFILE=- tar
+
+tape:
+	$(MAKE) ARCFILE=$(TAPEDEV) tar
+
+
+XLIBH = /usr/include/X11/Xlib.h /usr/include/X11/Xutil.h
+STRUCT = hfiles/struct.h hfiles/buffer.h hfiles/color.h hfiles/control.h \
+	 hfiles/coord.h hfiles/cursor.h hfiles/image.h hfiles/window.h
+WORKS = $(XLIBH) $(STRUCT) hfiles/constant.h hfiles/extern.h
+
+clralloc.o	: $(XLIBH) hfiles/color.h hfiles/define.h
+clrbar.o	:
+clrctrl.o	: $(WORKS) hfiles/cgraph.h
+clrhard.o	: $(XLIBH) hfiles/color.h
+clrinit.o	: $(XLIBH) hfiles/color.h hfiles/control.h
+clrmap.o	: $(XLIBH) hfiles/color.h hfiles/define.h
+clrmenu.o	: $(XLIBH) hfiles/color.h hfiles/colormap.h hfiles/constant.h \
+		hfiles/define.h hfiles/edit.h defs/colormap.def
+clrread.o	: hfiles/colormap.h hfiles/define.h
+clrsetup.o	: $(XLIBH) hfiles/color.h
+clrvary.o	: $(WORKS) hfiles/cgraph.h hfiles/define.h
+cmddisp.o	: $(WORKS) hfiles/cmdparse.h
+cmdimage.o	: $(WORKS) hfiles/cmdparse.h
+cmdnew.o	: $(XLIBH) $(STRUCT) hfiles/cmdparse.h hfiles/define.h \
+		hfiles/extern.h
+cmdparse.o	: $(WORKS) hfiles/cmdparse.h
+crdinvrt.o	: hfiles/coord.h
+crdrot.o	: hfiles/coord.h
+crdset.o	: hfiles/coord.h hfiles/image.h
+crdsynth.o	: hfiles/coord.h
+crdtemp.o	: hfiles/coord.h
+crdtrans.o	: hfiles/coord.h
+csranli.o	: $(XLIBH) hfiles/color.h hfiles/cursor.h
+csrarea.o	: $(XLIBH) hfiles/color.h hfiles/constant.h hfiles/cursor.h
+csrcoord.o	: $(XLIBH) hfiles/color.h hfiles/constant.h hfiles/coord.h \
+		hfiles/cursor.h
+csrctrl.o	: $(WORKS)
+csrdraw.o	: $(XLIBH) hfiles/color.h hfiles/constant.h hfiles/cursor.h
+csrgrab.o	: $(XLIBH) hfiles/color.h hfiles/constant.h hfiles/cursor.h \
+		hfiles/define.h
+csrmove.o	: $(XLIBH) hfiles/color.h hfiles/constant.h hfiles/cursor.h \
+		hfiles/define.h
+csrpoly1.o	: $(XLIBH) hfiles/color.h hfiles/coord.h hfiles/cursor.h \
+		hfiles/define.h
+csrpoly2.o	: $(XLIBH) hfiles/color.h hfiles/constant.h hfiles/coord.h \
+		hfiles/cursor.h
+csrpoly3.o	: $(XLIBH)
+csrsave.o	: $(XLIBH) hfiles/color.h hfiles/constant.h hfiles/cursor.h
+csrshape.o	: $(XLIBH) hfiles/color.h hfiles/constant.h hfiles/cursor.h \
+		defs/circle.def
+csrslct.o	: $(WORKS)
+csrtext.o	: $(WORKS) hfiles/edit.h hfiles/region.h
+ctrlcntn.o	: $(XLIBH) hfiles/control.h
+ctrldisk.o	:
+ctrlfile.o	: $(XLIBH) hfiles/edit.h
+ctrlgc.o	: $(XLIBH) hfiles/color.h hfiles/define.h
+ctrlmbox.o	: $(XLIBH) hfiles/control.h
+ctrlpipe.o	:
+ctrlsckt.o	: $(XLIBH) hfiles/control.h
+dispblnk.o	: $(WORKS)
+dispbtmp.o	: $(WORKS) hfiles/define.h hfiles/scale.h defs/dither.def
+dispdfse.o	:
+dispdthr.o	:
+display.o	: $(XLIBH) $(STRUCT) hfiles/define.h hfiles/extern.h \
+		hfiles/scale.h
+disppsct.o	: $(WORKS) hfiles/define.h hfiles/scale.h hfiles/region.h
+disppxmp.o	: hfiles/coord.h
+grphbar.o	:
+grphbtmp.o	: $(XLIBH) hfiles/color.h
+grphctrl.o	: $(WORKS) hfiles/cgraph.h defs/cgraph.def
+grphdraw.o	: $(XLIBH) hfiles/cgraph.h hfiles/color.h
+grphgrab.o	: $(XLIBH) hfiles/cgraph.h hfiles/color.h
+grphinit.o	: $(XLIBH) $(STRUCT) hfiles/cgraph.h hfiles/extern.h
+grphlbl.o	: $(XLIBH) $(STRUCT) hfiles/cgraph.h hfiles/define.h \
+		hfiles/extern.h
+grphline.o	: $(XLIBH) hfiles/cgraph.h hfiles/color.h
+grphmove.o	: $(XLIBH) hfiles/cgraph.h hfiles/color.h
+grpholap.o	: $(XLIBH) hfiles/cgraph.h hfiles/color.h
+grphpos.o	: $(XLIBH)
+grphtext.o	: $(XLIBH) $(STRUCT) hfiles/cgraph.h hfiles/extern.h
+editctrl.o	: $(XLIBH) hfiles/color.h hfiles/window.h hfiles/edit.h
+editdraw.o	: $(XLIBH) hfiles/define.h hfiles/edit.h
+editemcs.o	: $(XLIBH) hfiles/edit.h
+editinit.o	: $(XLIBH) hfiles/edit.h
+editline.o	: $(XLIBH) hfiles/edit.h
+editrdrw.o	: $(XLIBH) hfiles/edit.h
+histdist.o	: hfiles/histeq.h
+histeql.o	: hfiles/histeq.h
+histlist.o	: hfiles/histeq.h
+histmap.o	: hfiles/histeq.h
+histscan.o	: hfiles/histeq.h
+histzero.o	: hfiles/histeq.h
+imgcheck.o	: hfiles/cmdparse.h hfiles/constant.h hfiles/image.h
+imgflip.o	:
+imglogo.o	:
+imgnew.o	: $(WORKS) hfiles/define.h
+imgparam.o	: hfiles/coord.h hfiles/define.h hfiles/image.h
+imgread.o	: $(WORKS)
+imgrot.o	:
+imgtrans.o	: hfiles/define.h
+irafcrd.o	: $(XLIBH) $(STRUCT) hfiles/extern.h
+irafdisp.o	: $(WORKS) hfiles/scale.h
+irafenv.o	: hfiles/coord.h hfiles/define.h hfiles/image.h hfiles/imtool.h
+iraffdbk.o	: $(WORKS)
+irafimtl.o	: $(WORKS) hfiles/imtool.h
+irafio.o	: $(WORKS) hfiles/control.h hfiles/imtool.h
+irafpipe.o	: hfiles/imtool.h
+mainbffr.o	: $(XLIBH) $(WORKS) hfiles/scale.h
+mainevnt.o	: $(WORKS) hfiles/define.h
+maininit.o	: $(XLIBH) $(STRUCT) hfiles/constant.h hfiles/define.h \
+		defs/color.def defs/control.def defs/image.def \
+		defs/dispbox.def defs/magnibox.def defs/panbox.def \
+		defs/btnbox.def defs/colorbox.def defs/graphbox.def \
+		defs/desktop.def defs/cursor.def
+mainkey.o	: $(WORKS) /usr/include/X11/keysym.h \
+		/usr/include/X11/keysymdef.h
+mainslct.o	: $(WORKS)
+mainutil.o	: $(XLIBH) $(STRUCT) hfiles/extern.h
+menuctrl.o	: $(WORKS) btnlib/buttons.h
+menuinit.o	: $(XLIBH) btnlib/buttons.h hfiles/window.h
+menupanl.o	: panel/makemenu.c panel/menucmap.h panel/menuclr.h \
+		panel/menucsr.h panel/menuetc.h panel/menumain.h \
+		panel/menumono.h panel/menupan.h panel/menurgn.h \
+		panel/menuscl.h
+		$(CC) -c $(CFLAGS) panel/makemenu.c; $(MV) makemenu.o menupanl.o
+mgfyctrl.o	: $(WORKS) hfiles/magnify.h
+mgfydraw.o	: $(XLIBH) hfiles/color.h hfiles/magnify.h
+mgfyinit.o	: $(XLIBH) $(STRUCT) hfiles/define.h hfiles/extern.h \
+		hfiles/scale.h hfiles/magnify.h
+mgfymark.o	: $(XLIBH) hfiles/color.h hfiles/magnify.h defs/magnify.def
+mgfytabl.o	: $(XLIBH) $(STRUCT) hfiles/extern.h
+mgfyval.o	: $(WORKS)
+pancopy.o	: hfiles/define.h
+pancrsr.o	: $(XLIBH) $(STRUCT) hfiles/extern.h
+panctrl.o	: $(WORKS)
+panimage.o	: $(XLIBH) $(STRUCT) hfiles/define.h hfiles/extern.h
+panwndw.o	: $(XLIBH) $(STRUCT) hfiles/define.h hfiles/extern.h
+readarr.o	: hfiles/constant.h hfiles/image.h
+readfith.o	:
+readfits.o	: hfiles/constant.h hfiles/image.h
+readint.o	: hfiles/image.h hfiles/scale.h
+readiraf.o	: hfiles/constant.h hfiles/image.h
+readreal.o	: hfiles/image.h hfiles/scale.h
+rgnanli.o	: $(XLIBH) hfiles/color.h hfiles/cursor.h
+rgnctrl.o	: $(WORKS)
+rgndraw.o	: $(WORKS) hfiles/define.h hfiles/region.h
+rgndrop.o	: $(XLIBH) hfiles/constant.h hfiles/color.h hfiles/cursor.h \
+		hfiles/define.h
+rgnmake.o	: $(WORKS) hfiles/define.h
+rgnread.o	: $(WORKS) hfiles/define.h hfiles/edit.h hfiles/region.h
+rgntoken.o	: $(XLIBH) hfiles/constant.h hfiles/region.h
+rgnwpros.o	: $(WORKS) hfiles/color.h hfiles/constant.h hfiles/cursor.h \
+		hfiles/define.h
+rgnwrite.o	: $(XLIBH) hfiles/constant.h hfiles/color.h hfiles/cursor.h \
+		hfiles/define.h hfiles/edit.h hfiles/image.h
+rtcmd.o		: $(WORKS) hfiles/rtcmd.h
+rtio.o		: $(XLIBH) hfiles/control.h hfiles/rtcmd.h
+sclctrl.o	: $(WORKS) hfiles/define.h hfiles/scale.h
+sclmap.o	: $(WORKS) hfiles/scale.h
+wndwadj.o	: $(XLIBH) $(STRUCT) hfiles/extern.h hfiles/cgraph.h
+wndwconf.o	: $(XLIBH) $(STRUCT) hfiles/extern.h
+wndwcre.o	: $(XLIBH) hfiles/window.h
+wndwinit.o	: $(XLIBH) $(STRUCT) hfiles/define.h hfiles/extern.h
+wndwmaus.o	: $(WORKS) defs/mouse.def
+hget.o		: hfiles/fitshead.h
+platepos.o	: hfiles/wcs.h
+prntcent.o	: $(XLIBH) hfiles/struct.h hfiles/extern.h
+prntcurs.o	: $(XLIBH) hfiles/struct.h hfiles/extern.h hfiles/constant.h
+wcs.o		: $(XLIBH) hfiles/fitshead.h hfiles/wcs.h
+worldpos.o	: hfiles/wcs.h
+

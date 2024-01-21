@@ -1,0 +1,208 @@
+From watnews1.watson.ibm.com!watnews.watson.ibm.com!locutus.rchland.ibm.com!ibmboulder!juniper.almaden.ibm.com!uunet!gatech!howland.reston.ans.net!nctuccca.edu.tw!news.cc.nctu.edu.tw!news.csie.nctu.edu.tw!tpts1.seed.net.tw!vc0328 Tue Feb  7 00:24:35 1995
+Article: 25704 of comp.os.linux.admin
+Path: watnews1.watson.ibm.com!watnews.watson.ibm.com!locutus.rchland.ibm.com!ibmboulder!juniper.almaden.ibm.com!uunet!gatech!howland.reston.ans.net!nctuccca.edu.tw!news.cc.nctu.edu.tw!news.csie.nctu.edu.tw!tpts1.seed.net.tw!vc0328
+From: vc0328@tpts1.seed.net.tw (Vincent Chen)
+Newsgroups: comp.os.linux.admin,comp.os.linux.help
+Subject: Re: Q: Setting up SLIP --
+Date: Mon, 6 Feb 1995 03:00:14 CST
+Organization: Vincent Research.
+Lines: 191
+Message-ID: <vc0328.26.0013DAEC@tpts1.seed.net.tw>
+References: <3gu3al$c13@ccnet3.ccnet.com> <sbRDlWF42a3R078yn@UUserv.Net.tw>
+NNTP-Posting-Host: @140.109.247.5
+X-Newsreader: Trumpet for Windows [Version 1.0 Rev B final beta #4]
+Xref: watnews1.watson.ibm.com comp.os.linux.admin:25704 comp.os.linux.help:88262
+
+
+>OK: I got Linux setup, but how do I set up SLIP?
+
+  There are several files must be modified.
+
+1) add your ip address & FQDN to /etc/hosts
+
+    ex:
+    <your ip addr> <F.Q.D.N.> <alias>
+
+2) add your nameservers to /etc/resolv.conf
+   ps: multiple nameservers are allowed.
+
+    ex:
+    <your domainname>
+    nameserver xxx.xxx.xxx.xxx
+    nameserver xxx.xxx.xxx.xxx
+
+3) create your dip script
+
+    ex:
+
+NOTE: replace xxxxx with your setting
+
+----- cut here -----
+
+#
+# xxx.dip       Dialup IP connection support script. (dynamic)
+#
+# Version:      xxx.dip 1.0     08/12/94
+#
+# Author:       Vincent Chen
+#
+# Server:       xxxxx
+#
+# Features:     Auto redial when busy
+#               Two phone numbers support
+#
+
+main:
+
+  #
+  # Set serial port and speed.
+  #
+  port cua1
+  speed 57600
+
+  #
+  # Should match the assignment from your administrator
+  #
+  netmask 255.255.255.0
+
+  #
+  # Send initializing string to modem and print banner
+  #
+  send AT&FL1S0=0S7=25\r
+  wait OK 3
+  if $errlvl != 0 goto modemerr
+  print DIP script for xxxxxx server by Vincent Chen 08/12/1994
+  print -------------------------------------------------------
+  print .............. AutoDial procedure started .............
+  print ................ Press Ctrl-C to abort ................
+
+dialsvr:
+
+  send +++\r
+  wait OK 3
+  send ATH0\r
+  wait OK 3
+  print ................... Trying xxx-xxxx ...................
+  send ATDTxxx-xxxx\r
+  if $errlvl != 0 goto error
+  wait BUSY 15
+  if $errlvl == 0 goto next
+  wait CONNECT 15
+  if $errlvl != 0 goto next
+  goto login
+
+next:
+
+  send +++\r
+  wait OK 3
+  send ATH0\r
+  wait OK 3
+  print ................... Trying xxx-xxxx ...................
+  send ATDTxxx-xxxx\r
+  if $errlvl != 0 goto error
+  wait BUSY 15
+  if $errlvl == 0 goto dialsvr
+  wait CONNECT 15
+  if $errlvl != 0 goto dialsvr
+  goto login
+
+#
+# We are connected.  Login to the system.
+#
+
+login:
+
+  #
+  # "login:" is my system prompt, change it to yours
+  #
+  wait login: 30
+  if $errlvl != 0 goto error
+  #
+  # Tell server our user ID
+  #
+  send xxxxxxx\r
+  if $errlvl != 0 goto error
+  #
+  # My system don't need password for slip connection
+  #
+  #wait password: 10
+  #if $errlvl != 0 goto error
+  #
+  # Tell server our password
+  #
+  #send xxxxx\r
+  #if $errlvl != 0 goto error
+  #
+  # If you must enter shell and type extra commands to enter slip mode,
+  # add your own chat procedure here.
+  #
+  # Catch the key word to confirm that IP string will show up shortly.
+  # Here we're waiting for a string: "IP address is"
+  wait IP\saddress\sis 5
+  if $errlvl != 0 goto error
+  #
+  # Get our dynamic IP from strings that sent by server
+  #
+  get $local remote 3
+  if $errlvl != 0 goto error
+  #
+  # Get server's IP from strings that sent by server
+  #
+  get $remote remote 3
+
+  #
+  # Set up the SLIP operating parameters.
+  #
+  get $mtu 1024
+
+  #
+  # Set Destination net/address as type 'default' (vice an address).
+  # This is used by the 'route' command to set the kernel routing table.
+  # Some machines seem to require this be done for SLIP to work properly.
+  #
+  default
+
+#
+# Give the connection report !
+#
+
+done:
+
+  print Entering SLIP mode.
+  print Dynamic IP assigned by host is $local
+  print Remote host connected is $remote
+  mode CSLIP
+  goto exit
+
+error:
+
+  print SLIP connection failed.
+  goto exit
+
+modemerr:
+
+  print Modem initializing failed.
+  goto exit
+
+exit:
+
+-----  cut here  -----
+
+4) ok, ready to go now
+
+    type 'dip <full path of your own script>' to connect server
+
+5) all tcp/ip applications available now.
+
+Good luck.
+
+
+
+
+      Vincent Chen
+vc0328@tpts1.seed.net.tw
+ Taipei, Taiwan, R.O.C.
+
+
+
+

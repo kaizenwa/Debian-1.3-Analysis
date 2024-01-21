@@ -1,0 +1,39 @@
+#! /bin/sh
+# delgroup - delete a newsgroup, locally only
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/etc/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/maint:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+usage="Usage: $0 groupname"
+
+case $# in
+1)	;;
+*)	echo "$usage" >&2 ; exit 2	;;
+esac
+
+case "$1" in
+*/*)	echo "$usage" >&2 ; exit 2	;;
+esac
+
+already="`awk '\$1 == \"'"$1"'\"' $NEWSCTL/active`"
+if test " $already" = " "
+then
+	echo "$0: $1 appears not to exist" >&2
+	exit 1
+fi
+
+lock -v LOCK $$ 5 || exit 1
+trap "unlock LOCK ; trap 0 ; exit 0" 0 1 2 15
+
+cd $NEWSCTL
+
+awk "\$1 != \"$1\"" active >active.tmp
+mv active active.save && mv active.tmp active && rm active.save
+awk "\$1 != \"$1\"" active.times >active.times.t
+mv active.times active.times.s && mv active.times.t active.times &&
+	rm active.times.s
+
+echo "$1" | sed 's;\.;/;g' >>dirs.tbd

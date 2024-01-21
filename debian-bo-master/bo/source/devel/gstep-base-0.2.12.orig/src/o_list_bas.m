@@ -1,0 +1,263 @@
+/* Basic functions for list structures.
+ * Copyright (C) 1995, 1996  Free Software Foundation, Inc.
+ * 
+ * Author: Albin L. Jones <Albin.L.Jones@Dartmouth.EDU>
+ * Created: Tue Dec 12 12:33:01 EST 1995
+ * Updated: Mon Mar 11 00:56:35 EST 1996
+ * Serial: 96.03.11.02
+ * 
+ * This file is part of the GNUstep Base Library.
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Library General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Library General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Library General Public
+ * License along with this library; if not, write to the Free
+ * Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA. */ 
+
+/**** Included Headers *******************************************************/
+
+#include <Foundation/NSZone.h>
+#include <Foundation/NSString.h>
+#include <gnustep/base/numbers.h>
+#include <gnustep/base/o_list.h>
+
+/**** Type, Constant, and Macro Definitions **********************************/
+
+#define __list__ 1
+
+/**** Function Implementations ***********************************************/
+
+/** Magic numbers... **/
+
+/* Returns XX's magic number. */
+inline int
+o_list_magic_number(o_list_t *xx)
+{
+  return xx->magic_number;
+}
+
+/** Zones... **/
+
+/* Returns the zone used to create and maintain XX. */
+inline NSZone *
+o_list_zone(o_list_t *xx)
+{
+  return xx->zone;
+}
+
+/** Names... **/
+
+/* Returns the name that was given to XX. */
+inline NSString *
+o_list_name(o_list_t *xx)
+{
+  return xx->name;
+}
+
+/* Gives XX a name. */
+inline void
+o_list_set_name(o_list_t *xx, NSString *name)
+{
+  [name retain];
+  [xx->name release];
+  xx->name = name;
+  return;
+}
+
+/* Takes away XX's name. */
+inline void
+o_list_unset_name(o_list_t *xx)
+{
+  [xx->name release];
+  xx->name = nil;
+  return;
+}
+
+/** Number **/
+
+/* Returns the (process-wide) unique serial number given to the
+ * structure XX.  See <gnustep/base/numbers.h> for more info. */
+inline size_t
+o_list_serial_number(o_list_t *xx)
+{
+  return xx->serial_number;
+}
+
+/* Gives XX a new (process-wide) unique number.  Numbers are not
+ * reused.  See <gnustep/base/numbers.h> for more info. */
+inline size_t
+_o_list_set_serial_number(o_list_t *xx)
+{
+  size_t old_number;
+
+  old_number = xx->serial_number;
+  xx->serial_number = (___o_number_serialized)++;
+
+  return old_number;
+}
+
+/** Extras **/
+
+/* Sets the callbacks associated with XX's ``extra''.  NOTE: This must
+ * be done before calling `o_list_set_extra()', as these callbacks
+ * are used in that routine. */
+inline o_callbacks_t
+o_list_set_extra_callbacks(o_list_t *xx,
+                                 o_callbacks_t callbacks)
+{
+  o_callbacks_t old_callbacks;
+
+  /* Remember the old callbacks for later. */
+  old_callbacks = xx->extra_callbacks;
+
+  /* Set the new callbacks. */
+  xx->extra_callbacks = callbacks;
+
+  /* Release the old contents. */
+  o_release(old_callbacks, (void *)(xx->extra), xx);
+
+  /* Set the contents to something noticible. */
+  xx->extra = (xx->extra_callbacks).not_an_item_marker;
+
+  return old_callbacks;
+}
+
+/* Returns the callbacks associated with XX's ``extra''. */
+inline o_callbacks_t
+o_list_extra_callbacks(o_list_t *xx)
+{
+  return xx->extra_callbacks;
+}
+
+/* Returns XX's ``extra'', a little extra space that each
+ * structure carries around with it.  Its use is
+ * implementation-dependent. */
+inline const void *
+o_list_extra(o_list_t *xx)
+{
+  return xx->extra;
+}
+
+/* Sets XX's ``extra'', a little extra space that each structure
+ * carries around with it.  Its use is implementation-dependent. */
+inline const void *
+o_list_set_extra(o_list_t *xx, const void *extra)
+{
+  const void *old_extra;
+
+  /* Out with the old, and in with the new. */
+  old_extra = xx->extra;
+  xx->extra = o_retain(xx->extra_callbacks, extra, xx);
+  o_release(xx->extra_callbacks, (void *)old_extra, xx);
+
+  return old_extra;
+}
+
+/* Resets XX's ``extra''. */
+inline void
+o_list_unset_extra (o_list_t *xx)
+{
+  /* Release XX's extra. */
+  o_release(xx->extra_callbacks, (void *)(xx->extra), xx);
+
+  /* Reset XX's extra. */
+  xx->extra = (xx->extra_callbacks).not_an_item_marker;
+
+  return;
+}
+
+/** Low-level Creation and Destruction **/
+
+/* Handles the universal, low-level allocation of structures. */
+inline o_list_t *
+_o_list_alloc_with_zone(NSZone *zone)
+{
+  o_list_t *xx;
+
+  /* Try to allocate some space for XX. */
+  xx = (o_list_t *) NSZoneMalloc(zone, sizeof(o_list_t));
+
+  /* The `o_malloc()' was successful. */
+  if (xx != 0)
+    {
+      _o_list_set_serial_number(xx);
+      xx->magic_number = _OBJECTS_MAGIC_list;
+      xx->name = 0;
+      xx->zone = zone;
+      xx->extra_callbacks = o_callbacks_for_non_owned_void_p;
+      xx->extra = 0;
+
+      /* Increment the counter of allocated structures. */
+      ++(___o_number_allocated);
+    }
+
+  return xx;
+}
+
+/* Handles the universal, low-level deallocation of list structures. */
+inline void
+_o_list_dealloc(o_list_t *xx)
+{
+  /* Make sure XX is valid. */
+  if (xx != 0)
+  {
+    /* Free up any space we needed to keep track of XX's name. */
+    if (xx->name != 0)
+      NSZoneFree(o_list_zone(xx), (char *)(xx->name));
+
+    /* Release XX's extra. */
+    o_list_unset_extra(xx);
+
+    /* Free up XX itself. */
+    NSZoneFree(o_list_zone(xx), xx);
+
+    /* Increment the counter of deallocated structures. */
+    ++(___o_number_deallocated);
+  }
+
+  return;
+}
+
+/* Handles the low-level copying of structures. */
+inline o_list_t *
+_o_list_copy_with_zone(o_list_t *xx, NSZone *zone)
+{
+  o_list_t *new;
+
+  /* Create a new structure. */
+  new = _o_list_alloc_with_zone(zone);
+
+  if (new != 0)
+  {
+    /* Copy over XX's name. */
+    o_list_set_name(new, o_list_name(xx));
+
+    /* Copy over XX's extras. */
+    o_list_set_extra_callbacks(new, o_list_extra_callbacks(xx));
+    o_list_set_extra(new, o_list_extra(xx));
+  }
+
+  return new;
+}
+
+inline NSString *
+_o_list_description(o_list_t *xx)
+{
+  return [NSString
+	   stringWithFormat: @"magic_number = %#x;\nserial_number = %d;\n"
+	   @"name = %s;\nextra = %s;\nzone = %s;\n",
+	   o_list_magic_number(xx),
+	   o_list_serial_number(xx),
+	   [o_list_name(xx) cStringNoCopy],
+	   [o_describe(o_list_extra_callbacks(xx), o_list_extra(xx), xx)
+		      cStringNoCopy],
+	   [NSZoneName(o_list_zone(xx)) cStringNoCopy]];
+}

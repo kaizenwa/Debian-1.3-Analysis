@@ -1,0 +1,143 @@
+#!/usr/bin/make -f
+# debian.rules file for bibindex
+# Based on the sample debian.rules file written by Ian Jackson.
+# Written by Christian Linhart in 1995 and 1996.
+# I hereby place this file in the public domain.
+
+package=bibindex
+version=2.6
+debian=0
+priority=extra
+section=tex
+urgency=New
+
+arch=$(shell dpkg --print-architecture)
+ctrlfilter=sed -e '2s/=/$(version)-$(debian)/; 3s/=/$(arch)/;' 
+name=$(package)_$(version)-$(debian)
+binary=$(name)_$(arch).deb
+source=$(name).tar.gz
+diff=$(name).diff.gz
+changes=$(name).changes
+
+#EXAMPLE_DIR=debian-tmp/usr/doc/examples/$(package)
+#EXAMPLE_SUBDIRS=
+#EXAMPLES=
+DOC_DIR=debian-tmp/usr/doc/$(package)
+DOCS=README NEWS PROBLEMS debian.README debian.changelog 
+BIN_DIR=debian-tmp/usr/bin
+MAN_DIR=debian-tmp/usr/man
+
+build:
+	$(checkdir)
+	$(MAKE) bibindex biblook
+	touch build
+
+clean:
+	$(checkdir)
+	-rm -f build
+	-$(MAKE) -i mostlyclean
+	rm -f biblook bibindex memio
+	-rm -rf debian-tmp *~ 
+
+binary:		checkroot build
+	#
+	#*** Debian stuff ***
+	#
+	-rm -rf debian-tmp
+	mkdir debian-tmp debian-tmp/DEBIAN
+	install -d debian-tmp/usr/doc/copyright
+	$(ctrlfilter) debian.control > debian-tmp/DEBIAN/control
+	#
+	#*** Program ***
+	#
+	install -d $(BIN_DIR)
+	install bibindex $(BIN_DIR)/bibindex
+	install biblook $(BIN_DIR)/biblook
+	install -d $(MAN_DIR)/man1
+	install bibindex.man $(MAN_DIR)/man1/bibindex.1
+	install biblook.man $(MAN_DIR)/man1/biblook.1
+	cp debian.copyright debian-tmp/usr/doc/copyright/$(package)
+	#
+	#*** Examples *** (there are none)
+	#
+	#install -d $(EXAMPLE_DIR)
+	#install -d $(EXAMPLE_SUBDIRS)
+	#for example in $(EXAMPLES) ; do \
+	#	gzip -9vc $$example >$(EXAMPLE_DIR)/$$example.gz ; done
+	#
+	#*** DOCS ***
+	#
+	install -d $(DOC_DIR)
+	for doc in $(DOCS) ; do \
+		gzip -9vc $$doc >$(DOC_DIR)/$$doc.gz ; done
+	#
+	#*** make deb file ***
+	#
+	chown -R root.root debian-tmp
+	chmod -R g-ws debian-tmp
+	dpkg --build debian-tmp && dpkg-name -o -s .. debian-tmp.deb
+	#mv debian-tmp.deb ../$(binary)
+
+define checkdir
+	test -f bibindex.c
+endef
+
+# Below here is fairly generic really
+
+source:		clean
+	chmod +x debian.rules
+	cd .. && \
+	tar cf $(name).tar $(package)_$(version) && \
+	gzip -9vf $(name).tar
+ 
+diff:		clean
+	cd .. && \
+	(diff -ruN $(package)_$(version).orig $(package)_$(version) \
+	 >$(name).diff; [ $$? = 1 ]) && \
+	gzip -9vf $(name).diff
+
+checkroot:
+	$(checkdir)
+	test root = "`whoami`"
+
+#Below is for maintainer only (automatic announce & upload)
+#Usage:
+#	1. make all files (including the changes file):
+#		as root: ./debian.rules allfiles
+#	2. test the package. if not ok correct it and go back to 1.
+#	3. announce & prepare for upload (put in the uploadqueue directory)
+#		as chris: ./debian.rules announce
+
+
+announceaddr=debian-devel@lists.debian.org
+
+checkmaintainerhost:
+	test baer.christian.linhart.nodomain = "`hostname -fqdn`"
+
+announce: checkmaintainerhost upload
+	( cat ../$(changes) ; echo ; echo -- ; cat ~chris/.signature ) \
+		>../$(name).announce
+	vi ../$(name).announce
+	su chris -c 'mail $(announceaddr) \
+		-s "uploading $(name)" <../$(name).announce'
+
+upload: checkmaintainerhost
+	su chris -c 'cp ../$(binary) ../$(diff) ../$(source) ../$(changes) \
+		~chris/Debian/uploadqueue'
+
+allfiles: binary source diff
+	su chris -c "./debian.rules changes"
+	
+changes: ../$(binary) ../$(source) ../$(diff)
+	#extract change info from changelog
+	tmp=/tmp/$$$$ ; \
+	perl -ne '\
+		if ($$copy) {s/^\t//;print}; \
+		$$copy=1 if ( /^\s+$(package)\s*\($(version)-$(debian)\)/ )' \
+	< debian.changelog >$$tmp ; \
+	cd .. ; dchanges -n ce=$$tmp urg=$(urgency) \
+		pgp="Christian Linhart <chris@cosy.sbg.ac.at>" \
+		s=$(section) p=$(priority) $(binary) $(source) $(diff) ; \
+	rm $$tmp
+
+.PHONY: binary source diff clean checkroot changes

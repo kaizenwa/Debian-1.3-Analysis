@@ -1,0 +1,103 @@
+#!/bin/sh
+# Tcl sees the next lines as an assignment to variable `kludge'.
+# For sh, the two shifts cancel the effect of the set, and then we
+# run scotty on this script.
+
+set kludge { $*
+    shift
+    shift
+    if test -f ../scotty ; then
+      exec ../scotty -nf $0 $*
+    else
+      exec scotty -nf $0 $*
+    fi
+}
+
+##
+## Send a snmp request to all ip addresses on a class C like
+## network. Use with care as this script floods you network! It is
+## just an example how fast asynchronous SNMP operations can work.
+##
+
+proc SnmpDiscover {net} {
+    for {set i 1} {$i < 255} {incr i} {
+	set s [snmp session -address $net.$i]
+	$s get sysDescr.0 {
+	    if {"%E" == "noError"} {
+		set d [lindex [lindex {%V} 0] 2]
+		regsub -all "\[\n\r\]" $d "" d
+		puts "[%S cget -address]\t$d"
+	    }
+	    %S destroy
+	}
+	update
+    }
+    snmp wait
+}
+
+##
+## Send an icmp echo request to all ip addresses on a class C like
+## network. Use with care as this script floods you network! 
+## It is just an example how fast our icmp command can work.
+##
+
+proc IcmpDiscover {net} {
+    set hosts ""
+    for {set i 1} {$i < 255} {incr i} {
+	lappend hosts $net.$i
+    }
+    if {[catch {icmp -delay 3 echo $hosts} result]} {
+	puts stderr $result
+	continue
+    }
+    foreach elem $result {
+	set ip  [lindex $elem 0]
+	set rtt [lindex $elem 1]
+	if {$rtt >= 0} {
+	    puts "$ip\ticmp echo $rtt ms"
+	}
+    }
+}
+
+mib load rfc1213.mib
+
+if {$argv == ""} {
+    puts stderr {usage: discover [-snmp] [-ping] networks}
+    exit 42
+}
+
+set discover SnmpDiscover
+
+set newargv ""
+set parsing_options 1
+while {([llength $argv] > 0) && $parsing_options} {
+    set arg [lindex $argv 0]
+    set argv [lrange $argv 1 end]
+    if {[string index $arg 0] == "-"} {
+	switch -- $arg  {
+	    "-snmp" { set discover SnmpDiscover }
+	    "-ping" { set discover IcmpDiscover }
+	    "--"    { set parsing_options 0 }
+	}
+    } else {
+	set parsing_options 0
+	lappend newargv $arg
+    }
+}
+set argv [concat $newargv $argv]
+
+foreach network $argv {
+    switch -regexp $network {
+	{^[0-9]+\.[0-9]+$} {
+	    for {set i 1} {$i < 255} {incr i} {
+		$discover $network.$i
+	    }
+	}
+	{^[0-9]+\.[0-9]+\.[0-9]+$} {
+	    $discover $network
+	}
+	default {
+	    puts stderr "sorry, $network ignored."
+	}
+    }
+}

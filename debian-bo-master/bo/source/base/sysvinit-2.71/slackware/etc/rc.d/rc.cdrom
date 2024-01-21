@@ -1,0 +1,36 @@
+#
+# /etc/rc.d/rc.cdrom
+# This script searches for a CD-ROM on the known Linux CD devices.
+# If one is found, it is mounted under $MOUNTPOINT.
+#
+
+MOUNTPOINT="/cdrom"
+unset SKIP
+if mount | fgrep "on $MOUNTPOINT " 1> /dev/null 2> /dev/null ; then
+  SKIP=1
+elif [ ! -d $MOUNTPOINT ]; then
+  SKIP=1
+fi
+if [ ! "$SKIP" = "1" ]; then
+  unset MOUNT
+  echo -n "Checking for a CD... "
+  for device in scd0 scd1 sonycd cdu535 mcd sbpcd aztcd cm206cd gscd0 \
+mcdx0 mcdx1 optcd0 sjcd lmscd hdd hdc hdb hda hde hdf hdg hdh ; do # check for a CD-ROM drive with a disc in it.
+    if mount -t iso9660 -o ro /dev/$device $MOUNTPOINT 1> /dev/null 2> /dev/null ; then
+      MOUNT=1
+      rm -f /dev/cdrom
+      ln -sf /dev/$device /dev/cdrom
+      break;
+    fi
+  done
+  if [ "$MOUNT" = "1" ]; then # mount successful
+    echo "found on /dev/$device."
+    if [ -d /cdrom/rootdsks.144 -o -d /cdrom/rootdsks ]; then # Slackware CD-ROM is mounted.
+      echo "    Mounting Slackware Linux CD-ROM under $MOUNTPOINT."
+    else
+      echo "    Mounting unknown ISO9660 CD-ROM under $MOUNTPOINT."
+    fi
+  else
+    echo "no CD found."
+  fi
+fi

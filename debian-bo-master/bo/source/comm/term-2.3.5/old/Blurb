@@ -1,0 +1,138 @@
+
+#
+# this file written by Olaf (sorry , lost email).
+# LOTS of nice things. Read.
+#
+
+This is a set of enhancements to term 1.0.7. I consider it to be in
+beta stage and would appreciate any bug reports, especially if
+something that works with 1.0.7 gets broken by this patch (which
+really shouldn't happen). Probably this stuff could get into the
+official distribution but that depends on Michael.  :-)
+
+I'm distributing this as one large collection of unified diffs against
+stock term 1.0.7 (termdiff.all - just feed it to patch, there should
+be absolutely no problems with backward compatibility) and one
+separate file for patching into ftp.c (of either stock BSD or ncftp
+flavor - the diff is noproxy.d against the ncftp version of ftp.c, for
+the BSD version apply the patch manually - it's very easy).
+
+See the file 'Changed' for a table of additional features vs. changed
+files.
+
+The following features are added:
+- tredir may now redirect several ports at once
+       Affects clients only
+- Support for HP-UX 8.07 
+       Affects server and clients under HP-UX only
+- Enhanced security: trsh requests can be blocked, term can run under
+  chroot.
+       Affects server only
+
+Bug corrections:
+- mistype in pty handling: alphabetical sequence was incorrect
+       Affects server only
+- C_BIND works now: correct update of # of active clients
+       Affects server only but makes certain clients usable
+- Redundancy taken out: don't request own address and delete it just 
+  afterwards
+       In the server, affects nothing (as far as I can tell now)
+- Finally, non-existing "linecheck.1" taken out of Makefile
+       Affects installation process only
+
+And one major feature was added, which unfortunately required a
+protocol change.  The termftp clients as known use proxy (passive)
+server mode. This will break with ancient ftp servers and with certain
+firewalls (the latter situation provided the incentive for me to write
+this, s.b.)).  To use the PORT command like the genuine ftp client,
+term needs the C_BIND command which does not work. I've corrected this
+(making possible some other new clients as well... see tclient.c for
+an example. Anyone dares to hack up ircII to do DCC file transfer over
+term in both directions?)  Also, to properly implement this mode, the
+ftp client needs to get a listening socket from the system (usual
+technique: bind to 0.0.0.0:0 and get port # with getsockname()). For
+this I have inserted a new command, C_BINDN, which will return the
+port number used. I've not seen any possibility to transfer this
+critical information - the port # - from the remote server to the
+client other than a new protocol element.
+       Affects server and termftp clients only, but *could* cause
+       problems with future clients *if* protocol is changed again
+       (very unlikely)
+
+To get termftp working with this, you need to completely replace the
+functions initconn() and dataconn() in ftp.c, inside the #ifdef TERM
+or TERM_FTP, with the ones provided in ftpconn.c. (I've done this in a
+separate branch with #ifdef TERMPROXY.) This applies to both termftp
+(patched original BSD ftp client) and ncftp+term (patched ncftp);
+ncftp is derived from BSD anyway.
+
+*** Explanations - only of interest if you really need to know ***
+
+  Multiple redirections 
+Have you ever worried about the long list of tredir's in the ps
+listing? One process can manage as many ports as file descriptors are
+available, only the standard tredir doesn't use this capability. (as
+from the release note of 0.99.something) The changes are rather
+trivial (get tredir to process a set of arguments in the first place,
+and add an argument to the redirecting function in the client lib - the
+latter means that every client compiled with the new lib has to be
+adapted (trivially), but old ones will run unchanged. Refer to the
+diff for xconn.c to see what has to be changed.)
+
+  HPUX support 
+This is the result of my (eventually successful) attempts to get term
+1.0.7 to run on a HP with a rather screwy OS (some sort of a mixture
+of HPUX 8.05 and 8.07). Some definitions in the Makefile are changed,
+etc. The most prominent feature is the use of SIGWINCH (which is
+called SIGWINDOW and not used properly in HPUX, but required anyway).
+I'm using the c89 compiler (cc refuses to run), there is no install
+command, and other minor annoyances.
+
+  Security considerations 
+Ever run term as root on one end? Don't.  Everyone who has access to
+the other end's term socket (at least root on that machine) can become
+root on your box - all he has to do is trsh. Also, if term runs as
+root, it can clobber every file on your system with an appropriate
+tupload. The solution: two more options in the termrc file, one to
+deny trsh's from the other end and one to run term in a chroot
+environment (much like anonymous ftp does). The changes are only a few
+lines of addition.
+
+  Why not use proxy mode with FTP? Why does termftp fail on some sites?
+There are two ways how the data port of FTP can be opened: the client
+connects to a port of the server, or the server connects to a port of
+the client. Proxy FTP mode (the client sends PASV command and connects
+to the socket returned by the server for data connections) works well
+in an open network with modern ftp servers (the PASV command is now
+required). However, there is a subtle difference to the usual scheme
+(where the client sends PORT <port> command and the server connects to
+<port>). If you bother to look at netstat, you will see the
+difference:
+(Example: A.B.C.D be the host with term and Internet connection, and
+M.N.O.P the ftp server; 9999 denotes an arbitrary port number, the *
+side is the active end)
+either   *A.B.C.D:9999   M.N.O.P:9999  (termftp, proxy mode)
+or        A.B.C.D:9999  *M.N.O.P:20    (the usual scheme)
+
+In the latter case (which is set up by the PORT command), the
+connection is from a standard port (20 - ftp data). In the former
+case, you can get two non-standard ports, which will be blocked by
+"packet filtering gateways" (the most modest and least annoying form
+of firewalls). To avoid this problem, one side of the connection must
+be port 20, and for this in the first case (proxy mode) the client had
+to run setuid root. This is impractical just in the situation where it
+would be needed, so proxy mode can't be used. If you have termftp or
+ncftp-term, and it "hangs" on the first "ls", "get" or "put" command,
+then you're perhaps in this situation. If you can use standard
+Internet ftp, you can likely use my enhanced termftp as well - it uses
+the same ports and makes the term server behave exactly like an
+ordinary ftp client.
+  More FTP chicanery
+Assume you have an ftp client on your Internet box that is setuid
+root, and any other ftp client (compiled by yourself) won't run. Then
+you're out of luck with term anyway and should ask your network
+administration a few polite questions. The same holds for a genuine
+firewall - a network gateway which doesn't let anything "through" at
+all. In this case you can't do anything but FTPing the files to the
+firewall and tupload'ing them afterwards (or vice versa).
+

@@ -1,0 +1,2 @@
+#define PARSE_NO_ERROR	0
+#define PARSE_MV_ERROR	1

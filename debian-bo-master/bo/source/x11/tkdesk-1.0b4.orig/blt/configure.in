@@ -1,0 +1,874 @@
+AC_INIT(src/bltInit.c)
+AC_CONFIG_HEADER(src/bltConfig.h)
+AC_CONFIG_AUX_DIR(cf)
+AC_PREREQ(2.0)	
+
+# -----------------------------------------------------------------------
+#
+# 	Drag in old settings from config.BLT
+#
+# -----------------------------------------------------------------------
+
+saveFile="./config.BLT"
+if test -r $saveFile; then
+    echo loading previous configuration from $saveFile
+    . $saveFile
+fi
+
+AC_CANONICAL_SYSTEM
+
+# -----------------------------------------------------------------------
+#
+# 	Set a variable containing current working directory if /bin/sh
+#	doesn't do it already.
+#
+# -----------------------------------------------------------------------
+
+PWD=`pwd`
+
+# -----------------------------------------------------------------------
+#
+# 	C compiler and debugging flags
+#
+# -----------------------------------------------------------------------
+if test -z "$CC" ; then
+    CC="cc"
+    unset blt_cv_prog_gcc ac_cv_prog_CPP
+fi
+AC_MSG_CHECKING([which C compiler])
+AC_ARG_WITH(cc, [  --with-cc=CC		  set C compiler to CC], 
+    [CC=$with_cc ; unset blt_cv_prog_gcc ac_cv_prog_CPP])
+AC_MSG_RESULT([$CC])
+AC_PROG_CPP
+
+AC_MSG_CHECKING([whether C compiler is gcc])
+AC_CACHE_VAL(blt_cv_prog_gcc, 
+    AC_EGREP_CPP(_cc_is_gcc_, [
+#ifdef __GNUC__
+_cc_is_gcc_
+#endif
+],      [blt_cv_prog_gcc=yes], [blt_cv_prog_gcc=no]))
+AC_MSG_RESULT([$blt_cv_prog_gcc])
+
+GCCFLAGS=""
+if test "${blt_cv_prog_gcc}" = "yes" ; then
+    GCCFLAGS="-Wwrite-strings -Wshadow -Wtraditional -fwritable-strings -Wall"
+fi
+AC_SUBST(GCCFLAGS)
+
+AC_SUBST(CC)
+AC_ISC_POSIX
+
+if test -z "$CFLAGS" ; then
+    if test "${blt_cv_prog_gcc}" = "yes" ; then
+	CFLAGS="-O3 -fno-strength-reduce"
+    else
+	CFLAGS="-O"
+    fi
+fi
+AC_MSG_CHECKING([default compiler flags])
+AC_ARG_WITH(cflags, [  --with-cflags=FLAGS  	  set compiler flags to FLAGS],
+    [CFLAGS="$with_cflags"])
+AC_MSG_RESULT([$CFLAGS])
+AC_SUBST(CFLAGS)
+
+
+# -----------------------------------------------------------------------
+#
+# Programs:	Check for existence of ranlib and install programs
+#
+# -----------------------------------------------------------------------
+AC_PROG_INSTALL
+AC_PROG_RANLIB
+
+# -----------------------------------------------------------------------
+#
+# Headers:	Check for header files used
+#
+# -----------------------------------------------------------------------
+
+AC_HEADER_STDC
+AC_HEADER_SYS_WAIT
+AC_HEADER_TIME
+AC_CHECK_HEADERS(stdlib.h string.h float.h)
+AC_CHECK_HEADERS(unistd.h malloc.h memory.h)
+AC_CHECK_HEADERS(errno.h limits.h)
+AC_CHECK_HEADERS(sys/time.h waitflags.h sys/wait.h)
+
+AC_MSG_CHECKING([whether strdup is declared in header files])
+AC_CACHE_VAL(blt_cv_decl_strdup, 
+    AC_EGREP_CPP(strdup, [
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+#ifdef HAVE_STRING_H
+#include <string.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif /* HAVE_UNISTD_H */
+],      [blt_cv_decl_strdup=yes], [blt_cv_decl_strdup=no]))
+
+if test "${blt_cv_devl_strdup}" = "no"; then
+    AC_DEFINE(NO_DECL_STRDUP)
+fi
+AC_MSG_RESULT([$blt_cv_decl_strdup])
+
+AC_MSG_CHECKING([whether strcasecmp is declared in header files])
+AC_CACHE_VAL(blt_cv_decl_strcasecmp, 
+    AC_EGREP_CPP(strcasecmp, [
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+#ifdef HAVE_STRING_H
+#include <string.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif /* HAVE_UNISTD_H */
+],      [blt_cv_decl_strcasecmp=yes], [blt_cv_decl_strcasecmp=no]))
+
+if test "${blt_cv_decl_strcasecmp}" = "no"; then
+    AC_DEFINE(NO_DECL_STRCASECMP)
+fi
+AC_MSG_RESULT([$blt_cv_decl_strcasecmp])
+
+# -----------------------------------------------------------------------
+#
+# Functions: 	Check for strerror, strdup, strcasecmp.
+#
+# -----------------------------------------------------------------------
+
+AC_HAVE_FUNCS(strdup strerror strcasecmp)
+
+# -----------------------------------------------------------------------
+#
+# Types:	Check for existence of types of size_t and pid_t
+#
+# -----------------------------------------------------------------------
+
+AC_TYPE_SIZE_T
+AC_TYPE_PID_T
+
+# -----------------------------------------------------------------------
+#
+# 	Set up a new default prefix to installation path.  The ways
+#	the prefix can be set and their precedence are as follows:
+#
+#	1. --prefix option given to ./configure. (prefix != NONE)
+#       2. use previously configured prefix, if one exists (PREFIX != "")
+#	3. make the prefix default to /usr/local/blt
+#
+# -----------------------------------------------------------------------
+
+AC_MSG_CHECKING([installation directory prefix])
+
+if test "$prefix" = "NONE"; then 
+    if test -z "$PREFIX" ; then
+	prefix=/usr/local/blt
+    else
+	prefix=$PREFIX
+    fi
+fi
+AC_PREFIX_DEFAULT($prefix)
+PREFIX=$ac_default_prefix
+PREFIX=$prefix
+exec_prefix=$PREFIX
+AC_SUBST(PREFIX)
+AC_MSG_RESULT([$PREFIX])
+
+# -----------------------------------------------------------------------
+#
+# Custom Tests:	union wait and long string declaration
+#
+# -----------------------------------------------------------------------
+
+
+# -----------------------------------------------------------------------
+#
+#	Check whether <sys/wait.h> defines the type "union wait" 
+#	correctly.  It's needed because of weirdness in HP-UX where 
+#	"union wait" is defined in both the BSD and SYS-V  environments.  
+#	Checking the usability of WIFEXITED seems to do	the trick.
+#
+# -----------------------------------------------------------------------
+
+AC_MSG_CHECKING([whether union wait is defined correctly])
+AC_CACHE_VAL(blt_cv_struct_wait_works,
+    AC_TRY_COMPILE([#include <sys/types.h> 
+#include <sys/wait.h>], [
+union wait x;
+WIFEXITED(x);		/* Generates compiler error if WIFEXITED
+			 * uses an int. */
+], 
+    	[blt_cv_struct_wait_works="yes"], 
+	[blt_cv_struct_wait_works="no"]))
+
+if test "${blt_cv_struct_wait_works}" = "no"; then
+    AC_DEFINE(NO_UNION_WAIT)
+fi
+AC_MSG_RESULT([$blt_cv_struct_wait_works])
+
+# -----------------------------------------------------------------------
+#
+# 	Check if postscript prolog can be inlined. Some compilers
+#	(HP, others?) don't handle long strings.  We'll use the
+#	bltGraph.pro file if it can't 
+#
+#--------------------------------------------------------------------
+
+AC_MSG_CHECKING([whether postscript prolog can be inlined])
+AC_CACHE_VAL(blt_cv_c_long_strings,
+  AC_TRY_COMPILE([#include "./src/bltGrPs.h"],,
+    [blt_cv_c_long_strings="yes"], 
+    [blt_cv_c_long_strings="no"]))
+
+if test "${blt_cv_c_long_strings}" = "no"; then
+  AC_DEFINE(NO_INLINE_PS_PROLOG)
+fi
+AC_MSG_RESULT([$blt_cv_c_long_strings])
+
+
+# -----------------------------------------------------------------------
+#
+# 	Check the smallest value such that 1.0 + x != 1.0.
+#	For ANSI compilers this is DBL_EPSILON in float.h
+#
+#--------------------------------------------------------------------
+
+
+AC_CACHE_VAL(blt_cv_dbl_epsilon, 
+    OLD_CFLAGS="$CFLAGS"
+    CFLAGS="-g"
+    AC_TRY_RUN_WITH_OUTPUT(blt_cv_dbl_epsilon, [
+#ifdef HAVE_FLOAT_H
+#include <float.h>
+#endif
+main () {
+#ifndef DBL_EPSILON 
+    double eps, u, comp;
+    u = 1.0;
+    for(;;) {
+       u *= 0.5;
+       comp = 1.0 + u;
+       if (comp == 1.0) {
+	   break;
+       }
+    }
+    eps = u * 2.0;
+    printf("%.17e\n", eps);
+#endif /* DBL_EPSILON */
+    exit(0);
+}])
+    CFLAGS="$OLD_CFLAGS"
+)
+
+AC_MSG_CHECKING([whether DBL_EPSILON is defined in float.h])
+AC_CACHE_VAL(blt_cv_define_dbl_epsilon, [
+    if test "x${blt_cv_dbl_epsilon}" != "x"; then 
+	blt_cv_define_dbl_epsilon="no"
+	AC_DEFINE_UNQUOTED(BLT_DBL_EPSILON, ${blt_cv_dbl_epsilon})
+    else
+	blt_cv_define_dbl_epsilon="yes"
+    fi
+])
+AC_MSG_RESULT([${blt_cv_define_dbl_epsilon}])
+
+# -----------------------------------------------------------------------
+#
+# Libraries: 	X11, tcl, tk, nsl, socket, math
+#
+# -----------------------------------------------------------------------
+
+LIBS=""
+AC_PATH_X
+
+# -----------------------------------------------------------------------
+#
+#	Check for the existence of various libraries.  The order here
+#	is important, so that then end up in the right order in the
+#	command line generated by Make.
+#
+# -----------------------------------------------------------------------
+
+AC_CHECK_LIB(Xbsd, main, [LIBS="$LIBS -lXbsd"])
+AC_CHECK_LIB(socket, main, [LIBS="$LIBS -lsocket"])
+AC_CHECK_LIB(nsl, main, [LIBS="$LIBS -lnsl"])
+AC_CHECK_LIB(m, main, [LIBS="$LIBS -lm"])
+AC_SUBST(LIBS)
+
+
+# -----------------------------------------------------------------------
+#
+# 	Just in case xmkmf failed, check the location of the X 
+#	libraries and header files.
+#
+# -----------------------------------------------------------------------
+
+AC_MSG_CHECKING([again for X11/Xlib.h])
+blt_path_x_headers=""
+guesses="$XINCDIR \
+     $x_includes \
+     /usr/X11R6/include /usr/local/X11R6/include /usr/include/X11R6 \
+     /usr/X11/include /usr/X386/include \
+     /usr/X11R5/include /usr/local/X11R5/include /usr/include/X11R5 \
+     /usr/openwin/include \
+     /usr/X11R4/include /usr/local/X11R4/include /usr/include/X11R4 \
+     /usr/local/include /usr/include"
+
+for dir in $guesses; do
+    if test -r "$dir/X11/Xlib.h"; then
+	blt_path_x_headers=$dir
+	break
+    fi
+done
+
+XINCSW=""
+if test -z "${blt_path_x_headers}" ; then
+    XINCDIR="__Edit_${saveFile}__"
+    AC_MSG_RESULT([no])
+else 
+    XINCDIR=$blt_path_x_headers
+    AC_MSG_RESULT([$XINCDIR])
+fi
+
+if test "$XINCDIR" != "/usr/include" ; then
+    XINCSW="-I$XINCDIR"
+fi
+AC_SUBST(XINCSW)
+AC_SUBST(XINCDIR)
+
+AC_MSG_CHECKING([again for libX11.a])
+blt_path_x_libs=""
+guesses="$XLIBDIR \
+     $x_libraries \
+     /usr/X11R6/lib /usr/local/X11R6/lib /usr/lib/X11R6 \
+     /usr/X11/lib /usr/X386/lib \
+     /usr/X11R5/lib /usr/local/X11R5/lib /usr/lib/X11R5 \
+     /usr/openwin/lib \
+     /usr/X11R4/lib /usr/local/X11R4/lib /usr/lib/X11R4 \
+     /usr/local/lib /usr/unsupported/lib \
+     /usr/lib /lib"
+
+for dir in $guesses; do
+    libnames=`echo $dir/libX11.*`
+    if test "$libnames" != "$dir/libX11.*" ; then
+	blt_path_x_libs=$dir
+	break
+    fi
+done
+
+if test -z "$blt_path_x_libs" ; then
+    XLIBDIR="__Edit_${saveFile}__"
+    AC_MSG_RESULT([no])
+else 
+    XLIBDIR=$blt_path_x_libs
+    AC_MSG_RESULT([$XLIBDIR])
+fi
+if test "$XLIBDIR" != "/usr/lib" ; then
+    XLIBSW="-L$XLIBDIR -lX11"
+else
+    XLIBSW="-lX11"
+fi
+AC_SUBST(XLIBSW)
+AC_SUBST(XLIBDIR)
+
+# -----------------------------------------------------------------------
+#
+# 	Make some ?educated? guesses where the Tcl/Tk header files and 
+#	libraries are located.  I'm not crazy about doing it this way.  
+#	It might be better to specify some command-line options when
+#	invoking configure.
+#
+# 	We'll look first in the usual places that Tcl/Tk distributions
+#	are installed, next checking if its in an ancestor directory,
+#	and finally searching the standard header/library locations.  If
+#	we still can't find the entry, we'll generate a bogus entry, forcing
+#	the user to hand edit the file "config.BLT" and to rerun this
+#	program.
+#
+# -----------------------------------------------------------------------
+
+# -----------------------------------------------------------------------
+#	tcl.h
+# -----------------------------------------------------------------------
+AC_MSG_CHECKING([for tcl.h])
+blt_path_tcl_h=""
+guesses="$TCLINCDIR \
+     $TCL_LIBRARY/../../include \
+     /usr/local/itcl/include \
+     /usr/local/tcl/tcl7.5/include /usr/local/tcl/tcl7.4/include \
+     /usr/local/tcl/tcl7.3/include /usr/local/tcl/tcl7.2/include \
+     /usr/local/tcl/tcl7.1/include /usr/local/tcl/tcl7.0/include \
+     $PWD/../itcl2.0/tcl7.4 \
+     $PWD/../tcl7.5 \
+     $PWD/../tcl7.5b3 \
+     $PWD/../tcl7.4 \
+     $PWD/../tcl7.3 $PWD/../tcl7.2 $PWD/../tcl7.1 $PWD/../tcl7.0 \
+     $prefix/include \
+     $XINCDIR/tk $XINCDIR/tcl $XINCDIR \
+     /usr/local/include /usr/include/tcl /usr/include"
+
+for dir in $guesses; do
+    if test -r $dir/itcl/tcl.h ; then
+	blt_path_tcl_h="$dir/itcl"
+	break
+    fi
+    if test -r $dir/tcl.h ; then
+	blt_path_tcl_h=$dir
+	break
+    fi
+done
+
+TCLINCDIR="${blt_path_tcl_h}"
+TCLINCSW=""
+if test -z "${blt_path_tcl_h}" ; then
+    TCLINCDIR="__Edit_${saveFile}__"
+    AC_MSG_RESULT([no])
+else
+    AC_MSG_RESULT([${blt_path_tcl_h}])
+fi
+if test "$TCLINCDIR" != "/usr/include" ; then
+    TCLINCSW="-I$TCLINCDIR"
+fi
+AC_SUBST(TCLINCSW)
+AC_SUBST(TCLINCDIR)
+
+# -----------------------------------------------------------------------
+#	libtcl.a
+# -----------------------------------------------------------------------
+AC_MSG_CHECKING([for libtcl.a])
+blt_path_tcl_lib=""
+guesses="$TCLLIBDIR \
+     $TCL_LIBRARY/.. \
+     /usr/local/itcl/lib \
+     /usr/local/tcl/lib \
+     /usr/local/tcl/tcl7.5/lib /usr/local/tcl/tcl7.4/lib \
+     /usr/local/tcl/tcl7.3/lib /usr/local/tcl/tcl7.2/lib \
+     /usr/local/tcl/tcl7.1/lib /usr/local/tcl/tcl7.0/lib \
+     $PWD/../itcl2.0/tcl7.4 \
+     $PWD/../tcl7.5 \
+     $PWD/../tcl7.5b3 \
+     $PWD/../tcl7.4 \
+     $PWD/../tcl7.3 $PWD/../tcl7.2 $PWD/../tcl7.1 $PWD/../tcl7.0 \
+     $prefix/lib \
+     $XLIBDIR \
+     $blt_path_tcl_h/../lib \
+     /usr/local/lib /usr/lib"
+
+for dir in $guesses; do
+    libnames=`echo $dir/itcl/libtcl*`
+    if test "$libnames" != "$dir/itcl/libtcl*" ; then
+	blt_path_tcl_lib="$dir/itcl"
+	break
+    fi
+    libnames=`echo $dir/libtcl*`
+    if test "$libnames" != "$dir/libtcl*" ; then
+	blt_path_tcl_lib=$dir
+	break
+    fi
+done
+
+TCLLIBSW=""
+TCLLIBDIR="${blt_path_tcl_lib}"
+
+TCL_VERSION=""
+case "$target" in 
+  *-sunos4*)
+     ;;
+  *) 
+     if test -r $TCLLIBDIR/tclConfig.sh; then
+	 . $TCLLIBDIR/tclConfig.sh
+     fi
+     ;;
+esac
+  
+if test "x${blt_path_tcl_lib}" != "x" ; then
+    AC_MSG_RESULT([${blt_path_tcl_lib}])
+else
+    TCLLIBDIR="__Edit_${saveFile}__"
+    AC_MSG_RESULT([no])
+fi
+if test "$TCLLIBDIR" != "/usr/lib" ; then
+    TCLLIBSW="-L$TCLLIBDIR -ltcl${TCL_VERSION}"
+fi
+
+AC_SUBST(TCLLIBSW)
+AC_SUBST(TCLLIBDIR)
+
+# -----------------------------------------------------------------------
+# 	tk.h
+# -----------------------------------------------------------------------
+AC_MSG_CHECKING([for tk.h])
+blt_path_tk_h=""
+guesses="\
+     $TKINCDIR \
+     /usr/local/itcl/include \
+     /usr/local/tcl/include \
+     /usr/local/tcl/tk4.1/include \
+     /usr/local/tcl/tk4.0/include \
+     /usr/local/tcl/tk3.6/include \
+     /usr/local/tcl/tk3.5/include \
+     /usr/local/tcl/tk3.4/include \
+     /usr/local/tcl/tk3.3/include \
+     $PWD/../itcl2.0/tk4.0 \
+     $PWD/../tk4.1b3 \
+     $PWD/../tk4.0 \
+     $PWD/../tk3.6 $PWD/../tk3.5 $PWD/../tk3.4 $PWD/../tk3.3 \
+     $TK_LIBRARY/../../include \
+     $prefix/include \
+     $XINCDIR/tk \
+     /usr/local/tcl /usr/local/include /usr/include/tcl /usr/include"
+
+for dir in $guesses; do
+    if test -r $dir/itcl/tk.h ; then
+	blt_path_tk_h="$dir/itcl"
+	break
+    fi
+    if test -r $dir/tk.h ; then
+	blt_path_tk_h=$dir
+	break
+    fi
+done
+
+TKINCSW=""
+TKINCDIR="${blt_path_tk_h}"
+if test -z "${blt_path_tk_h}" ; then
+    TKINCDIR="__Edit_${saveFile}__"
+    AC_MSG_RESULT([no])
+else
+    AC_MSG_RESULT([${blt_path_tk_h}])
+fi
+
+if test "$TKINCDIR" != "/usr/include" ; then
+    TKINCSW="-I$TKINCDIR"
+fi
+
+AC_SUBST(TKINCSW)
+AC_SUBST(TKINCDIR)
+
+
+# -----------------------------------------------------------------------
+# 	libtk.a
+# -----------------------------------------------------------------------
+AC_MSG_CHECKING([for libtk.a])
+blt_path_tk_lib=""
+guesses="$TKLIBDIR \
+     $TK_LIBRARY/.. \
+     /usr/local/itcl/lib \
+     /usr/local/tcl/lib \
+     /usr/local/tcl/tk4.1/lib \
+     /usr/local/tcl/tk4.0/lib \
+     /usr/local/tcl/tk3.6/lib \
+     /usr/local/tcl/tk3.5/lib \
+     /usr/local/tcl/tk3.4/lib \
+     /usr/local/tcl/tk3.3/lib \
+     $PWD/../itcl2.0/tk4.0 \
+     $PWD/../tk4.1b3 \
+     $PWD/../tk4.0 \
+     $PWD/../tk3.6 $PWD/../tk3.5 $PWD/../tk3.4 $PWD/../tk3.3 \
+     $prefix/lib \
+     $XLIBDIR \
+     $blt_path_tk_h/../lib \
+     /usr/local/lib /usr/lib"
+
+for dir in $guesses; do
+    libnames=`echo $dir/itcl/libtk*`
+    if test "$libnames" != "$dir/itcl/libtk*" ; then
+	blt_path_tk_lib="$dir/itcl"
+	break
+    fi
+    libnames=`echo $dir/libtk*`
+    if test "$libnames" != "$dir/libtk*" ; then
+	blt_path_tk_lib=$dir
+	break
+    fi
+done
+
+TKLIBSW=""
+TKLIBDIR="${blt_path_tk_lib}"
+
+
+TK_VERSION=""
+
+# What's the name of the Tk library this week?
+case "$target" in 
+  *-sunos4*)
+     ;;
+  *) 
+     if test -r $TKLIBDIR/tkConfig.sh; then
+	 . $TKLIBDIR/tkConfig.sh
+     fi
+     ;;
+esac
+
+if test "x${blt_path_tk_lib}" != "x"; then
+    AC_MSG_RESULT([${blt_path_tk_lib}])
+else
+    TKLIBDIR="__Edit_${saveFile}__"
+    AC_MSG_RESULT([no])
+fi
+
+if test "$TKLIBDIR" != "/usr/lib" ; then
+    TKLIBSW="-L$TKLIBDIR -ltk${TK_VERSION}"
+fi
+
+AC_SUBST(TKLIBSW)
+AC_SUBST(TKLIBDIR) 
+
+# -----------------------------------------------------------------------
+# 	libitcl.a
+# -----------------------------------------------------------------------
+
+AC_MSG_CHECKING([for libitcl.a])
+blt_path_itcl_lib=""
+guesses="$TCLLIBDIR $TKLIBDIR"
+for dir in $guesses; do
+    libnames=`echo $dir/libitcl*`
+    if test "$libnames" != "$dir/libitcl*" ; then
+	blt_path_itcl_lib=$dir
+	break
+    fi
+done
+
+ITCLLIBSW=""
+if test "x${blt_path_itcl_lib}" != "x" ; then
+    case "$target" in 
+      *-sunos4*)
+	 ITCL_VERSION=""
+	 ;;
+      *) 
+	 ITCL_VERSION="2.0"
+	 if test -r ${blt_path_itcl_lib}/itclConfig.sh; then
+	     . ${blt_path_itcl_lib}/itclConfig.sh
+	 fi
+	 ;;
+    esac
+    ITCLLIBSW="-litcl${ITCL_VERSION}"
+    AC_MSG_RESULT([${blt_path_itcl_lib}])
+else
+    AC_MSG_RESULT([no])
+fi
+AC_SUBST(ITCLLIBSW)
+
+# -----------------------------------------------------------------------
+# 	libitk.a
+# -----------------------------------------------------------------------
+
+AC_MSG_CHECKING([for libitk.a])
+blt_path_itk_lib=""
+guesses="$TCLLIBDIR $TKLIBDIR"
+for dir in $guesses; do
+    libnames=`echo $dir/libitk*`
+    if test "$libnames" != "$dir/libitk*" ; then
+	blt_path_itk_lib=$dir
+	break
+    fi
+done
+
+ITKLIBSW=""
+if test "x${blt_path_itk_lib}" != "x" ; then
+    case "$target" in 
+      *-sunos4*)
+         ITK_VERSION=""
+	 ;;
+      *) 
+	 ITK_VERSION="2.0"
+	 if test -r ${blt_path_itk_lib}/itkConfig.sh; then
+	     . ${blt_path_itk_lib}/itkConfig.sh
+	 fi
+	 ;;
+    esac
+    ITKLIBSW="-litk${ITK_VERSION}"
+    AC_MSG_RESULT([${blt_path_itk_lib}])
+else
+    AC_MSG_RESULT([no])
+fi
+AC_SUBST(ITKLIBSW)
+
+CPPFLAGS="$TKINCSW $TCLINCSW $XINCSW"
+AC_CHECK_HEADERS(itk.h)
+AC_CHECK_HEADERS(itcl.h)
+AC_CHECK_HEADERS(tkInt.h)
+CPPFLAGS=""
+
+AC_MSG_CHECKING([BLT major version number])
+AC_CACHE_VAL(blt_cv_major_version, 
+    AC_TRY_RUN_WITH_OUTPUT(blt_cv_major_version, [
+#include "./blt.h"
+main() { printf("%d", BLT_MAJOR_VERSION); exit(0); }
+    ])
+)
+AC_MSG_RESULT([$blt_cv_major_version])
+
+AC_MSG_CHECKING([BLT minor version number])
+AC_CACHE_VAL(blt_cv_minor_version, 
+    AC_TRY_RUN_WITH_OUTPUT(blt_cv_minor_version, [
+#include "./blt.h"
+main() { printf("%d", BLT_MINOR_VERSION); exit(0); }
+    ])
+)
+AC_MSG_RESULT([$blt_cv_minor_version])
+
+#
+# Always check for Tk's major version number.  It's a good sanity check.
+#
+AC_MSG_CHECKING([Tk major version number])
+  OLD_CFLAGS="$CFLAGS"
+  CFLAGS="$CFLAGS $XINCSW $TKINCSW $TCLINCSW"
+  TK_MAJOR_VERSION="???"
+  AC_TRY_RUN_WITH_OUTPUT(TK_MAJOR_VERSION, [
+#include <tk.h>
+main() { printf("%d", TK_MAJOR_VERSION); exit(0); }
+  ])
+CFLAGS="$OLD_CFLAGS"
+AC_SUBST(TK_MAJOR_VERSION)
+AC_MSG_RESULT([$TK_MAJOR_VERSION])
+
+#--------------------------------------------------------------------
+#
+#	Check if we can generate shared libraries on this system.
+#	Set flags to generate shared libraries for systems that we 
+#	know about.
+#
+#--------------------------------------------------------------------
+
+AC_MSG_CHECKING([how to make shared libraries])
+SHLIB_CCFLAGS=""
+SHLIB_LOADER="$CC"
+SHLIB_LDFLAGS=""
+SHLIB_SUFFIX=".so.${blt_cv_major_version}"
+SHLIB_EXTRA_FLAGS=""
+SHLIB_TARGET=""
+SHLIB_LIBS=""
+
+case "$target" in 
+  *-sunos4*) 
+    SHLIB_LOADER="ld"
+    SHLIB_CCFLAGS="-pic"
+    SHLIB_LDFLAGS="-assert pure-text"
+    SHLIB_SUFFIX=".so.${blt_cv_major_version}.${blt_cv_minor_version}"
+    SHLIB_LIBS="-ldl"
+    ;;
+  *-solaris2*)
+    SHLIB_CCFLAGS="-K pic"
+    SHLIB_LDFLAGS="-G -ztext -h libBLT$(SHLIB_SUFFIX)"
+    SHLIB_EXTRA_FLAGS='-R$(LIBDIR):$(TKLIBDIR):$(TCLLIBDIR):$(XLIBDIR)'
+    SHLIB_LIBS="-ldl"
+    ;;
+  *-hpux9*)
+    SHLIB_CCFLAGS="+z"
+    SHLIB_LDFLAGS="-b -n"
+    SHLIB_SUFFIX=".sl"
+    SHLIB_LIBS="-ldld"
+    SHLIB_EXTRA_FLAGS='-Wl,+b,${LIBDIR}'
+    ;;
+  *-osf1*)
+    SHLIB_CCFLAGS="-fpic"
+    SHLIB_LDFLAGS="-shared"
+    SHLIB_LOADER="$CC"
+    ;;
+  *-irix5*)
+    SHLIB_CCFLAGS="-KPIC"
+    SHLIB_LDFLAGS="-shared"
+    SHLIB_EXTRA_FLAGS='-Wl,-D,08000000 -rpath ${LIBDIR}'
+    ;;
+  *-freebsd*|*-386bsd*|*-netbsd*)
+    SHLIB_CCFLAGS="-fpic"
+    SHLIB_LDFLAGS="-Bshareable"
+    ;;
+  *-linux*)
+    AC_CACHE_VAL(blt_cv_sys_elf, 
+        AC_EGREP_CPP(isElf, [
+#ifdef __ELF__
+isElf
+#else
+isAout
+#endif],  [blt_cv_sys_elf="elf"], [blt_cv_sys_elf="aout"]))
+    if test "${blt_cv_sys_elf}" = "elf"; then
+	SHLIB_CCFLAGS="-fpic"
+	SHLIB_LDFLAGS="-shared -Wl,-soname,libBLT${SHLIB_SUFFIX}"
+	SHLIB_EXTRA_FLAGS='-Wl,-rpath,$(LIBDIR):$(TKLIBDIR):$(TCLLIBDIR):$(XLIBDIR)'
+	SHLIB_SUFFIX=".so.${blt_cv_major_version}.${blt_cv_minor_version}"
+	SHLIB_LIBS="-ldl"
+    fi
+    target="${target}${blt_cv_sys_elf}"
+    ;;
+esac
+if test -z "$SHLIB_CCFLAGS" ; then 
+    AC_MSG_RESULT([don't know how for $target])
+else 
+    AC_MSG_RESULT([flags set for $target])
+    # Override native compiler flags if C compiler is gcc
+    if test "${blt_cv_prog_gcc}" = "yes" ; then
+	SHLIB_CCFLAGS="-fpic"
+    fi
+    SHLIB_TARGET="lib-shared"
+fi
+
+AC_SUBST(SHLIB_CCFLAGS)
+AC_SUBST(SHLIB_LDFLAGS)
+AC_SUBST(SHLIB_LOADER)
+AC_SUBST(SHLIB_SUFFIX)
+AC_SUBST(SHLIB_EXTRA_FLAGS)
+AC_SUBST(SHLIB_TARGET)
+AC_SUBST(SHLIB_LIBS)
+
+#--------------------------------------------------------------------
+#	Propagate prefix argument as installation directory.
+#--------------------------------------------------------------------
+AC_SUBST(PREFIX)
+
+DESTDIR=$PREFIX
+BINDIR="$PREFIX/bin"
+LIBDIR="$PREFIX/lib"
+INCDIR="$PREFIX/include"
+BLT_LIBRARY="$PREFIX/lib/blt${blt_cv_major_version}.${blt_cv_minor_version}"
+MANDIR="$PREFIX/man"
+
+AC_SUBST(DESTDIR)
+AC_SUBST(BINDIR)
+AC_SUBST(INCDIR)
+AC_SUBST(LIBDIR)
+AC_SUBST(MANDIR)
+AC_SUBST(BLT_LIBRARY)
+
+#--------------------------------------------------------------------
+#	Print out some of the more important settings 
+#--------------------------------------------------------------------
+echo "
+Configuration results (edit $saveFile and rerun ./configure to modify):
+
+  directory containing \"tcl.h\"        => $TCLINCDIR
+  directory containing \"tk.h\"         => $TKINCDIR
+  directory containing \"X11/Xlib.h\"   => $XINCDIR
+  directory containing \"libtcl.a\"     => $TCLLIBDIR
+  directory containing \"libtk.a\"      => $TKLIBDIR
+  directory containing \"libX11.a\"     => $XLIBDIR
+
+  Directories where BLT is to be installed:
+    \"bltwish\"     install in  $BINDIR
+    \"libBLT.a\"    install in  $LIBDIR
+    scripts       install in  $BLT_LIBRARY
+    manual pages  install in  $MANDIR
+"
+
+#--------------------------------------------------------------------
+#
+#	Generate the following Makefiles
+#
+#	   ./Makefile
+#	   ./src/Makefile
+#	   ./src/shared/Makefile
+#	   ./man/Makefile
+#	   ./library/Makefile
+#
+#--------------------------------------------------------------------
+AC_OUTPUT(config.BLT:cf/config.BLT.in Makefile src/Makefile src/shared/Makefile man/Makefile library/Makefile)
+
+
+
+
+
+
+

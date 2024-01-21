@@ -1,0 +1,1270 @@
+This is Info file octave.info, produced by Makeinfo version 1.67 from
+the input file ./octave.texi.
+
+START-INFO-DIR-ENTRY
+* Octave: (octave).	Interactive language for numerical computations.
+END-INFO-DIR-ENTRY
+
+   Copyright (C) 1996, 1997 John W. Eaton.
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+   Permission is granted to copy and distribute modified versions of
+this manual under the conditions for verbatim copying, provided that
+the entire resulting derived work is distributed under the terms of a
+permission notice identical to this one.
+
+   Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions.
+
+
+File: octave.info,  Node: Script Files,  Next: Dynamically Linked Functions,  Prev: Function Files,  Up: Functions and Scripts
+
+Script Files
+============
+
+   A script file is a file containing (almost) any sequence of Octave
+commands.  It is read and evaluated just as if you had typed each
+command at the Octave prompt, and provides a convenient way to perform a
+sequence of commands that do not logically belong inside a function.
+
+   Unlike a function file, a script file must *not* begin with the
+keyword `function'.  If it does, Octave will assume that it is a
+function file, and that it defines a single function that should be
+evaluated as soon as it is defined.
+
+   A script file also differs from a function file in that the variables
+named in a script file are not local variables, but are in the same
+scope as the other variables that are visible on the command line.
+
+   Even though a script file may not begin with the `function' keyword,
+it is possible to define more than one function in a single script file
+and load (but not execute) all of them at once.  To do this, the first
+token in the file (ignoring comments and other white space) must be
+something other than `function'.  If you have no other statements to
+evaluate, you can use a statement that has no effect, like this:
+
+     # Prevent Octave from thinking that this
+     # is a function file:
+     
+     1;
+     
+     # Define function one:
+     
+     function one ()
+       ...
+
+   To have Octave read and compile these functions into an internal
+form, you need to make sure that the file is in Octave's `LOADPATH',
+then simply type the base name of the file that contains the commands.
+(Octave uses the same rules to search for script files as it does to
+search for function files.)
+
+   If the first token in a file (ignoring comments) is `function',
+Octave will compile the function and try to execute it, printing a
+message warning about any non-whitespace characters that appear after
+the function definition.
+
+   Note that Octave does not try to look up the definition of any
+identifier until it needs to evaluate it.  This means that Octave will
+compile the following statements if they appear in a script file, or
+are typed at the command line,
+
+     # not a function file:
+     1;
+     function foo ()
+       do_something ();
+     endfunction
+     function do_something ()
+       do_something_else ();
+     endfunction
+
+even though the function `do_something' is not defined before it is
+referenced in the function `foo'.  This is not an error because Octave
+does not need to resolve all symbols that are referenced by a function
+until the function is actually evaluated.
+
+   Since Octave doesn't look for definitions until they are needed, the
+following code will always print `bar = 3' whether it is typed directly
+on the command line, read from a script file, or is part of a function
+body, even if there is a function or script file called `bar.m' in
+Octave's `LOADPATH'.
+
+     eval ("bar = 3");
+     bar
+
+   Code like this appearing within a function body could fool Octave if
+definitions were resolved as the function was being compiled.  It would
+be virtually impossible to make Octave clever enough to evaluate this
+code in a consistent fashion.  The parser would have to be able to
+perform the call to `eval' at compile time, and that would be
+impossible unless all the references in the string to be evaluated could
+also be resolved, and requiring that would be too restrictive (the
+string might come from user input, or depend on things that are not
+known until the function is evaluated).
+
+   Although Octave normally executes commands from script files that
+have the name `FILE.m', you can use the function `source' to execute
+commands from any file.
+
+ - Built-in Function:  source (FILE)
+     Parse and execute the contents of FILE.  This is equivalent to
+     executing commands from a script file, but without requiring the
+     file to be named `FILE.m'.
+
+
+File: octave.info,  Node: Dynamically Linked Functions,  Next: Organization of Functions,  Prev: Script Files,  Up: Functions and Scripts
+
+Dynamically Linked Functions
+============================
+
+   On some systems, Octave can dynamically load and execute functions
+written in C++.  Octave can only directly call functions written in C++,
+but you can also load functions written in other languages by calling
+them from a simple wrapper function written in C++.
+
+   Here is an example of how to write a C++ function that Octave can
+load, with commentary.  The source for this function is included in the
+source distributions of Octave, in the file `examples/oregonator.cc'.
+It defines the same set of differential equations that are used in the
+example problem of *Note Ordinary Differential Equations::.  By running
+that example and this one, we can compare the execution times to see
+what sort of increase in speed you can expect by using dynamically
+linked functions.
+
+   The function defined in `oregonator.cc' contains just 8 statements,
+and is not much different than the code defined in the corresponding
+M-file (also distributed with Octave in the file
+`examples/oregonator.m').
+
+   Here is the complete text of `oregonator.cc':
+
+   just
+
+     #include <octave/oct.h>
+     
+     DEFUN_DLD (oregonator, args, ,
+       "The `oregonator'.")
+     {
+       ColumnVector dx (3);
+     
+       ColumnVector x = args(0).vector_value ();
+     
+       dx(0) = 77.27 * (x(1) - x(0)*x(1) + x(0)
+                        - 8.375e-06*pow (x(0), 2));
+     
+       dx(1) = (x(2) - x(0)*x(1) - x(1)) / 77.27;
+     
+       dx(2) = 0.161*(x(0) - x(2));
+     
+       return octave_value (dx);
+     }
+
+   The first line of the file,
+
+     #include <octave/oct.h>
+
+includes declarations for all of Octave's internal functions that you
+will need.  If you need other functions from the standard C++ or C
+libraries, you can include the necessary headers here.
+
+   The next two lines
+     DEFUN_DLD (oregonator, args, ,
+       "The `oregonator'.")
+
+declares the function.  The macro `DEFUN_DLD' and the macros that it
+depends on are defined in the files `defun-dld.h', `defun.h', and
+`defun-int.h' (these files are included in the header file
+`octave/oct.h').
+
+   Note that the third parameter to `DEFUN_DLD' (`nargout') is not
+used, so it is omitted from the list of arguments to in order to avoid
+the warning from gcc about an unused function parameter.
+
+simply declares an object to store the right hand sides of the
+differential equation, and
+
+   The statement
+
+     ColumnVector x = args(0).vector_value ();
+
+extracts a column vector from the input arguments.  The variable `args'
+is passed to functions defined with `DEFUN_DLD' as an
+`octave_value_list' object, which includes methods for getting the
+length of the list and extracting individual elements.
+
+   In this example, we don't check for errors, but that is not
+difficult.  All of the Octave's built-in functions do some form of
+checking on their arguments, so you can check the source code for those
+functions for examples of various strategies for verifying that the
+correct number and types of arguments have been supplied.
+
+   The next statements
+
+     ColumnVector dx (3);
+     
+     dx(0) = 77.27 * (x(1) - x(0)*x(1) + x(0)
+                      - 8.375e-06*pow (x(0), 2));
+     
+     dx(1) = (x(2) - x(0)*x(1) - x(1)) / 77.27;
+     
+     dx(2) = 0.161*(x(0) - x(2));
+
+define the right hand side of the differential equation.  Finally, we
+can return `dx':
+
+     return octave_value (dx);
+
+The actual return type is `octave_value_list', but it is only necessary
+to convert the return type to an `octave_value' because there is a
+default constructor that can automatically create an object of that
+type from an `octave_value' object, so we can just use that instead.
+
+   To use this file, your version of Octave must support dynamic
+linking.  To find out if it does, type the command `octave_config_info
+("dld")' at the Octave prompt.  Support for dynamic linking is included
+if this command returns 1.
+
+   To compile the example file, type the command `mkoctfile
+oregonator.cc' at the shell prompt.  The script `mkoctfile' should have
+been installed along with Octave.  Running it will create a file called
+`oregonator.oct' that can be loaded by Octave.  To test the
+`oregonator.oct' file, start Octave and type the command
+
+     oregonator ([1, 2, 3], 0)
+
+at the Octave prompt.  Octave should respond by printing
+
+     ans =
+     
+        77.269353
+        -0.012942
+        -0.322000
+
+   You can now use the `oregonator.oct' file just as you would the
+`oregonator.m' file to solve the set of differential equations.
+
+   On a 133 MHz Pentium running Linux, Octave can solve the problem
+shown in *Note Ordinary Differential Equations:: in about 1.4 second
+using the dynamically linked function, compared to about 19 seconds
+using the M-file.  Similar decreases in execution time can be expected
+for other functions, particularly those that rely on functions like
+`lsode' that require user-supplied functions.
+
+   Additional examples are available in the files in the `src'
+directory of the Octave distribution.  Currently, this includes the
+files
+
+     balance.cc  fft.cc      hess.cc     lu.cc       schur.cc
+     chol.cc     fft2.cc     ifft.cc     minmax.cc   sort.cc
+     colloc.cc   filter.cc   ifft2.cc    pinv.cc     svd.cc
+     dassl.cc    find.cc     inv.cc      qr.cc       syl.cc
+     det.cc      fsolve.cc   log.cc      quad.cc
+     eig.cc      fsqp.cc     lsode.cc    qzval.cc
+     expm.cc     givens.cc   lu.cc       rand.cc
+
+These files use the macro `DEFUN_DLD_BUILTIN' instead of `DEFUN_DLD'.
+The difference between these two macros is just that
+`DEFUN_DLD_BUILTIN' can define a built-in function that is not
+dynamically loaded if the operating system does not support dynamic
+linking.  To define your own dynamically linked functions you should use
+`DEFUN_DLD'.
+
+   There is currently no detailed description of all the functions that
+you can call in a built-in function.  For the time being, you will have
+to read the source code for Octave.
+
+
+File: octave.info,  Node: Organization of Functions,  Prev: Dynamically Linked Functions,  Up: Functions and Scripts
+
+Organization of Functions Distributed with Octave
+=================================================
+
+   Many of Octave's standard functions are distributed as function
+files.  They are loosely organized by topic, in subdirectories of
+`OCTAVE_HOME/lib/octave/VERSION/m', to make it easier to find them.
+
+   The following is a list of all the function file subdirectories, and
+the types of functions you will find there.
+
+`audio'
+     Functions for playing and recording sounds.
+
+`control'
+     Functions for design and simulation of automatic control systems.
+
+`elfun'
+     Elementary functions.
+
+`general'
+     Miscellaneous matrix manipulations, like `flipud', `rot90', and
+     `triu', as well as other basic functions, like `is_matrix',
+     `nargchk', etc.
+
+`image'
+     Image processing tools.  These functions require the X Window
+     System.
+
+`io'
+     Input-ouput functions.
+
+`linear-algebra'
+     Functions for linear algebra.
+
+`miscellaneous'
+     Functions that don't really belong anywhere else.
+
+`plot'
+     A set of functions that implement the MATLAB-like plotting
+     functions.
+
+`polynomial'
+     Functions for manipulating polynomials.
+
+`set'
+     Functions for creating and manipulating sets of unique values.
+
+`signal'
+     Functions for signal processing applications.
+
+`specfun'
+     Special functions.
+
+`special-matrix'
+     Functions that create special matrix forms.
+
+`startup'
+     Octave's system-wide startup file.
+
+`statistics'
+     Statistical functions.
+
+`strings'
+     Miscellaneous string-handling functions.
+
+`time'
+     Functions related to time keeping.
+
+
+File: octave.info,  Node: Error Handling,  Next: Input and Output,  Prev: Functions and Scripts,  Up: Top
+
+Error Handling
+**************
+
+   Octave includes several functions for printing error and warning
+messages.  When you write functions that need to take special action
+when they encounter abnormal conditions, you should print the error
+messages using the functions described in this chapter.
+
+ - Built-in Function:  error (TEMPLATE, ...)
+     The `error' function formats the optional arguments under the
+     control of the template string TEMPLATE using the same rules as
+     the `printf' family of functions (*note Formatted Output::.).  The
+     resulting message is prefixed by the string `error: ' and printed
+     on the `stderr' stream.
+
+     Calling `error' also sets Octave's internal error state such that
+     control will return to the top level without evaluating any more
+     commands.  This is useful for aborting from functions or scripts.
+
+     If the error message does not end with a new line character,
+     Octave will print a traceback of all the function calls leading to
+     the error.  For example, given the following function definitions:
+
+          function f () g () end
+          function g () h () end
+          function h () nargin == 1 || error ("nargin != 1"); end
+
+     calling the function `f' will result in a list of messages that
+     can help you to quickly locate the exact location of the error:
+
+          f ()
+          error: nargin != 1
+          error: evaluating index expression near line 1, column 30
+          error: evaluating binary operator `||' near line 1, column 27
+          error: called from `h'
+          error: called from `g'
+          error: called from `f'
+
+     If the error message ends in a new line character, Octave will
+     print the message but will not display any traceback messages as
+     it returns control to the top level.  For example, modifying the
+     error message in the previous example to end in a new line causes
+     Octave to only print a single message:
+
+          function h () nargin == 1 || error ("nargin != 1\n"); end
+          f ()
+          error: nargin != 1
+
+ - Built-in Variable: error_text
+     This variable contains the the text of error messages that would
+     have been printed in the body of the most recent `unwind_protect'
+     or `try' statement or the TRY part of the most recent call to the
+     `eval' function.  Outside of the `unwind_protect' and `try'
+     statements or the `eval' function, or if no error has occurred
+     within them, the value of `error_text' is guaranteed to be the
+     empty string.
+
+     Note that the message does not include the first `error: ' prefix,
+     so that it may easily be passed to the `error' function without
+     additional processing(1).
+
+     *Note The try Statement:: and *Note The unwind_protect Statement::.
+
+ - Built-in Variable: beep_on_error
+     If the value of `beep_on_error' is nonzero, Octave will try to
+     ring your terminal's bell before printing an error message.  The
+     default value is 0.
+
+ - Built-in Function:  warning (MSG)
+     Print a warning message MSG prefixed by the string `warning: '.
+     After printing the warning message, Octave will continue to execute
+     commands.  You should use this function should when you want to
+     notify the user of an unusual condition, but only when it makes
+     sense for your program to go on.
+
+ - Built-in Function:  usage (MSG)
+     Print the message MSG, prefixed by the string `usage: ', and set
+     Octave's internal error state such that control will return to the
+     top level without evaluating any more commands.  This is useful for
+     aborting from functions.
+
+     After `usage' is evaluated, Octave will print a traceback of all
+     the function calls leading to the usage message.
+
+     You should use this function for reporting problems errors that
+     result from an improper call to a function, such as calling a
+     function with an incorrect number of arguments, or with arguments
+     of the wrong type.  For example, most functions distributed with
+     Octave begin with code like this
+
+          if (nargin != 2)
+            usage ("foo (a, b)");
+          endif
+
+     to check for the proper number of arguments.
+
+   The following pair of functions are of limited usefulness, and may be
+removed from future versions of Octave.
+
+ - Function File:  perror (NAME, NUM)
+     Print the error message for function NAME corresponding to the
+     error number NUM.  This function is intended to be used to print
+     useful error messages for those functions that return numeric error
+     codes.
+
+ - Function File:  strerror (NAME, NUM)
+     Return the text of an error message for function NAME
+     corresponding to the error number NUM.  This function is intended
+     to be used to print useful error messages for those functions that
+     return numeric error codes.
+
+   ---------- Footnotes ----------
+
+   (1)  Yes, it's a kluge, but it seems to be a reasonably useful one.
+
+
+File: octave.info,  Node: Input and Output,  Next: Plotting,  Prev: Error Handling,  Up: Top
+
+Input and Output
+****************
+
+   There are two distinct classes of input and output functions.  The
+first set are modeled after the functions available in MATLAB.  The
+second set are modeled after the standard I/O library used by the C
+programming language and offer more flexibility and control over the
+output.
+
+   When running interactively, Octave normally sends any output intended
+for your terminal that is more than one screen long to a paging program,
+such as `less' or `more'.  This avoids the problem of having a large
+volume of output stream by before you can read it.  With `less' (and
+some versions of `more') you can also scan forward and backward, and
+search for specific items.
+
+   Normally, no output is displayed by the pager until just before
+Octave is ready to print the top level prompt, or read from the
+standard input (for example, by using the `fscanf' or `scanf'
+functions).  This means that there may be some delay before any output
+appears on your screen if you have asked Octave to perform a
+significant amount of work with a single command statement.  The
+function `fflush' may be used to force output to be sent to the pager
+(or any other stream) immediately.
+
+   You can select the program to run as the pager by setting the
+variable `PAGER', and you can turn paging off by setting the value of
+the variable `page_screen_output' to 0.
+
+ - Command: more
+ - Command: more ON
+ - Command: more OFF
+     Turn output pagination on or off.  Without an argument, `more'
+     toggles the current state.
+
+ - Built-in Variable: PAGER
+     The default value is normally `"less"', `"more"', or `"pg"',
+     depending on what programs are installed on your system.  *Note
+     Installation::.
+
+     When running interactively, Octave sends any output intended for
+     your terminal that is more than one screen long to the program
+     named by the value of the variable `PAGER'.
+
+ - Built-in Variable: page_screen_output
+     If the value of `page_screen_output' is nonzero, all output
+     intended for the screen that is longer than one page is sent
+     through a pager.  This allows you to view one screenful at a time.
+     Some pagers (such as `less'--see *Note Installation::) are also
+     capable of moving backward on the output.  The default value is 1.
+
+ - Built-in Variable: page_output_immediately
+     If the value of `page_output_immediately' is nonzero, Octave sends
+     output to the pager as soon as it is available.  Otherwise, Octave
+     buffers its output and waits until just before the prompt is
+     printed to flush it to the pager.  The default value is 0.
+
+      - Built-in Function:  fflush (FID)
+          Flush output to FID.  This is useful for ensuring that all
+          pending output makes it to the screen before some other event
+          occurs.  For example, it is always a good idea to flush the
+          standard output stream before calling `input'.
+
+
+* Menu:
+
+* Basic Input and Output::
+* C-Style I/O Functions::
+
+
+File: octave.info,  Node: Basic Input and Output,  Next: C-Style I/O Functions,  Prev: Input and Output,  Up: Input and Output
+
+Basic Input and Output
+======================
+
+* Menu:
+
+* Terminal Output::
+* Terminal Input::
+* Simple File I/O::
+
+
+File: octave.info,  Node: Terminal Output,  Next: Terminal Input,  Prev: Basic Input and Output,  Up: Basic Input and Output
+
+Terminal Output
+---------------
+
+   Since Octave normally prints the value of an expression as soon as it
+has been evaluated, the simplest of all I/O functions is a simple
+expression.  For example, the following expression will display the
+value of pi
+
+     pi
+          -| pi = 3.1416
+
+   This works well as long as it is acceptable to have the name of the
+variable (or `ans') printed along with the value.  To print the value
+of a variable without printing its name, use the function `disp'.
+
+   The `format' command offers some control over the way Octave prints
+values with `disp' and through the normal echoing mechanism.
+
+ - Built-in Variable: ans
+     This variable holds the most recently computed result that was not
+     explicitly assigned to a variable.  For example, after the
+     expression
+
+          3^2 + 4^2
+
+     is evaluated, the value of `ans' is 25.
+
+ - Built-in Function:  disp (X)
+     Display the value of X.  For example,
+
+          disp ("The value of pi is:"), disp (pi)
+          
+               -| the value of pi is:
+               -| 3.1416
+
+     Note that the output from `disp' always ends with a newline.
+
+ - Command: format OPTIONS
+     Control the format of the output produced by `disp' and Octave's
+     normal echoing mechanism.  Valid options are listed in the
+     following table.
+
+    `short'
+          This is the default format.  Octave will try to print numbers
+          with at least 5 significant figures within a field that is a
+          maximum of 10 characters wide.
+
+          If Octave is unable to format a matrix so that columns line
+          up on the decimal point and all the numbers fit within the
+          maximum field width, it switches to an `e' format.
+
+    `long'
+          Octave will try to print numbers with at least 15 significant
+          figures within a field that is a maximum of 24 characters
+          wide.
+
+          As will the `short' format, Octave will switch to an `e'
+          format if it is unable to format a matrix so that columns
+          line up on the decimal point and all the numbers fit within
+          the maximum field width.
+
+    `long e'
+    `short e'
+          The same as `format long' or `format short' but always display
+          output with an `e' format.  For example, with the `short e'
+          format, pi is displayed as `3.14e+00'.
+
+    `long E'
+    `short E'
+          The same as `format long e' or `format short e' but always
+          display output with an uppercase `E' format.  For example,
+          with the `long E' format, pi is displayed as
+          `3.14159265358979E+00'.
+
+    `free'
+    `none'
+          Print output in free format, without trying to line up
+          columns of matrices on the decimal point.  This also causes
+          complex numbers to be formatted like this `(0.604194,
+          0.607088)' instead of like this `0.60419 + 0.60709i'.
+
+    `bank'
+          Print in a fixed format with two places to the right of the
+          decimal point.
+
+    `+'
+          Print a `+' symbol for nonzero matrix elements and a space
+          for zero matrix elements.  This format can be very useful for
+          examining the structure of a large matrix.
+
+    `hex'
+          Print the hexadecimal representation numbers as they are
+          stored in memory.  For example, on a workstation which stores
+          8 byte real values in IEEE format with the least significant
+          byte first, the value of `pi' when printed in `hex' format is
+          `400921fb54442d18'.  This format only works for numeric
+          values.
+
+    `bit'
+          Print the bit representation of numbers as stored in memory.
+          For example, the value of `pi' is
+
+               01000000000010010010000111111011
+               01010100010001000010110100011000
+
+          (shown here in two 32 bit sections for typesetting purposes)
+          when printed in bit format on a workstation which stores 8
+          byte real values in IEEE format with the least significant
+          byte first.  This format only works for numeric types.
+
+ - Built-in Variable: print_answer_id_name
+     If the value of `print_answer_id_name' is nonzero, variable names
+     are printed along with the result.  Otherwise, only the result
+     values are printed.  The default value is 1.
+
+
+File: octave.info,  Node: Terminal Input,  Next: Simple File I/O,  Prev: Terminal Output,  Up: Basic Input and Output
+
+Terminal Input
+--------------
+
+   Octave has three functions that make it easy to prompt users for
+input.  The `input' and `menu' functions are normally used for managing
+an interactive dialog with a user, and the `keyboard' function is
+normally used for doing simple debugging.
+
+ - Built-in Function:  input (PROMPT)
+ - Built-in Function:  input (PROMPT, "s")
+     Print a prompt and wait for user input.  For example,
+
+          input ("Pick a number, any number! ")
+
+     prints the prompt
+
+          Pick a number, any number!
+
+     and waits for the user to enter a value.  The string entered by
+     the user is evaluated as an expression, so it may be a literal
+     constant, a variable name, or any other valid expression.
+
+     Currently, `input' only returns one value, regardless of the number
+     of values produced by the evaluation of the expression.
+
+     If you are only interested in getting a literal string value, you
+     can call `input' with the character string `"s"' as the second
+     argument.  This tells Octave to return the string entered by the
+     user directly, without evaluating it first.
+
+     Because there may be output waiting to be displayed by the pager,
+     it is a good idea to always call `fflush (stdout)' before calling
+     `input'.  This will ensure that all pending output is written to
+     the screen before your prompt.  *Note Input and Output::.
+
+ - Function File:  menu (TITLE, OPT1, ...)
+     Print a title string followed by a series of options.  Each option
+     will be printed along with a number.  The return value is the
+     number of the option selected by the user.  This function is
+     useful for interactive programs.  There is no limit to the number
+     of options that may be passed in, but it may be confusing to
+     present more than will fit easily on one screen.
+
+ - Built-in Function:  keyboard (PROMPT)
+     This function is normally used for simple debugging.  When the
+     `keyboard' function is executed, Octave prints a prompt and waits
+     for user input.  The input strings are then evaluated and the
+     results are printed.  This makes it possible to examine the values
+     of variables within a function, and to assign new values to
+     variables.  No value is returned from the `keyboard' function, and
+     it continues to prompt for input until the user types `quit', or
+     `exit'.
+
+     If `keyboard' is invoked without any arguments, a default prompt of
+     `debug> ' is used.
+
+   For both `input' and `keyboard', the normal command line history and
+editing functions are available at the prompt.
+
+   Octave also has a function that makes it possible to get a single
+character from the keyboard without requiring the user to type a
+carriage return.
+
+ - Built-in Function:  kbhit ()
+     Read a single keystroke from the keyboard.  For example,
+
+          x = kbhit ();
+
+     will set X to the next character typed at the keyboard as soon as
+     it is typed.
+
+
+File: octave.info,  Node: Simple File I/O,  Prev: Terminal Input,  Up: Basic Input and Output
+
+Simple File I/O
+---------------
+
+   The `save' and `load' commands allow data to be written to and read
+from disk files in various formats.  The default format of files
+written by the `save' command can be controlled using the built-in
+variables `default_save_format' and `save_precision'.
+
+   Note that Octave can not yet save or load structure variables or any
+user-defined types.
+
+ - Command: save OPTIONS FILE V1 V2 ...
+     Save the named variables V1, V2, ... in the file FILE.  The
+     special filename `-' can be used to write the output to your
+     terminal.  If no variable names are listed, Octave saves all the
+     variables in the current scope.  Valid options for the `save'
+     command are listed in the following table.  Options that modify
+     the output format override the format specified by the built-in
+     variable `default_save_format'.
+
+    `-ascii'
+          Save the data in Octave's text data format.
+
+    `-binary'
+          Save the data in Octave's binary data format.
+
+    `-float-binary'
+          Save the data in Octave's binary data format but only using
+          single precision.  You should use this format only if you
+          know that all the values to be saved can be represented in
+          single precision.
+
+    `-mat-binary'
+          Save the data in MATLAB's binary data format.
+
+    `-save-builtins'
+          Force Octave to save the values of built-in variables too.
+          By default, Octave does not save built-in variables.
+
+     The list of variables to save may include wildcard patterns
+     containing the following special characters:
+    `?'
+          Match any single character.
+
+    `*'
+          Match zero or more characters.
+
+    `[ LIST ]'
+          Match the list of characters specified by LIST.  If the first
+          character is `!' or `^', match all characters except those
+          specified by LIST.  For example, the pattern `[a-zA-Z]' will
+          match all lower and upper case alphabetic characters.
+
+     Except when using the MATLAB binary data file format, saving global
+     variables also saves the global status of the variable, so that if
+     it is restored at a later time using `load', it will be restored
+     as a global variable.
+
+     The command
+
+          save -binary data a b*
+
+     saves the variable `a' and all variables beginning with `b' to the
+     file `data' in Octave's binary format.
+
+   There are two variables that modify the behavior of `save'.
+
+ - Built-in Variable: default_save_format
+     This variable specifies the default format for the `save' command.
+     It should have one of the following values: `"ascii"', `"binary"',
+     `float-binary', or `"mat-binary"'.  The initial default save
+     format is Octave's text format.
+
+ - Built-in Variable: save_precision
+     This variable specifies the number of digits to keep when saving
+     data in text format.  The default value is 17.
+
+ - Command: load OPTIONS FILE V1 V2 ...
+     Load the named variables from the file FILE.  As with `save', you
+     may specify a list of variables and `load' will only extract those
+     variables with names that match.  For example, to restore the
+     variables saved in the file `data', use the command
+
+          load data
+
+     Octave will refuse to overwrite existing variables unless you use
+     the option `-force'.
+
+     If a variable that is not marked as global is loaded from a file
+     when a global symbol with the same name already exists, it is
+     loaded in the global symbol table.  Also, if a variable is marked
+     as global in a file and a local symbol exists, the local symbol is
+     moved to the global symbol table and given the value from the
+     file.  Since it seems that both of these cases are likely to be
+     the result of some sort of error, they will generate warnings.
+
+     The `load' command can read data stored in Octave's text and
+     binary formats, and MATLAB's binary format.  It will automatically
+     detect the type of file and do conversion from different floating
+     point formats (currently only IEEE big and little endian, though
+     other formats may added in the future).
+
+     Valid options for `load' are listed in the following table.
+
+    `-force'
+          Force variables currently in memory to be overwritten by
+          variables with the same name found in the file.
+
+    `-ascii'
+          Force Octave to assume the file is in Octave's text format.
+
+    `-binary'
+          Force Octave to assume the file is in Octave's binary format.
+
+    `-mat-binary'
+          Force Octave to assume the file is in MATLAB's binary format.
+
+
+File: octave.info,  Node: C-Style I/O Functions,  Prev: Basic Input and Output,  Up: Input and Output
+
+C-Style I/O Functions
+=====================
+
+   Octave's C-style input and output functions provide most of the
+functionality of the C programming language's standard I/O library.  The
+argument lists for some of the input functions are slightly different,
+however, because Octave has no way of passing arguments by reference.
+
+   In the following, FILE refers to a file name and `fid' refers to an
+integer file number, as returned by `fopen'.
+
+   There are three files that are always available.  Although these
+files can be accessed using their corresponding numeric file ids, you
+should always use the symbolic names given in the table below, since it
+will make your programs easier to understand.
+
+ - Built-in Variable: stdin
+     The standard input stream (file id 0).  When Octave is used
+     interactively, this is filtered through the command line editing
+     functions.
+
+ - Built-in Variable: stdout
+     The standard output stream (file id 1).  Data written to the
+     standard output is normally filtered through the pager.
+
+ - Built-in Variable: stderr
+     The standard error stream (file id 2).  Even if paging is turned
+     on, the standard error is not sent to the pager.  It is useful for
+     error messages and prompts.
+
+* Menu:
+
+* Opening and Closing Files::
+* Simple Output::
+* Line-Oriented Input::
+* Formatted Output::
+* Output Conversion for Matrices::
+* Output Conversion Syntax::
+* Table of Output Conversions::
+* Integer Conversions::
+* Floating-Point Conversions::  Other Output Conversions::
+* Other Output Conversions::
+* Formatted Input::
+* Input Conversion Syntax::
+* Table of Input Conversions::
+* Numeric Input Conversions::
+* String Input Conversions::
+* Binary I/O::
+* Temporary Files::
+* EOF and Errors::
+* File Positioning::
+
+
+File: octave.info,  Node: Opening and Closing Files,  Next: Simple Output,  Prev: C-Style I/O Functions,  Up: C-Style I/O Functions
+
+Opening and Closing Files
+-------------------------
+
+ - Built-in Function: [FID, MSG] = fopen (NAME, MODE, ARCH)
+ - Built-in Function: FID_LIST = fopen ("all")
+ - Built-in Function: FILE = fopen (FID)
+     The first form of the `fopen' function opens the named file with
+     the specified mode (read-write, read-only, etc.) and architecture
+     interpretation (IEEE big endian, IEEE little endian, etc.), and
+     returns an integer value that may be used to refer to the file
+     later.  If an error occurs, FID is set to -1 and MSG contains the
+     corresponding system error message.  The MODE is a one or two
+     character string that specifies whether the file is to be opened
+     for reading, writing, or both.
+
+     The second form of the `fopen' function returns a vector of file
+     ids corresponding to all the currently open files, excluding the
+     `stdin', `stdout', and `stderr' streams.
+
+     The third form of the `fopen' function returns the name of a
+     currently open file given its file id.
+
+     For example,
+
+          myfile = fopen ("splat.dat", "r", "ieee-le");
+
+     opens the file `splat.dat' for reading.  If necessary, binary
+     numeric values will be read assuming they are stored in IEEE
+     format with the least significant bit first, and then converted to
+     the native representation.
+
+     Opening a file that is already open simply opens it again and
+     returns a separate file id.  It is not an error to open a file
+     several times, though writing to the same file through several
+     different file ids may produce unexpected results.
+
+     The possible values `mode' may have are
+
+    `r'
+          Open a file for reading.
+
+    `w'
+          Open a file for writing.  The previous contents are discared.
+
+    `a'
+          Open or create a file for writing at the end of the file.
+
+    `r+'
+          Open an existing file for reading and writing.
+
+    `w+'
+          Open a file for reading or writing.  The previous contents are
+          discarded.
+
+    `a+'
+          Open or create a file for reading or writing at the end of the
+          file.
+
+     The parameter ARCH is a string specifying the default data format
+     for the file.  Valid values for ARCH are:
+
+          `native' The format of the current machine (this is the
+          default).
+
+          `ieee-le' IEEE big endian format.
+
+          `ieee-be' IEEE little endian format.
+
+          `vaxd' VAX D floating format.
+
+          `vaxg' VAX G floating format.
+
+          `cray' Cray floating format.
+
+     however, conversions are currently only supported for `native'
+     `ieee-be', and `ieee-le' formats.
+
+ - Built-in Function:  fclose (FID)
+     Closes the specified file.  If an error is encountered while
+     trying to close the file, an error message is printed and `fclose'
+     returns 0.  Otherwise, it returns 1.
+
+
+File: octave.info,  Node: Simple Output,  Next: Line-Oriented Input,  Prev: Opening and Closing Files,  Up: C-Style I/O Functions
+
+Simple Output
+-------------
+
+ - Built-in Function:  fputs (FID, STRING)
+     Write a string to a file with no formatting.
+
+ - Built-in Function:  puts (STRING)
+     Write a string to the standard output with no formatting.
+
+
+File: octave.info,  Node: Line-Oriented Input,  Next: Formatted Output,  Prev: Simple Output,  Up: C-Style I/O Functions
+
+Line-Oriented Input
+-------------------
+
+ - Built-in Function:  fgetl (FID, LEN)
+     Read characters from a file, stopping at the first newline
+     character that is encountered or after LEN characters have been
+     read, and returning the characters as a string.  The newline is
+     not included in the returned value.
+
+     If LEN is omitted, `fgetl' reads until the next newline character.
+
+     If there are no more characters to read, `fgetl' returns -1.
+
+ - Built-in Function:  fgets (FID, LEN)
+     Read characters from a file, stopping at the first newline
+     character that is encountered or after LEN characters have been
+     read, and returning the characters as a string.  The newline is
+     included in the returned value.
+
+     If LEN is omitted, `fgets' reads until the next newline character.
+
+     If there are no more characters to read, `fgets' returns -1.
+
+
+File: octave.info,  Node: Formatted Output,  Next: Output Conversion for Matrices,  Prev: Line-Oriented Input,  Up: C-Style I/O Functions
+
+Formatted Output
+----------------
+
+   This section describes how to call `printf' and related functions.
+
+   The following functions are available for formatted output.  They are
+modelled after the C language functions of the same name, but they
+interpret the format template differently in order to improve the
+performance of printing vector and matrix values.
+
+ - Function File:  printf (TEMPLATE, ...)
+     The `printf' function prints the optional arguments under the
+     control of the template string TEMPLATE to the stream `stdout'.
+
+ - Built-in Function:  fprintf (FID, TEMPLATE, ...)
+     This function is just like `printf', except that the output is
+     written to the stream FID instead of `stdout'.
+
+ - Built-in Function:  sprintf (TEMPLATE, ...)
+     This is like `printf', except that the output is returned as a
+     string.  Unlike the C library function, which requires you to
+     provide a suitably sized string as an argument, Octave's `sprintf'
+     function returns the string, automatically sized to hold all of
+     the items converted.
+
+   The `printf' function can be used to print any number of arguments.
+The template string argument you supply in a call provides information
+not only about the number of additional arguments, but also about their
+types and what style should be used for printing them.
+
+   Ordinary characters in the template string are simply written to the
+output stream as-is, while "conversion specifications" introduced by a
+`%' character in the template cause subsequent arguments to be
+formatted and written to the output stream.  For example,
+
+     pct = 37;
+     filename = "foo.txt";
+     printf ("Processing of `%s' is %d%% finished.\nPlease be patient.\n",
+             filename, pct);
+
+produces output like
+
+     Processing of `foo.txt' is 37% finished.
+     Please be patient.
+
+   This example shows the use of the `%d' conversion to specify that a
+scalar argument should be printed in decimal notation, the `%s'
+conversion to specify printing of a string argument, and the `%%'
+conversion to print a literal `%' character.
+
+   There are also conversions for printing an integer argument as an
+unsigned value in octal, decimal, or hexadecimal radix (`%o', `%u', or
+`%x', respectively); or as a character value (`%c').
+
+   Floating-point numbers can be printed in normal, fixed-point notation
+using the `%f' conversion or in exponential notation using the `%e'
+conversion.  The `%g' conversion uses either `%e' or `%f' format,
+depending on what is more appropriate for the magnitude of the
+particular number.
+
+   You can control formatting more precisely by writing "modifiers"
+between the `%' and the character that indicates which conversion to
+apply.  These slightly alter the ordinary behavior of the conversion.
+For example, most conversion specifications permit you to specify a
+minimum field width and a flag indicating whether you want the result
+left- or right-justified within the field.
+
+   The specific flags and modifiers that are permitted and their
+interpretation vary depending on the particular conversion.  They're all
+described in more detail in the following sections.
+
+
+File: octave.info,  Node: Output Conversion for Matrices,  Next: Output Conversion Syntax,  Prev: Formatted Output,  Up: C-Style I/O Functions
+
+Output Conversion for Matrices
+------------------------------
+
+   When given a matrix value, Octave's formatted output functions cycle
+through the format template until all the values in the matrix have been
+printed.  For example,
+
+     printf ("%4.2f %10.2e %8.4g\n", hilb (3));
+     
+          -| 1.00   5.00e-01   0.3333
+          -| 0.50   3.33e-01     0.25
+          -| 0.33   2.50e-01      0.2
+
+   If more than one value is to be printed in a single call, the output
+functions do not return to the beginning of the format template when
+moving on from one value to the next.  This can lead to confusing output
+if the number of elements in the matrices are not exact multiples of the
+number of conversions in the format template.  For example,
+
+     printf ("%4.2f %10.2e %8.4g\n", [1, 2], [3, 4]);
+     
+          -| 1.00   2.00e+00        3
+          -| 4.00
+
+   If this is not what you want, use a series of calls instead of just
+one.
+
+
+File: octave.info,  Node: Output Conversion Syntax,  Next: Table of Output Conversions,  Prev: Output Conversion for Matrices,  Up: C-Style I/O Functions
+
+Output Conversion Syntax
+------------------------
+
+   This section provides details about the precise syntax of conversion
+specifications that can appear in a `printf' template string.
+
+   Characters in the template string that are not part of a conversion
+specification are printed as-is to the output stream.
+
+   The conversion specifications in a `printf' template string have the
+general form:
+
+     % FLAGS WIDTH [ . PRECISION ] TYPE CONVERSION
+
+   For example, in the conversion specifier `%-10.8ld', the `-' is a
+flag, `10' specifies the field width, the precision is `8', the letter
+`l' is a type modifier, and `d' specifies the conversion style.  (This
+particular type specifier says to print a numeric argument in decimal
+notation, with a minimum of 8 digits left-justified in a field at least
+10 characters wide.)
+
+   In more detail, output conversion specifications consist of an
+initial `%' character followed in sequence by:
+
+   * Zero or more "flag characters" that modify the normal behavior of
+     the conversion specification.
+
+   * An optional decimal integer specifying the "minimum field width".
+     If the normal conversion produces fewer characters than this, the
+     field is padded with spaces to the specified width.  This is a
+     *minimum* value; if the normal conversion produces more characters
+     than this, the field is *not* truncated.  Normally, the output is
+     right-justified within the field.
+
+     You can also specify a field width of `*'.  This means that the
+     next argument in the argument list (before the actual value to be
+     printed) is used as the field width.  The value is rounded to the
+     nearest integer.  If the value is negative, this means to set the
+     `-' flag (see below) and to use the absolute value as the field
+     width.
+
+   * An optional "precision" to specify the number of digits to be
+     written for the numeric conversions.  If the precision is
+     specified, it consists of a period (`.') followed optionally by a
+     decimal integer (which defaults to zero if omitted).
+
+     You can also specify a precision of `*'.  This means that the next
+     argument in the argument list (before the actual value to be
+     printed) is used as the precision.  The value must be an integer,
+     and is ignored if it is negative.
+
+   * An optional "type modifier character".  This character is ignored
+     by Octave's `printf' function, but is recognized to provide
+     compatibility with the C language `printf'.
+
+   * A character that specifies the conversion to be applied.
+
+   The exact options that are permitted and how they are interpreted
+vary between the different conversion specifiers.  See the descriptions
+of the individual conversions for information about the particular
+options that they use.
+
+
+File: octave.info,  Node: Table of Output Conversions,  Next: Integer Conversions,  Prev: Output Conversion Syntax,  Up: C-Style I/O Functions
+
+Table of Output Conversions
+---------------------------
+
+   Here is a table summarizing what all the different conversions do:
+
+`%d', `%i'
+     Print an integer as a signed decimal number.  *Note Integer
+     Conversions::, for details.  `%d' and `%i' are synonymous for
+     output, but are different when used with `scanf' for input (*note
+     Table of Input Conversions::.).
+
+`%o'
+     Print an integer as an unsigned octal number.  *Note Integer
+     Conversions::, for details.
+
+`%u'
+     Print an integer as an unsigned decimal number.  *Note Integer
+     Conversions::, for details.
+
+`%x', `%X'
+     Print an integer as an unsigned hexadecimal number.  `%x' uses
+     lower-case letters and `%X' uses upper-case.  *Note Integer
+     Conversions::, for details.
+
+`%f'
+     Print a floating-point number in normal (fixed-point) notation.
+     *Note Floating-Point Conversions::, for details.
+
+`%e', `%E'
+     Print a floating-point number in exponential notation.  `%e' uses
+     lower-case letters and `%E' uses upper-case.  *Note Floating-Point
+     Conversions::, for details.
+
+`%g', `%G'
+     Print a floating-point number in either normal (fixed-point) or
+     exponential notation, whichever is more appropriate for its
+     magnitude.  `%g' uses lower-case letters and `%G' uses upper-case.
+     *Note Floating-Point Conversions::, for details.
+
+`%c'
+     Print a single character.  *Note Other Output Conversions::.
+
+`%s'
+     Print a string.  *Note Other Output Conversions::.
+
+`%%'
+     Print a literal `%' character.  *Note Other Output Conversions::.
+
+   If the syntax of a conversion specification is invalid, unpredictable
+things will happen, so don't do this.  If there aren't enough function
+arguments provided to supply values for all the conversion
+specifications in the template string, or if the arguments are not of
+the correct types, the results are unpredictable.  If you supply more
+arguments than conversion specifications, the extra argument values are
+simply ignored; this is sometimes useful.
+
