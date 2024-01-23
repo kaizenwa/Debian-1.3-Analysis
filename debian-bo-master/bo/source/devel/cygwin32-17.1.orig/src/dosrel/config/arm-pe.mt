@@ -1,2 +1,0 @@
-DEMODIR=arm-pe
-

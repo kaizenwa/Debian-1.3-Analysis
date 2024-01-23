@@ -1,8 +1,0 @@
-"Trash*MenuButton*cursor:		hand2",
-"Trash*Command*cursor:			hand2",
-"Trash*SimpleMenu*cursor:		hand2",
-"Trash*Toggle*cursor:			hand2",
-"Trash*font:				-*-lucida-*-r-*-*-12-*",
-"Trash*List*font:			-*-lucidatypewriter-medium-r-*-*-14-*",
-"Trash*Text*font:			-*-lucidatypewriter-medium-r-*-*-14-*",
-"Trash*iconic:				True",

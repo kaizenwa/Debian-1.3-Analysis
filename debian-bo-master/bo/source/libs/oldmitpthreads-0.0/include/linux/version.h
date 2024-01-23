@@ -1,2 +1,0 @@
-#define UTS_RELEASE "2.0.27"
-#define LINUX_VERSION_CODE 131099

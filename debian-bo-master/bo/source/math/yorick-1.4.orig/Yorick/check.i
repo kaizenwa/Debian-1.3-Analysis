@@ -1,5 +1,0 @@
-
-
-#include "testp.i"
-
-quit

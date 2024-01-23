@@ -1,1 +1,0 @@
-DEMODIR=sh-coff-hms

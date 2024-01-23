@@ -1,1 +1,0 @@
-fprintf ("foo", "bar")

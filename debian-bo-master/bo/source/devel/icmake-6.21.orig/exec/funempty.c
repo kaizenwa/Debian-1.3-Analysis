@@ -1,3 +1,0 @@
-void fun_empty ()
-{
-}

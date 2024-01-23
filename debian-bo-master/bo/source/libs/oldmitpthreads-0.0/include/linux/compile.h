@@ -1,6 +1,0 @@
-#define UTS_VERSION "#2 Wed Dec 4 21:33:34 CST 1996"
-#define LINUX_COMPILE_TIME "21:33:34"
-#define LINUX_COMPILE_BY "root"
-#define LINUX_COMPILE_HOST "linux"
-#define LINUX_COMPILE_DOMAIN ""
-#define LINUX_COMPILER "gcc version 2.7.2.1"

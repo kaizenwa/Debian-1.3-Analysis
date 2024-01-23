@@ -1,4 +1,0 @@
-char *getprogramname()
-{
-  return "unknown";
-}

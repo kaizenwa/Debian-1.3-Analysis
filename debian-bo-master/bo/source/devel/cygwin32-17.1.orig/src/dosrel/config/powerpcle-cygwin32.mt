@@ -1,2 +1,0 @@
-DEMODIR=powerpcle-cygwin32
-

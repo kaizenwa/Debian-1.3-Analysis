@@ -1,1 +1,0 @@
-libswanted=m

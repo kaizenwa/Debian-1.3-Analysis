@@ -1,1 +1,0 @@
-../wcslib/fitshead.h

@@ -1,1 +1,0 @@
-../wcslib/wcs.h

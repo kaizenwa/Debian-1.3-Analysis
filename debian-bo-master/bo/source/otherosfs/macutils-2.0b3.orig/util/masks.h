@@ -1,4 +1,0 @@
-#define	NIBBLEMASK	0x0000000f
-#define	BYTEMASK	0x000000ff
-#define	WORDMASK	0x0000ffff
-

@@ -1,1 +1,0 @@
-DEMODIR=i386-aout
