@@ -362,6 +362,25 @@ start_kernel
     trap_init
     init_IRQ
     sched_init <-- Here
+
+1653: Calls init_bh for timer_bh.
+
+1654: Calls init_bh for tqueue_bh.
+
+1655: Calls init_bh for immediate_bh.
+```
+
+#### init\_bh (linux/include/linux/interrupt.h:44)
+
+```txt
+Control Flow:
+start_kernel
+    setup_arch
+    paging_init
+    trap_init
+    init_IRQ
+    sched_init
+        init_bh <-- Here
 ```
 
 #### time\_init (linux/arch/i386/kernel/time.c:456)
@@ -420,6 +439,47 @@ start_kernel
     parse_options
     init_modules
     console_init <-- Here
+
+1853: Calls tty_register_ldisc.
+
+1859-1864: Initializes the global tty_std_termios structure.
+
+1871: return con_init(kmem_start);
+```
+
+#### tty\_register\_ldisc (linux/drivers/char/tty\_io.c:199)
+
+```txt
+Control Flow:
+start_kernel
+    setup_arch
+    paging_init
+    trap_init
+    init_IRQ
+    sched_init
+    time_init
+    parse_options
+    init_modules
+    console_init
+        tty_register_ldisc <-- Here
+```
+
+#### con\_init (linux/drivers/char/console.c:1995)
+
+```txt
+Control Flow:
+start_kernel
+    setup_arch
+    paging_init
+    trap_init
+    init_IRQ
+    sched_init
+    time_init
+    parse_options
+    init_modules
+    console_init
+        tty_register_ldisc
+        con_init <-- Here
 ```
 
 #### pci\_init (linux/drivers/pci/pci.c:955)
@@ -437,6 +497,75 @@ start_kernel
     init_modules
     console_init
     pci_init <-- Here
+
+957: Calls pcibios_init.
+
+959: Calls pcibios_present.
+
+970: Calls pcibios_fixup.
+
+981: return mem_start;
+```
+
+#### pcibios\_init (linux/arch/i386/kernel/bios32.c:872)
+
+```txt
+Control Flow:
+start_kernel
+    setup_arch
+    paging_init
+    trap_init
+    init_IRQ
+    sched_init
+    time_init
+    parse_options
+    init_modules
+    console_init
+    pci_init
+        pcibios_init <-- Here
+```
+
+#### pcibios\_present (linux/arch/i386/kernel/bios32.c:755)
+
+```txt
+Control Flow:
+start_kernel
+    setup_arch
+    paging_init
+    trap_init
+    init_IRQ
+    sched_init
+    time_init
+    parse_options
+    init_modules
+    console_init
+    pci_init
+        pcibios_init
+        pcibios_present <-- Here
+
+757: return access_pci ? 1 : 0;
+```
+
+#### pcibios\_fixup (linux/arch/i386/kernel/bios32.c:865)
+
+```txt
+Control Flow:
+start_kernel
+    setup_arch
+    paging_init
+    trap_init
+    init_IRQ
+    sched_init
+    time_init
+    parse_options
+    init_modules
+    console_init
+    pci_init
+        pcibios_init
+        pcibios_present
+        pcibios_fixup <-- Here
+
+867: return mem_start;
 ```
 
 #### kmalloc\_init (linux/mm/kmalloc.c:204)
@@ -639,6 +768,161 @@ start_kernel
     mem_init
     buffer_init
     sock_init <-- Here
+
+1413: Calls init_netlink.
+
+1420: Calls netlink_attach.
+
+1428: Calls fwchain_init.
+
+1435: Calls proto_init.
+
+1442: Calls export_net_symbols.
+```
+
+#### init\_netlink (linux/net/netlink.c:231)
+
+```txt
+Control Flow:
+start_kernel
+    setup_arch
+    paging_init
+    trap_init
+    init_IRQ
+    sched_init
+    time_init
+    parse_options
+    init_modules
+    console_init
+    pci_init
+    kmalloc_init
+    sti
+    calibrate_delay
+    inode_init
+    file_table_init
+    name_cache_init
+    mem_init
+    buffer_init
+    sock_init
+        init_netlink <-- Here
+```
+
+#### netlink\_attach (linux/net/netlink.c:192)
+
+```txt
+Control Flow:
+start_kernel
+    setup_arch
+    paging_init
+    trap_init
+    init_IRQ
+    sched_init
+    time_init
+    parse_options
+    init_modules
+    console_init
+    pci_init
+    kmalloc_init
+    sti
+    calibrate_delay
+    inode_init
+    file_table_init
+    name_cache_init
+    mem_init
+    buffer_init
+    sock_init
+        init_netlink
+        netlink_attach <-- Here
+```
+
+#### fwchain\_init (linux/net/core/firewall.c:159)
+
+```txt
+Control Flow:
+start_kernel
+    setup_arch
+    paging_init
+    trap_init
+    init_IRQ
+    sched_init
+    time_init
+    parse_options
+    init_modules
+    console_init
+    pci_init
+    kmalloc_init
+    sti
+    calibrate_delay
+    inode_init
+    file_table_init
+    name_cache_init
+    mem_init
+    buffer_init
+    sock_init
+        init_netlink
+        netlink_attach
+        fwchain_init <-- Here
+```
+
+#### proto\_init (linux/net/socket.c:1380)
+
+```txt
+Control Flow:
+start_kernel
+    setup_arch
+    paging_init
+    trap_init
+    init_IRQ
+    sched_init
+    time_init
+    parse_options
+    init_modules
+    console_init
+    pci_init
+    kmalloc_init
+    sti
+    calibrate_delay
+    inode_init
+    file_table_init
+    name_cache_init
+    mem_init
+    buffer_init
+    sock_init
+        init_netlink
+        netlink_attach
+        fwchain_init
+        proto_init <-- Here
+```
+
+#### export\_net\_symbols (linux/net/netsyms.c:190)
+
+```txt
+Control Flow:
+start_kernel
+    setup_arch
+    paging_init
+    trap_init
+    init_IRQ
+    sched_init
+    time_init
+    parse_options
+    init_modules
+    console_init
+    pci_init
+    kmalloc_init
+    sti
+    calibrate_delay
+    inode_init
+    file_table_init
+    name_cache_init
+    mem_init
+    buffer_init
+    sock_init
+        init_netlink
+        netlink_attach
+        fwchain_init
+        proto_init
+        export_net_symbols <-- Here
 ```
 
 #### dquot\_init (linux/fs/dquot.c:905)
@@ -753,6 +1037,10 @@ start_kernel
     arch_syms_export
     check_bugs
     smp_init <-- Here
+
+715: Calls smp_boot_cpus.
+
+...
 ```
 
 #### sysctl\_init (linux/kernel/sysctl.c:167)
@@ -784,6 +1072,40 @@ start_kernel
     check_bugs
     smp_init
     sysctl_init <-- Here
+
+170: Calls register_proc_table.
+```
+
+#### register\_proc\_table (linux/kernel/sysctl.c:396)
+
+```txt
+Control Flow:
+start_kernel
+    setup_arch
+    paging_init
+    trap_init
+    init_IRQ
+    sched_init
+    time_init
+    parse_options
+    init_modules
+    console_init
+    pci_init
+    kmalloc_init
+    sti
+    calibrate_delay
+    inode_init
+    file_table_init
+    name_cache_init
+    mem_init
+    buffer_init
+    sock_init
+    dqout_init
+    arch_syms_export
+    check_bugs
+    smp_init
+    sysctl_init
+        register_proc_table <-- Here
 ```
 
 #### kernel\_thread (linux/include/asm-i386/unistd.h:299)
@@ -816,6 +1138,84 @@ start_kernel
     smp_init
     sysctl_init
     kernel_thread <-- Here
+```
+
+#### init (linux/init/main.c:913)
+
+```txt
+Control Flow:
+init <-- Here
+
+921: Calls kernel_thread to create the bdflush daemon.
+
+923: Calls kernel_thread to create the kswapd daemon.
+
+931: Calls sys_setup.
+
+939: Calls smp_begin.
+
+980: Calls open on "/dev/tty1".
+
+984-985: Calls sys_dup to create STDOUT and STDERR.
+
+988-991: Calls execve at multiple file locations to create
+         the init process. We assume this always succeeds.
+```
+
+#### sys\_setup (linux/fs/filesystems.c:33)
+
+```txt
+Control Flow:
+init
+    sys_setup <-- Here
+```
+
+#### smp\_begin (linux/init/main.c:756)
+
+```txt
+Control Flow:
+init
+    sys_setup
+    smp_begin <-- Here
+
+758: Assigns one to global variable smp_threads_ready.
+
+759: Calls smp_commence.
+```
+
+#### smp\_commence (linu/arch/i386/kernel/smp.c:527)
+
+```txt
+Control Flow:
+init
+    sys_setup
+    smp_begin
+        smp_commence <-- Here
+
+532: Assigns one to the global variable smp_commenced.
+```
+
+#### sys\_dup (linux/fs/fcntl.c:50)
+
+```txt
+Control Flow:
+init
+    sys_setup
+    smp_begin
+    sys_dup <-- Here
+
+52: return dupfd(fildes,0);
+```
+
+#### dupfd (linux/fs/fcntl.c:20)
+
+```txt
+Control Flow:
+init
+    sys_setup
+    smp_begin
+    sys_dup
+        dupfd <-- Here
 ```
 
 #### cpu\_idle (linux/arch/i386/kernel/process.c:146)
