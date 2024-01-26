@@ -1168,6 +1168,245 @@ init <-- Here
 Control Flow:
 init
     sys_setup <-- Here
+
+39: Assigns zero to local static variable callable.
+
+41: Calls device_setup.
+
+42: Calls binfmt_setup.
+
+50: Calls init_ext2_fs.
+
+82: Calls init_nfs_fs.
+
+113: Calls mount_root.
+
+114: Returns zero.
+```
+
+#### device\_setup (linux/drivers/block/genhd.c:723)
+
+```txt
+Control Flow:
+init
+    sys_setup
+        device_setup <-- Here
+
+738: Calls chr_dev_init.
+
+739: Calls blk_dev_init.
+
+740: Calls sti.
+
+742: Calls scsi_dev_init.
+
+745: Calls net_dev_init.
+
+747: Calls console_map_init.
+
+750: Calls setup_dev.
+```
+
+#### chr\_dev\_init (linux/drivers/char/mem.c:387)
+
+```txt
+Control Flow:
+init
+    sys_setup
+        device_setup
+            chr_dev_init <-- Here
+```
+
+#### blk\_dev\_init (linux/drivers/block/ll\_rw\_blk.c:610)
+
+```txt
+Control Flow:
+init
+    sys_setup
+        device_setup
+            chr_dev_init
+            blk_dev_init <-- Here
+```
+
+#### scsi\_dev\_init (linux/drivers/scsi/scsi.c:2561)
+
+```txt
+Control Flow:
+init
+    sys_setup
+        device_setup
+            chr_dev_init
+            blk_dev_init
+            scsi_dev_init <-- Here
+```
+
+#### net\_dev\_init (linux/net/core/dev.c:1492)
+
+```txt
+Control Flow:
+init
+    sys_setup
+        device_setup
+            chr_dev_init
+            blk_dev_init
+            scsi_dev_init
+            net_dev_init <-- Here
+```
+
+#### console\_map\_init (linux/drivers/char/consolemap.c:479)
+
+```txt
+Control Flow:
+init
+    sys_setup
+        device_setup
+            chr_dev_init
+            blk_dev_init
+            scsi_dev_init
+            net_dev_init
+            console_map_init <-- Here
+```
+
+#### setup\_dev (linux/drivers/block/genhd.c:750)
+
+```txt
+Control Flow:
+init
+    sys_setup
+        device_setup
+            chr_dev_init
+            blk_dev_init
+            scsi_dev_init
+            net_dev_init
+            console_map_init
+            setup_dev <-- Here
+```
+
+#### binfmt\_setup (linux/fs/exec.c:64)
+
+```txt
+Control Flow:
+init
+    sys_setup
+        device_setup
+        binfmt_setup <-- Here
+
+67: Calls init_elf_binfmt.
+
+78: Calls init_script_binfmt.
+```
+
+#### init\_elf\_binfmt (linux/fs/binfmt\_elf.c:1266)
+
+```txt
+Control Flow:
+init
+    sys_setup
+        device_setup
+        binfmt_setup
+            init_elf_binfmt <-- Here
+
+1268: return register_binfmt(&elf_format);
+```
+
+#### register\_binfmt (linux/fs/exec.c:81)
+
+```txt
+Control Flow:
+init
+    sys_setup
+        device_setup
+        binfmt_setup
+            init_elf_binfmt
+                register_binfmt <-- Here
+```
+
+#### init\_script\_binfmt (linux/fs/binfmt\_script.c:106)
+
+```txt
+Control Flow:
+init
+    sys_setup
+        device_setup
+        binfmt_setup
+            init_elf_binfmt
+            init_script_binfmt <-- Here
+
+107: return register_binfmt(&script_format);
+```
+
+#### init\_ext2\_fs (fs/ext2/super.c:686)
+
+```txt
+Control Flow:
+init
+    sys_setup
+        device_setup
+        binfmt_setup
+        init_ext2_fs <-- Here
+
+688: return register_filesystem(&ext2_fs_type);
+```
+
+#### register\_filesystem (linux/fs/super.c:156)
+
+```txt
+Control Flow:
+init
+    sys_setup
+        device_setup
+        binfmt_setup
+        init_ext2_fs
+            register_filesystem <-- Here
+```
+
+#### init\_nfs\_fs (linux/fs/nfs/inode.c:352)
+
+```txt
+Control Flow:
+init
+    sys_setup
+        device_setup
+        binfmt_setup
+        init_ext2_fs
+        init_nfs_fs <-- Here
+
+355-358: Calls kernel_thread to create four run_nfsiod threads.
+
+359: return register_filesystem(&nfs_fs_type);
+```
+
+#### mount\_root (linux/fs/super.c:1031)
+
+```txt
+Control Flow:
+init
+    sys_setup
+        device_setup
+        binfmt_setup
+        init_ext2_fs
+        init_nfs_fs
+        mount_root <-- Here
+
+1033: Calls memset to bzero the global super_blocks array.
+
+1034: Calls do_mount_root.
+
+114: Returns zero.
+```
+
+#### do\_mount\_root (linux/fs/super.c:922)
+
+```txt
+Control Flow:
+init
+    sys_setup
+        device_setup
+        binfmt_setup
+        init_ext2_fs
+        init_nfs_fs
+        mount_root
+            do_mount_root <-- Here
 ```
 
 #### smp\_begin (linux/init/main.c:756)
