@@ -18,6 +18,8 @@
 Control Flow:
 main <-- Here
 
+279: Calls setlocale.
+
 281: Calls catopen.
 
 287: Assigns the first program argument to the global
@@ -35,11 +37,20 @@ main <-- Here
 378: Calls exit(0).
 ```
 
-#### catopen (libc4-4.6.27/nls/msgcat.c:118)
+#### setlocale (libc-5.4.33/locale/setlocale.c:228)
 
 ```txt
 Control Flow:
 main
+    setlocale <-- Here
+```
+
+#### catopen (libc4-4.6.27/nls/msgcat.c:128)
+
+```txt
+Control Flow:
+main
+    setlocale
     catopen <-- Here
 ```
 
@@ -48,6 +59,7 @@ main
 ```txt
 Control Flow:
 main
+    setlocale
     catopen
     setfilename <-- Here
 
@@ -63,6 +75,7 @@ main
 ```txt
 Control Flow:
 main
+    setlocale
     catopen
     setfilename
         fopen
@@ -77,6 +90,7 @@ main
 ```txt
 Control Flow:
 main
+    setlocale
     catopen
     setfilename
         fopen
@@ -90,6 +104,7 @@ main
 ```txt
 Control Flow:
 main
+    setlocale
     catopen
     setfilename
     NLS_CATCLOSE <-- Here
@@ -97,11 +112,12 @@ main
 37: #  define NLS_CATCLOSE(catfd) catclose (catfd);
 ```
 
-#### catclose (libc4-4.6.27/nls/msgcat.c:315)
+#### catclose (libc-5.4.33/nls/msgcat.c:340)
 
 ```txt
 Control Flow:
 main
+    setlocale
     catopen
     setfilename
     NLS_CATCLOSE
