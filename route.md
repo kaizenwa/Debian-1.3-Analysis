@@ -235,4 +235,30 @@ main
                 socki_lookup
                 ip_rt_ioctl
                     ip_rt_new <-- Here
+
+1552: Calls getname.
+
+1555: Calls dev_get.
+
+1556: Calls putname.
+
+1647: Calls rt_add.
+
+1648: Returns zero.
+```
+
+#### dev\_get (linux/net/core/dev.c:208)
+
+```txt
+Control Flow:
+main
+    sys_socket
+    rt_add
+        resolve
+        sys_ioctl
+            sock_ioctl
+                socki_lookup
+                ip_rt_ioctl
+                    ip_rt_new
+                        dev_get <-- Here
 ```
