@@ -56,7 +56,7 @@ main
            ret
 ```
 
-#### SYSCALL\_\_ (libc-5.4.33/sysdeps/linux/
+#### SYSCALL\_\_ (libc-5.4.33/sysdeps/linux/sysdep.h:40)
 
 ```txt
 Control Flow:
