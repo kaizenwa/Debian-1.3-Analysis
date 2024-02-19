@@ -8,8 +8,13 @@
 Control Flow:
 sys_socketcall <-- Here
 
-854: Routes the system call to the appropriate case via the
-     call argument.
+1248: Calls verify_area.
+
+1256-1326: Routes the system call to the appropriate case via the
+           call argument.
+
+1261-1262: return(sys_bind(a0,(struct sockaddr *)a1,
+                   get_user(args+2)));
 ```
 
 #### verify\_area (linux/mm/memory.c:677)
@@ -18,94 +23,188 @@ sys_socketcall <-- Here
 Control Flow:
 sys_socketcall
     verify_area <-- Here
-
-16-19: Returns -EFAULT if the addr or addr+size is greater
-       than TASK_SIZE, which is equal to 3GiB.
-
-20-21: Returns 0 here if we are verifying a read operation
-       or if the architecture supports write protection.
-
-22: Verifies the area manually for write operations on
-    architectures that do NOT support write protection.
 ```
 
-#### sock\_bind (linux/net/socket.c:537)
+#### sys\_bind (linux/net/socket.c:668)
 
 ```txt
 Control Flow:
 sys_socketcall
     verify_area
-    sock_bind <-- Here
+    sys_bind <-- Here
 
-545: Obtains a pointer to the socket from the fd argument.
+678: Calls sockfd_lookup.
 
-546: Calls the socket's bind method and returns its retval
-     if it was unsuccessful.
+681: Calls move_addr_to_kernel.
 
-550: Returns 0 on success.
+684: Calls the socket's bind method.
+
+688: Returns zero.
 ```
 
-#### sockfd\_lookup (linux/net/socket.c:157)
+#### sockfd\_lookup (linux/net/socket.c:219)
 
 ```txt
 Control Flow:
 sys_socketcall
     verify_area
-    sock_bind
+    sys_bind
         sockfd_lookup <-- Here
 
-161: Returns NULL if the file descriptor is invalid.
-     Assigns the file structure indexed by fd argument
-     to the stack allocated file argument.
+227: Assigns the file structure's inode to the local
+     variable inode.
 
-162: Points the pass-through return variable to stack
-     allocated file structure.
-
-163: Calls socki_lookup and returns its retval.
+234: return socki_lookup(inode);
 ```
 
-#### socki\_lookup (linux/net/socket.c:138)
+#### socki\_lookup (linux/net/socket.c:210)
 
 ```txt
 Control Flow:
 sys_socketcall
     verify_area
-    sock_bind
+    sys_bind
         sockfd_lookup
             socki_lookup <-- Here
 
-142-144: Returns the socket obtained from the inode if the
-         socket is not marked free and points to the inode.
-
-147-151: Manually searches the sockets array to find the
-         socket that points to the inode.
-
-152: Returns NULL if there are no sockets that point to
-     the inode.
+212: return &inode->u.socket_i;
 ```
 
-#### inet\_bind (linux/net/inet/sock.c:1013)
+#### move\_addr\_to\_kernel (linux/net/socket.c:132)
 
 ```txt
 Control Flow:
 sys_socketcall
     verify_area
-    sock_bind
+    sys_bind
         sockfd_lookup
-        inet_bind <-- (inet socket case)
+        move_addr_to_kernel <-- Here
 
+139: Calls verify_area.
 
+141: Calls memcpy_fromfs.
+
+142: Returns zero.
 ```
 
-#### unix\_proto\_bind (linux/net/unix/sock.c:381)
+#### inet\_bind (linux/net/ipv4/af\_inet.c:598)
 
 ```txt
 Control Flow:
 sys_socketcall
     verify_area
-    sock_bind
+    sys_bind
         sockfd_lookup
-        unix_proto_bind <-- (unix socket case)
+        move_addr_to_kernel
+        inet_bind <-- Here
 
+621-622: Calls the inet socket protocol's good_socknum
+         method.
 
+626: Calls ip_chk_addr.
+
+649: Calls the inet socket protocol's verify_bind
+     method.
+
+656: Calls the inet socket protocol's rehash
+     method.
+
+657: Calls add_to_prot_sklist.
+
+659: Calls ip_rt_put.
+
+661: Returns zero.
+```
+
+#### udp\_good\_socknum (linux/net/ipv4/udp.c:162)
+
+```txt
+Control Flow:
+sys_socketcall
+    verify_area
+    sys_bind
+        sockfd_lookup
+        move_addr_to_kernel
+        inet_bind
+            udp_good_socknum <-- Here
+```
+
+#### ip\_chk\_addr (linux/net/ipv4/devinet.c:78)
+
+```txt
+Control Flow:
+sys_socketcall
+    verify_area
+    sys_bind
+        sockfd_lookup
+        move_addr_to_kernel
+        inet_bind
+            udp_good_socknum
+            ip_chk_addr <-- Here
+```
+
+#### udp\_v4\_verify\_bind (linux/net/ipv4/udp.c:123)
+
+```txt
+Control Flow:
+sys_socketcall
+    verify_area
+    sys_bind
+        sockfd_lookup
+        move_addr_to_kernel
+        inet_bind
+            udp_good_socknum
+            ip_chk_addr
+            udp_v4_verify_bind <-- Here
+```
+
+#### udp\_v4\_rehash (linux/net/ipv4/udp.c:232)
+
+```txt
+Control Flow:
+sys_socketcall
+    verify_area
+    sys_bind
+        sockfd_lookup
+        move_addr_to_kernel
+        inet_bind
+            udp_good_socknum
+            ip_chk_addr
+            udp_v4_verify_bind
+            udp_v4_rehash <-- Here
+```
+
+#### add\_to\_prot\_sklist (linux/include/net/sock.h:431)
+
+```txt
+Control Flow:
+sys_socketcall
+    verify_area
+    sys_bind
+        sockfd_lookup
+        move_addr_to_kernel
+        inet_bind
+            udp_good_socknum
+            ip_chk_addr
+            udp_v4_verify_bind
+            udp_v4_rehash
+            add_to_prot_sklist <-- Here
+```
+
+#### ip\_rt\_put (linux/include/net/route.h:123)
+
+```txt
+Control Flow:
+sys_socketcall
+    verify_area
+    sys_bind
+        sockfd_lookup
+        move_addr_to_kernel
+        inet_bind
+            udp_good_socknum
+            ip_chk_addr
+            udp_v4_verify_bind
+            udp_v4_rehash
+            add_to_prot_sklist
+            ip_rt_put <-- Here
 ```
