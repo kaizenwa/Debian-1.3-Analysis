@@ -8,259 +8,296 @@
 Control Flow:
 sys_socketcall <-- Here
 
-854: Routes the system call to the appropriate case via the
-     call argument.
+1248: Calls verify_area.
+
+1256-1326: Routes the system call to the appropriate case via the
+           call argument.
+
+1259: return(sys_socket(a0,a1,get_user(args+2)));
 ```
 
-#### verify\_area (linux/include/linux/mm.h:14)
+#### verify\_area (linux/mm/memory.c:677)
 
 ```txt
 Control Flow:
 sys_socketcall
     verify_area <-- Here
-
-16-19: Returns -EFAULT if the addr or addr+size is greater
-       than TASK_SIZE, which is equal to 3GiB.
-
-20-21: Returns 0 here if we are verifying a read operation
-       or if the architecture supports write protection.
-
-22: Verifies the area manually for write operations on
-    architectures that do NOT support write protection.
 ```
 
-#### sock\_socket (linux/net/socket.c:428)
+#### sys\_socket (linux/net/socket.c:529)
 
 ```txt
 Control Flow:
 sys_socketcall
     verify_area
-    sock_socket <-- Here
+    sys_socket <-- Here
 
-447: Assigns the protocol ops structure to the ops
-     argument.
+536: Calls find_protocol_family.
 
-464-467: Allocates a socket structure and assigns it to
-         the sock argument.
+554: Assigns the appropriate entry of the static array pops to
+     the local variable ops.
 
-468-469: Assigns the socket's type and protocol
-         ops.
+     NOTE: pops is defined on line 119 of this source file.
 
-         inet sockets -> inet_proto_ops (linux/net/inet/sock.c:1828)
+573: Calls sock_alloc.
 
-         unix sockets -> unix_proto_ops (linux/net/unix/sock.c:902)
+582: Calls the socket's create method.
 
-470: Invokes the socket's create method to create the
-     underlying specific socket type (unix or inet).
+588: Calls get_fd.
 
-475: Calls get_fd to find and assign a file descriptor
-     to the socket.
+594: Assigns the socket's file structure to the sock->file field.
+
+595: Returns local variable fd.
 ```
 
-#### sock\_alloc (linux/net/socket.c:168)
+#### find\_protocol\_family (linux/net/socket.c:516)
 
 ```txt
 Control Flow:
 sys_socketcall
     verify_area
-    sock_socket
+    sys_socket
+        find_protocol_family <-- Here
+
+519-525: Searches the static array pops for an entry
+         with a family field that matches the family
+         argument.
+
+526: Returns negative one if we could not find a
+     matching entry.
+```
+
+
+#### sock\_alloc (linux/net/socket.c:241)
+
+```txt
+Control Flow:
+sys_socketcall
+    verify_area
+    sys_socket
+        find_protocol_family
         sock_alloc <-- Here
 
-173: Disables interrupts.
+246: Calls get_empty_inode.
 
-174-206: Iterates through the socket array to obtain
-         the first unused socket structure.
+250-253: Initializes the inode.
 
-175-182: Enables interrupts and initializes the socket's
-         fields to 0.
+255-267: Initializes the inode's socket field.
 
-191: Assigns an inode structure to the socket by calling
-     get_empty_inode.
-
-196-199: Initializes the inode's fields.
-
-201: Initializes the socket's waitqueue.
-
-205: Returns the socket on success.
-
-208: Enables interrupts if the for loop fails to find
-     an unused socket.
-
-211: Sleeps on &socket_wait_free to wait for an unused
-     socket.
-
-212-215: Returns NULL if the process' sleep was
-         interrupted by a signal.
+268: Returns the local variable sock.
 ```
 
-#### get\_empty\_inode (linux/fs/inode.c:343)
+#### get\_empty\_inode (linux/fs/inode.c:480)
 
 ```txt
 Control Flow:
 sys_socketcall
     verify_area
-    sock_socket
+    sys_socket
+        find_protocol_family
         sock_alloc
             get_empty_inode <-- Here
-
-348-349: Calls grow_inodes if there are twice as many inodes
-         in use as there are inodes available for use.
-
-351-352: Initializes inode to first_inode and best to NULL.
-
-353-362: Iterates through the inode list and finds the first
-         clean unused inode.
-
-363-367: Calls grow_inodes and loops back to repeat if we
-         were unable to find an clean unused inode.
-
-384: Bzeroes the inode with the clear_inode function.
-
-385-386: Initializes the inode's refcount, link count, and
-         semaphore count to one.
-
-388: Decrements nr_free_inodes.
-
-393: Returns the inode.
 ```
 
-#### clear\_inode (linux/fs/inode.c:147)
-
-```
-Control Flow:
-sys_socketcall
-    verify_area
-    sock_socket
-        sock_alloc
-            get_empty_inode
-                clear_inode <-- Here
-
-152-153: Removes the inode from the inode hashlist and
-         free list.
-
-155-156: Increments nr_free_inodes if the inode we are
-         clearing has a nonzero refcount.
-
-157: Bzeroes the inode structure.
-
-159: Inserts the inode into the free list.
-```
-
-#### inet\_create (linux/net/inet/sock.c:755)
+#### inet\_create (linux/net/ipv4/af\_inet.c:411)
 
 ```txt
 Control Flow:
 sys_socketcall
     verify_area
-    sock_socket
+    sys_socket
+        find_protocol_family
         sock_alloc
-        inet_create <-- Here (remote IPC case)
+        inet_create <-- Here
 
-761: Allocates a sock structure and assigns it to
-     sk argument.
+416: Calls sk_alloc.
 
-764-765: Initializes the inet socket structure's num and
-         reuse field.
+429: Assigns TCP_NO_CHECK to sk->no_check.
 
-766: Switches on the inet socket's type. We will only
-     consider datagram sockets in these notes.
+430: Assigns tcp_prot to local variable prot.
 
-783: Sets protocol to IPROTO_UDP.
+     NOTE: tcp_prot is defined on lines 2370-2401
+           of linux/net/ipv4/tcp.c.
 
-785: Assigns &udp_prot (linux/net/inet/udp.c:616) to the prot
-     argument.
+435: Assigns UDP_NO_CHECK to sk->no_check.
 
-827-923: Initializes the inet socket's fields.
+436: Assigns udp_prot to local variable prot.
 
-925-934: sk->num is 0 for the DGRAM case, so we ignore
-         this if statement.
+     NOTE: udp_prot is defined on lines 1093-1124
+           of linux/net/ipv4/udp.c.
 
-936-942: udp_prot does not have an init method so we
-         ignore this if statement.
+450: Assigns the sock argument to sk->socket.
 
-943: Returns 0 on success.
+454-517: Initialize the sk structure.
+
+480: Assigns sk to sock->data.
+
+519-520: Calls the inet socket's protocol init method.
+
+         NOTE: This method is NULL for TCP and UDP.
+
+526: Returns zero.
 ```
 
-#### unix\_proto\_create (linux/net/unix/sock.c:311)
+#### get\_fd (linux/net/socket.c:172)
 
 ```txt
 Control Flow:
 sys_socketcall
     verify_area
-    sock_socket
-        sock_alloc
-        unix_proto_create <-- Here (local IPC case)
-
-320: Assigns a unix_proto_data structure to the unix socket.
-
-324: Allocates and assigns a buffer to the unix_proto_data
-     structure.
-
-329-330: Assigns a protocol and socket to the unix_proto_data
-         structure.
-
-331: Assigns the unix_proto_data structure to the unix socket's
-     data field.
-
-332-334: Initializes the unix_proto_data structure's refcount
-         to 1 and returns 0.
-```
-
-#### unix\_data\_alloc (linux/net/unix/sock.c:251)
-
-```txt
-Control Flow:
-sys_socketcall
-    verify_area
-    sock_socket
-        sock_alloc
-        unix_proto_create
-            unix_data_alloc <-- Here
-
-255: Disables interrupts.
-
-256-269: Iterates through the unix_datas array (linux/net/unix/sock.c:55)
-         and finds the first unused entry.
-
-259: Enables interrupts inside the for loop.
-
-260-267: Initializes the unix_proto_data structure fields to 0
-         and returns it.
-
-270-271: Enables interrupts if there are no free
-         unix_proto_data structures and returns NULL.
-```
-
-#### get\_fd (linux/net/socket.c:98)
-
-```txt
-Control Flow:
-sys_socketcall
-    verify_area
-    sock_socket
+    sys_socket
+        find_protocol_family
         sock_alloc
         inet_create
         get_fd <-- Here
 
-104: Calls get_empty_filp to obtain a pointer to an
-     empty file structure.
+180: Calls get_unused_fd.
 
-106-107: Iterates through the process' file descriptor table
-         to find the first unused descriptor.
+182: Calls get_empty_filp.
 
-108-110: Returns -1 if the process has no free file descriptors.
+189: Inserts the empty file structure into the appropriate
+     entry of the files structure.
 
-112: Clears the file's close_on_exec flag.
+190-197: Initializes the file structure.
 
-113: Assigns the file structure to the file descriptor.
+195-196: Increments the inode argument's i_count field.
 
-114: Assigns &socket_file_ops (linux/net/socket.c:60) as the file's
-     operation structure.
+199: Returns local variable fd.
+```
 
-115-118: Initializes the file's fields.
+#### get\_unused\_fd (linux/fs/open.c:555)
 
-119: Increments the inode's refcount.
+```txt
+Control Flow:
+sys_socketcall
+    verify_area
+    sys_socket
+        find_protocol_family
+        sock_alloc
+        inet_create
+        get_fd
+            get_unused_fd <-- Here
 
-120-121: Initializes the file offset to 0 and returns the
-         file descriptor.
+560: Calls find_first_zero_bit on the files structure's
+     open_fds bitmap.
+
+562: Calls FD_SET on the files structure's open_fds bitmap.
+
+563: Calls FD_CLR on the files structure's close_on_exec
+     bitmap.
+
+564: Returns local variable fd.
+
+566: Returns -EMFILE if we could not obtain an empty
+     file descriptor.
+```
+
+#### find\_first\_zero\_bit (linux/include/asm-i386/bitops.h:75)
+
+```txt
+Control Flow:
+sys_socketcall
+    verify_area
+    sys_socket
+        find_protocol_family
+        sock_alloc
+        inet_create
+        get_fd
+            get_unused_fd
+                find_first_zero_bit <-- Here
+```
+
+#### FD\_SET (linux/include/linux/time.h:30)
+
+```txt
+Control Flow:
+sys_socketcall
+    verify_area
+    sys_socket
+        find_protocol_family
+        sock_alloc
+        inet_create
+        get_fd
+            get_unused_fd
+                find_first_zero_bit
+                    FD_SET <-- Here
+
+30: #define FD_SET(fd,fdsetp)	__FD_SET(fd,fdsetp)
+```
+
+#### \_\_FD\_SET (linux/include/asm-i386/posix\_types.h:39)
+
+```txt
+Control Flow:
+sys_socketcall
+    verify_area
+    sys_socket
+        find_protocol_family
+        sock_alloc
+        inet_create
+        get_fd
+            get_unused_fd
+                find_first_zero_bit
+                    FD_SET
+                        __FD_SET <-- Here
+
+39-41: #define __FD_SET(fd,fdsetp) \
+               __asm__ __volatile__("btsl %1,%0": \
+                   "=m" (*(__kernel_fd_set *) (fdsetp)):"r" ((int) (fd)))
+```
+
+#### FD\_CLR (linux/include/linux/time.h:31)
+
+```txt
+Control Flow:
+sys_socketcall
+    verify_area
+    sys_socket
+        find_protocol_family
+        sock_alloc
+        inet_create
+        get_fd
+            get_unused_fd
+                find_first_zero_bit
+                    FD_SET
+                    FD_CLR <-- Here
+
+31: #define FD_CLR(fd,fdsetp)	__FD_CLR(fd,fdsetp)
+```
+
+#### \_\_FD\_CLR (linux/include/asm-i386/posix\_types.h:44)
+
+```txt
+Control Flow:
+sys_socketcall
+    verify_area
+    sys_socket
+        find_protocol_family
+        sock_alloc
+        inet_create
+        get_fd
+            get_unused_fd
+                find_first_zero_bit
+                    FD_SET
+                    FD_CLR
+                        __FD_CLR <-- Here
+
+44-46: #define __FD_CLR(fd,fdsetp) \
+               __asm__ __volatile__("btrl %1,%0": \
+                   "=m" (*(__kernel_fd_set *) (fdsetp)):"r" ((int) (fd)))
+```
+
+#### get\_empty\_filp (linux/fs/file\_table.c:113)
+
+```txt
+Control Flow:
+sys_socketcall
+    verify_area
+    sys_socket
+        find_protocol_family
+        sock_alloc
+        inet_create
+        get_fd
+            get_unused_fd
+            get_empty_filp <-- Here
 ```

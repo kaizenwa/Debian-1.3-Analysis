@@ -10,7 +10,7 @@ sys_read <-- Here
 
 111: Calls fget.
 
-126: Calls locks_verirfy_area.
+126: Calls locks_verify_area.
 
 129: Calls verify_area.
 
@@ -47,7 +47,7 @@ sys_read
         locks_mandatory_area <-- Here
 ```
 
-#### verify\_area (linux/include/linux/mm.h:14)
+#### verify\_area (linux/mm/memory.c:677)
 
 ```txt
 Control Flow:

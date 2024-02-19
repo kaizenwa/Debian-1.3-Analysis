@@ -55,7 +55,7 @@ sys_write
         locks_mandatory_area <-- Here
 ```
 
-#### verify\_area (linux/include/linux/mm.h:14)
+#### verify\_area (linux/mm/memory.c:677)
 
 ```txt
 Control Flow:
