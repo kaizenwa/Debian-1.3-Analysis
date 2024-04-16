@@ -1267,7 +1267,7 @@ init
             console_map_init <-- Here
 ```
 
-#### setup\_dev (linux/drivers/block/genhd.c:750)
+#### setup\_dev (linux/drivers/block/genhd.c:709)
 
 ```txt
 Control Flow:
@@ -1280,6 +1280,24 @@ init
             net_dev_init
             console_map_init
             setup_dev <-- Here
+
+719: Calls hd_geninit.
+```
+
+#### hd\_geninit (linux/drivers/block/hd.c:954)
+
+```txt
+Control Flow:
+init
+    sys_setup
+        device_setup
+            chr_dev_init
+            blk_dev_init
+            scsi_dev_init
+            net_dev_init
+            console_map_init
+            setup_dev
+                hd_geninit <-- Here
 ```
 
 #### binfmt\_setup (linux/fs/exec.c:64)
