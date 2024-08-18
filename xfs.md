@@ -232,7 +232,11 @@ main
     ReadConfigFile
     OsInit <-- Here
 
-103: Calls write.
+97: Calls fclose on stdin.
+
+98: Calls fclose on stdout.
+
+103: Calls sys_write.
 
 106: Calls sprintf to write "/usr/adm/X%smsgs" into local character
      array fname.
@@ -240,11 +244,176 @@ main
      Note: the external character pointer display is used to fill in
            the %s in the format string.
 
-112: Calls fopen on fname.
+110: Calls fopen on fname.
 
-114: Calls fileno.
+112: Calls fileno.
 
-...
+122: Calls setlinebuf.
+
+127: Calls sys_getpgrp.
+
+128: Calls sys_setpgid.
+
+183: Assigns TRUE to static variable been_here.
+
+186: Calls OsInitAllocator.
+```
+
+#### fclose (libc-5.4.33/libio/iostdio.h:63)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+    OsInit
+        fclose <-- Here
+
+63: #define fclose _IO_fclose
+```
+
+#### \_IO\_fclose (lib-5.4.33/libio/iofclose.c:35)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+    OsInit
+        fclose
+            _IO_fclose <-- Here
+```
+
+#### fileno (libc-5.4.33/libio/stdio/fileno.c:5)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+    OsInit
+        fclose
+        fileno <-- Here
+```
+
+#### dup2 (libc-5.4.33/sysdeps/pthreads/mit/fd.c:734)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+    OsInit
+        fclose
+        fileno
+        dup2 <-- Here
+```
+
+#### setlinebuf (libc-5.4.33/libio/iostdio.h:111)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+    OsInit
+        fclose
+        fileno
+        dup2
+        setlinebuf <-- Here
+
+111: #define setlinebuf _IO_setlinebuf
+```
+
+#### \_IO\_setlinebuf (libc-5.4.33/libio/iolibio.h:49)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+    OsInit
+        fclose
+        fileno
+        dup2
+        setlinebuf
+            _IO_setlinebuf <-- Here
+
+49: #define _IO_setlinebuf(_FP) _IO_setvbuf(_FP, NULL, 1, 0)
+```
+
+#### \_IO\_setvbuf (libc4-4.6.27/libio-4.6.26/iosetvbuf.c:32)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+    OsInit
+        fclose
+        fileno
+        dup2
+        setlinebuf
+            _IO_setlinebuf
+                _IO_setvbuf <-- Here
+```
+
+#### sys\_getpgrp (linux/kernel/sys.c:617)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+    OsInit
+        fclose
+        fileno
+        dup2
+        setlinebuf
+        sys_getpgrp <-- Here
+```
+
+#### sys\_setpgid (linux/kernel/sys.c:563)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+    OsInit
+        fclose
+        fileno
+        dup2
+        setlinebuf
+        sys_getpgrp
+        sys_setpgid <-- Here
+```
+
+#### OsInitAllocator (xfree86-3.3/programs/xfs/os/utils.c:211)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+    OsInit
+        fclose
+        fileno
+        dup2
+        setlinebuf
+        sys_getpgrp
+        sys_setpgid
+        OsInitAllocator <-- Here
 ```
 
 #### CacheInit (xfree86-3.3/programs/lbxproxy/di/cache.c:101)
@@ -272,7 +441,7 @@ main
     CreateSockets <-- Here
 ```
 
-#### InitProcVectors (xfree86-3.3/programs/Xserver/dix/dispatch.c:3433)
+#### InitProcVectors (xfree86-3.3/programs/xfs/difs/dispatch.c:1021)
 
 ```txt
 Control Flow:
@@ -298,7 +467,7 @@ main
     ResetSockets <-- Here
 ```
 
-#### InitClient (xfree86-3.3/)
+#### InitClient (xfree86-3.3/programs/xfs/difs/dispatch.c:1036)
 
 ```txt
 Control Flow:
@@ -309,9 +478,60 @@ main
     InitProcVectors
     ResetSockets
     InitClient <-- Here
+
+1043: Calls GetTimeInMillis.
 ```
 
-#### InitClientResources (xfree86-3.3/programs/Xserver/dix/resource.c:169)
+#### GetTimeInMillis (xfree86-3.3/programs/xfs/os/utils.c:195)
+
+```txt
+Control Flow:
+main
+    ...
+    CacheInit
+    CreateSockets
+    InitProcVectors
+    ResetSockets
+    InitClient
+        GetTimeInMillis <-- Here
+
+199: Calls X_GETTIMEOFDAY.
+```
+
+#### X\_GETTIMEOFDAY (xfree86-3.3/include/Xos.h:250)
+
+```txt
+Control Flow:
+main
+    ...
+    CacheInit
+    CreateSockets
+    InitProcVectors
+    ResetSockets
+    InitClient
+        GetTimeInMillis
+            X_GETTIMEOFDAY <-- Here
+
+250: #define X_GETTIMEOFDAY(t) gettimeofday(t, (struct timezone*)0)
+```
+
+#### sys\_gettimeofday (linux/kernel/time.c:87)
+
+```txt
+Control Flow:
+main
+    ...
+    CacheInit
+    CreateSockets
+    InitProcVectors
+    ResetSockets
+    InitClient
+        GetTimeInMillis
+            X_GETTIMEOFDAY
+                sys_gettimeofday <-- Here
+```
+
+#### InitClientResources (xfree86-3.3/programs/xfs/difs/resource.c:157)
 
 ```txt
 Control Flow:
@@ -324,7 +544,7 @@ main
     InitClientResources <-- Here
 ```
 
-#### InitExtensions (xfree86-3.3/programs/Xserver/mi/miinittext.c:171)
+#### InitExtensions (xfree86-3.3/programs/xfs/difs/extensions.c:202)
 
 ```txt
 Control Flow:
@@ -337,7 +557,7 @@ main
     InitExtensions <-- Here
 ```
 
-#### InitAtoms (xfree86-3.3/programs/Xserver/dix/atom.c:201)
+#### InitAtoms (xfree86-3.3/programs/xfs/difs/atom.c:198)
 
 ```txt
 Control Flow:
@@ -350,7 +570,7 @@ main
     InitAtoms <-- Here
 ```
 
-#### InitFonts (xfree86-3.3/)
+#### InitFonts (xfree86-3.3/xfs/difs/initfonts.c:57)
 
 ```txt
 Control Flow:
@@ -402,7 +622,7 @@ main
     Dispatch <-- Here
 ```
 
-#### CacheReset (xfree86-3.3/)
+#### CacheReset (xfree86-3.3/programs/xfs/difs/cache.c:190)
 
 ```txt
 Control Flow:
@@ -428,7 +648,7 @@ main
     CloseDownExtensions <-- Here
 ```
 
-#### CloseErrors (xfree86-3.3/)
+#### CloseErrors (xfree86-3.3/programs/xfs/os/error.c:119)
 
 ```txt
 Control Flow:
@@ -441,7 +661,7 @@ main
     CloseErrors <-- Here
 ```
 
-#### exit ()
+#### exit (libc-5.4.33/gcc/libgcc2.c:2104)
 
 ```txt
 Control Flow:
