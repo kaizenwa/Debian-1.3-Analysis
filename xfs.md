@@ -222,7 +222,7 @@ main
 I might do this later.
 ```
 
-#### OsInit (xfree86-3.3/programs/Xserver/os/osinit.c:87)
+#### OsInit (xfree86-3.3/programs/xfs/os/osinit.c:59)
 
 ```txt
 Control Flow:
@@ -232,34 +232,12 @@ main
     ReadConfigFile
     OsInit <-- Here
 
-97: Calls fclose on stdin.
+61: Calls GetTimeinMillis.
 
-98: Calls fclose on stdout.
-
-103: Calls sys_write.
-
-106: Calls sprintf to write "/usr/adm/X%smsgs" into local character
-     array fname.
-
-     Note: the external character pointer display is used to fill in
-           the %s in the format string.
-
-110: Calls fopen on fname.
-
-112: Calls fileno.
-
-122: Calls setlinebuf.
-
-127: Calls sys_getpgrp.
-
-128: Calls sys_setpgid.
-
-183: Assigns TRUE to static variable been_here.
-
-186: Calls OsInitAllocator.
+62: Calls OsInitAllocator.
 ```
 
-#### fclose (libc-5.4.33/libio/iostdio.h:63)
+#### GetTimeInMillis (xfree86-3.3/programs/xfs/os/utils.c:195)
 
 ```txt
 Control Flow:
@@ -268,12 +246,12 @@ main
     InitErrors
     ReadConfigFile
     OsInit
-        fclose <-- Here
+        GetTimeInMillis <-- Here
 
-63: #define fclose _IO_fclose
+199: Calls X_GETTIMEOFDAY.
 ```
 
-#### \_IO\_fclose (lib-5.4.33/libio/iofclose.c:35)
+#### X\_GETTIMEOFDAY (xfree86-3.3/include/Xos.h:250)
 
 ```txt
 Control Flow:
@@ -282,11 +260,13 @@ main
     InitErrors
     ReadConfigFile
     OsInit
-        fclose
-            _IO_fclose <-- Here
+        GetTimeInMillis
+            X_GETTIMEOFDAY <-- Here
+
+250: #define X_GETTIMEOFDAY(t) gettimeofday(t, (struct timezone*)0)
 ```
 
-#### fileno (libc-5.4.33/libio/stdio/fileno.c:5)
+#### sys\_gettimeofday (linux/kernel/time.c:87)
 
 ```txt
 Control Flow:
@@ -295,107 +275,9 @@ main
     InitErrors
     ReadConfigFile
     OsInit
-        fclose
-        fileno <-- Here
-```
-
-#### dup2 (libc-5.4.33/sysdeps/pthreads/mit/fd.c:734)
-
-```txt
-Control Flow:
-main
-    ProcessCmdLine
-    InitErrors
-    ReadConfigFile
-    OsInit
-        fclose
-        fileno
-        dup2 <-- Here
-```
-
-#### setlinebuf (libc-5.4.33/libio/iostdio.h:111)
-
-```txt
-Control Flow:
-main
-    ProcessCmdLine
-    InitErrors
-    ReadConfigFile
-    OsInit
-        fclose
-        fileno
-        dup2
-        setlinebuf <-- Here
-
-111: #define setlinebuf _IO_setlinebuf
-```
-
-#### \_IO\_setlinebuf (libc-5.4.33/libio/iolibio.h:49)
-
-```txt
-Control Flow:
-main
-    ProcessCmdLine
-    InitErrors
-    ReadConfigFile
-    OsInit
-        fclose
-        fileno
-        dup2
-        setlinebuf
-            _IO_setlinebuf <-- Here
-
-49: #define _IO_setlinebuf(_FP) _IO_setvbuf(_FP, NULL, 1, 0)
-```
-
-#### \_IO\_setvbuf (libc4-4.6.27/libio-4.6.26/iosetvbuf.c:32)
-
-```txt
-Control Flow:
-main
-    ProcessCmdLine
-    InitErrors
-    ReadConfigFile
-    OsInit
-        fclose
-        fileno
-        dup2
-        setlinebuf
-            _IO_setlinebuf
-                _IO_setvbuf <-- Here
-```
-
-#### sys\_getpgrp (linux/kernel/sys.c:617)
-
-```txt
-Control Flow:
-main
-    ProcessCmdLine
-    InitErrors
-    ReadConfigFile
-    OsInit
-        fclose
-        fileno
-        dup2
-        setlinebuf
-        sys_getpgrp <-- Here
-```
-
-#### sys\_setpgid (linux/kernel/sys.c:563)
-
-```txt
-Control Flow:
-main
-    ProcessCmdLine
-    InitErrors
-    ReadConfigFile
-    OsInit
-        fclose
-        fileno
-        dup2
-        setlinebuf
-        sys_getpgrp
-        sys_setpgid <-- Here
+        GetTimeInMillis
+            X_GETTIMEOFDAY
+                sys_gettimeofday <-- Here
 ```
 
 #### OsInitAllocator (xfree86-3.3/programs/xfs/os/utils.c:211)
@@ -407,13 +289,24 @@ main
     InitErrors
     ReadConfigFile
     OsInit
-        fclose
-        fileno
-        dup2
-        setlinebuf
-        sys_getpgrp
-        sys_setpgid
+        GetTimeinMillis
         OsInitAllocator <-- Here
+
+214: Calls CheckMemory.
+```
+
+#### CheckMemory (xfree86-3.3/util/memleak/fmalloc.c:476)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+    OsInit
+        GetTimeinMillis
+        OsInitAllocator
+            CheckMemory <-- Here
 ```
 
 #### CacheInit (xfree86-3.3/programs/xfs/difs/cache.c:83)
@@ -480,55 +373,6 @@ main
     InitClient <-- Here
 
 1043: Calls GetTimeInMillis.
-```
-
-#### GetTimeInMillis (xfree86-3.3/programs/xfs/os/utils.c:195)
-
-```txt
-Control Flow:
-main
-    ...
-    CacheInit
-    CreateSockets
-    InitProcVectors
-    ResetSockets
-    InitClient
-        GetTimeInMillis <-- Here
-
-199: Calls X_GETTIMEOFDAY.
-```
-
-#### X\_GETTIMEOFDAY (xfree86-3.3/include/Xos.h:250)
-
-```txt
-Control Flow:
-main
-    ...
-    CacheInit
-    CreateSockets
-    InitProcVectors
-    ResetSockets
-    InitClient
-        GetTimeInMillis
-            X_GETTIMEOFDAY <-- Here
-
-250: #define X_GETTIMEOFDAY(t) gettimeofday(t, (struct timezone*)0)
-```
-
-#### sys\_gettimeofday (linux/kernel/time.c:87)
-
-```txt
-Control Flow:
-main
-    ...
-    CacheInit
-    CreateSockets
-    InitProcVectors
-    ResetSockets
-    InitClient
-        GetTimeInMillis
-            X_GETTIMEOFDAY
-                sys_gettimeofday <-- Here
 ```
 
 #### InitClientResources (xfree86-3.3/programs/xfs/difs/resource.c:157)
