@@ -86,57 +86,57 @@ main
     ProcessCmdLine
     InitErrors <-- Here
 
-108: Calls creat.
+108: Calls sys_creat.
 
-110: Calls dup2.
+110: Calls sys_dup2.
 
-111: Calls close.
+111: Calls sys_close.
 ```
 
-#### creat (libc-5.4.33/sysdeps/pthreads/mit/fd\_kern.c:868)
+#### sys\_creat (linux/fs/open.c:599)
 
 ```txt
 Control Flow:
 main
     ProcessCmdLine
     InitErrors
-        creat <-- Here
+        sys_creat <-- Here
 
-870: return open (path, O_CREAT | O_TRUNC | O_WRONLY, mode);
+601: return sys_open(pathname, O_CREAT | O_WRONLY | O_TRUNC, mode);
 ```
 
-#### open (libc-5.4.33/sysdeps/pthreadsa/mit/fk\_kern.c:804)
+#### sys\_open (linux/fs/open.c:574)
 
 ```txt
 Control Flow:
 main
     ProcessCmdLine
     InitErrors
-        creat
-            open <-- Here
+        sys_creat
+            sys_open <-- Here
 ```
 
-#### dup2 (libc-5.4.33/sysdpes/pthreads/mit/fd.c:734)
+#### sys\_dup2 (linux/fs/fcntl.c:37)
 
 ```txt
 Control Flow:
 main
     ProcessCmdLine
     InitErrors
-        creat
-        dup2 <-- Here
+        sys_creat
+        sys_dup2 <-- Here
 ```
 
-#### close (libc-5.4.33/sysdeps/pthreads/mit/fd.c:637)
+#### sys\_close (linux/fs/open.c:631)
 
 ```txt
 Control Flow:
 main
     ProcessCmdLine
     InitErrors
-        creat
-        dup2
-        close <-- Here
+        sys_creat
+        sys_dup2
+        sys_close <-- Here
 ```
 
 #### ReadConfigFile (xfree86-3.3/programs/xfs/os/config.c:307)
@@ -190,6 +190,93 @@ main
             FSalloc <-- Here
 ```
 
+#### fread (libc4-4.6.27/libio/iostdio.h:71)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+        fsalloc
+        fread <-- Here
+
+71: #define fread _IO_fread
+```
+
+#### \_IO\_fread (libc4-4.6.27/libio/iofread.c:28)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+        fsalloc
+        fread
+            _IO_fread <-- Here
+```
+
+#### ftell (libc4-4.6.27/libio/iostdio.h:76)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+        fsalloc
+        fread
+        ftell <-- Here
+
+76: #define ftell _IO_ftell
+```
+
+#### \_IO\_ftell (libc4-4.6.27/libio/ioftell.c:30)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+        fsalloc
+        fread
+        ftell
+            _IO_ftell <-- Here
+```
+
+#### fclose (libc4-4.6.27/libio/iostdio.h:60)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+        fsalloc
+        fread
+        ftell
+        fclose <-- Here
+
+60: #define fclose _IO_fclose
+```
+
+#### \_IO\_fclose (libc4-4.6.27/libio/iofclose.c:31)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+        fsalloc
+        fread
+        ftell
+        fclose
+            _IO_fclose <-- Here
+```
+
 #### strip\_comments (xfree86-3.3/programs/xfs/os/config.c:135)
 
 ```txt
@@ -199,6 +286,9 @@ main
     InitErrors
     ReadConfigFile
         fsalloc
+        fread
+        ftell
+        fclose
         strip_comments <-- Here
 
 142-143: Calls blank_comment.
@@ -213,6 +303,9 @@ main
     InitErrors
     ReadConfigFile
         fsalloc
+        fread
+        ftell
+        fclose
         strip_comments
             blank_comment <-- Here
 
@@ -229,10 +322,93 @@ main
     InitErrors
     ReadConfigFile
         fsalloc
+        fread
+        ftell
+        fclose
         strip_comments
         parse_config <-- Here
 
 I might do this later.
+```
+
+#### fsfree (xfree86-3.3/programs/xfs/include/os.h:70)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+        fsalloc
+        fread
+        ftell
+        fclose
+        strip_comments
+        parse_config
+        fsfree <-- Here
+
+70: #define fsfree(ptr)    FSfree((pointer)ptr)
+```
+
+#### FSfree (xfree86-3.3/programs/xfs/os/utils.c:443)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+        fsalloc
+        fread
+        ftell
+        fclose
+        strip_comments
+        parse_config
+        fsfree
+            FSfree <-- Here
+
+450-451: Calls free.
+```
+
+#### free (libc-5.4.33/dl-malloc/malloc.c:858)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+        fsalloc
+        fread
+        ftell
+        fclose
+        strip_comments
+        parse_config
+        fsfree
+            FSfree
+                free <-- Here
+
+858: #pragma weak free = __libc_free
+```
+
+#### \_\_libc\_free (libc-5.4.33/malloc/free.c:202)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+    ReadConfigFile
+        fsalloc
+        fread
+        ftell
+        fclose
+        strip_comments
+        parse_config
+        fsfree
+            FSfree
+                free
+                    __libc_free <-- Here
 ```
 
 #### OsInit (xfree86-3.3/programs/xfs/os/osinit.c:59)
@@ -304,22 +480,6 @@ main
     OsInit
         GetTimeinMillis
         OsInitAllocator <-- Here
-
-214: Calls CheckMemory.
-```
-
-#### CheckMemory (xfree86-3.3/util/memleak/fmalloc.c:476)
-
-```txt
-Control Flow:
-main
-    ProcessCmdLine
-    InitErrors
-    ReadConfigFile
-    OsInit
-        GetTimeinMillis
-        OsInitAllocator
-            CheckMemory <-- Here
 ```
 
 #### CacheInit (xfree86-3.3/programs/xfs/difs/cache.c:83)
