@@ -416,7 +416,7 @@ main
         OsInitAllocator <-- Here
 ```
 
-#### CacheInit (xfree86-3.3/programs/lbxproxy/di/cache.c:101)
+#### CacheInit (xfree86-3.3/programs/xfs/difs/cache.c:83)
 
 ```txt
 Control Flow:
