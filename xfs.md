@@ -93,7 +93,7 @@ main
 111: Calls close.
 ```
 
-#### creat ()
+#### creat (libc-5.4.33/sysdeps/pthreads/mit/fd\_kern.c:868)
 
 ```txt
 Control Flow:
@@ -101,9 +101,22 @@ main
     ProcessCmdLine
     InitErrors
         creat <-- Here
+
+870: return open (path, O_CREAT | O_TRUNC | O_WRONLY, mode);
 ```
 
-#### dup2 ()
+#### open (libc-5.4.33/sysdeps/pthreadsa/mit/fk\_kern.c:804)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+        creat
+            open <-- Here
+```
+
+#### dup2 (libc-5.4.33/sysdpes/pthreads/mit/fd.c:734)
 
 ```txt
 Control Flow:
@@ -114,7 +127,7 @@ main
         dup2 <-- Here
 ```
 
-#### close ()
+#### close (libc-5.4.33/sysdeps/pthreads/mit/fd.c:637)
 
 ```txt
 Control Flow:
