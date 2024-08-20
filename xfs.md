@@ -728,6 +728,285 @@ main
         malloc
         _FontTransReopenCOTSServer
         _FontTransMakeAllCOTSServerListeners <-- Here
+
+1116: Calls _FontTransOpenCOTSServer.
+
+1127: Calls _FontTransCreateListener.
+```
+
+#### \_FontTransOpenCOTSServer (xfree86-3.3/lib/xtrans/Xtrans.c:587)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+        _FontTransMakeAllCOTSServerListeners
+            _FontTransOpenCOTSServer <-- Here
+
+593: return TRANS(Open) (XTRANS_OPEN_COTS_SERVER, address);
+```
+
+#### \_FontTransOpen (xfree86-3.3/lib/xtrans/Xtrans.c:393)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+        _FontTransMakeAllCOTSServerListeners
+            _FontTransOpenCOTSServer
+                _FontTransOpen <-- Here
+
+415: Calls _FontTransParseAddress.
+
+423: Calls _FontTransSelectTransport.
+
+445: Calls _FontTransSocketOpenCOTSServer.
+```
+
+#### \_FontTransParseAddress (xfree86-3.3/lib/xtrans/Xtrans.c:200)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+        _FontTransMakeAllCOTSServerListeners
+            _FontTransOpenCOTSServer
+                _FontTransOpen
+                    _FontTransParseAddress <-- Here
+```
+
+#### \_FontTransSelectTransport (xfree86-3.3/lib/xtrans/Xtrans.c:164)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+        _FontTransMakeAllCOTSServerListeners
+            _FontTransOpenCOTSServer
+                _FontTransOpen
+                    _FontTransParseAddress
+                    _FontTransSelectTransport <-- Here
+```
+
+#### \_FontTransSocketOpenCOTSServer (xfree86-3.3/lib/xtrans/Xtranssock.c:503)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+        _FontTransMakeAllCOTSServerListeners
+            _FontTransOpenCOTSServer
+                _FontTransOpen
+                    _FontTransParseAddress
+                    _FontTransSelectTransport
+                    _FontTransSocketOpenCOTSServer <-- Here
+
+516: This is a no-op for Debian.
+
+518: Calls _FontTransSocketSelectFamily.
+
+526-527: Calls _FontTransSocketOpen.
+```
+
+#### \_FontTransSocketOpen (xfree86-3.3/lib/xtrans/Xtranssock.c:372)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+        _FontTransMakeAllCOTSServerListeners
+            _FontTransOpenCOTSServer
+                _FontTransOpen
+                    _FontTransParseAddress
+                    _FontTransSelectTransport
+                    _FontTransSocketOpenCOTSServer
+                        _FontTransSocketOpen <-- Here
+
+382-383: Calls xcalloc.
+
+389-390: Calls socket.
+
+412-413: Calls setsockopt.
+```
+
+#### setsockopt (libc-5.4.33/sysdeps/linux/setsockopt.c:23)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+        _FontTransMakeAllCOTSServerListeners
+            _FontTransOpenCOTSServer
+                _FontTransOpen
+                    _FontTransParseAddress
+                    _FontTransSelectTransport
+                    _FontTransSocketOpenCOTSServer
+                        _FontTransSocketOpen
+                            setsockopt <-- Here
+
+32: return (socketcall (SYS_SETSOCKOPT, args));
+```
+
+#### \_FontTransCreateListener (xfree86-3.3/lib/xtrans/Xtrans.c:779)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+        _FontTransMakeAllCOTSServerListeners
+            _FontTransOpenCOTSServer
+            _FontTransCreateListener <-- Here
+
+785: return ciptr->transptr->CreateListener (ciptr, port);
+```
+
+#### \_FontTransSocketCreateListener (xfree86-3.3/lib/xtrans/Xtranssock.c:752)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+        _FontTransMakeAllCOTSServerListeners
+            _FontTransOpenCOTSServer
+            _FontTransCreateListener
+                _FontTransSocketCreateListener <-- Here
+
+770: Calls bind.
+
+802: Calls listen.
+```
+
+#### bind (libc-5.4.33/sysdeps/linux/bind.c:22)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+        _FontTransMakeAllCOTSServerListeners
+            _FontTransOpenCOTSServer
+            _FontTransCreateListener
+                _FontTransSocketCreateListener
+                    bind <-- Here
+
+29: return socketcall(SYS_BIND, args);
+```
+
+#### socketcall (libc-5.4.33/sysdeps/linux/\_\_socketcall.S:21)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+        _FontTransMakeAllCOTSServerListeners
+            _FontTransOpenCOTSServer
+            _FontTransCreateListener
+                _FontTransSocketCreateListener
+                    bind
+                        socketcall <-- Here
+```
+```asm
+SYSCALL__ (socketcall, 2)
+	ret
+```
+
+#### listen (libc-5.4.33/sysdeps/linux/listen.c:21)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+        _FontTransMakeAllCOTSServerListeners
+            _FontTransOpenCOTSServer
+            _FontTransCreateListener
+                _FontTransSocketCreateListener
+                    bind
+                    listen <-- Here
+
+27: return socketcall(SYS_LISTEN, args);
 ```
 
 #### \_FontTransGetConnectionNumber (xfree86-3.3/lib/xtrans/Xtrans.c:1041)
