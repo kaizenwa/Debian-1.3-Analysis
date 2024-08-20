@@ -505,6 +505,265 @@ main
     OsInit
     CacheInit
     CreateSockets <-- Here
+
+228: Calls getdtablesize.
+
+243-244: Calls malloc.
+
+260: Calls _FontTransReopenCOTSServer.
+
+278: Calls _FontTransMakeAllCOTSServerListeners.
+
+286: Calls _FontTransGetConnectionNumber.
+```
+
+#### malloc (libc-5.4.33/malloc/malloc.c:29)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc <-- Here
+
+29: #pragma weak malloc = __libc_malloc
+```
+
+#### \_\_libc\_malloc (libc-5.4.33/malloc/malloc.c:158)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+            __libc_malloc <-- Here
+```
+
+#### \_FontTransReopenCOTSServer (xfree86-3.3/lib/xtrans/Xtrans.c:631)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer <-- Here
+
+639: return TRANS(Reopen) (XTRANS_OPEN_COTS_SERVER, trans_id, fd, port);
+```
+
+#### \_FontTransReopen (xfree86-3.3/lib/xtrans/Xtrans.c:492)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+            _FontTransReopen <-- Here
+
+524: Calls xalloc.
+
+538: Calls _FontTransSocketReopenCOTSServer.
+```
+
+#### \_FontTransSocketReopenCOTSServer (xfree86-3.3/lib/xtrans/Xtranssock.c:653)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+            _FontTransReopen
+                _FontTransSocketReopenCOTSServer <-- Here
+
+666: This is a no-op for Debian.
+
+668: Calls _FontTransSocketSelectFamily.
+
+676: Calls _FontTransSocketReopen.
+```
+
+#### \_FontTransSocketSelectFamily (xfree86-3.3/lib/xtrans/Xtranssock.c:267)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+            _FontTransReopen
+                _FontTransSocketReopenCOTSServer
+                    _FontTransSocketSelectFamily <-- Here
+```
+
+#### \_FontTransSocketReopen (xfree86-3.3/lib/xtrans/Xtranssock.c:424)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+            _FontTransReopen
+                _FontTransSocketReopenCOTSServer
+                    _FontTransSocketSelectFamily
+                    _FontTransSocketReopen <-- Here
+
+436-437: Calls xcalloc.
+```
+
+#### xcalloc (xfree86-3.3/lib/xtrans/transport.c:63)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+            _FontTransReopen
+                _FontTransSocketReopenCOTSServer
+                    _FontTransSocketSelectFamily
+                    _FontTransSocketReopen
+                        xcalloc <-- Here
+
+63: #define xcalloc(_num,_size) calloc(_num,_size)
+```
+
+#### calloc (libc-5.4.33/dl-malloc/malloc.c:857)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+            _FontTransReopen
+                _FontTransSocketReopenCOTSServer
+                    _FontTransSocketSelectFamily
+                    _FontTransSocketReopen
+                        xcalloc
+                            calloc <-- Here
+
+857: #pragma weak calloc = __libc_calloc
+```
+
+#### \_\_libc\_calloc (libc-5.4.33/malloc/calloc.c:33)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+            _FontTransReopen
+                _FontTransSocketReopenCOTSServer
+                    _FontTransSocketSelectFamily
+                    _FontTransSocketReopen
+                        xcalloc
+                            calloc
+                                __libc_calloc <-- Here
+```
+
+#### \_FontTransMakeAllCOTSServerListeners (xfree86-3.3/lib/xtrans/Xtrans.c:1087)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+        _FontTransMakeAllCOTSServerListeners <-- Here
+```
+
+#### \_FontTransGetConnectionNumber (xfree86-3.3/lib/xtrans/Xtrans.c:1041)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+        _FontTransMakeAllCOTSServerListeners
+        _FontTransGetConnectionNumber <-- Here
+```
+
+#### getdtablesize (libc-5.4.33/login/param.h:8)
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        getdtablesize <-- Here
+
+8: #define getdtablesize() (NR_OPEN-1)
+
+   Note: NR_OPEN is defined as 256 on line 30 of
+         linux/include/linux/fs.h.
 ```
 
 #### InitProcVectors (xfree86-3.3/programs/xfs/difs/dispatch.c:1021)
