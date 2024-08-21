@@ -1097,6 +1097,74 @@ main
     ResetSockets
     InitClient
     InitClientResources <-- Here
+
+164: Calls CloseClientFont.
+
+165: Calls DeleteAuthCont.
+```
+
+#### CloseClientFont (xfree86-3.3/programs/xfs/difs/fonts.c:576)
+
+```txt
+Control Flow:
+main
+    ...
+    CreateSockets
+    InitProcVectors
+    ResetSockets
+    InitClient
+    InitClientResources
+        CloseClientFont <-- Here
+
+588: Calls remove_id_from_list.
+
+589: Calls close_font.
+```
+
+#### remove\_id\_from\_list (xfree86-3.3/programs/xfs/difs/fonts.c:220)
+
+```txt
+Control Flow:
+main
+    ...
+    CreateSockets
+    InitProcVectors
+    ResetSockets
+    InitClient
+    InitClientResources
+        CloseClientFont
+            remove_id_from_list <-- Here
+```
+
+#### close\_font (xfree86-3.3/programs/xfs/difs/fonts.c:558)
+
+```txt
+Control Flow:
+main
+    ...
+    CreateSockets
+    InitProcVectors
+    ResetSockets
+    InitClient
+    InitClientResources
+        CloseClientFont
+            remove_id_from_list
+            close_font <-- Here
+```
+
+#### DeleteAuthCont (xfree86-3.3/programs/xfs/difs/dispatch.c:656)
+
+```txt
+Control Flow:
+main
+    ...
+    CreateSockets
+    InitProcVectors
+    ResetSockets
+    InitClient
+    InitClientResources
+        CloseClientFont
+        DeleteAuthCont <-- Here
 ```
 
 #### InitExtensions (xfree86-3.3/programs/xfs/difs/extensions.c:202)
@@ -1123,9 +1191,46 @@ main
     InitClientResources
     InitExtensions
     InitAtoms <-- Here
+
+200: Calls free_all_atoms.
 ```
 
-#### InitFonts (xfree86-3.3/xfs/difs/initfonts.c:57)
+#### free\_all\_atoms (xfree86-3.3/xfs/difs/atom.c:)
+
+```txt
+Control Flow:
+main
+    ...
+    ResetSockets
+    InitClient
+    InitClientResources
+    InitExtensions
+    InitAtoms
+        free_all_atoms <-- Here
+
+190: Calls free_atom.
+```
+
+#### free\_atom (xfree86-3.3/xfs/difs/atom.c:173)
+
+```txt
+Control Flow:
+main
+    ...
+    ResetSockets
+    InitClient
+    InitClientResources
+    InitExtensions
+    InitAtoms
+        free_all_atoms
+            free_atom <-- Here
+
+181: Calls fsfree.
+
+182: Calls fsfree.
+```
+
+#### InitFonts (xfree86-3.3/programs/xfs/difs/initfonts.c:57)
 
 ```txt
 Control Flow:
@@ -1136,6 +1241,57 @@ main
     InitExtensions
     InitAtoms
     InitFonts <-- Here
+
+59-60: Calls FreeFontPatternCache.
+
+61: Calls MakeFontPatternCache.
+
+63: Calls ResetFontPrivateIndex.
+```
+
+#### FreeFontPatternCache (xfree86-3.3/lib/font/util/patcache.c:85)
+
+```txt
+Control Flow:
+main
+    ...
+    InitClient
+    InitClientResources
+    InitExtensions
+    InitAtoms
+    InitFonts
+        FreeFontPatternCache <-- Here
+```
+
+#### MakeFontPatternCache (xfree86-3.3/lib/font/util/patcache.c:67)
+
+```txt
+Control Flow:
+main
+    ...
+    InitClient
+    InitClientResources
+    InitExtensions
+    InitAtoms
+    InitFonts
+        FreeFontPatternCache
+        MakeFontPatternCache <-- Here
+```
+
+#### ResetFontPrivateIndex (xfree86-3.3/lib/font/util/private.c:46)
+
+```txt
+Control Flow:
+main
+    ...
+    InitClient
+    InitClientResources
+    InitExtensions
+    InitAtoms
+    InitFonts
+        FreeFontPatternCache
+        MakeFontPatternCache
+        ResetFontPrivateIndex <-- Here
 ```
 
 #### SetConfigValues (xfree86-3.3/programs/xfs/os/config.c:271)
@@ -1149,6 +1305,24 @@ main
     InitAtoms
     InitFonts
     SetConfigValues <-- Here
+
+276: Calls SetFontCatalogue.
+
+281: Calls InitErrors.
+```
+
+#### SetFontCatalogue (xfree86-3.3/programs/xfs/difs/fonts.c:746)
+
+```txt
+Control Flow:
+main
+    ...
+    InitClientResources
+    InitExtensions
+    InitAtoms
+    InitFonts
+    SetConfigValues
+        SetConfigCatalogue <-- Here
 ```
 
 #### create\_connection\_block (xfree86-3.3/programs/xfs/difs/main.c:181)
@@ -1175,6 +1349,30 @@ main
     SetConfigValues
     create_connection_block
     Dispatch <-- Here
+
+124: Calls WaitForSomething.
+
+...
+```
+
+#### ALLOCATE\_LOCAL ()
+
+```txt
+```
+
+#### WaitForSomething (xfree86-3.3/programs/xfs/os/waitfor.c:113)
+
+```txt
+Control Flow:
+main
+    ...
+    InitAtoms
+    InitFonts
+    SetConfigValues
+    create_connection_block
+    Dispatch
+        ALLOCATE_LOCAL
+        WaitForSomething <-- Here
 ```
 
 #### CacheReset (xfree86-3.3/programs/xfs/difs/cache.c:190)
