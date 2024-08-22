@@ -145,21 +145,603 @@ main
 439: Calls XrmGetStringDatabase.
 
 441-443: Calls XrmParseCommand.
+
+444-445: Calls GetResource.
+
+446: Calls XrmGetFileDatabase.
 ```
 
-#### SetConfigFileTime ()
+#### XrmDestroyDatabase (xfree86-3.3/lib/X11/Xrm.c:2640)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase <-- Here
 ```
 
-#### LoadDMResources ()
+#### XrmGetStringDatabase (xfree86-3.3/lib/X11/Xrm.c:1555)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase <-- Here
+```
+
+#### XrmParseCommand (xfree86-3.3/lib/X11/ParseCmd.c:75)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand <-- Here
+```
+
+#### GetResource (xfree86-3.3/programs/xdm/resource.c:316)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource <-- Here
+
+329: Calls XrmGetResource.
+```
+
+#### XrmGetResource (xfree86-3.3/lib/X11/Xrm.c:2563)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+                XrmGetResource <-- Here
+
+2583: Calls XrmStringToNameList.
+
+2584: Calls XrmStringToClassList.
+
+2585: Calls XrmQGetResource.
+
+2586: Calls XrmQuarkToString.
+```
+
+#### XrmStringToNameList (xfree86-3.3/lib/X11/Xresource.h:155)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+                XrmGetResource
+                    XrmStringToNameList <-- Here
+
+155: #define XrmStringToNameList(str, name) XrmStringToQuarkList(str, name)
+```
+
+#### XrmStringToQuarkList (xfree86-3.3/lib/X11/Xrm.c:350)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+                XrmGetResource
+                    XrmStringToNameList
+                        XrmStringToQuarkList <-- Here
+
+370: Calls _XrmInternalStringToQuark.
+```
+
+#### \_XrmInternalStringToQuark (xfree86-3.3/lib/X11/Quarks.c:247)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+                XrmGetResource
+                    XrmStringToNameList
+                        XrmStringToQuarkList
+                            _XrmInternalStringToQuark <-- Here
+```
+
+#### XrmStringToClassList (xfree86-3.3/lib/X11/Xresource.h:161)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+                XrmGetResource
+                    XrmStringToNameList
+                        XrmStringToQuarkList
+                        XrmStringToClassList <-- Here
+
+161: #define XrmStringToClassList(str,c_class) XrmStringToQuarkList(str, c_class)
+```
+
+#### XrmQGetResource (xfree86-3.3/lib/X11/xrm.c:2520)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+                XrmGetResource
+                    XrmStringToNameList
+                        XrmStringToQuarkList
+                        XrmStringToClassList
+                        XrmQGetResource <-- Here
+```
+
+#### XrmQuarkToString (xfree86-3.3/lib/X11/Quarks.c:414)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+                XrmGetResource
+                    XrmStringToNameList
+                        XrmStringToQuarkList
+                        XrmStringToClassList
+                        XrmQGetResource
+                            XrmQuarkToString <-- Here
+```
+
+#### XrmGetFileDatabase (xfree86-3.3/lib/X11/Xrm.c:1649)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+            XrmGetFileDatabase <-- Here
+
+1659: Calls ReadInFile.
+
+1662: Calls NewDatabase.
+
+1664: Calls GetDatabase.
+```
+
+#### ReadInFile (xfree86-3.3/lib/X11/Xrm.c:1578)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+            XrmGetFileDatabase
+                ReadInFile <-- Here
+
+1586: Calls OpenFile.
+
+1589: Calls GetSizeOfFile.
+
+1596: Calls ReadFile.
+
+1612: Calls CloseFile.
+```
+
+#### OpenFile (xfree86-3.3/lib/X11/XrmI.h:45)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+            XrmGetFileDatabase
+                ReadInFile
+                    OpenFile <-- Here
+
+45: #define OpenFile(name) open((name), O_RDONLY)
+```
+
+#### open (libc-5.4.33/sysdeps/linux/\_\_open.S:21)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+            XrmGetFileDatabase
+                ReadInFile
+                    OpenFile
+                        open <-- Here
+
+21: SYSCALL__ (open, 3)
+```
+
+#### sys\_open (linux/fs/open.c:574)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+            XrmGetFileDatabase
+                ReadInFile
+                    OpenFile
+                        open
+                            sys_open <-- Here
+```
+
+#### GetSizeOfFile (xfree86-3.3/lib/X11/XrmI.h:49)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+            XrmGetFileDatabase
+                ReadInFile
+                    OpenFile
+                    GetSizeOfFile <-- Here
+```
+```asm
+#define GetSizeOfFile(name,size)                    \
+{                                                   \
+    struct stat status_buffer;                      \
+    if ( (stat((name), &status_buffer)) == -1 )     \
+	size = -1;                                  \
+    else                                            \
+	size = status_buffer.st_size;               \
+}
+```
+
+#### stat (libc-5.4.33/sbin/lib/\_\_stat.S:21)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+            XrmGetFileDatabase
+                ReadInFile
+                    OpenFile
+                    GetSizeOfFile
+                        stat <-- Here
+
+21: SYSCALL__ (stat, 2)
+```
+
+#### sys\_stat (linux/fs/stat.c:110)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+            XrmGetFileDatabase
+                ReadInFile
+                    OpenFile
+                    GetSizeOfFile
+                        stat
+                            sys_stat <-- Here
+```
+
+#### ReadFile (xfree86-3.3/lib/X11/XrmI.h:48)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+            XrmGetFileDatabase
+                ReadInFile
+                    OpenFile
+                    GetSizeOfFile
+                    ReadFile <-- Here
+
+48: #define ReadFile(fd,buf,size) read((fd), (buf), (size))
+```
+
+#### read (libc-5.4.33/sysdeps/linux/\_\_read.S:21)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+            XrmGetFileDatabase
+                ReadInFile
+                    OpenFile
+                    GetSizeOfFile
+                    ReadFile
+                        read <-- Here
+
+21: SYSCALL__ (read, 3)
+```
+
+#### sys\_read (linux/fs/read\_write.c:104)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+            XrmGetFileDatabase
+                ReadInFile
+                    OpenFile
+                    GetSizeOfFile
+                    ReadFile
+                        read
+                            sys_read <-- Here
+```
+
+#### CloseFile (xfree86-3.3/lib/X11/XrmI.h:47)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+            XrmGetFileDatabase
+                ReadInFile
+                    OpenFile
+                    GetSizeOfFile
+                    ReadFile
+                    CloseFile <-- Here
+
+47: #define CloseFile(fd) close((fd))
+```
+
+#### close (libc-5.4.33/sysdeps/linux/\_\_close.S:21)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+            XrmGetFileDatabase
+                ReadInFile
+                    OpenFile
+                    GetSizeOfFile
+                    ReadFile
+                    CloseFile
+                        close <-- Here
+
+21: SYSCALL__ (close, 1)
+```
+
+#### sys\_close (linux/fs/open.c:631)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+            XrmGetFileDatabase
+                ReadInFile
+                    OpenFile
+                    GetSizeOfFile
+                    ReadFile
+                    CloseFile
+                        close
+                            sys_close <-- Here
+```
+
+#### NewDatabase (xfree86-3.3/lib/X11/Xrm.c:486)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+            XrmGetFileDatabase
+                ReadInFile
+                NewDatabase <-- Here
+```
+
+#### GetDatabase (xfree86-3.3/lib/X11/Xrm.c:1088)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+            XrmDestroyDatabase
+            XrmGetStringDatabase
+            XrmParseCommand
+            GetResource
+            XrmGetFileDatabase
+                ReadInFile
+                NewDatabase
+                GetDatabase <-- Here
+```
+
+#### SetConfigFileTime (xfree86-3.3/programs/xdm/dm.c:290)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime <-- Here
+```
+
+#### LoadDMResources (xfree86-3.3/programs/xdm/resource.c:468)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources <-- Here
 ```
 
 #### getuid (libc-5.4.33/sysdeps/linux/\_\_getuid.S:21)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid <-- Here
 
 21: SYSCALL__ (getuid, 0)
 ```
@@ -167,84 +749,374 @@ main
 #### sys\_getuid (linux/kernel/sched.c:1283)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+            sys_getuid <-- Here
 ```
 
-#### BecomeOrphan ()
+#### BecomeOrphan (xfree86-3.3/programs/xdm/daemon.c:64)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan <-- Here
 ```
 
-#### BecomeDaemon ()
+#### BecomeDaemon (xfree86-3.3/programs/xdm/daemon.c:112)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon <-- Here
 ```
 
-#### StorePid ()
+#### StorePid (xfree86-3.3/programs/xdm/dm.c:738)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid <-- Here
 ```
 
-#### InitErrorLog ()
+#### InitErrorLog (xfree86-3.3/programs/xdm/error.c:184)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog <-- Here
 ```
 
 #### system (tclx74-7.4a-p2/osSupport/system.c:35)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system <-- Here
 ```
 
-#### init\_session\_id ()
+#### init\_session\_id (xfree86-3.3/programs/xdm/xdmcp.c:730)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id <-- Here
 ```
 
-#### CreateWellKnownSockets ()
+#### CreateWellKnownSockets (xfree86-3.3/programs/xdm/socket.c:84)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets <-- Here
 ```
 
-#### SetAccessFileTime ()
+#### SetAccessFileTime (xfree86-3.3/programs/xdm/dm.c:298)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime <-- Here
 ```
 
-#### ScanAccessDatabase ()
+#### ScanAccessDatabase (xfree86-3.3/programs/xdm/access.c:427)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase <-- Here
 ```
 
-#### ScanServers ()
+#### ScanServers (xfree86-3.3/programs/xdm/dm.c:225)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers <-- Here
 ```
 
-#### StartDisplays ()
+#### StartDisplays (xfree86-3.3/programs/xdm/dm.c:569)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays <-- Here
 ```
 
-#### AnyWellKnownSockets ()
+#### AnyWellKnownSockets (xfree86-3.3/programs/xdm/xdmcp.c:122)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+        AnyWellKnownSockets <-- Here
 ```
 
-#### AnyDisplaysLeft ()
+#### AnyDisplaysLeft (xfree86-3.3/programs/xdm/dpylist.c:43)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+        AnyWellKnownSockets
+        AnyDisplaysLeft <-- Here
 ```
 
-#### RescanServers ()
+#### RescanServers (xfree86-3.3/programs/xdm/dm.c:274)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+        AnyWellKnownSockets
+        AnyDisplaysLeft
+        RescanServers <-- Here
 ```
 
-#### WaitForSomething ()
+#### WaitForSomething (xfree86-3.3/programs/xm/xdmcp.c:367)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+        AnyWellKnownSockets
+        AnyDisplaysLeft
+        RescanServers
+        WaitForSomething <-- Here
 ```
 
-#### exit ()
+#### exit (libc-5.4.33/gcc/libgcc2.c:2104)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+        AnyWellKnownSockets
+        AnyDisplaysLeft
+        RescanServers
+        WaitForSomething
+        exit <-- Here
 ```
