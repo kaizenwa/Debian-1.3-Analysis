@@ -774,6 +774,84 @@ main
         LoadDMResources
         getuid
         BecomeOrphan <-- Here
+
+78: Calls fork.
+
+99: Parent calls setpgrp.
+
+108: Parent calls exit.
+```
+
+#### setpgrp (xfree86-3.3/programs/xdm/daemon.c:46)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+            setpgrp <-- Here (parent)
+
+46: #define setpgrp setpgid
+```
+
+#### setpgid (libc-5.4.33/sysdeps/linux/setpgid.S:21)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+            setpgrp
+                setpgid <-- Here (parent)
+
+21: SYSCALL__ (setpgid, 2)
+```
+
+#### sys\_setpgid (linux/kernel/sys.c:563)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+            setpgrp
+                setpgid
+                    sys_setpgid <-- Here (parent)
+```
+
+#### exit (libc-5.4.33/gcc/libgcc2.c:2104)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+            setpgrp
+            exit <-- Here (parent)
 ```
 
 #### BecomeDaemon (xfree86-3.3/programs/xdm/daemon.c:112)
@@ -790,6 +868,139 @@ main
         getuid
         BecomeOrphan
         BecomeDaemon <-- Here
+
+126: Calls getpid and setpgrp.
+
+129-131: Calls close on STDIN, STDOUT, and STDERR.
+
+145: Calls open on "/dev/tty".
+
+154: Calls ioctl with the TIOCNOTTY argument.
+
+166: Calls open.
+
+167-168: Calls dup2 to create STDOUT and STDERR.
+```
+
+#### getpid (libc-5.4.33/sysdeps/linux/\_\_getpid.S:21)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+            getpid <-- Here
+
+21: SYSCALL__ (getpid, 0)
+```
+
+#### sys\_getpid (linux/kernel/sched.c:1273)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+            getpid
+                sys_getpid <-- Here
+```
+
+#### ioctl (libc-5.4.33/sysdeps/linux/\_\_ioctl.S:21)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+            getpid
+            ioctl <-- Here
+
+21: SYSCALL__ (ioctl, 3)
+```
+
+#### sys\_ioctl (linux/fs/ioctl.c:58)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+            getpid
+            ioctl
+                sys_ioctl <-- Here
+
+103-104: Calls tty_ioctl with TIOCNOTTY argument.
+```
+
+#### tty\_ioctl (linux/drivers/char/tty\_io.c:1403)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+            getpid
+            ioctl
+                sys_ioctl
+                    tty_ioctl <-- Here (TIONOCTTY)
+
+1490-1491: Calls disassociate_ctty.
+```
+
+#### disassociate\_ctty (linux/drivers/char/tty\_io.c:475)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+            getpid
+            ioctl
+                sys_ioctl
+                    tty_ioctl
+                        disassociate_ctty <-- Here
 ```
 
 #### StorePid (xfree86-3.3/programs/xdm/dm.c:738)
@@ -825,6 +1036,12 @@ main
         BecomeDaemon
         StorePid
         InitErrorLog <-- Here
+
+188: Calls creat.
+
+191: Calls dup2.
+
+192: Calls close.
 ```
 
 #### system (tclx74-7.4a-p2/osSupport/system.c:35)
@@ -1089,34 +1306,4 @@ main
         AnyDisplaysLeft
         RescanServers
         WaitForSomething <-- Here
-```
-
-#### exit (libc-5.4.33/gcc/libgcc2.c:2104)
-
-```txt
-Control Flow:
-main
-    umask
-    InitResources
-        XrmInitialize
-        ReinitResources
-        SetConfigFileTime
-        LoadDMResources
-        getuid
-        BecomeOrphan
-        BecomeDaemon
-        StorePid
-        InitErrorLog
-        system
-        init_session_id
-        CreateWellKnownSockets
-        SetAccessFileTime
-        ScanAccessDatabase
-        ScanServers
-        StartDisplays
-        AnyWellKnownSockets
-        AnyDisplaysLeft
-        RescanServers
-        WaitForSomething
-        exit <-- Here
 ```

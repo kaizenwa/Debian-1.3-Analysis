@@ -86,11 +86,23 @@ main
     ProcessCmdLine
     InitErrors <-- Here
 
-108: Calls sys_creat.
+108: Calls creat.
 
-110: Calls sys_dup2.
+110: Calls dup2.
 
-111: Calls sys_close.
+111: Calls close.
+```
+
+#### creat (libc-5.4.33/sydeps/linux/creat.S:21)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+        creat <-- Here
+
+21: SYSCALL__ (creat, 2)
 ```
 
 #### sys\_creat (linux/fs/open.c:599)
@@ -100,7 +112,8 @@ Control Flow:
 main
     ProcessCmdLine
     InitErrors
-        sys_creat <-- Here
+        creat
+            sys_creat <-- Here
 
 601: return sys_open(pathname, O_CREAT | O_WRONLY | O_TRUNC, mode);
 ```
@@ -112,8 +125,22 @@ Control Flow:
 main
     ProcessCmdLine
     InitErrors
-        sys_creat
-            sys_open <-- Here
+        creat
+            sys_creat
+                sys_open <-- Here
+```
+
+#### dup2 (libc-5.4.33/sysdeps/linux/\_\_dup2.S:21)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+        creat
+        dup2 <-- Here
+
+21: SYSCALL__ (dup2, 2)
 ```
 
 #### sys\_dup2 (linux/fs/fcntl.c:37)
@@ -123,8 +150,23 @@ Control Flow:
 main
     ProcessCmdLine
     InitErrors
-        sys_creat
-        sys_dup2 <-- Here
+        creat
+        dup2
+            sys_dup2 <-- Here
+```
+
+#### close (libc-5.4.33/sysdeps/linux/\_\_close.S:21)
+
+```txt
+Control Flow:
+main
+    ProcessCmdLine
+    InitErrors
+        creat
+        dup2
+        close <-- Here
+
+21: SYSCALL__ (close, 1)
 ```
 
 #### sys\_close (linux/fs/open.c:631)
@@ -134,9 +176,10 @@ Control Flow:
 main
     ProcessCmdLine
     InitErrors
-        sys_creat
-        sys_dup2
-        sys_close <-- Here
+        creat
+        dup2
+        close
+            sys_close <-- Here
 ```
 
 #### ReadConfigFile (xfree86-3.3/programs/xfs/os/config.c:307)
