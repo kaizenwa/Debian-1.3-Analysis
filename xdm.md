@@ -1102,6 +1102,416 @@ main
         system
         init_session_id
         CreateWellKnownSockets <-- Here
+
+95: Calls localHostname.
+
+106: Calls socket.
+
+112: Calls localHostname.
+
+113: Calls registerHostname.
+
+114: Calls RegisterCloseOnFork.
+
+153: Calls bind.
+
+170: Calls socket.
+
+207: Calls listen.
+```
+
+#### localHostname (xfree86-3.3/programs/xdm/util.c:256)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+            localHostname <-- Here
+
+260: Calls XmuGetHostname.
+```
+
+#### XmuGetHostname (xfree86-3.3/lib/Xmu/GetHost.c:54)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+            localHostname
+                XmuGetHostname <-- Here
+
+72: Calls uname.
+```
+
+#### uname (libc-5.4.33/sysdeps/linux/\_\_uname.S:21)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+            localHostname
+                XmuGetHostname
+                    uname <-- Here
+```
+
+#### sys\_uname (linux/kernel/sys.c:737)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+            localHostname
+                XmuGetHostname
+                    uname
+                        sys_uname <-- Here
+```
+
+#### socket (libc-5.4.33/sysdeps/linux/socket.c:21)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+            localHostname
+            socket <-- Here
+
+28: return socketcall(SYS_SOCKET, args);
+```
+
+#### socketcall (libc-5.4.33/sysdeps/linux/\_\_socketcall.S:21)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+            localHostname
+            socket
+                socketcall <-- Here
+
+21: SYSCALL__ (socketcall, 2)
+```
+
+#### sys\_socketcall (linux/net/socket.c:1237)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+            localHostname
+            socket
+                socketcall
+                    sys_socketcall <-- Here
+```
+
+#### registerHostname (xfree86-3.3/programs/xdm/xdmcp.c:416)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+            localHostname
+            socket
+            registerHostname <-- Here
+
+422: Calls XdmcpReallocARRAYS.
+```
+
+#### XdmcpReallocARRAYS (xfree86-3.3/lib/Xdmcp/RaA8.c:37)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+            localHostname
+            socket
+            registerHostname
+                XdmcpReallocARRAYS <-- Here
+
+43: Calls Xrealloc.
+```
+
+#### Xrealloc (xfree86-3.3/Xdmcp/Alloc.c:46)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+            localHostname
+            socket
+            registerHostname
+                XdmcpReallocARRAYS
+                    Xrealloc <-- Here
+
+54: return (unsigned long *) realloc ((char *) old, amount);
+```
+
+#### realloc (libc-5.4.33/malloc/realloc.c:29)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+            localHostname
+            socket
+            registerHostname
+                XdmcpReallocARRAYS
+                    Xrealloc
+                        realloc <-- Here
+
+29: #pragma weak realloc = __libc_realloc
+```
+
+#### \_\_libc\_realloc (libc-5.4.33/malloc/realloc.c:44)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+            localHostname
+            socket
+            registerHostname
+                XdmcpReallocARRAYS
+                    Xrealloc
+                        realloc
+                            __libc_realloc <-- Here
+```
+
+#### RegisterCloseOnFork (xfree86-3.3/programs/xdm/dm.c:696)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+            localHostname
+            socket
+            registerHostname
+            RegisterCloseOnFork <-- Here
+```
+
+#### bind (libc-5.4.33/sysdeps/linux/bind.c:22)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+            localHostname
+            socket
+            registerHostname
+            RegisterCloseOnFork
+            bind <-- Here
+
+29: return socketcall(SYS_BIND, args);
+```
+
+#### listen (libc-5.4.33/sysdeps/linux/listen.c:21)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+            localHostname
+            socket
+            registerHostname
+            RegisterCloseOnFork
+            bind
+            listen <-- Here
+
+27: return socketcall(SYS_LISTEN, args);
 ```
 
 #### SetAccessFileTime (xfree86-3.3/programs/xdm/dm.c:298)
@@ -1147,6 +1557,269 @@ main
         CreateWellKnownSockets
         SetAccessFileTime
         ScanAccessDatabase <-- Here
+
+431: Calls FreeAccessDatabase.
+
+434: Calls fopen.
+
+440: Calls ReadAccessDatabase.
+
+441: Calls fclose.
+```
+
+#### FreeAccessDatabase (xfree86-3.3/programs/xdm/access.c:160)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+            FreeAccessDatabase <-- Here
+
+167: Calls FreeDisplayEntry.
+```
+
+#### FreeDisplayEntry (xfree86-3.3/programs/xdm/access.c:137)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+            FreeAccessDatabase
+                FreeDisplayEntry <-- Here
+
+148-149: Calls XdmcpDisposeARRAYS.
+
+154: Calls FreeHostEntry.
+
+156: Calls free.
+```
+
+#### XdmcpDisposeARRAY8 (xfree86-3.3/lib/Xdmcp/DA8.c:37)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+            FreeAccessDatabase
+                FreeDisplayEntry
+                    XdmcpDisposeARRAY8 <-- Here
+
+40: Calls Xfree.
+```
+
+#### Xfree (xfree86-3.3/lib/Xdmcp/Alloc.c:58)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+            FreeAccessDatabase
+                FreeDisplayEntry
+                    XdmcpDisposeARRAY8
+                        Xfree <-- Here
+
+61-62: Calls free.
+```
+
+#### free (libc-5.4.33/dl-malloc/malloc.c:858)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+            FreeAccessDatabase
+                FreeDisplayEntry
+                    XdmcpDisposeARRAY8
+                        Xfree
+                            free <-- Here
+
+858: #pragma weak free = __libc_free
+```
+
+#### \_\_libc\_free (libc-5.4.33/malloc/free.c:202)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+            FreeAccessDatabase
+                FreeDisplayEntry
+                    XdmcpDisposeARRAYS
+                        Xfree
+                            free
+                                __libc_free <-- Here
+```
+
+#### FreeHostEntry (xfree86-3.3/programs/xdm/access.c:160)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+            FreeAccessDatabase
+                FreeDisplayEntry
+                    XdmcpDisposeARRAY8
+                    FreeHostEntry <-- Here
+
+133: Calls free.
+```
+
+#### ReadAccessDatabase (xfree86-3.3/programs/xdm/access.c:427)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+            FreeAccessDatabase
+            ReadAccessDatabase <-- Here
+
+419: Calls ReadDisplayEntry.
+```
+
+#### ReadDisplayEntry (xfree86-3.3/programs/xdm/access.c:309)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+            FreeAccessDatabase
+            ReadAccessDatabase
+                ReadDisplayEntry <-- Here
 ```
 
 #### ScanServers (xfree86-3.3/programs/xdm/dm.c:225)
@@ -1171,6 +1844,95 @@ main
         SetAccessFileTime
         ScanAccessDatabase
         ScanServers <-- Here
+
+240: Calls fopen.
+
+248: Calls fstat.
+
+251: Calls fgets.
+
+256: Calls ParseDisplay.
+
+258: Calls fclose.
+```
+
+#### fstat (libc4-4.6.27/sysdeps/linux/\_\_fstat.S:21)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+            fstat <-- Here
+
+21: SYSCALL__ (fstat, 2)
+```
+
+#### sys\_fstat (linux/fs/stat.c:189)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+            fstat
+                sys_fstat <-- Here
+```
+
+#### ParseDisplays (xfree86-3.3/programs/xdm/file.c:144)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+            fstat
+            ParseDisplays <-- Here
 ```
 
 #### StartDisplays (xfree86-3.3/programs/xdm/dm.c:569)
@@ -1196,6 +1958,478 @@ main
         ScanAccessDatabase
         ScanServers
         StartDisplays <-- Here
+
+571: Calls ForEachDisplay with CheckDisplayStatus as the argument.
+```
+
+#### ForEachDisplay (xfree86-3.3/programs/xdm/dm.c:48)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay <-- Here
+
+55: Calls CheckDisplayStatus.
+```
+
+#### CheckDisplayStatus (xfree86-3.3/programs/xdm/dm.c:549)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus <-- Here
+
+562: Calls StartDisplay.
+```
+
+#### StartDisplay (xfree86-3.3/programs/xdm/dm.c:569)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay <-- Here
+
+581: Calls LoadServerResources.
+
+592: Calls SetLocalAuthorizatoin.
+
+602: Calls StartServer.
+
+616: Calls fork.
+
+626: Child calls LoadSessionResources.
+
+627: Child calls SetAuthorization.
+
+628: Child calls WaitForServer.
+
+632: Child calls RunChooser?
+
+635: Child calls ManageSession?
+```
+
+#### LoadServerResources (xfree86-3.3/programs/xdm/resource.c:526)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources <-- Here
+```
+
+#### SetLocalAuthorization (xfree86-3.3/programs/xdm/auth.c:424)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization <-- Here
+```
+
+#### StartServer (xfree86-3.3/programs/xdm/server.c:136)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer <-- Here
+```
+
+#### LoadSessionResources (xfree86-3.3/programs/xdm/resource.c:532)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources <-- Here
+
+535: Calls LoadDisplayResources.
+```
+
+#### LoadDisplayResources (xfree86-3.3/programs/xdm/resource.c:504)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                            LoadDisplayResources <-- Here
+```
+
+#### SetAuthorization (xfree86-3.3/programs/xdm/dm.c:482)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        SetAuthorization <-- Here
+```
+
+#### WaitForServer (xfree86-3.3/programs/xdm/server.c:331)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer <-- Here
+
+337: Calls Signal.
+
+338: Calls alarm.
+
+339: Calls Setjmp.
+
+342: Calls XSetIOErrorHandler with openErrorHandler argument.
+
+343: Calls XOpenDisplay.
+
+...
+```
+
+#### Signal ()
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                            Signal <-- Here
+```
+
+#### alarm (libc-5.4.33/sysdeps/linux/alarm.S:21)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                            Signal
+                            alarm <-- Here
+
+21: SYSCALL__ (alarm, 1)
+```
+
+#### sys\_alarm (linux/kernel/sched.c:1252)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                            Signal
+                            alarm
+                                sys_alarm <-- Here
+```
+
+#### Setjmp ()
+
+```txt
+```
+
+#### XSetIOErrorHandler (xfree86-3.3/lib/X11/ErrHndlr.c:73)
+
+```txt
+```
+
+#### XOpenDisplay (xfree86-3.3/lib/X11/OpenDis.c:86)
+
+```txt
+```
+
+#### RunChooser (xfree86-3.3/programs/xdm/choose.c:578)
+
+```txt
+```
+
+#### ManageSession (xfree86-3.3/programs/xdm/sessions.c:246)
+
+```txt
 ```
 
 #### AnyWellKnownSockets (xfree86-3.3/programs/xdm/xdmcp.c:122)
