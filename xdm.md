@@ -2410,26 +2410,180 @@ main
 #### Setjmp ()
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                            Signal
+                            alarm
+                            Setjmp <-- Here
 ```
 
 #### XSetIOErrorHandler (xfree86-3.3/lib/X11/ErrHndlr.c:73)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                            Signal
+                            alarm
+                            Setjmp
+                            XSetIoErrorHandler <-- Here
 ```
 
 #### XOpenDisplay (xfree86-3.3/lib/X11/OpenDis.c:86)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                            Signal
+                            alarm
+                            Setjmp
+                            XSetIoErrorHandler
+                            XOpenDisplay <-- Here
 ```
 
 #### RunChooser (xfree86-3.3/programs/xdm/choose.c:578)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        RunChooser <-- Here?
 ```
 
 #### ManageSession (xfree86-3.3/programs/xdm/sessions.c:246)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession <-- Here?
 ```
 
 #### AnyWellKnownSockets (xfree86-3.3/programs/xdm/xdmcp.c:122)
