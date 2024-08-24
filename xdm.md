@@ -2293,11 +2293,21 @@ main
 
 339: Calls Setjmp.
 
-342: Calls XSetIOErrorHandler with openErrorHandler argument.
+342: Calls XSetIOErrorHandler with openErrorHandler as the argument.
 
 343: Calls XOpenDisplay.
 
-...
+355: Calls alarm.
+
+356: Calls Signal.
+
+357: Calls XSetIOErrorHandler with NULL as the argument.
+
+362: Calls GetRemoteAddress.
+
+364: Calls RegisterCloseOnFork.
+
+365: Calls fcntl.
 ```
 
 #### Signal ()
@@ -2407,7 +2417,7 @@ main
                                 sys_alarm <-- Here
 ```
 
-#### Setjmp ()
+#### Setjmp (xfree86-3.3/programs/xdm/dm.h:372)
 
 ```txt
 Control Flow:
@@ -2441,6 +2451,126 @@ main
                             Signal
                             alarm
                             Setjmp <-- Here
+
+#define Setjmp(e)   sigsetjmp(e,1)
+```
+
+#### sigsetjmp (libc-5.4.33/sysdeps/i386/setjmp/sigsetjmp.c:27)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                            Signal
+                            alarm
+                            Setjmp
+                                sigsetjmp <-- Here
+
+30-31: Calls sigprocmask.
+```
+
+#### sigprocmask (libc-5.4.33/sysdeps/linux/\_\_sigproc.S:21)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                            Signal
+                            alarm
+                            Setjmp
+                                sigsetjmp
+                                    sigprocmask <-- Here
+
+21: SYSCALL__ (sigprocmask, 3)
+```
+
+#### sys\_sigprocmask (linux/kernel/signal.c:29)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                            Signal
+                            alarm
+                            Setjmp
+                                sigsetjmp
+                                    sigprocmask
+                                        sys_sigprocmask <-- Here
 ```
 
 #### XSetIOErrorHandler (xfree86-3.3/lib/X11/ErrHndlr.c:73)
@@ -2516,6 +2646,170 @@ main
                             Setjmp
                             XSetIoErrorHandler
                             XOpenDisplay <-- Here
+```
+
+#### GetRemoteAddress (xfree86-3.3/programs/xdm/server.c:265)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                            Signal
+                            alarm
+                            Setjmp
+                            XSetIoErrorHandler
+                            XOpenDisplay
+                            GetRemoteAddress <-- Here
+```
+
+#### RegisterCloseOnFork (xfree86-3.3/programs/xdm/dm.c:696)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                            Signal
+                            alarm
+                            Setjmp
+                            XSetIoErrorHandler
+                            XOpenDisplay
+                            GetRemoteAddress
+                            RegisterCloseOnFork <-- Here
+```
+
+#### fcntl (libc-5.4.33/sysdeps/linux/\_\_fcntl.S:21)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                            Signal
+                            alarm
+                            Setjmp
+                            XSetIoErrorHandler
+                            XOpenDisplay
+                            GetRemoteAddress
+                            RegisterCloseOnFork
+                            fcntl <-- Here
+
+21: SYSCALL__ (fcntl, 3)
+```
+
+#### sys\_fcntl (linux/fs/fcntl.c:55)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                            Signal
+                            alarm
+                            Setjmp
+                            XSetIoErrorHandler
+                            XOpenDisplay
+                            GetRemoteAddress
+                            RegisterCloseOnFork
+                            fcntl
+                                sys_fcntl <-- Here
 ```
 
 #### RunChooser (xfree86-3.3/programs/xdm/choose.c:578)
