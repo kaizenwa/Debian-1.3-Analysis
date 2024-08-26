@@ -2961,7 +2961,7 @@ main
         RescanServers <-- Here
 ```
 
-#### WaitForSomething (xfree86-3.3/programs/xm/xdmcp.c:367)
+#### WaitForSomething (xfree86-3.3/programs/xdm/xdmcp.c:367)
 
 ```txt
 Control Flow:
@@ -2988,4 +2988,149 @@ main
         AnyDisplaysLeft
         RescanServers
         WaitForSomething <-- Here
+
+374: Calls AnyWellKnownSockets.
+
+381: Calls select.
+
+392: Calls ProcessRequestSocket.
+
+...
 ```
+
+#### select (libc-5.4.33/sysdeps/linux/i386/\_\_select.c:60)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+        AnyWellKnownSockets
+        AnyDisplaysLeft
+        RescanServers
+        WaitForSomething
+            select <-- Here
+
+60: weak_alias (__select, select);
+```
+
+#### \_\_select (libc-5.4.33/sysdeps/linux/i386/\_\_select.c:36)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+        AnyWellKnownSockets
+        AnyDisplaysLeft
+        RescanServers
+        WaitForSomething
+            select
+                __select <-- Here
+```
+```c
+    long __res;
+#if defined(__PIC__) || defined (__pic__)
+    __asm__ volatile ("pushl %%ebx\n\t"
+              "movl %%ecx,%%ebx\n\t"
+              "int $0x80\n\t"
+              "popl %%ebx"
+        : "=a" (__res)
+        : "0" (SYS_select),"c" ((long) &nd));
+```
+
+#### sys\_select (linux/fs/select.c:240)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+        AnyWellKnownSockets
+        AnyDisplaysLeft
+        RescanServers
+        WaitForSomething
+            select
+                __select
+                    sys_select <-- Here
+```
+
+#### ProcessRequestSocket (xfree86-3.3/programs/xdm/xdmcp.c:287)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+        AnyWellKnownSockets
+        AnyDisplaysLeft
+        RescanServers
+        WaitForSomething
+            select
+            ProcessRequestSocket <-- Here
+```
+
