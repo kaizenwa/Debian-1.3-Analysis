@@ -116,6 +116,397 @@ XOpenDisplay
     _XAllocIDS
     Xcalloc
     _X11TransConnectDisplay <-- Here
+
+316: Calls _X11TransOpenCOTSClient.
+
+320: Calls _X11TransConnect.
+
+334: Calls _X11TransGetPeerAddr.
+
+342: Calls _X11TransConvertAddress.
+
+367: Calls _X11TransSetOption.
+
+391-392: Calls GetAuthorization.
+```
+
+#### \_X11TransOpenCOTSClient (xfree86-3.3/lib/xtrans/Xtrans.c:572)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay <-- Here
+
+578: return TRANS(Open) (XTRANS_OPEN_COTS_CLIENT, address);
+```
+
+#### \_X11TransOpen (xfree86-3.3/lib/xtrans/Xtrans.c:200)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen <-- Here
+
+415: Calls _X11TransParseAddress.
+
+423: Calls _X11TransSelectTransport.
+
+445: Calls _X11TransSocketOpenCOTSServer.
+```
+
+#### \_X11TransParseAddress (xfree86-3.3/lib/xtrans/Xtrans.c:200)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+            _X11TransParseAddress <-- Here
+```
+
+#### \_X11TransSelectTransport (xfree86-3.3/lib/xtrans/Xtrans.c:164)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+            _X11TransParseAddress
+            _X11TransSelectTransport <-- Here
+```
+
+#### \_X11TransSocketOpenCOTSServer (xfree86-3.3/lib/xtrans/Xtranssock.c:503)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+            _X11TransParseAddress
+            _X11TransSelectTransport
+            _X11TransSocketOpenCOTSServer <-- Here
+
+516: This is a no-op for Debian.
+
+518: Calls _X11TransSocketSelectFamily.
+
+526-527: Calls _X11TransSocketOpen.
+```
+
+#### \_X11TransSocketOpen (xfree86-3.3/lib/xtrans/Xtranssock.c:372)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+            _X11TransParseAddress
+            _X11TransSelectTransport
+            _X11TransSocketOpenCOTSServer
+                _X11TransSocketOpen <-- Here
+
+382-383: Calls xcalloc.
+
+389-390: Calls socket.
+
+412-413: Calls setsockopt.
+```
+
+#### socket ()
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+            _X11TransParseAddress
+            _X11TransSelectTransport
+            _X11TransSocketOpenCOTSServer
+                _X11TransSocketOpen
+                    socket <-- Here
+```
+
+#### setsockopt (libc-5.4.33/sysdeps/linux/setsockopt.c:23)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+            _X11TransParseAddress
+            _X11TransSelectTransport
+            _X11TransSocketOpenCOTSServer
+                _X11TransSocketOpen
+                    socket
+                    setsockopt <-- Here
+
+32: return (socketcall (SYS_SETSOCKOPT, args));
+```
+
+#### \_X11TransConnect (xfree86-3.3/lib/xtrans/Xtrans.c:844)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+        _X11TransConnect <-- Here
+
+857: Calls _X11TransParseAddress.
+
+873: Calls _X11TransSocketUNIXConnect.
+```
+
+#### \_X11TransSocketUNIXConnect (xfree86-3.3/lib/xtrans/Xtranssock.c:1514)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+        _X11TransConnect
+            _X11TransSocketUNIXConnect <-- Here
+
+1599: Calls connect.
+```
+
+
+#### connect ()
+
+```txt
+```
+
+#### \_X11TransGetPeerAddr (xfree86-3.3/lib/xtrans/Xtrans.c:1016)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+        _X11TransConnect
+        _X11TransGetPeerAddr <-- Here
+```
+
+#### \_X11TransConvertAddress (xfree86-3.3/lib/xtrans/Xtransutil.c:91)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+        _X11TransConnect
+        _X11TransGetPeerAddr
+        _X11TransConvertAddress <-- Here
+
+192: Calls _X11TransGetHostname
+```
+
+#### \_X11TransGetHostname (xfree86-3.3/xtrans/Xtrans.c:1431)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+        _X11TransConnect
+        _X11TransGetPeerAddr
+        _X11TransConvertAddress
+            _X11TransGetHostname <-- Here
+
+1449: Calls gethostname.
+```
+
+#### gethostname ()
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+        _X11TransConnect
+        _X11TransGetPeerAddr
+        _X11TransConvertAddress
+            _X11TransGetHostname
+                gethostname <-- Here
+```
+
+#### \_X11TransSetOption (xfree86-3.3/lib/xtrans/Xtrans.c:688)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+        _X11TransConnect
+        _X11TransGetPeerAddr
+        _X11TransConvertAddress
+        _X11TransSetOption <-- Here
+```
+
+#### GetAuthorization (xfree86-3.3/lib/X11/ConnDis.c:944)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+        _X11TransConnect
+        _X11TransGetPeerAddr
+        _X11TransConvertAddress
+        _X11TransSetOption
+        GetAuthorization <-- Here
+
+1014: Calls _X11TransGetMyAddr.
+
+1050: Calls getpid.
+
+1088-1089: Calls XdmcpWrap.
+
+1144: Calls XauDisposeAuth.
+```
+
+#### \_X11TransGetMyAddr (xfree86-3.3/lib/xtrans/Xtrans.c:992)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+        _X11TransConnect
+        _X11TransGetPeerAddr
+        _X11TransConvertAddress
+        _X11TransSetOption
+        GetAuthorization
+            _X11TransGetMyAddr <-- Here
+```
+
+#### XdmcWrap (xfree86-3.3/lib/Xdmcp/Wrap.c:50)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+        _X11TransConnect
+        _X11TransGetPeerAddr
+        _X11TransConvertAddress
+        _X11TransSetOption
+        GetAuthorization
+            _X11TransGetMyAddr
+            XdmcWrap <-- Here
+```
+
+#### XauDisposeAuth (xfree86-3.3/lib/Xau/AuDispose.c:33)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+        _X11TransConnect
+        _X11TransGetPeerAddr
+        _X11TransConvertAddress
+        _X11TransSetOption
+        GetAuthorization
+            _X11TransGetMyAddr
+            XdmcWrap
+            XauDisposeAuth <-- Here
 ```
 
 #### \_X11TransGetConnectionNumber (xfree86-3.3/lib/xtrans/Xtrans.c:1041)

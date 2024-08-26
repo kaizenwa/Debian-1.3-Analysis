@@ -914,6 +914,29 @@ main
 412-413: Calls setsockopt.
 ```
 
+#### socket ()
+
+```txt
+Control Flow:
+main
+    ...
+    InitErrors
+    ReadConfigFile
+    OsInit
+    CacheInit
+    CreateSockets
+        malloc
+        _FontTransReopenCOTSServer
+        _FontTransMakeAllCOTSServerListeners
+            _FontTransOpenCOTSServer
+                _FontTransOpen
+                    _FontTransParseAddress
+                    _FontTransSelectTransport
+                    _FontTransSocketOpenCOTSServer
+                        _FontTransSocketOpen
+                            socket <-- Here
+```
+
 #### setsockopt (libc-5.4.33/sysdeps/linux/setsockopt.c:23)
 
 ```txt
@@ -934,6 +957,7 @@ main
                     _FontTransSelectTransport
                     _FontTransSocketOpenCOTSServer
                         _FontTransSocketOpen
+                            socket
                             setsockopt <-- Here
 
 32: return (socketcall (SYS_SETSOCKOPT, args));
