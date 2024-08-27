@@ -3025,6 +3025,8 @@ main
 
 331: Calls AbortClient.
 
+338: Calls Source.
+
 339: Calls SessionExit.
 ```
 
@@ -3172,6 +3174,93 @@ main
                             SetTitle
                             LoadXloginResources
                             GreetUser <-- Here
+
+321: Calls InitGreet.
+
+...
+```
+
+### InitGreet (xfree86-3.3/programs/xdm/greeter/greet.c:153)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet <-- Here
+
+165: Calls XtToolkitInitialize.
+
+...
+```
+
+#### XToolkitInitialize (xfree86-3.3/lib/Xt/Initialize.c:203)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                    XtToolkitInitialize <-- Here
 ```
 
 #### StartClient (xfree86-3.3/programs/xdm/session.c:487)
@@ -3213,6 +3302,178 @@ main
                             StartClient <-- Here
 ```
 
+#### wait (libc-5.4.33/sysdeps/linux/\_\_wait.c:20)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                            StartClient
+                                wait <-- Here
+
+20: weak_alias (__wait, wait);
+```
+
+#### \_\_wait (libc-5.4.33/sysdeps/linux/\_\_wait.c:13)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                            StartClient
+                                wait
+                                    __wait <-- Here
+
+15: return wait4(WAIT_ANY, wait_stat, 0, NULL);
+```
+
+#### wait4 (libc-5.4.33/sysdeps/linux/\_\_wait4.S:21)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                            StartClient
+                                wait
+                                    __wait
+                                        wait4 <-- Here
+
+21: SYSCALL__ (wait4, 4)
+```
+
+#### sys\_wait4 (linux/kernel/exit.c:612)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                            StartClient
+                                wait
+                                    __wait
+                                        wait4
+                                            sys_wait4 <-- Here
+```
+
 #### AbortClient (xfree86-3.3/programs/xdm/sessions.c:173)
 
 ```txt
@@ -3250,12 +3511,93 @@ main
                             LoadXloginResources
                             GreetUser
                             StartClient
+                            wait
                             AbortClient <-- Here
 ```
 
-#### SessionExit ()
+#### source (xfree86-3.3/programs/xdm/session.c:675)
 
 ```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                            StartClient
+                            wait
+                            AbortClient
+                            source <-- Here
+```
+
+#### SessionExit (xfree86-3.3/programs/xdm/sessions.c:444)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                            StartClient
+                            wait
+                            AbortClient
+                            source
+                            SessionExit <-- Here
 ```
 
 #### AnyWellKnownSockets (xfree86-3.3/programs/xdm/xdmcp.c:122)
