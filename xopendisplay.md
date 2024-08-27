@@ -243,10 +243,9 @@ XOpenDisplay
 412-413: Calls setsockopt.
 ```
 
-#### socket ()
+#### socket (libc-5.4.33/sysdeps/linux/socket.c:21)
 
-```txt
-Control Flow:
+```txt Control Flow:
 XOpenDisplay
     _XSendClientPrefix
     _X11TransConnectDisplay
@@ -260,6 +259,8 @@ XOpenDisplay
             _X11TransSocketOpenCOTSServer
                 _X11TransSocketOpen
                     socket <-- Here
+
+28: return socketcall(SYS_SOCKET, args);
 ```
 
 #### setsockopt (libc-5.4.33/sysdeps/linux/setsockopt.c:23)
@@ -322,9 +323,23 @@ XOpenDisplay
 ```
 
 
-#### connect ()
+#### connect (libc-5.4.33/sysdeps/linux/conenct.c:22)
 
 ```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+        _X11TransConnect
+            _X11TransSocketUNIXConnect
+                connect <-- Here
+
+29: return socketcall(SYS_CONNECT, args);
 ```
 
 #### \_X11TransGetPeerAddr (xfree86-3.3/lib/xtrans/Xtrans.c:1016)
@@ -362,7 +377,7 @@ XOpenDisplay
 192: Calls _X11TransGetHostname
 ```
 
-#### \_X11TransGetHostname (xfree86-3.3/xtrans/Xtrans.c:1431)
+#### \_X11TransGetHostname (xfree86-3.3/lib/xtrans/Xtrans.c:1431)
 
 ```txt
 Control Flow:
@@ -382,7 +397,7 @@ XOpenDisplay
 1449: Calls gethostname.
 ```
 
-#### gethostname ()
+#### gethostname (libc-5.4.33/sysdeps/linux/\_\_gethstnm.c:28)
 
 ```txt
 Control Flow:
@@ -399,6 +414,75 @@ XOpenDisplay
         _X11TransConvertAddress
             _X11TransGetHostname
                 gethostname <-- Here
+
+28: weak_alias (__gethostname, gethostname);
+```
+
+#### \_\_gethostname (libc-5.4.33/sysdeps/linux/\_\_gethstnm.c:7)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+        _X11TransConnect
+        _X11TransGetPeerAddr
+        _X11TransConvertAddress
+            _X11TransGetHostname
+                gethostname
+                    __gethostname <-- Here
+
+16: Calls __uname.
+```
+
+#### \_\_uname (libc-5.4.33/sysdeps/linux/\_\_uname.S:21)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+        _X11TransConnect
+        _X11TransGetPeerAddr
+        _X11TransConvertAddress
+            _X11TransGetHostname
+                gethostname
+                    __gethostname
+                        __uname <-- Here
+
+21: SYSCALL__ (uname, 1)
+```
+
+#### sys\_uname (linux/kernel/sys.c:737)
+
+```txt
+Control Flow:
+XOpenDisplay
+    _XSendClientPrefix
+    _X11TransConnectDisplay
+    _XAllocID
+    _XAllocIDS
+    Xcalloc
+    _X11TransConnectDisplay
+        _X11TransOpen
+        _X11TransConnect
+        _X11TransGetPeerAddr
+        _X11TransConvertAddress
+            _X11TransGetHostname
+                gethostname
+                    __gethostname
+                        __uname
+                            sys_uname <-- Here
 ```
 
 #### \_X11TransSetOption (xfree86-3.3/lib/xtrans/Xtrans.c:688)
@@ -563,7 +647,7 @@ XOpenDisplay
     _XInitDisplayLock <-- Here
 ```
 
-#### \_XPollfdCacheInit (xfree86-3.3/lib/X11/Xlibint.c:353)
+#### \_XPollfdCacheInit (xfree86-3.3/lib/X11/XlibInt.c:353)
 
 ```txt
 Control Flow:

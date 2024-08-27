@@ -2019,7 +2019,7 @@ main
 562: Calls StartDisplay.
 ```
 
-#### StartDisplay (xfree86-3.3/programs/xdm/dm.c:569)
+#### StartDisplay (xfree86-3.3/programs/xdm/dm.c:575)
 
 ```txt
 Control Flow:
@@ -2310,7 +2310,7 @@ main
 365: Calls fcntl.
 ```
 
-#### Signal ()
+#### Signal (xfree86-3.3/util/patch/common.h:22)
 
 ```txt
 Control Flow:
@@ -2342,6 +2342,126 @@ main
                         LoadSessionResources
                         WaitForServer
                             Signal <-- Here
+
+22: #define Signal (void)signal
+```
+
+#### signal (libc-5.4.33/sysdeps/linux/signal.c:4)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                            Signal
+                                signal <-- Here
+
+12: Calls __sigaction.
+```
+
+#### \_\_sigaction (libc-5.4.33/sysdeps/linux/i386/\_\_sigact.c:46)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                            Signal
+                                signal
+                                    __sigaction <-- Here
+```
+```c
+	__asm__ volatile ("pushl %%ebx\n\t"
+			  "movl %%edi,%%ebx\n\t"
+			  "int $0x80\n\t"
+			  "popl %%ebx"
+		:"=a" (sig)
+		:"0" (SYS_sigaction),"D" (sig),"c" (new),"d" (old));
+```
+
+#### sys\_sigaction (linux/kernel/signal.c:150)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                            Signal
+                                signal
+                                    __sigaction
+                                        sigaction <-- Here
 ```
 
 #### alarm (libc-5.4.33/sysdeps/linux/alarm.S:21)
@@ -2878,6 +2998,264 @@ main
                         LoadSessionResources
                         WaitForServer
                         ManageSession <-- Here?
+
+256: Calls XSetIOErrorHandler.
+
+257: Calls XSetErrorHandler.
+
+258: Calls SetTitle.
+
+262: Calls LoadXloginResources.
+
+283: Calls GreetUser.
+
+288: Calls Setjmp.
+
+289: Calls Signal.
+
+294: Calls StartClient.
+
+302: Calls Setjmp.
+
+304: Calls Signal.
+
+305: Calls alarm.
+
+306: Calls wait.
+
+331: Calls AbortClient.
+
+339: Calls SessionExit.
+```
+
+#### XSetErrorHandler (xfree86-3.3/lib/X11/ErrHndlr.c:40)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler <-- Here
+```
+
+#### SetTitle (xfree86-3.3/programs/xdm/dm.c:822)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle <-- Here
+```
+
+#### LoadXloginResources (xfree86-3.3/programs/xdm/sessions.c:342)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources <-- Here 
+```
+
+#### GreetUser (xfree86-3.3/programs/xdm/greeter/greet.c:279)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser <-- Here
+```
+
+#### StartClient (xfree86-3.3/programs/xdm/session.c:487)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                            StartClient <-- Here
+```
+
+#### AbortClient (xfree86-3.3/programs/xdm/sessions.c:173)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                            StartClient
+                            AbortClient <-- Here
+```
+
+#### SessionExit ()
+
+```txt
 ```
 
 #### AnyWellKnownSockets (xfree86-3.3/programs/xdm/xdmcp.c:122)
