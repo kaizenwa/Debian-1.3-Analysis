@@ -1962,7 +1962,7 @@ main
 571: Calls ForEachDisplay with CheckDisplayStatus as the argument.
 ```
 
-#### ForEachDisplay (xfree86-3.3/programs/xdm/dm.c:48)
+#### ForEachDisplay (xfree86-3.3/programs/xdm/dpylist.c:48)
 
 ```txt
 Control Flow:
@@ -2153,6 +2153,138 @@ main
                         LoadServerResources
                         SetLocalAuthorization
                         StartServer <-- Here
+
+144: Calls StartServerOnce.
+```
+
+#### StartServerOnce (xfree86-3.3/programs/xdm/server.c:83)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                            StartServerOnce <-- Here
+
+94: Calls Signal with SIGUSR1 and CatchUsr1 as arguments.
+
+96: Calls fork.
+
+98: Child calls CleanUpChild.
+
+116: Child calls Signal with SIGUSR1 and SIG_IGN as arguments.
+
+117: Child calls execv.
+
+130: Parent calls serverPause.
+```
+
+#### CatchUsr1 (xfree86-3.3/programs/xdm/server.c:66)
+
+```txt
+Note: I included this for context.
+
+73: Increments receivedUsr1.
+```
+
+#### CleanUpChild (xfree86-3.3/programs/xdm/util.c:220)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                            StartServerOnce
+                                CleanUpChild <-- Here (Child)
+
+230: Calls setpgrp.
+
+238: Calls sigsetmask.
+
+243: Calls Signal with SIGCHLD and SIG_DFL as arguments.
+
+245-248: Calls Signal to set SIG_DFL as the handler for
+         SIGTERM, SIGPIPE, SIGALRM, and SIGHUP.
+
+249: Calls CloseOnFork.
+```
+
+#### CloseOnFork (xfree86-3.3/programs/xdm/dm.c:716)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                            StartServerOnce
+                                CleanUpChild
+                                    CloseONFork <-- Here (Child)
 ```
 
 #### LoadSessionResources (xfree86-3.3/programs/xdm/resource.c:532)
@@ -3175,9 +3307,12 @@ main
                             LoadXloginResources
                             GreetUser <-- Here
 
+Note: dlfuncs are defined on lines 98-126 of
+      xfree86-3.3/programs/xdm/session.c.
+
 321: Calls InitGreet.
 
-...
+327: Calls SetupDisplay.
 ```
 
 ### InitGreet (xfree86-3.3/programs/xdm/greeter/greet.c:153)
