@@ -3313,6 +3313,18 @@ Note: dlfuncs are defined on lines 98-126 of
 321: Calls InitGreet.
 
 327: Calls SetupDisplay.
+
+336: Calls Greet.
+
+345: Calls Verify.
+
+350: Calls DeleteXloginResources.
+
+351: Calls CloseGreet.
+
+675: Calls source.
+
+360: Calls SessionExit.
 ```
 
 ### InitGreet (xfree86-3.3/programs/xdm/greeter/greet.c:153)
@@ -3356,6 +3368,864 @@ main
 165: Calls XtToolkitInitialize.
 
 ...
+```
+
+#### XtToolkitInitialize (xfree86-3.3/lib/Xt/Initialize.c:203)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                    XtToolkitInitialize <-- Here
+
+205: Calls _XtResourceListInitialize.
+
+216: Calls XrmInitialize.
+
+217: Calls _XtResourceListInitialize.
+
+220: Calls _XtConvertInitialize.
+
+221: Calls _XtEventInitialize.
+
+222: Calls _XtTranslateInitialize.
+```
+
+#### \_XtResourceListInitialize (xfree86-3.3/lib/Xt/Resources.c:1218)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                    XtToolkitInitialize
+                                        _XtResourceListInitialize <-- Here
+```
+
+#### XrmInitialize (xfree86-3.3/lib/X11/Xrm.c:324)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                    XtToolkitInitialize
+                                        _XtResourceListInitialize
+                                        XrmInitialize <-- Here
+```
+
+#### \_XtResourceListInitialize (xfree86-3.3/lib/Xt/Resources.c:1218)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                    XtToolkitInitialize
+                                        _XtResourceListInitialize
+                                        XrmInitialize
+                                        _XtResourceListInitialize <-- Here
+```
+
+#### \_XtConvertInitialize (xfree86-3.3/lib/Xt/Converters.c:127)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                    XtToolkitInitialize
+                                        _XtResourceListInitialize
+                                        XrmInitialize
+                                        _XtResourceListInitialize
+                                        _XtConvertInitialize <-- Here
+```
+
+#### \_XtEventInitialize (xfree86-3.3/lib/Xt/Event.c:1168)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                    XtToolkitInitialize
+                                        _XtResourceListInitialize
+                                        XrmInitialize
+                                        _XtResourceListInitialize
+                                        _XtConvertInitialize
+                                        _XtEventInitialize <-- Here
+```
+
+#### \_XtTranslateInitialize (xfree86-3.3/lib/Xt/TMparse.c:2035)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                    XtToolkitInitialize
+                                        _XtResourceListInitialize
+                                        XrmInitialize
+                                        _XtResourceListInitialize
+                                        _XtConvertInitialize
+                                        _XtEventInitialize
+                                        _XtTranslateInitialize <-- Here
+```
+
+#### SetupDisplay (xfree86-3.3/programs/xdm/session.c:359)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                SetupDisplay <-- Here
+```
+
+#### Greet (xfree86-3.3/programs/xdm/greeter/greet.c:237)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                SetupDisplay
+                                Greet <-- Here
+```
+
+#### Verify (xfree86-3.3/programs/xdm/greeter/verify.c:108)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                SetupDisplay
+                                Greet
+                                Verify <-- Here
+
+126: Calls getpwnam.
+
+136: Calls getspnam.
+
+142: Calls endspent.
+
+147: Calls crypt.
+
+...
+```
+
+#### getspnam (shadow-961025/lib/shadow.c:506)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                SetupDisplay
+                                Greet
+                                Verify
+                                    getspnam <-- Here
+```
+
+#### endspent (shadow-961025/lib/shadow.c:153)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                SetupDisplay
+                                Greet
+                                Verify
+                                    getspnam
+                                    endspent <-- Here
+```
+
+#### DeleteXloginResources (xfree86-3.3/programs/xdm/session.c:373)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                SetupDisplay
+                                Greet
+                                Verify
+                                DeleteXloginResources <-- Here
+```
+
+#### CloseGreet (xfree86-3.3/programs/xdm/greeter/greet.c:210)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                SetupDisplay
+                                Greet
+                                Verify
+                                DeleteXloginResources
+                                CloseGreet <-- Here
+```
+
+#### source (xfree86-3.3/programs/xdm/session.c:675)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                SetupDisplay
+                                Greet
+                                Verify
+                                DeleteXloginResources
+                                CloseGreet
+                                source <-- Here
+
+685: Calls parseArgs.
+
+692: Calls runAndWait.
+
+693: Calls freeArgs.
+```
+
+#### parseArgs ()
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                SetupDisplay
+                                Greet
+                                Verify
+                                DeleteXloginResources
+                                CloseGreet
+                                source
+                                    parseArgs <-- Here
+```
+
+#### runAndWait (xfree86-3.3/programs/xdm/session.c:700)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                SetupDisplay
+                                Greet
+                                Verify
+                                DeleteXloginResources
+                                CloseGreet
+                                source
+                                    parseArgs
+                                    runAndWait <-- Here
+```
+
+#### freeArgs (xfree86-3.3/programs/xdm/util.c:207)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                SetupDisplay
+                                Greet
+                                Verify
+                                DeleteXloginResources
+                                CloseGreet
+                                source
+                                    parseArgs
+                                    runAndWait
+                                    freeArgs <-- Here
+```
+
+#### SessionExit (xfree86-3.3/programs/xdm/session.c:444)
+
+```txt
+Control Flow:
+main
+    umask
+    InitResources
+        XrmInitialize
+        ReinitResources
+        SetConfigFileTime
+        LoadDMResources
+        getuid
+        BecomeOrphan
+        BecomeDaemon
+        StorePid
+        InitErrorLog
+        system
+        init_session_id
+        CreateWellKnownSockets
+        SetAccessFileTime
+        ScanAccessDatabase
+        ScanServers
+        StartDisplays
+            ForEachDisplay
+                CheckDisplayStatus
+                    StartDisplay
+                        LoadServerResources
+                        SetLocalAuthorization
+                        StartServer
+                        LoadSessionResources
+                        WaitForServer
+                        ManageSession
+                            XSetErrorHandler
+                            SetTitle
+                            LoadXloginResources
+                            GreetUser
+                                InitGreet
+                                SetupDisplay
+                                Greet
+                                Verify
+                                DeleteXloginResources
+                                CloseGreet
+                                source
+                                SessionExit <-- Here
 ```
 
 #### XToolkitInitialize (xfree86-3.3/lib/Xt/Initialize.c:203)
@@ -3759,6 +4629,8 @@ main
         ScanServers
         StartDisplays
         AnyWellKnownSockets <-- Here
+
+124: return xdmcpFd != -1 || chooserFd != -1;
 ```
 
 #### AnyDisplaysLeft (xfree86-3.3/programs/xdm/dpylist.c:43)
