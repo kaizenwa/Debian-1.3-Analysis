@@ -85,75 +85,218 @@ main <-- Here
 296: Calls XtAppMainLoop.
 ```
 
-#### register\_signals ()
+#### register\_signals (xfree86-3.3/programs/xsm/signals.c:181)
+
+```txt
+Control Flow:
+main
+    register_signals <-- Here
+```
+
+#### InstallIOErrorHandler (xfree86-3.3/programs/xsm/xsm.c:1375)
+
+```txt
+Control Flow:
+main
+    register_signals
+    InstallIOErrorHandler <-- Here
+```
+
+#### SmsInitialize (xfree86-3.3/lib/SM/sm\_manager.c:41)
+
+```txt
+Control Flow:
+main
+    register_signals
+    InstallIOErrorHandler
+    SmsInitialize <-- Here
+```
+
+#### IceListenForConnections (xfree86-3.3/lib/ICE/listen.c:38)
+
+```txt
+Control Flow:
+main
+    register_signals
+    InstallIOErrorHandler
+    SmsInitialize
+    IceListenForConnections <-- Here
+```
+
+#### SetAuthentication (xfree96-3.3/programs/xsm/auth.c:146)
+
+```txt
+Control Flow:
+main
+    ...
+    InstallIOErrorHandler
+    SmsInitialize
+    IceListenForConnections
+    SetAuthentication <-- Here
+```
+
+#### InitWatchProcs (xfree86-3.3/programs/proxymngr/main.c:981)
+
+```txt
+Control Flow:
+main
+    ...
+    SmsInitialize
+    IceListenForConnections
+    SetAuthentication
+    InitWatchProcs <-- Here
+```
+
+#### IceGetListenConnectionNumber (xfree86-3.3/lib/ICE/listen.c:160)
+
+```txt
+Control Flow:
+main
+    ...
+    IceListenForConnections
+    SetAuthentication
+    InitWatchProcs
+    IceGetListenConnectionNumber <-- Here
+
+165: return (_IceTransGetConnectionNumber (listenObj->trans_conn));
+```
+
+#### \_IceTransGetConnectionNumber ()
 
 ```txt
 ```
-#### InstallIOErrorHandler ()
+
+#### IceComposeNetworkIdListen (xfree86-3.3/lib/ICE/listen.c:189)
 
 ```txt
+Control Flow:
+main
+    ...
+    SetAuthentication
+    InitWatchProcs
+    IceGetListenConnectionNumber
+    IceComposeNetworkIdListen <-- Here
 ```
-#### SmsInitialize ()
+
+####create\_choose\_session\_popup (xfree86-3.3/programs/xsm/choose.c:740)
 
 ```txt
+Control Flow:
+main
+    ...
+    InitWatchProcs
+    IceGetListenConnectionNumber
+    IceComposeNetworkIdListen
+    create_choose_session_popup <-- Here
 ```
-#### SmsInitialize ()
+
+#### create\_main\_window (xfree86-3.3/programs/xsm/mainwin.c:66)
 
 ```txt
+Control Flow:
+main
+    ...
+    IceGetListenConnectionNumber
+    IceComposeNetworkIdListen
+    create_choose_session_popup
+    create_main_window <-- Here
 ```
-#### IceListenForConnections ()
+
+#### create\_client\_info\_popup (xfree86-3.3/programs/xsm/info.c:826)
 
 ```txt
+Control Flow:
+main
+    ...
+    IceComposeNetworkIdListen
+    create_choose_session_popup
+    create_main_window
+    create_client_info_popup <-- Here
 ```
-#### SetAuthentication ()
+
+#### create\_save\_popup (xfree86-3.3/programs/xsm/save.c:942)
 
 ```txt
+Control Flow:
+main
+    ...
+    create_choose_session_popup
+    create_main_window
+    create_client_info_popup
+    create_save_popup <-- Here
 ```
-#### InitWatchProcs ()
+
+#### create\_log\_popup (xfree86-3.3/programs/xsm/log.c:122)
 
 ```txt
+Control Flow:
+main
+    ...
+    create_main_window
+    create_client_info_popup
+    create_save_popup
+    create_log_popup <-- Here
 ```
-#### IceGetListenConnectionNumber ()
+
+#### ListInit (xfree86-3.3/programs/xsm/list.c:31)
 
 ```txt
+Control Flow:
+main
+    ...
+    create_client_info_popup
+    create_save_popup
+    create_log_popup
+    ListInit <-- Here
 ```
-#### IceComposeNetworkIdListen ()
+
+#### GetSessionNames (xfree86-3.3/programs/xsm/choose.c:75)
 
 ```txt
+Control Flow:
+main
+    ...
+    create_save_popup
+    create_log_popup
+    ListInit
+    GetSessionNames <-- Here
 ```
-####create\_choose\_session\_popup ()
+
+#### StartSession (xfree86-3.3/programs/xsm/xsm.c:453)
 
 ```txt
+Control Flow:
+main
+    ...
+    create_log_popup
+    ListInit
+    GetSessionNames
+    StartSession <-- Here
 ```
-#### create\_main\_window ()
+
+#### ChooseSession (xfree86-3.3/programs/xsm/choose.c:288)
 
 ```txt
+Control Flow:
+main
+    ...
+    ListInit
+    GetSessionNames
+    ChooseSession <-- Here
+
+299: Calls AddSessionNames.
+
+...
 ```
-#### create\_client\_info\_popup ()
+
+#### AddSessionNames (xfree86-3.3/programs/xsm/choose.c:234)
 
 ```txt
-```
-#### create\_save\_popup ()
-
-```txt
-```
-#### create\_log\_popup ()
-
-```txt
-```
-#### ListInit ()
-
-```txt
-```
-#### GetSessionNames ()
-
-```txt
-```
-#### StartSession ()
-
-```txt
-```
-#### ChooseSession ()
-
-```txt
+Control Flow:
+main
+    ...
+    ListInit
+    GetSessionNames
+    ChooseSession
+        AddSessionNames <-- Here
 ```
