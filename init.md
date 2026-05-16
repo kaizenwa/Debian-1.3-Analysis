@@ -892,6 +892,239 @@ start_kernel
         netlink_attach
         fwchain_init
         proto_init <-- Here
+
+1386: Assigns global protocols structure protocols to
+      local variable pro.
+
+      NOTE: protocols is defined on line 49 of
+            linux/net/protocols.c.
+
+1387-1391: Calls the init_func for every protocol
+           defined in the global variable protocols
+           structure.
+```
+
+#### inet\_proto\_init (linux/net/ipv4/af\_inet.c:1086)
+
+```txt
+Control Flow:
+start_kernel
+    setup_arch
+    paging_init
+    trap_init
+    init_IRQ
+    sched_init
+    time_init
+    parse_options
+    init_modules
+    console_init
+    pci_init
+    kmalloc_init
+    sti
+    calibrate_delay
+    inode_init
+    file_table_init
+    name_cache_init
+    mem_init
+    buffer_init
+    sock_init
+        init_netlink
+        netlink_attach
+        fwchain_init
+        proto_init
+            ...
+            inet_proto_init <-- Here
+
+1090: Calls printk on "Swansea University Computer Society TCP/IP
+      for NET3.034\n".
+
+1096: Calls sock_register with &inet_proto_ops as the second argument.
+
+1105-1111: Calls inet_add_protocol on each protocol contained in the
+           inet_protocol_base list.
+
+1116: Calls arp_init.
+
+1120: Calls ip_inet.
+
+1124: calls icmp_init.
+
+...
+```
+
+#### sock\_register (linux/net/socket.c:1336)
+
+```txt
+Control Flow:
+start_kernel
+    setup_arch
+    paging_init
+    trap_init
+    init_IRQ
+    sched_init
+    time_init
+    parse_options
+    init_modules
+    console_init
+    pci_init
+    kmalloc_init
+    sti
+    calibrate_delay
+    inode_init
+    file_table_init
+    name_cache_init
+    mem_init
+    buffer_init
+    sock_init
+        init_netlink
+        netlink_attach
+        fwchain_init
+        proto_init
+            ...
+            inet_proto_init
+                sock_register <-- Here
+```
+
+#### inet\_add\_protocol (linux/net/ipv4/protocol.c:150)
+
+```txt
+Control Flow:
+start_kernel
+    setup_arch
+    paging_init
+    trap_init
+    init_IRQ
+    sched_init
+    time_init
+    parse_options
+    init_modules
+    console_init
+    pci_init
+    kmalloc_init
+    sti
+    calibrate_delay
+    inode_init
+    file_table_init
+    name_cache_init
+    mem_init
+    buffer_init
+    sock_init
+        init_netlink
+        netlink_attach
+        fwchain_init
+        proto_init
+            ...
+            inet_proto_init
+                sock_register
+                inet_add_protocol <-- Here
+```
+
+#### arp\_init (linux/net/ipv4/arp.c:2445)
+
+```txt
+Control Flow:
+start_kernel
+    setup_arch
+    paging_init
+    trap_init
+    init_IRQ
+    sched_init
+    time_init
+    parse_options
+    init_modules
+    console_init
+    pci_init
+    kmalloc_init
+    sti
+    calibrate_delay
+    inode_init
+    file_table_init
+    name_cache_init
+    mem_init
+    buffer_init
+    sock_init
+        init_netlink
+        netlink_attach
+        fwchain_init
+        proto_init
+            ...
+            inet_proto_init
+                sock_register
+                inet_add_protocol
+                arp_init <-- Here
+```
+
+#### ip\_inet (linux/net/ipv4/ip\_output.c:1093)
+
+```txt
+Control Flow:
+start_kernel
+    setup_arch
+    paging_init
+    trap_init
+    init_IRQ
+    sched_init
+    time_init
+    parse_options
+    init_modules
+    console_init
+    pci_init
+    kmalloc_init
+    sti
+    calibrate_delay
+    inode_init
+    file_table_init
+    name_cache_init
+    mem_init
+    buffer_init
+    sock_init
+        init_netlink
+        netlink_attach
+        fwchain_init
+        proto_init
+            ...
+            inet_proto_init
+                sock_register
+                inet_add_protocol
+                arp_init
+                ip_inet <-- Here
+```
+
+#### icmp\_init (linux/net/ipv4/icmp.c:1179)
+
+```txt
+Control Flow:
+start_kernel
+    setup_arch
+    paging_init
+    trap_init
+    init_IRQ
+    sched_init
+    time_init
+    parse_options
+    init_modules
+    console_init
+    pci_init
+    kmalloc_init
+    sti
+    calibrate_delay
+    inode_init
+    file_table_init
+    name_cache_init
+    mem_init
+    buffer_init
+    sock_init
+        init_netlink
+        netlink_attach
+        fwchain_init
+        proto_init
+            ...
+            inet_proto_init
+                sock_register
+                inet_add_protocol
+                arp_init
+                ip_inet
+                icmp_init <-- Here
 ```
 
 #### export\_net\_symbols (linux/net/netsyms.c:190)
